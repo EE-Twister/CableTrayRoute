@@ -92,7 +92,6 @@ export function projectLoadRows(loads = []) {
   return (Array.isArray(loads) ? loads : [])
     .filter(hasRecordValue)
     .map((load, index) => {
-      const quantity = Math.max(1, finite(load.quantity, 1));
       let kw = finite(load.kw, Number.NaN);
       if (!Number.isFinite(kw)) kw = finite(load.power, Number.NaN);
       if (!Number.isFinite(kw)) kw = finite(load.watts, 0) / 1000;
@@ -112,7 +111,7 @@ export function projectLoadRows(loads = []) {
         id: text(load.id || load.ref || load.tag, `load-${index + 1}`),
         equipmentId: text(load.equipmentId || load.equipmentRef || load.source),
         label,
-        kw: Number((kw * quantity).toFixed(3)),
+        kw: Number(kw.toFixed(3)),
         demandFactor,
         sourcePath: `loads.${text(load.id || load.ref || load.tag, index)}`
       };

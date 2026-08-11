@@ -44,6 +44,55 @@ export const DEFAULT_MCC_REPORT_TITLE_BLOCK = {
   reportDate: ''
 };
 
+export const DEFAULT_MCC_SYSTEM_REQUIREMENTS = {
+  phases: '',
+  wires: '',
+  frequencyHz: '',
+  groundingConfiguration: '',
+  neutralRequirement: '',
+  availableFaultCurrentKa: '',
+  faultCurrentMethod: '',
+  faultCurrentBasis: '',
+  serviceEntrance: '',
+  certifications: [],
+  otherCertification: '',
+  arcResistantRequirement: '',
+  arcResistantType: '',
+  seismicQualification: '',
+  codeBasis: '',
+  jurisdiction: '',
+  ahj: '',
+  notes: ''
+};
+
+export const DEFAULT_MCC_INSTALLATION_REQUIREMENTS = {
+  installationLocation: '',
+  equipmentCoordinates: '',
+  incomingCableSummary: '',
+  outgoingCableSummary: '',
+  incomingLugType: '',
+  cableEntryArea: '',
+  conduitEntryNotes: '',
+  accessRequirement: '',
+  frontWorkingClearanceIn: '',
+  rearWorkingClearanceIn: '',
+  shippingSplitRequirements: '',
+  maxShippingWidthIn: '',
+  maxShippingHeightIn: '',
+  maxShippingDepthIn: '',
+  buildingEntryRestrictions: '',
+  baseChannelRequired: '',
+  housekeepingPadHeightIn: '',
+  anchorageRequirements: '',
+  floorOpeningRequirements: '',
+  altitudeFt: '',
+  minAmbientTempC: '',
+  maxAmbientTempC: '',
+  environmentClassification: '',
+  hazardousAreaClassification: '',
+  environmentNotes: ''
+};
+
 export const MCC_BUCKET_TYPES = [
   'main',
   'starter',
@@ -88,6 +137,58 @@ export const MCC_STARTER_TYPE_CHOICES = [
   { value: 'reduced-voltage-autotransformer', label: 'Reduced Voltage Autotransformer' },
   { value: 'other', label: 'Other' }
 ];
+
+export const MCC_CONTROL_SCHEME_CHOICES = [
+  { value: '', label: '-' },
+  { value: 'start-stop', label: 'Start/Stop', types: ['starter', 'vfd'] },
+  { value: 'hoa', label: 'Hand-Off-Auto (HOA)', types: ['starter', 'vfd'] },
+  { value: 'joa', label: 'Jog-Off-Auto (JOA)', types: ['starter'] },
+  { value: 'local-remote', label: 'Local/Remote', types: ['starter', 'vfd'] },
+  { value: 'forward-off-reverse', label: 'Forward-Off-Reverse', types: ['starter'], starterTypes: ['fvr'] },
+  { value: 'forward-reverse-pushbuttons', label: 'Forward/Reverse Pushbuttons', types: ['starter'], starterTypes: ['fvr'] },
+  { value: 'forward-off-reverse-auto', label: 'Forward-Off-Reverse/Auto', types: ['starter'], starterTypes: ['fvr'] },
+  { value: 'high-off-low', label: 'High-Off-Low', types: ['starter'], starterTypes: ['two-speed'] },
+  { value: 'start-stop-speed-select', label: 'Start/Stop + Speed Select', types: ['starter'], starterTypes: ['two-speed'] },
+  { value: 'vfd-keypad', label: 'VFD Keypad Control', types: ['vfd'] },
+  { value: 'hoa-speed-pot', label: 'HOA + Speed Potentiometer', types: ['vfd'] },
+  { value: 'local-remote-speed', label: 'Local/Remote + Speed Reference', types: ['vfd'] },
+  { value: 'analog-speed-reference', label: 'Analog Speed Reference (4-20 mA)', types: ['vfd'] },
+  { value: 'network-speed-control', label: 'Network/PLC Speed Control', types: ['vfd'] },
+  { value: 'custom', label: 'Custom', types: ['starter', 'vfd'] }
+];
+
+const MCC_CONTROL_SCHEME_ALIASES = {
+  ss: 'start-stop',
+  'start/stop': 'start-stop',
+  hoa: 'hoa',
+  joa: 'joa',
+  'f-o-r': 'forward-off-reverse',
+  for: 'forward-off-reverse',
+  'forward/reverse': 'forward-reverse-pushbuttons',
+  'high/low': 'high-off-low'
+};
+
+function controlSchemeToken(value) {
+  const raw = text(value).toLowerCase();
+  if (MCC_CONTROL_SCHEME_ALIASES[raw]) return MCC_CONTROL_SCHEME_ALIASES[raw];
+  const normalized = raw.replace(/\s*\/\s*/g, '-').replace(/[\s_]+/g, '-');
+  return MCC_CONTROL_SCHEME_ALIASES[normalized] || normalized;
+}
+
+export function mccControlSchemeChoices({ type = '', starterType = '' } = {}) {
+  const normalizedType = text(type).toLowerCase().replace(/[\s_]+/g, '-');
+  const normalizedStarterType = text(starterType).toLowerCase().replace(/[\s_]+/g, '-');
+  return MCC_CONTROL_SCHEME_CHOICES.filter(option => {
+    if (!option.value) return true;
+    if (!option.types?.includes(normalizedType)) return false;
+    return !option.starterTypes || option.starterTypes.includes(normalizedStarterType);
+  });
+}
+
+export function normalizeMccControlScheme(value, context = {}) {
+  const normalized = controlSchemeToken(value);
+  return mccControlSchemeChoices(context).some(option => option.value === normalized) ? normalized : '';
+}
 
 export const MCC_BUCKET_STATUSES = [
   'active',
@@ -199,6 +300,13 @@ function positiveNumber(value, fallback, min = 0.01) {
 
 function nonNegativeNumber(value, fallback) {
   return Math.max(0, finiteNumber(value, fallback));
+}
+
+function optionalNumber(value, { min = null } = {}) {
+  if (value === '' || value === null || value === undefined) return '';
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) return '';
+  return min !== null ? Math.max(min, parsed) : parsed;
 }
 
 function booleanValue(value, fallback = false) {
@@ -414,6 +522,61 @@ export function normalizeMccReportTitleBlock(report = {}) {
   };
 }
 
+export function normalizeMccSystemRequirements(system = {}) {
+  const source = system && typeof system === 'object' ? system : {};
+  return {
+    phases: text(source.phases),
+    wires: text(source.wires),
+    frequencyHz: optionalNumber(source.frequencyHz, { min: 0 }),
+    groundingConfiguration: text(source.groundingConfiguration),
+    neutralRequirement: text(source.neutralRequirement),
+    availableFaultCurrentKa: optionalNumber(source.availableFaultCurrentKa, { min: 0 }),
+    faultCurrentMethod: text(source.faultCurrentMethod),
+    faultCurrentBasis: text(source.faultCurrentBasis),
+    serviceEntrance: choiceValue(source.serviceEntrance, ['yes', 'no'], ''),
+    certifications: normalizeMultiChoice(source.certifications, ['ul-845', 'nema-ics-18', 'cul-csa', 'other']),
+    otherCertification: text(source.otherCertification),
+    arcResistantRequirement: choiceValue(source.arcResistantRequirement, ['required', 'not-required'], ''),
+    arcResistantType: text(source.arcResistantType),
+    seismicQualification: text(source.seismicQualification),
+    codeBasis: text(source.codeBasis),
+    jurisdiction: text(source.jurisdiction),
+    ahj: text(source.ahj),
+    notes: text(source.notes)
+  };
+}
+
+export function normalizeMccInstallationRequirements(installation = {}) {
+  const source = installation && typeof installation === 'object' ? installation : {};
+  return {
+    installationLocation: text(source.installationLocation),
+    equipmentCoordinates: text(source.equipmentCoordinates),
+    incomingCableSummary: text(source.incomingCableSummary),
+    outgoingCableSummary: text(source.outgoingCableSummary),
+    incomingLugType: text(source.incomingLugType),
+    cableEntryArea: choiceValue(source.cableEntryArea, ['top', 'bottom', 'top-and-bottom', 'other'], ''),
+    conduitEntryNotes: text(source.conduitEntryNotes),
+    accessRequirement: choiceValue(source.accessRequirement, ['front-only', 'front-and-rear', 'rear-required'], ''),
+    frontWorkingClearanceIn: optionalNumber(source.frontWorkingClearanceIn, { min: 0 }),
+    rearWorkingClearanceIn: optionalNumber(source.rearWorkingClearanceIn, { min: 0 }),
+    shippingSplitRequirements: text(source.shippingSplitRequirements),
+    maxShippingWidthIn: optionalNumber(source.maxShippingWidthIn, { min: 0 }),
+    maxShippingHeightIn: optionalNumber(source.maxShippingHeightIn, { min: 0 }),
+    maxShippingDepthIn: optionalNumber(source.maxShippingDepthIn, { min: 0 }),
+    buildingEntryRestrictions: text(source.buildingEntryRestrictions),
+    baseChannelRequired: choiceValue(source.baseChannelRequired, ['yes', 'no'], ''),
+    housekeepingPadHeightIn: optionalNumber(source.housekeepingPadHeightIn, { min: 0 }),
+    anchorageRequirements: text(source.anchorageRequirements),
+    floorOpeningRequirements: text(source.floorOpeningRequirements),
+    altitudeFt: optionalNumber(source.altitudeFt, { min: 0 }),
+    minAmbientTempC: optionalNumber(source.minAmbientTempC),
+    maxAmbientTempC: optionalNumber(source.maxAmbientTempC),
+    environmentClassification: text(source.environmentClassification),
+    hazardousAreaClassification: text(source.hazardousAreaClassification),
+    environmentNotes: text(source.environmentNotes)
+  };
+}
+
 export function mccSpecSummary(spec = {}) {
   const normalized = normalizeMccSpecRequirements(spec);
   const protocol = normalized.communicationProtocol === 'none' ? 'no comms' : normalized.communicationProtocol;
@@ -462,6 +625,8 @@ export function createDefaultMccLineup(index = 0) {
     sectionDepthIn: DEFAULT_MCC_SECTION_DEPTH_IN,
     arrangement: 'MCC Room',
     specRequirements: DEFAULT_MCC_SPEC_REQUIREMENTS,
+    systemRequirements: DEFAULT_MCC_SYSTEM_REQUIREMENTS,
+    installationRequirements: DEFAULT_MCC_INSTALLATION_REQUIREMENTS,
     sections: [
       {
         id: createMccUniqueId('mcc-sec'),
@@ -502,6 +667,7 @@ export function normalizeBucket(bucket = {}, unitHeightIn = DEFAULT_MCC_UNIT_HEI
   const status = MCC_BUCKET_STATUSES.includes(bucket.status) ? bucket.status : (type === 'space' ? 'space' : (type === 'spare' ? 'spare' : 'active'));
   const equipmentTag = text(bucket.equipmentTag, bucket.loadTag || '');
   const starterType = text(bucket.starterType).toLowerCase().replace(/[\s_]+/g, '-');
+  const normalizedStarterType = MCC_STARTER_TYPES.includes(starterType) ? starterType : '';
   const motorSpaceHeaterRequired = booleanValue(bucket.motorSpaceHeaterRequired, false);
 
   return {
@@ -521,7 +687,8 @@ export function normalizeBucket(bucket = {}, unitHeightIn = DEFAULT_MCC_UNIT_HEI
     hp: text(bucket.hp),
     breakerA: text(bucket.breakerA),
     breakerFrameA: text(bucket.breakerFrameA),
-    starterType: MCC_STARTER_TYPES.includes(starterType) ? starterType : '',
+    starterType: normalizedStarterType,
+    controlScheme: normalizeMccControlScheme(bucket.controlScheme, { type, starterType: normalizedStarterType }),
     starterSize: text(bucket.starterSize),
     starterSizeEstimated: booleanValue(bucket.starterSizeEstimated, false),
     starterSizeBasis: text(bucket.starterSizeBasis),
@@ -534,11 +701,12 @@ export function normalizeBucket(bucket = {}, unitHeightIn = DEFAULT_MCC_UNIT_HEI
     sourceLoadTag: text(bucket.sourceLoadTag),
     sourceCircuit: text(bucket.sourceCircuit),
     sourceLoadType: text(bucket.sourceLoadType),
+    sourceMccUnitType: text(bucket.sourceMccUnitType),
+    sourceControlScheme: text(bucket.sourceControlScheme),
     sourceKw: text(bucket.sourceKw),
     sourceHp: text(bucket.sourceHp),
     sourceVoltage: text(bucket.sourceVoltage),
     sourcePhases: text(bucket.sourcePhases),
-    sourceQuantity: text(bucket.sourceQuantity),
     loadListSourceValues: bucket.loadListSourceValues && typeof bucket.loadListSourceValues === 'object'
       ? { ...bucket.loadListSourceValues }
       : {}
@@ -582,6 +750,8 @@ export function normalizeMccLineup(lineup = {}, index = 0) {
   const hasEquipmentTag = Object.prototype.hasOwnProperty.call(lineup, 'equipmentTag');
   const specRequirements = normalizeMccSpecRequirements(lineup.specRequirements || lineup.specificationRequirements || lineup.specification || {});
   const reportTitleBlock = normalizeMccReportTitleBlock(lineup.reportTitleBlock || lineup.titleBlock || {});
+  const systemRequirements = normalizeMccSystemRequirements(lineup.systemRequirements || lineup.systemRatingBasis || {});
+  const installationRequirements = normalizeMccInstallationRequirements(lineup.installationRequirements || lineup.installationInterfaces || {});
   const sections = Array.isArray(lineup.sections)
     ? lineup.sections.map((section, sectionIndex) => normalizeSection(section, unitHeightIn, sectionIndex))
     : [];
@@ -603,7 +773,21 @@ export function normalizeMccLineup(lineup = {}, index = 0) {
     sectionDepthIn: positiveNumber(lineup.sectionDepthIn, DEFAULT_MCC_SECTION_DEPTH_IN, 6),
     arrangement: text(lineup.arrangement, ''),
     specRequirements,
+    systemRequirements,
+    installationRequirements,
     reportTitleBlock,
+    projectDataOverrides: Array.isArray(lineup.projectDataOverrides)
+      ? [...new Set(lineup.projectDataOverrides.map(text).filter(Boolean))]
+      : [],
+    projectDataLinkedFields: Array.isArray(lineup.projectDataLinkedFields)
+      ? [...new Set(lineup.projectDataLinkedFields.map(text).filter(Boolean))]
+      : [],
+    projectDataSources: lineup.projectDataSources && typeof lineup.projectDataSources === 'object' && !Array.isArray(lineup.projectDataSources)
+      ? Object.fromEntries(Object.entries(lineup.projectDataSources).map(([path, binding]) => [path, {
+        sourcePath: text(binding?.sourcePath),
+        sourceLabel: text(binding?.sourceLabel)
+      }]))
+      : {},
     sections
   };
 }
@@ -637,12 +821,44 @@ export function mccLineupDimensions(lineup) {
 export function validateMccLineup(lineup) {
   const normalized = normalizeMccLineup(lineup);
   const messages = [];
+  const system = normalized.systemRequirements;
+  const installation = normalized.installationRequirements;
   if (!normalized.tag) {
     messages.push({ severity: 'error', message: 'Lineup tag is required.' });
   }
   if (!normalized.sections.length) {
     messages.push({ severity: 'error', message: 'Add at least one MCC section.' });
   }
+  if (!system.phases) messages.push({ severity: 'warning', message: 'System phase count is not specified.' });
+  if (!system.wires) messages.push({ severity: 'warning', message: 'System wire count is not specified.' });
+  if (!system.frequencyHz) messages.push({ severity: 'warning', message: 'System frequency is not specified.' });
+  if (!system.groundingConfiguration) messages.push({ severity: 'warning', message: 'System grounding configuration is not specified.' });
+  if (!system.availableFaultCurrentKa) messages.push({ severity: 'warning', message: 'Available fault current at the MCC bus is not specified.' });
+  if (!normalized.specRequirements.shortCircuitRatingKa) messages.push({ severity: 'warning', message: 'Required MCC short-circuit rating is not specified.' });
+  if (system.availableFaultCurrentKa && normalized.specRequirements.shortCircuitRatingKa
+    && system.availableFaultCurrentKa > normalized.specRequirements.shortCircuitRatingKa) {
+    messages.push({
+      severity: 'error',
+      message: `Available fault current ${round(system.availableFaultCurrentKa, 2)} kA exceeds the specified ${round(normalized.specRequirements.shortCircuitRatingKa, 2)} kA MCC short-circuit rating.`
+    });
+  }
+  if (/project summary/i.test(system.faultCurrentBasis)) {
+    messages.push({ severity: 'warning', message: 'Available fault current is linked from a project summary rather than a location-specific MCC bus result.' });
+  }
+  if (!system.serviceEntrance) messages.push({ severity: 'warning', message: 'Service-entrance requirement is not specified.' });
+  if (!system.certifications.length) messages.push({ severity: 'warning', message: 'Required MCC certifications and standards are not specified.' });
+  if (!system.arcResistantRequirement) messages.push({ severity: 'warning', message: 'Arc-resistant construction requirement is not specified.' });
+  if (!installation.installationLocation) messages.push({ severity: 'warning', message: 'MCC installation location is not specified.' });
+  if (!installation.incomingCableSummary) messages.push({ severity: 'warning', message: 'Incoming conductor and cable information is not specified.' });
+  if (!installation.cableEntryArea) messages.push({ severity: 'warning', message: 'Cable and conduit entry area is not specified.' });
+  if (!installation.accessRequirement) messages.push({ severity: 'warning', message: 'Front/rear access requirement is not specified.' });
+  if (!installation.shippingSplitRequirements) messages.push({ severity: 'warning', message: 'Shipping split and building-entry requirements are not specified.' });
+  if (installation.minAmbientTempC !== '' && installation.maxAmbientTempC !== ''
+    && installation.minAmbientTempC > installation.maxAmbientTempC) {
+    messages.push({ severity: 'error', message: 'Minimum ambient temperature cannot exceed maximum ambient temperature.' });
+  }
+  if (!installation.environmentClassification) messages.push({ severity: 'warning', message: 'Installation environmental classification is not specified.' });
+  if (!installation.hazardousAreaClassification) messages.push({ severity: 'warning', message: 'Hazardous-area classification or explicit unclassified status is not specified.' });
   if (normalized.usableBucketHeightIn > normalized.sectionHeightIn) {
     messages.push({ severity: 'error', message: 'Usable bucket height cannot exceed section height.' });
   }
@@ -749,6 +965,11 @@ export function mccLineupEquipmentSummary(lineup) {
     tag: normalized.equipmentTag || normalized.tag,
     description: normalized.name,
     voltage: normalized.voltage,
+    phases: normalized.systemRequirements.phases,
+    frequencyHz: normalized.systemRequirements.frequencyHz,
+    groundingConfiguration: normalized.systemRequirements.groundingConfiguration,
+    availableFaultCurrentKa: normalized.systemRequirements.availableFaultCurrentKa,
+    sccrKa: normalized.specRequirements.shortCircuitRatingKa,
     category: 'Electrical Distribution',
     subCategory: 'MCC',
     arrangement: normalized.arrangement,
@@ -781,6 +1002,11 @@ export function syncMccLineupsToEquipment(equipment = [], lineups = []) {
         arrangement: summary.arrangement,
         lineup: summary.lineup
       };
+      if (!next[index].phases && summary.phases) next[index].phases = summary.phases;
+      if (!next[index].frequencyHz && summary.frequencyHz) next[index].frequencyHz = summary.frequencyHz;
+      if (!next[index].groundingConfiguration && summary.groundingConfiguration) next[index].groundingConfiguration = summary.groundingConfiguration;
+      if (!next[index].availableFaultCurrentKa && summary.availableFaultCurrentKa) next[index].availableFaultCurrentKa = summary.availableFaultCurrentKa;
+      if (!next[index].sccrKa && summary.sccrKa) next[index].sccrKa = summary.sccrKa;
       if (!next[index].description) next[index].description = summary.description;
       if (!next[index].id) next[index].id = summary.id;
       if (!next[index].ref) next[index].ref = summary.ref;
@@ -838,6 +1064,11 @@ export function mccStarterTypeLabel(bucket = {}) {
     other: 'Other'
   };
   return labels[bucket.starterType] || '';
+}
+
+export function mccControlSchemeLabel(bucket = {}) {
+  const value = normalizeMccControlScheme(bucket.controlScheme, bucket);
+  return MCC_CONTROL_SCHEME_CHOICES.find(option => option.value === value)?.label || '';
 }
 
 export function mccStarterTypeSizeLabel(bucket = {}) {

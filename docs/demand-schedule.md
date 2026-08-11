@@ -104,7 +104,7 @@ Add a `necCategory` property to a load row (via JSON import) to force a specific
 
 | Metric | Description |
 |---|---|
-| Connected Load (kW / kVA) | Sum of nameplate kW × quantity, before demand factors |
+| Connected Load (kW / kVA) | Sum of connected kW from uniquely tagged Load List rows, before demand factors |
 | Demand Load (kW / kVA) | Coincident demand after applying code factors |
 | Overall Demand Factor | Demand ÷ Connected (aggregate) |
 | Demand Profile | Selected project classification profile used to apply or withhold demand factors |

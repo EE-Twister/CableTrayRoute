@@ -31,7 +31,9 @@ export function parseBreakerAmpFrame({ breakerFrameA = '', breakerA = '' } = {})
   const explicitFrame = positiveNumber(breakerFrameA);
   const raw = String(breakerA ?? '').trim();
   const tripMatch = raw.match(/(\d[\d,.]*)\s*A?T\b/i);
-  const tripA = positiveNumber(tripMatch?.[1]);
+  const loneTripMatch = raw.match(/^(\d[\d,.]*)\s*A?$/i);
+  const ratings = raw.match(/\d[\d,.]*/g) || [];
+  const tripA = positiveNumber(tripMatch?.[1] || loneTripMatch?.[1] || (ratings.length >= 2 ? ratings[0] : ''));
   let frameA = explicitFrame;
   let source = explicitFrame ? 'frame-field' : '';
 
@@ -42,7 +44,6 @@ export function parseBreakerAmpFrame({ breakerFrameA = '', breakerA = '' } = {})
   }
 
   if (!frameA && raw) {
-    const ratings = raw.match(/\d[\d,.]*/g) || [];
     if (ratings.length >= 2) {
       frameA = positiveNumber(ratings[1]);
       source = frameA ? 'rating-pair' : '';

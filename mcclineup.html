@@ -106,6 +106,7 @@
             </label>
             <button id="apply-mcc-profile" class="btn" type="button">Apply Profile</button>
           </div>
+          <div id="mcc-project-data-panel"></div>
           <div class="mcc-field-grid">
             <label>Tag
               <input type="text" data-mcc-lineup-field="tag" placeholder="e.g. MCC-101">
@@ -147,6 +148,79 @@
               <input type="number" min="6" step="0.5" data-mcc-lineup-field="sectionDepthIn" placeholder="20">
             </label>
           </div>
+
+          <details class="mcc-spec-details" open>
+            <summary>System and Rating Basis</summary>
+            <p class="field-hint">Compatible project values are reused when available. Editing a linked field creates an MCC-specific override.</p>
+            <div class="mcc-field-grid mcc-field-grid--spec">
+              <label>Phases
+                <input type="number" min="1" max="3" step="1" data-mcc-system-field="phases" placeholder="e.g. 3">
+              </label>
+              <label>Wires
+                <input type="number" min="2" max="5" step="1" data-mcc-system-field="wires" placeholder="e.g. 3 or 4">
+              </label>
+              <label>Frequency (Hz)
+                <input type="number" min="1" step="1" data-mcc-system-field="frequencyHz" placeholder="e.g. 60">
+              </label>
+              <label>Grounding Configuration
+                <input type="text" data-mcc-system-field="groundingConfiguration" placeholder="e.g. Solidly grounded wye">
+              </label>
+              <label>Neutral Requirement / Rating
+                <input type="text" data-mcc-system-field="neutralRequirement" placeholder="e.g. No neutral, or full-rated neutral">
+              </label>
+              <label>Available Fault Current (kA rms sym.)
+                <input type="number" min="0" step="0.01" data-mcc-system-field="availableFaultCurrentKa">
+              </label>
+              <label>Fault-Current Method
+                <input type="text" data-mcc-system-field="faultCurrentMethod" placeholder="e.g. ANSI or IEC 60909">
+              </label>
+              <label class="mcc-spec-notes">Fault-Current Basis
+                <textarea rows="2" data-mcc-system-field="faultCurrentBasis"></textarea>
+              </label>
+              <label>Service Entrance
+                <select data-mcc-system-field="serviceEntrance">
+                  <option value="">Not specified</option>
+                  <option value="yes">Required</option>
+                  <option value="no">Not required</option>
+                </select>
+              </label>
+              <label>Arc-Resistant Construction
+                <select data-mcc-system-field="arcResistantRequirement">
+                  <option value="">Not specified</option>
+                  <option value="required">Required</option>
+                  <option value="not-required">Not required</option>
+                </select>
+              </label>
+              <label>Arc-Resistant Type / Accessibility
+                <input type="text" data-mcc-system-field="arcResistantType" placeholder="Specify tested construction if required">
+              </label>
+              <label>Seismic Qualification
+                <input type="text" data-mcc-system-field="seismicQualification" placeholder="e.g. IBC/CBC project criteria">
+              </label>
+              <label>Code Basis
+                <input type="text" data-mcc-system-field="codeBasis" placeholder="e.g. NEC 2023">
+              </label>
+              <label>Jurisdiction
+                <input type="text" data-mcc-system-field="jurisdiction">
+              </label>
+              <label>AHJ
+                <input type="text" data-mcc-system-field="ahj">
+              </label>
+              <fieldset class="mcc-spec-checkbox-group">
+                <legend>Required Certifications / Standards</legend>
+                <label><input type="checkbox" data-mcc-system-field="certifications" value="ul-845"><span>UL 845</span></label>
+                <label><input type="checkbox" data-mcc-system-field="certifications" value="nema-ics-18"><span>NEMA ICS 18</span></label>
+                <label><input type="checkbox" data-mcc-system-field="certifications" value="cul-csa"><span>cUL / CSA</span></label>
+                <label><input type="checkbox" data-mcc-system-field="certifications" value="other"><span>Other</span></label>
+              </fieldset>
+              <label>Other Certification
+                <input type="text" data-mcc-system-field="otherCertification">
+              </label>
+              <label class="mcc-spec-notes">System Notes
+                <textarea rows="3" data-mcc-system-field="notes"></textarea>
+              </label>
+            </div>
+          </details>
 
           <details class="mcc-spec-details">
             <summary>Additional Information</summary>
@@ -232,6 +306,103 @@
           </details>
 
           <details class="mcc-spec-details">
+            <summary>Installation Interfaces</summary>
+            <p class="field-hint">Cable Schedule and Project Metadata values are reused where possible; standalone values remain fully editable.</p>
+            <div class="mcc-field-grid mcc-field-grid--spec">
+              <label>Installation Location
+                <input type="text" data-mcc-installation-field="installationLocation">
+              </label>
+              <label>Project Coordinates
+                <input type="text" data-mcc-installation-field="equipmentCoordinates" placeholder="e.g. X 100, Y 25, Z 0">
+              </label>
+              <label class="mcc-spec-notes">Incoming Conductors / Cables
+                <textarea rows="4" data-mcc-installation-field="incomingCableSummary"></textarea>
+              </label>
+              <label class="mcc-spec-notes">Outgoing Conductors / Cables
+                <textarea rows="4" data-mcc-installation-field="outgoingCableSummary"></textarea>
+              </label>
+              <label>Incoming Lug / Termination Type
+                <input type="text" data-mcc-installation-field="incomingLugType" placeholder="e.g. Mechanical Cu/Al lugs">
+              </label>
+              <label>Cable / Conduit Entry Area
+                <select data-mcc-installation-field="cableEntryArea">
+                  <option value="">Not specified</option>
+                  <option value="top">Top</option>
+                  <option value="bottom">Bottom</option>
+                  <option value="top-and-bottom">Top and bottom</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <label class="mcc-spec-notes">Conduit Entry / Bending-Space Notes
+                <textarea rows="3" data-mcc-installation-field="conduitEntryNotes"></textarea>
+              </label>
+              <label>Access Requirement
+                <select data-mcc-installation-field="accessRequirement">
+                  <option value="">Not specified</option>
+                  <option value="front-only">Front only</option>
+                  <option value="front-and-rear">Front and rear</option>
+                  <option value="rear-required">Rear access required</option>
+                </select>
+              </label>
+              <label>Front Working Clearance (in)
+                <input type="number" min="0" step="1" data-mcc-installation-field="frontWorkingClearanceIn">
+              </label>
+              <label>Rear Working Clearance (in)
+                <input type="number" min="0" step="1" data-mcc-installation-field="rearWorkingClearanceIn">
+              </label>
+              <label class="mcc-spec-notes">Shipping Split Requirements
+                <textarea rows="3" data-mcc-installation-field="shippingSplitRequirements"></textarea>
+              </label>
+              <label>Maximum Shipping Width (in)
+                <input type="number" min="0" step="1" data-mcc-installation-field="maxShippingWidthIn">
+              </label>
+              <label>Maximum Shipping Height (in)
+                <input type="number" min="0" step="1" data-mcc-installation-field="maxShippingHeightIn">
+              </label>
+              <label>Maximum Shipping Depth (in)
+                <input type="number" min="0" step="1" data-mcc-installation-field="maxShippingDepthIn">
+              </label>
+              <label class="mcc-spec-notes">Building-Entry Restrictions
+                <textarea rows="3" data-mcc-installation-field="buildingEntryRestrictions"></textarea>
+              </label>
+              <label>Base Channels
+                <select data-mcc-installation-field="baseChannelRequired">
+                  <option value="">Not specified</option>
+                  <option value="yes">Required</option>
+                  <option value="no">Not required</option>
+                </select>
+              </label>
+              <label>Housekeeping Pad Height (in)
+                <input type="number" min="0" step="0.5" data-mcc-installation-field="housekeepingPadHeightIn">
+              </label>
+              <label class="mcc-spec-notes">Anchorage Requirements
+                <textarea rows="3" data-mcc-installation-field="anchorageRequirements"></textarea>
+              </label>
+              <label class="mcc-spec-notes">Floor Openings / Sleeves
+                <textarea rows="3" data-mcc-installation-field="floorOpeningRequirements"></textarea>
+              </label>
+              <label>Site Altitude (ft)
+                <input type="number" min="0" step="1" data-mcc-installation-field="altitudeFt">
+              </label>
+              <label>Minimum Ambient (°C)
+                <input type="number" step="1" data-mcc-installation-field="minAmbientTempC">
+              </label>
+              <label>Maximum Ambient (°C)
+                <input type="number" step="1" data-mcc-installation-field="maxAmbientTempC">
+              </label>
+              <label>Environmental Classification
+                <input type="text" data-mcc-installation-field="environmentClassification" placeholder="e.g. Indoor, dry, non-corrosive">
+              </label>
+              <label>Hazardous-Area Classification
+                <input type="text" data-mcc-installation-field="hazardousAreaClassification" placeholder="e.g. Unclassified">
+              </label>
+              <label class="mcc-spec-notes">Environmental / Installation Notes
+                <textarea rows="3" data-mcc-installation-field="environmentNotes"></textarea>
+              </label>
+            </div>
+          </details>
+
+          <details class="mcc-spec-details">
             <summary>PDF Title Block</summary>
             <div class="mcc-field-grid mcc-field-grid--spec">
               <label>Project Name
@@ -267,7 +438,7 @@
           </div>
           <p id="mcc-sync-status" class="small-text" aria-live="polite"></p>
 
-          <h2>Layout Checks</h2>
+          <h2>Layout and Procurement Checks</h2>
           <ul id="mcc-validation-list" class="mcc-validation-list" aria-live="polite"></ul>
         </aside>
 

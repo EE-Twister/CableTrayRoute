@@ -1,8 +1,15 @@
 import * as dataStore from '../dataStore.mjs';
 import { openModal } from './components/modal.js';
+import { renderProjectInputPanel } from './components/projectInputBinding.js';
 import { reconcileMccLineupFromLoads } from './mcc-lineup/loadListSync.mjs';
 import { NEMA_STARTER_HP_TABLE_ROWS } from './mcc-lineup/nemaStarterSizing.mjs';
-import { approximateFeederBreakerBucketSize } from './mcc-lineup/breakerBucketSizing.mjs';
+import { approximateFeederBreakerBucketSize, parseBreakerAmpFrame } from './mcc-lineup/breakerBucketSizing.mjs';
+import {
+  applyMccProjectInputSuggestions,
+  buildMccProjectInputSuggestions,
+  markMccProjectFieldOverride,
+  mccProjectFieldSource
+} from './mcc-lineup/projectIntegration.mjs';
 import {
   DEFAULT_MCC_VERTICAL_WIREWAY_WIDTH_IN,
   MCC_BUS_MATERIAL_TYPES,
@@ -26,12 +33,16 @@ import {
   escapeXml,
   mccBucketPositionLabel,
   mccBusPlatingLabel,
+  mccControlSchemeChoices,
+  mccControlSchemeLabel,
   mccMainDeviceLabel,
   mccLineupDimensions,
   mccStarterTypeLabel,
   normalizeMccLineup,
   normalizeMccLineups,
+  normalizeMccInstallationRequirements,
   normalizeMccSpecRequirements,
+  normalizeMccSystemRequirements,
   renderMccElevationSvg,
   renderMccLineupSheetSvg,
   renderMccOneLineSvg,
@@ -158,6 +169,9 @@ function cloneLineup(lineup) {
   clone.tag = `${lineup.tag || 'MCC'}-COPY`;
   clone.name = `${lineup.name || lineup.tag || 'MCC Lineup'} Copy`;
   clone.equipmentTag = '';
+  clone.projectDataOverrides = [];
+  clone.projectDataLinkedFields = [];
+  clone.projectDataSources = {};
   clone.sections = (clone.sections || []).map(section => ({
     ...section,
     id: createMccUniqueId('mcc-sec'),
@@ -166,9 +180,32 @@ function cloneLineup(lineup) {
   return normalizeMccLineup(clone, state.lineups.length);
 }
 
+function mccProjectSuggestions(lineup) {
+  return buildMccProjectInputSuggestions({
+    lineup,
+    projectMeta: dataStore.getProjectMeta(),
+    designBasis: dataStore.getDesignBasis(),
+    equipment: dataStore.getEquipment(),
+    oneLine: dataStore.getOneLine(),
+    studies: dataStore.getStudies(),
+    cables: dataStore.getCables()
+  });
+}
+
+function applyAvailableProjectData(lineup, { force = false } = {}) {
+  const suggestions = mccProjectSuggestions(lineup);
+  const applied = applyMccProjectInputSuggestions(lineup, suggestions, { force, replaceDefaults: true });
+  return {
+    lineup: normalizeMccLineup(applied.lineup),
+    applied: applied.applied,
+    suggestions
+  };
+}
+
 function loadLineups() {
   const stored = normalizeMccLineups(dataStore.getMccLineups());
-  state.lineups = stored.length ? stored : [createDefaultMccLineup(0)];
+  const initial = stored.length ? stored : [createDefaultMccLineup(0)];
+  state.lineups = initial.map(lineup => applyAvailableProjectData(lineup).lineup);
   const storedActiveId = dataStore.getItem(ACTIVE_LINEUP_KEY, '');
   state.activeId = state.lineups.some(lineup => lineup.id === storedActiveId)
     ? storedActiveId
@@ -226,6 +263,7 @@ function bucketSummary(context) {
     context.bucket.equipmentDescription,
     mainDevice,
     !mainDevice && mccStarterTypeLabel(context.bucket) ? mccStarterTypeLabel(context.bucket) : '',
+    !mainDevice && mccControlSchemeLabel(context.bucket) ? mccControlSchemeLabel(context.bucket) : '',
     !mainDevice && context.bucket.breakerA ? `${context.bucket.breakerA}A` : '',
     context.bucket.cableTag ? `Cable ${context.bucket.cableTag}` : ''
   ].filter(Boolean).join(' / ');
@@ -264,6 +302,12 @@ function bucketTypeOptionList(bucket = {}) {
 function starterTypeOptionList(selected) {
   return MCC_STARTER_TYPE_CHOICES.map(option => (
     `<option value="${escapeXml(option.value)}"${option.value === selected ? ' selected' : ''}>${escapeXml(option.label)}</option>`
+  )).join('');
+}
+
+function controlSchemeOptionList(bucket = {}) {
+  return mccControlSchemeChoices(bucket).map(option => (
+    `<option value="${escapeXml(option.value)}"${option.value === bucket.controlScheme ? ' selected' : ''}>${escapeXml(option.label)}</option>`
   )).join('');
 }
 
@@ -375,6 +419,99 @@ function renderLineupFields(lineup) {
     const key = input.dataset.mccLineupField;
     input.value = lineup[key] ?? '';
   });
+}
+
+function renderSystemRequirementFields(lineup) {
+  const system = normalizeMccSystemRequirements(lineup.systemRequirements);
+  document.querySelectorAll('[data-mcc-system-field]').forEach(input => {
+    const key = input.dataset.mccSystemField;
+    if (input.type === 'checkbox') {
+      input.checked = Array.isArray(system[key]) && system[key].includes(input.value);
+    } else {
+      input.value = system[key] ?? '';
+    }
+  });
+}
+
+function renderInstallationRequirementFields(lineup) {
+  const installation = normalizeMccInstallationRequirements(lineup.installationRequirements);
+  document.querySelectorAll('[data-mcc-installation-field]').forEach(input => {
+    const key = input.dataset.mccInstallationField;
+    input.value = installation[key] ?? '';
+  });
+}
+
+function projectFieldElements(path) {
+  if (path.startsWith('systemRequirements.')) {
+    const key = path.slice('systemRequirements.'.length);
+    return [...document.querySelectorAll(`[data-mcc-system-field="${CSS.escape(key)}"]`)];
+  }
+  if (path.startsWith('installationRequirements.')) {
+    const key = path.slice('installationRequirements.'.length);
+    return [...document.querySelectorAll(`[data-mcc-installation-field="${CSS.escape(key)}"]`)];
+  }
+  if (path.startsWith('specRequirements.')) {
+    const key = path.slice('specRequirements.'.length);
+    return [...document.querySelectorAll(`[data-mcc-spec-field="${CSS.escape(key)}"]`)];
+  }
+  if (path.startsWith('reportTitleBlock.')) {
+    const key = path.slice('reportTitleBlock.'.length);
+    return [...document.querySelectorAll(`[data-mcc-report-field="${CSS.escape(key)}"]`)];
+  }
+  return [...document.querySelectorAll(`[data-mcc-lineup-field="${CSS.escape(path)}"]`)];
+}
+
+function renderProjectDataState(lineup, suggestions) {
+  document.querySelectorAll('[data-mcc-lineup-field],[data-mcc-system-field],[data-mcc-installation-field],[data-mcc-spec-field],[data-mcc-report-field]').forEach(input => {
+    delete input.dataset.projectInputState;
+    delete input.dataset.projectSource;
+    delete input.dataset.projectSourceLabel;
+    input.removeAttribute('title');
+  });
+  Object.entries(suggestions.bindings || {}).forEach(([path, binding]) => {
+    const source = mccProjectFieldSource(lineup, path);
+    projectFieldElements(path).forEach(input => {
+      if (source.state === 'manual') {
+        input.title = `Available from ${binding.sourceLabel}; use Refresh from project to link this field.`;
+        return;
+      }
+      input.dataset.projectInputState = source.state;
+      input.dataset.projectSource = binding.sourcePath || '';
+      input.dataset.projectSourceLabel = binding.sourceLabel || '';
+      input.title = source.sourceLabel;
+    });
+  });
+}
+
+function refreshActiveLineupFromProject({ force = true } = {}) {
+  const lineup = activeLineup();
+  if (!lineup) return;
+  const result = applyAvailableProjectData(lineup, { force });
+  state.lineups[activeIndex()] = result.lineup;
+  persistLineups();
+  render();
+  setStatus(result.applied
+    ? `Refreshed ${result.applied} MCC field${result.applied === 1 ? '' : 's'} from existing project data. Manual editing remains available.`
+    : 'No compatible project values were available for this MCC lineup. Manual entry remains available.');
+}
+
+function renderMccProjectDataPanel(lineup) {
+  const container = document.getElementById('mcc-project-data-panel');
+  if (!container) return null;
+  container.innerHTML = '';
+  const suggestions = mccProjectSuggestions(lineup);
+  renderProjectInputPanel({
+    container,
+    title: 'Project-linked MCC inputs',
+    summary: suggestions.sources.length
+      ? 'Compatible values update from the project until a field is manually edited. Refreshing deliberately replaces available overrides.'
+      : 'No compatible upstream values were found. All MCC fields remain available for standalone manual entry.',
+    bindings: suggestions.bindings,
+    missing: suggestions.missing,
+    onRefresh: () => refreshActiveLineupFromProject({ force: true })
+  });
+  renderProjectDataState(lineup, suggestions);
+  return suggestions;
 }
 
 function renderSpecRequirementFields(lineup) {
@@ -506,6 +643,7 @@ function renderSections(lineup) {
               <th>HP</th>
               <th title="Enter trip/frame as 100AT/250AF. Bucket estimation requires an explicit amp-frame rating.">Breaker AT / AF</th>
               <th>Starter Type</th>
+              <th>Control Scheme</th>
               <th><span class="mcc-table-header-with-help">Starter Size ${starterSizeChartTooltip()}</span></th>
               <th>Motor Htr</th>
               <th>Htr VA</th>
@@ -527,6 +665,7 @@ function renderSections(lineup) {
                 <td><input type="text" data-bucket-field="hp" value="${escapeXml(bucket.hp)}"></td>
                 <td><input type="text" data-bucket-field="breakerA" value="${escapeXml(bucket.breakerA)}" placeholder="100AT/250AF" title="Enter trip/frame as 100AT/250AF. A lone number is treated as trip amps only."></td>
                 <td><select data-bucket-field="starterType"${bucket.type === 'starter' ? '' : ' disabled'}>${starterTypeOptionList(bucket.starterType)}</select></td>
+                <td><select data-bucket-field="controlScheme"${['starter', 'vfd'].includes(bucket.type) ? '' : ' disabled'} title="Operator control arrangement; choices follow the unit and starter type.">${controlSchemeOptionList(bucket)}</select></td>
                 <td><input type="text" data-bucket-field="starterSize" value="${escapeXml(bucket.starterSize)}"></td>
                 <td class="mcc-bucket-check-cell"><input type="checkbox" data-bucket-field="motorSpaceHeaterRequired"${bucket.motorSpaceHeaterRequired ? ' checked' : ''} aria-label="Motor space heater feed required"></td>
                 <td><input type="number" min="0" step="1" data-bucket-field="motorSpaceHeaterVa" value="${escapeXml(bucket.motorSpaceHeaterVa)}"${bucket.motorSpaceHeaterRequired ? '' : ' disabled'}></td>
@@ -609,8 +748,11 @@ function render() {
   ensureSelectedBucket(lineup);
   renderLineupSelector();
   renderLineupFields(lineup);
+  renderSystemRequirementFields(lineup);
   renderSpecRequirementFields(lineup);
+  renderInstallationRequirementFields(lineup);
   renderReportTitleBlockFields(lineup);
+  renderMccProjectDataPanel(lineup);
   renderStats(lineup);
   renderSelectionStatus(lineup);
   renderValidation(lineup);
@@ -664,9 +806,14 @@ function updateUsableBucketHeightFromWireways(lineup) {
   lineup.usableBucketHeightIn = Math.max(6, Math.round((sectionHeight - topWireway - bottomWireway) * 100) / 100);
 }
 
+function markProjectOverride(lineup, path) {
+  markMccProjectFieldOverride(lineup, path);
+}
+
 function updateActiveLineupField(key, value) {
   const lineup = activeLineup();
   if (!lineup) return;
+  markProjectOverride(lineup, key);
   const numericFields = new Set([
     'busRatingA',
     'horizontalBusRatingA',
@@ -692,7 +839,10 @@ function updateActiveLineupField(key, value) {
       });
     }
   }
-  const normalized = normalizeMccLineup(lineup, activeIndex());
+  let normalized = normalizeMccLineup(lineup, activeIndex());
+  if (key === 'equipmentTag' || key === 'tag') {
+    normalized = applyAvailableProjectData(normalized, { force: false }).lineup;
+  }
   state.lineups[activeIndex()] = normalized;
   persistLineups();
   render();
@@ -702,6 +852,7 @@ function updateSpecRequirementField(input) {
   const lineup = activeLineup();
   if (!lineup) return;
   const key = input.dataset.mccSpecField;
+  markProjectOverride(lineup, `specRequirements.${key}`);
   const numericFields = new Set(['shortCircuitRatingKa']);
   const value = MCC_SPEC_MULTI_FIELDS.has(key)
     ? Array.from(document.querySelectorAll(`input[type="checkbox"][data-mcc-spec-field="${CSS.escape(key)}"]`))
@@ -719,10 +870,44 @@ function updateSpecRequirementField(input) {
   render();
 }
 
+function updateSystemRequirementField(input) {
+  const lineup = activeLineup();
+  if (!lineup) return;
+  const key = input.dataset.mccSystemField;
+  markProjectOverride(lineup, `systemRequirements.${key}`);
+  const value = key === 'certifications'
+    ? Array.from(document.querySelectorAll('input[type="checkbox"][data-mcc-system-field="certifications"]'))
+      .filter(checkbox => checkbox.checked)
+      .map(checkbox => checkbox.value)
+    : input.value;
+  lineup.systemRequirements = {
+    ...(lineup.systemRequirements || {}),
+    [key]: value
+  };
+  state.lineups[activeIndex()] = normalizeMccLineup(lineup, activeIndex());
+  persistLineups();
+  render();
+}
+
+function updateInstallationRequirementField(input) {
+  const lineup = activeLineup();
+  if (!lineup) return;
+  const key = input.dataset.mccInstallationField;
+  markProjectOverride(lineup, `installationRequirements.${key}`);
+  lineup.installationRequirements = {
+    ...(lineup.installationRequirements || {}),
+    [key]: input.value
+  };
+  state.lineups[activeIndex()] = normalizeMccLineup(lineup, activeIndex());
+  persistLineups();
+  render();
+}
+
 function updateReportTitleBlockField(input) {
   const lineup = activeLineup();
   if (!lineup) return;
   const key = input.dataset.mccReportField;
+  markProjectOverride(lineup, `reportTitleBlock.${key}`);
   lineup.reportTitleBlock = {
     ...(lineup.reportTitleBlock || {}),
     [key]: input.value
@@ -739,8 +924,10 @@ function applySelectedProfile() {
   if (!lineup || !profile) return;
   const { specRequirements = {}, ...lineupValues } = profile.values;
   Object.entries(lineupValues).forEach(([key, value]) => {
+    markProjectOverride(lineup, key);
     lineup[key] = value;
   });
+  Object.keys(specRequirements).forEach(key => markProjectOverride(lineup, `specRequirements.${key}`));
   lineup.specRequirements = {
     ...(lineup.specRequirements || {}),
     ...specRequirements
@@ -812,6 +999,12 @@ function updateBucketField(input) {
       if (input.value === 'spare') context.bucket.status = 'spare';
       if (context.bucket.status === 'space' && input.value !== 'space') context.bucket.status = 'active';
       if (context.bucket.status === 'spare' && input.value !== 'spare') context.bucket.status = 'active';
+    }
+  } else if (key === 'breakerA') {
+    context.bucket.breakerA = input.value;
+    const parsedBreaker = parseBreakerAmpFrame({ breakerA: input.value });
+    if (parsedBreaker.frameA && ['af-label', 'rating-pair'].includes(parsedBreaker.source)) {
+      context.bucket.breakerFrameA = String(parsedBreaker.frameA);
     }
   } else {
     context.bucket[key] = input.value;
@@ -900,6 +1093,7 @@ function createSpaceBucket(lineup, index, heightIn = 12) {
     hp: '',
     breakerA: '',
     starterType: '',
+    controlScheme: '',
     starterSize: '',
     motorSpaceHeaterRequired: false,
     motorSpaceHeaterVa: '',
@@ -963,6 +1157,7 @@ function addBucket(context) {
     hp: '',
     breakerA: '',
     starterType: 'fvnr',
+    controlScheme: '',
     starterSize: '',
     motorSpaceHeaterRequired: false,
     motorSpaceHeaterVa: '',
@@ -1363,7 +1558,7 @@ function renderLoadListBuildPreview(body, controller, summary) {
     table.className = 'mcc-load-sync-table';
     const head = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    ['Load Tag', 'Description', 'Type', 'kW', 'Voltage'].forEach(label => {
+    ['Load Tag', 'Description', 'Type', 'Starter Type', 'Control Scheme', 'Trip A', 'Frame A', 'kW', 'Voltage'].forEach(label => {
       const cell = document.createElement('th');
       cell.scope = 'col';
       cell.textContent = label;
@@ -1373,7 +1568,7 @@ function renderLoadListBuildPreview(body, controller, summary) {
     const tableBody = document.createElement('tbody');
     summary.loads.forEach(load => {
       const row = document.createElement('tr');
-      [load.tag, load.description, load.loadType, load.kw, load.voltage].forEach(value => {
+      [load.tag, load.description, load.loadType, load.starterType, load.controlScheme, load.breakerTripA, load.breakerFrameA, load.kw, load.voltage].forEach(value => {
         const cell = document.createElement('td');
         cell.textContent = value || '—';
         row.appendChild(cell);
@@ -1560,6 +1755,7 @@ function pdfBucketRows(lineup) {
           ? (mccMainDeviceLabel(bucket) || bucket.breakerA)
           : bucket.breakerA,
         starter: [mccStarterTypeLabel(bucket), bucket.starterSize].filter(Boolean).join(' / '),
+        controlScheme: mccControlSchemeLabel(bucket),
         motorHeater: bucket.motorSpaceHeaterRequired
           ? (bucket.motorSpaceHeaterVa ? `Yes / ${bucket.motorSpaceHeaterVa} VA` : 'Yes')
           : 'No',
@@ -1572,6 +1768,17 @@ function pdfBucketRows(lineup) {
 
 function pdfSpecRows(lineup) {
   const spec = normalizeMccSpecRequirements(lineup.specRequirements);
+  const system = normalizeMccSystemRequirements(lineup.systemRequirements);
+  const installation = normalizeMccInstallationRequirements(lineup.installationRequirements);
+  const sourceFor = paths => [...new Set((Array.isArray(paths) ? paths : [paths])
+    .filter(Boolean)
+    .map(path => mccProjectFieldSource(lineup, path).sourceLabel))].join(' / ');
+  const row = (group, item, value, paths = '') => ({
+    group,
+    item,
+    value,
+    source: paths && (Array.isArray(paths) ? paths.length : true) ? sourceFor(paths) : 'MCC entry / profile default'
+  });
   const incomingLinePower = spec.incomingLinePower === 'other'
     ? pdfCellText(spec.incomingLinePowerOther || 'Other')
     : titleCaseOption(spec.incomingLinePower);
@@ -1581,30 +1788,77 @@ function pdfSpecRows(lineup) {
       ? spec.spaceHeaterAccessories.map(titleCaseOption).join(', ')
       : 'None specified')
     : 'Not applicable';
+  const certifications = system.certifications.length
+    ? system.certifications.map(value => ({
+      'ul-845': 'UL 845',
+      'nema-ics-18': 'NEMA ICS 18',
+      'cul-csa': 'cUL / CSA',
+      other: system.otherCertification || 'Other'
+    })[value] || titleCaseOption(value)).join(', ')
+    : '';
+  const arcResistant = system.arcResistantRequirement === 'required'
+    ? `Required${system.arcResistantType ? ` / ${system.arcResistantType}` : ''}`
+    : (system.arcResistantRequirement === 'not-required' ? 'Not required' : '');
   const rows = [
-    { group: 'Electrical', item: 'Voltage', value: lineup.voltage },
-    { group: 'Electrical', item: 'Short-Circuit Rating', value: `${spec.shortCircuitRatingKa} kA` },
-    { group: 'Electrical', item: 'Control Voltage', value: spec.controlVoltage },
-    { group: 'Electrical', item: 'Incoming Line Power', value: incomingLinePower },
-    { group: 'Electrical', item: 'Motor Protection Devices', value: titleCaseOption(spec.motorProtectionDevice) },
-    { group: 'Bus', item: 'Horizontal Bus Rating', value: `${lineup.horizontalBusRatingA} A` },
-    { group: 'Bus', item: 'Vertical Bus Rating', value: `${lineup.verticalBusRatingA} A` },
-    { group: 'Bus', item: 'Bus Material', value: titleCaseOption(spec.busMaterial) },
-    { group: 'Bus', item: 'Bus Plating', value: mccBusPlatingLabel(spec) },
-    { group: 'Bus', item: 'Bus Join Plating', value: titleCaseOption(spec.busJoinPlating) },
-    { group: 'Bus', item: 'Ground Bus Required', value: titleCaseOption(spec.groundBusRequired) },
-    { group: 'Bus', item: 'Ground Bus Location', value: spec.groundBusRequired === 'yes' ? titleCaseOption(spec.groundBusLocation) : 'Not applicable' },
-    { group: 'Construction', item: 'MCC Enclosure', value: spec.enclosureRating },
-    { group: 'Construction', item: 'MCC Arrangement', value: titleCaseOption(spec.mccArrangement) },
-    { group: 'Construction', item: 'Expansion Cover Plates', value: titleCaseOption(spec.expansionCoverPlates) },
-    { group: 'Construction', item: 'Finish', value: spec.finish },
-    { group: 'Controls', item: 'Communication Protocol', value: titleCaseOption(spec.communicationProtocol) },
-    { group: 'Options', item: 'Space Heater', value: heaterStatus },
-    { group: 'Options', item: 'Space Heater Voltage', value: spec.spaceHeaterRequired ? spec.spaceHeaterVoltage : 'Not applicable' },
-    { group: 'Options', item: 'Space Heater Accessories', value: heaterAccessories }
+    row('System', 'Voltage', lineup.voltage, 'voltage'),
+    row('System', 'Phase / Wire / Frequency', [system.phases ? `${system.phases} phase` : '', system.wires ? `${system.wires} wire` : '', system.frequencyHz ? `${system.frequencyHz} Hz` : ''].filter(Boolean).join(', '), ['systemRequirements.phases', 'systemRequirements.wires', 'systemRequirements.frequencyHz']),
+    row('System', 'Grounding Configuration', system.groundingConfiguration, 'systemRequirements.groundingConfiguration'),
+    row('System', 'Neutral Requirement', system.neutralRequirement, 'systemRequirements.neutralRequirement'),
+    row('System', 'Available Fault Current', system.availableFaultCurrentKa !== '' ? `${system.availableFaultCurrentKa} kA rms symmetrical` : '', 'systemRequirements.availableFaultCurrentKa'),
+    row('System', 'Fault-Current Method', system.faultCurrentMethod, 'systemRequirements.faultCurrentMethod'),
+    row('System', 'Fault-Current Basis', system.faultCurrentBasis, 'systemRequirements.faultCurrentBasis'),
+    row('System', 'Required MCC Short-Circuit Rating', spec.shortCircuitRatingKa !== '' ? `${spec.shortCircuitRatingKa} kA` : '', 'specRequirements.shortCircuitRatingKa'),
+    row('System', 'Service Entrance', system.serviceEntrance ? titleCaseOption(system.serviceEntrance) : '', 'systemRequirements.serviceEntrance'),
+    row('System', 'Certifications / Standards', certifications, 'systemRequirements.certifications'),
+    row('System', 'Arc-Resistant Construction', arcResistant, 'systemRequirements.arcResistantRequirement'),
+    row('System', 'Seismic Qualification', system.seismicQualification, 'systemRequirements.seismicQualification'),
+    row('System', 'Code Basis', system.codeBasis, 'systemRequirements.codeBasis'),
+    row('System', 'Jurisdiction / AHJ', [system.jurisdiction, system.ahj].filter(Boolean).join(' / '), ['systemRequirements.jurisdiction', 'systemRequirements.ahj']),
+    row('Electrical', 'Control Voltage', spec.controlVoltage, 'specRequirements.controlVoltage'),
+    row('Electrical', 'Incoming Line Power', incomingLinePower, 'specRequirements.incomingLinePower'),
+    row('Electrical', 'Motor Protection Devices', titleCaseOption(spec.motorProtectionDevice), 'specRequirements.motorProtectionDevice'),
+    row('Bus', 'Horizontal Bus Rating', `${lineup.horizontalBusRatingA} A`, 'horizontalBusRatingA'),
+    row('Bus', 'Vertical Bus Rating', `${lineup.verticalBusRatingA} A`, 'verticalBusRatingA'),
+    row('Bus', 'Bus Material', titleCaseOption(spec.busMaterial), 'specRequirements.busMaterial'),
+    row('Bus', 'Bus Plating', mccBusPlatingLabel(spec), 'specRequirements.busPlating'),
+    row('Bus', 'Bus Join Plating', titleCaseOption(spec.busJoinPlating), 'specRequirements.busJoinPlating'),
+    row('Bus', 'Ground Bus Required', titleCaseOption(spec.groundBusRequired), 'specRequirements.groundBusRequired'),
+    row('Bus', 'Ground Bus Location', spec.groundBusRequired === 'yes' ? titleCaseOption(spec.groundBusLocation) : 'Not applicable', 'specRequirements.groundBusLocation'),
+    row('Construction', 'MCC Enclosure', spec.enclosureRating, 'specRequirements.enclosureRating'),
+    row('Construction', 'MCC Arrangement', titleCaseOption(spec.mccArrangement), 'specRequirements.mccArrangement'),
+    row('Construction', 'Expansion Cover Plates', titleCaseOption(spec.expansionCoverPlates), 'specRequirements.expansionCoverPlates'),
+    row('Construction', 'Finish', spec.finish, 'specRequirements.finish'),
+    row('Controls', 'Communication Protocol', titleCaseOption(spec.communicationProtocol), 'specRequirements.communicationProtocol'),
+    row('Options', 'Space Heater', heaterStatus, 'specRequirements.spaceHeaterRequired'),
+    row('Options', 'Space Heater Voltage', spec.spaceHeaterRequired ? spec.spaceHeaterVoltage : 'Not applicable', 'specRequirements.spaceHeaterVoltage'),
+    row('Options', 'Space Heater Accessories', heaterAccessories, 'specRequirements.spaceHeaterAccessories'),
+    row('Installation', 'Installation Location', installation.installationLocation, 'installationRequirements.installationLocation'),
+    row('Installation', 'Project Coordinates', installation.equipmentCoordinates, 'installationRequirements.equipmentCoordinates'),
+    row('Installation', 'Incoming Conductors / Cables', installation.incomingCableSummary, 'installationRequirements.incomingCableSummary'),
+    row('Installation', 'Outgoing Conductors / Cables', installation.outgoingCableSummary, 'installationRequirements.outgoingCableSummary'),
+    row('Installation', 'Incoming Lug / Termination', installation.incomingLugType, 'installationRequirements.incomingLugType'),
+    row('Installation', 'Cable / Conduit Entry', titleCaseOption(installation.cableEntryArea), 'installationRequirements.cableEntryArea'),
+    row('Installation', 'Conduit / Bending-Space Notes', installation.conduitEntryNotes, 'installationRequirements.conduitEntryNotes'),
+    row('Installation', 'Access Requirement', titleCaseOption(installation.accessRequirement), 'installationRequirements.accessRequirement'),
+    row('Installation', 'Working Clearances', [installation.frontWorkingClearanceIn !== '' ? `Front ${installation.frontWorkingClearanceIn} in` : '', installation.rearWorkingClearanceIn !== '' ? `Rear ${installation.rearWorkingClearanceIn} in` : ''].filter(Boolean).join(' / '), ['installationRequirements.frontWorkingClearanceIn', 'installationRequirements.rearWorkingClearanceIn']),
+    row('Shipping', 'Shipping Split Requirements', installation.shippingSplitRequirements, 'installationRequirements.shippingSplitRequirements'),
+    row('Shipping', 'Maximum Shipping Dimensions', [installation.maxShippingWidthIn !== '' ? `${installation.maxShippingWidthIn} in W` : '', installation.maxShippingHeightIn !== '' ? `${installation.maxShippingHeightIn} in H` : '', installation.maxShippingDepthIn !== '' ? `${installation.maxShippingDepthIn} in D` : ''].filter(Boolean).join(' x '), ['installationRequirements.maxShippingWidthIn', 'installationRequirements.maxShippingHeightIn', 'installationRequirements.maxShippingDepthIn']),
+    row('Shipping', 'Building-Entry Restrictions', installation.buildingEntryRestrictions, 'installationRequirements.buildingEntryRestrictions'),
+    row('Mounting', 'Base Channels', installation.baseChannelRequired ? titleCaseOption(installation.baseChannelRequired) : '', 'installationRequirements.baseChannelRequired'),
+    row('Mounting', 'Housekeeping Pad Height', installation.housekeepingPadHeightIn !== '' ? `${installation.housekeepingPadHeightIn} in` : '', 'installationRequirements.housekeepingPadHeightIn'),
+    row('Mounting', 'Anchorage Requirements', installation.anchorageRequirements, 'installationRequirements.anchorageRequirements'),
+    row('Mounting', 'Floor Openings / Sleeves', installation.floorOpeningRequirements, 'installationRequirements.floorOpeningRequirements'),
+    row('Environment', 'Altitude', installation.altitudeFt !== '' ? `${installation.altitudeFt} ft` : '', 'installationRequirements.altitudeFt'),
+    row('Environment', 'Ambient Range', [installation.minAmbientTempC !== '' ? `${installation.minAmbientTempC} C min` : '', installation.maxAmbientTempC !== '' ? `${installation.maxAmbientTempC} C max` : ''].filter(Boolean).join(' / '), ['installationRequirements.minAmbientTempC', 'installationRequirements.maxAmbientTempC']),
+    row('Environment', 'Environmental Classification', installation.environmentClassification, 'installationRequirements.environmentClassification'),
+    row('Environment', 'Hazardous-Area Classification', installation.hazardousAreaClassification, 'installationRequirements.hazardousAreaClassification'),
+    row('Environment', 'Environmental / Installation Notes', installation.environmentNotes, 'installationRequirements.environmentNotes')
   ];
   if (spec.notes) {
-    rows.push({ group: 'Notes', item: 'Specification Notes', value: spec.notes });
+    rows.push(row('Notes', 'Specification Notes', spec.notes, 'specRequirements.notes'));
+  }
+  if (system.notes) {
+    rows.push(row('Notes', 'System Notes', system.notes, 'systemRequirements.notes'));
   }
   return rows;
 }
@@ -1684,7 +1938,7 @@ function addSummaryGrid(doc, lineup, dimensions, startY) {
     ['Buckets', dimensions.bucketCount],
     ['Dimensions', `${dimensions.totalWidthIn}" W x ${lineup.sectionDepthIn}" D x ${lineup.sectionHeightIn}" H`],
     ['Arrangement', lineup.arrangement],
-    ['Specifications', 'See Specification Requirements page']
+    ['Requirements', 'See Procurement Requirements page']
   ];
   const columnWidth = 238;
   const rowHeight = 18;
@@ -1709,16 +1963,17 @@ function addSpecificationRequirements(doc, lineup, startY) {
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 36;
   const columns = [
-    { key: 'group', label: 'Category', width: 96 },
-    { key: 'item', label: 'Requirement', width: 190 },
-    { key: 'value', label: 'Specified Value', width: pageWidth - margin * 2 - 286 }
+    { key: 'group', label: 'Category', width: 78 },
+    { key: 'item', label: 'Requirement', width: 154 },
+    { key: 'value', label: 'Specified Value', width: 318 },
+    { key: 'source', label: 'Source / Status', width: pageWidth - margin * 2 - 550 }
   ];
   const rows = pdfSpecRows(lineup);
   const drawTableHeader = y => {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(17, 24, 39);
-    doc.text('Specification Requirements', margin, y);
+    doc.text('System, Specification, and Installation Requirements', margin, y);
     y += 10;
     doc.setFillColor(30, 64, 175);
     doc.setTextColor(255, 255, 255);
@@ -1744,7 +1999,7 @@ function addSpecificationRequirements(doc, lineup, startY) {
       addPdfFooter(doc);
       doc.addPage('letter', 'landscape');
       previousGroup = '';
-      y = drawTableHeader(addPdfHeader(doc, lineup, 'Specification Requirements'));
+      y = drawTableHeader(addPdfHeader(doc, lineup, 'Procurement Requirements'));
       cells = cellsForRow();
       rowHeight = Math.max(22, 9 * Math.max(...cells.map(cell => cell.length)) + 10);
     }
@@ -1812,18 +2067,19 @@ function addBucketSchedule(doc, lineup) {
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 36;
   const columns = [
-    { key: 'section', label: 'Section', width: 52 },
-    { key: 'position', label: 'Pos.', width: 34 },
-    { key: 'tag', label: 'Equipment Tag', width: 78 },
-    { key: 'description', label: 'Equipment Description', width: 120 },
-    { key: 'type', label: 'Type', width: 46 },
-    { key: 'units', label: 'Units', width: 34 },
-    { key: 'height', label: 'Ht.', width: 34 },
-    { key: 'breaker', label: 'Main/Breaker', width: 62 },
-    { key: 'starter', label: 'Starter', width: 60 },
-    { key: 'motorHeater', label: 'Motor Htr', width: 64 },
-    { key: 'cable', label: 'Cable', width: 52 },
-    { key: 'notes', label: 'Notes', width: 64 }
+    { key: 'section', label: 'Section', width: 45 },
+    { key: 'position', label: 'Pos.', width: 30 },
+    { key: 'tag', label: 'Equipment Tag', width: 70 },
+    { key: 'description', label: 'Equipment Description', width: 90 },
+    { key: 'type', label: 'Type', width: 40 },
+    { key: 'units', label: 'Units', width: 30 },
+    { key: 'height', label: 'Ht.', width: 30 },
+    { key: 'breaker', label: 'Main/Breaker', width: 55 },
+    { key: 'starter', label: 'Starter', width: 50 },
+    { key: 'controlScheme', label: 'Control Scheme', width: 80 },
+    { key: 'motorHeater', label: 'Motor Htr', width: 55 },
+    { key: 'cable', label: 'Cable', width: 45 },
+    { key: 'notes', label: 'Notes', width: 50 }
   ];
   const drawHeader = y => {
     doc.setFillColor(30, 64, 175);
@@ -1897,7 +2153,7 @@ async function downloadLineupPdfReport() {
     await addPdfOneLinePages(doc, normalized);
 
     doc.addPage('letter', 'landscape');
-    y = addPdfHeader(doc, normalized, 'Specification Requirements');
+    y = addPdfHeader(doc, normalized, 'Procurement Requirements');
     addSpecificationRequirements(doc, normalized, y);
     addPdfFooter(doc);
 
@@ -2002,6 +2258,12 @@ function bindUi() {
   });
   document.querySelectorAll('[data-mcc-spec-field]').forEach(input => {
     input.addEventListener('change', () => updateSpecRequirementField(input));
+  });
+  document.querySelectorAll('[data-mcc-system-field]').forEach(input => {
+    input.addEventListener('change', () => updateSystemRequirementField(input));
+  });
+  document.querySelectorAll('[data-mcc-installation-field]').forEach(input => {
+    input.addEventListener('change', () => updateInstallationRequirementField(input));
   });
   document.querySelectorAll('[data-mcc-report-field]').forEach(input => {
     input.addEventListener('change', () => updateReportTitleBlockField(input));

@@ -35,6 +35,8 @@ Specialized project-scope selectors are available where a study must target a pa
 
 Changing the selected scope refreshes linked fields. An engineer can edit any linked field to create a study-specific override.
 
+MCC Lineups use the same linked-input pattern for procurement requirements. A lineup matched by Equipment Tag or Tag can reuse ratings from Equipment List or One-Line, available fault current from Short Circuit, conductor interfaces from Cable Schedule, environmental and report data from Project Metadata, and code-basis data from Design Basis. Blank, already linked, and untouched generic starting values update automatically; manual edits and deliberately applied MCC profiles are preserved as overrides until the user explicitly selects **Refresh from project**. All fields also accept standalone manual entry when upstream workflow records do not exist.
+
 ## Linked study inputs
 
 A linked study field has one of three states:

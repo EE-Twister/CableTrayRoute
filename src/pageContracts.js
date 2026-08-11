@@ -186,6 +186,11 @@ export const PAGE_CONTRACTS_BY_HREF = {
     projectInputs: [
       equipment,
       projectInput('loadList', 'schedule', false, 'Optional source-linked loads used to preview, build, and refresh MCC buckets.'),
+      projectInput('oneLineDiagram', 'model', false, 'Optional system ratings and MCC component metadata used to prefill matching lineup requirements.'),
+      projectInput('cableSchedule', 'schedule', false, 'Optional incoming and outgoing conductor interfaces for the matching MCC.'),
+      projectInput('studyResults', 'study-result', false, 'Optional location-specific Short Circuit results used to prefill available fault current.'),
+      projectMeta,
+      designBasis,
       mccLineupActiveId
     ],
     outputs: [
@@ -193,7 +198,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
       output('equipment', 'schedule', 'Optional synchronized MCC equipment rows.', ['equipmentlist.html', 'oneline.html']),
       output('settings.mccLineupActiveId', 'setting', 'Active MCC lineup selection.', ['mcclineup.html'])
     ],
-    readiness: ready('Ready when at least one lineup contains identifiable sections or buckets.', ['No lineup exists or lineup entries are missing equipment tags.']),
+    readiness: ready('Ready when at least one lineup contains identifiable sections or buckets; linked project requirements may be completed with MCC-specific manual entries.', ['No lineup exists, lineup entries are missing equipment tags, or required system and installation requirements remain unconfirmed.']),
     downstream: ['equipmentlist.html', 'equipmentarrangements.html', 'projectreport.html']
   }),
   'loadlist.html': contract({

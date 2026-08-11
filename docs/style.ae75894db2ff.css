@@ -599,7 +599,7 @@ body.theme-high-contrast .mcc-spec-details {
 }
 .mcc-bucket-table {
   width:100%;
-  min-width:1750px;
+  min-width:1970px;
   border-collapse:collapse;
   table-layout:fixed;
 }
@@ -766,15 +766,18 @@ body.theme-high-contrast .mcc-spec-details {
   width:132px;
 }
 .mcc-bucket-table th:nth-child(9) {
-  width:180px;
+  width:220px;
 }
 .mcc-bucket-table th:nth-child(10) {
-  width:90px;
+  width:180px;
 }
 .mcc-bucket-table th:nth-child(11) {
   width:90px;
 }
 .mcc-bucket-table th:nth-child(12) {
+  width:90px;
+}
+.mcc-bucket-table th:nth-child(13) {
   width:180px;
 }
 .mcc-bucket-table th:last-child {

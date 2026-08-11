@@ -183,6 +183,11 @@ Coverage: 80 contracts for 80 navigation routes.
 **Project Inputs**
 - `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
 - `loadList` (schedule, optional): Optional source-linked loads used to preview, build, and refresh MCC buckets.
+- `oneLineDiagram` (model, optional): Optional system ratings and MCC component metadata used to prefill matching lineup requirements.
+- `cableSchedule` (schedule, optional): Optional incoming and outgoing conductor interfaces for the matching MCC.
+- `studyResults` (study-result, optional): Optional location-specific Short Circuit results used to prefill available fault current.
+- `settings.projectMeta` (setting, optional): Canonical project identity, client, site, engineer, revision, and environmental context.
+- `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.mccLineupActiveId` (setting, optional): Active MCC lineup selection.
 
 **Outputs**
@@ -191,8 +196,8 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.mccLineupActiveId` (setting): Active MCC lineup selection. Consumers: `mcclineup.html`.
 
 **Readiness**
-- Ready when: Ready when at least one lineup contains identifiable sections or buckets.
-- Blockers: No lineup exists or lineup entries are missing equipment tags.
+- Ready when: Ready when at least one lineup contains identifiable sections or buckets; linked project requirements may be completed with MCC-specific manual entries.
+- Blockers: No lineup exists, lineup entries are missing equipment tags, or required system and installation requirements remain unconfirmed.
 
 **Downstream Pages**
 - `equipmentlist.html`

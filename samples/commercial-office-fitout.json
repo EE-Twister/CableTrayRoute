@@ -321,7 +321,6 @@
       "source": "PP-100",
       "tag": "REC-101",
       "description": "Workstation receptacle allowance",
-      "quantity": "72",
       "voltage": "120",
       "loadType": "Receptacle",
       "duty": "Intermittent",

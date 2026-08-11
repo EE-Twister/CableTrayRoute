@@ -13,7 +13,13 @@ import {
   READINESS_VOCABULARY,
   getContractReadinessCopy
 } from './src/workflowStatus.js';
-import { MCC_BUCKET_TYPE_CHOICES, MCC_STARTER_TYPE_CHOICES } from './src/mccLineupModel.mjs';
+import {
+  MCC_BUCKET_TYPE_CHOICES,
+  MCC_CONTROL_SCHEME_CHOICES,
+  MCC_STARTER_TYPE_CHOICES,
+  mccControlSchemeChoices,
+  normalizeMccControlScheme
+} from './src/mccLineupModel.mjs';
 
 const LOAD_READINESS_COPY = getContractReadinessCopy('loadlist.html');
 
@@ -62,7 +68,6 @@ class ContextMenu {
 }
 
 export function calculateDerived(load) {
-  const qty = parseFloat(load.quantity) || 1;
   const voltage = parseFloat(load.voltage);
   const kw = parseFloat(load.kw);
   const pf = parseFloat(load.powerFactor);
@@ -70,7 +75,7 @@ export function calculateDerived(load) {
   const eff = parseFloat(load.efficiency);
   const df = parseFloat(load.demandFactor);
   const phases = parseInt(load.phases, 10);
-  const totalKw = isNaN(kw) ? 0 : kw * qty;
+  const totalKw = isNaN(kw) ? 0 : kw;
   const lfKw = isNaN(lf) ? totalKw : totalKw * (lf / 100);
   const effKw = isNaN(eff) || eff === 0 ? lfKw : lfKw / (eff / 100);
   const kVA = pf ? effKw / pf : effKw;
@@ -85,8 +90,7 @@ export function aggregateLoadsBySource(loads) {
   return loads.reduce((acc, load) => {
     const src = load.source || '';
     const { kva, demandKw, demandKva } = calculateDerived(load);
-    const qty = parseFloat(load.quantity) || 1;
-    const kW = (parseFloat(load.kw) || 0) * qty;
+    const kW = parseFloat(load.kw) || 0;
     if (!acc[src]) acc[src] = { kW: 0, kVA: 0, demandKW: 0, demandKVA: 0 };
     acc[src].kW += kW;
     acc[src].kVA += parseFloat(load.kva) || kva;
@@ -155,18 +159,18 @@ if (typeof window !== 'undefined') {
       ...MCC_BUCKET_TYPE_CHOICES
     ];
     const starterLoads = [
-      { source: 'SWBD-1', tag: 'MTR-101', description: 'Process pump motor', quantity: '1', voltage: '480', kw: '18.6', hp: '25', mccUnitType: 'starter', starterType: 'fvnr', circuit: 'MCC-1-01', ...loadTypeDefaults.Motor },
-      { source: 'PNL-L1', tag: 'LTG-101', description: 'Office lighting zone', quantity: '1', voltage: '120', kw: '3.2', circuit: 'L1-03', ...loadTypeDefaults.Lighting },
-      { source: 'PNL-L1', tag: 'REC-101', description: 'General receptacles', quantity: '12', voltage: '120', kw: '0.18', circuit: 'L1-05', ...loadTypeDefaults.Receptacle },
-      { source: 'MCC-1', tag: 'AHU-101', description: 'Air handling unit', quantity: '1', voltage: '480', kw: '22', mccUnitType: 'vfd', circuit: 'MCC-1-05', ...loadTypeDefaults.HVAC },
-      { source: 'SWBD-1', tag: 'UPS-101', description: 'Controls UPS input', quantity: '1', voltage: '480', kw: '12', circuit: 'SWBD-1-12', ...loadTypeDefaults.UPS }
+      { source: 'SWBD-1', tag: 'MTR-101', description: 'Process pump motor', voltage: '480', kw: '18.6', hp: '25', mccUnitType: 'starter', starterType: 'fvnr', controlScheme: 'hoa', circuit: 'MCC-1-01', ...loadTypeDefaults.Motor },
+      { source: 'PNL-L1', tag: 'LTG-101', description: 'Office lighting zone', voltage: '120', kw: '3.2', circuit: 'L1-03', ...loadTypeDefaults.Lighting },
+      { source: 'PNL-L1', tag: 'REC-101', description: 'General receptacle allowance', voltage: '120', kw: '2.16', circuit: 'L1-05', ...loadTypeDefaults.Receptacle },
+      { source: 'MCC-1', tag: 'AHU-101', description: 'Air handling unit', voltage: '480', kw: '22', mccUnitType: 'vfd', controlScheme: 'network-speed-control', circuit: 'MCC-1-05', ...loadTypeDefaults.HVAC },
+      { source: 'SWBD-1', tag: 'UPS-101', description: 'Controls UPS input', voltage: '480', kw: '12', circuit: 'SWBD-1-12', ...loadTypeDefaults.UPS }
     ];
     const viewPresets = {
-      basic: ['select', 'source', 'tag', 'description', 'quantity', 'voltage', 'loadType', 'mccUnitType', 'starterType', 'duty', 'kw', 'hp', 'powerFactor', 'phases', 'circuit', 'kva', 'current', 'actions'],
-      electrical: ['select', 'source', 'tag', 'description', 'quantity', 'voltage', 'mccUnitType', 'starterType', 'kw', 'hp', 'powerFactor', 'phases', 'kva', 'current', 'circuit', 'actions'],
-      demand: ['select', 'source', 'tag', 'demandFactor', 'demandKva', 'demandKw', 'kw', 'hp', 'loadFactor', 'description', 'loadType', 'mccUnitType', 'starterType', 'duty', 'actions'],
-      procurement: ['select', 'source', 'tag', 'description', 'manufacturer', 'model', 'quantity', 'voltage', 'hp', 'loadType', 'mccUnitType', 'starterType', 'notes', 'actions'],
-      full: ['select', 'source', 'tag', 'description', 'manufacturer', 'model', 'quantity', 'voltage', 'loadType', 'mccUnitType', 'starterType', 'duty', 'kw', 'hp', 'powerFactor', 'loadFactor', 'efficiency', 'demandFactor', 'phases', 'circuit', 'notes', 'kva', 'current', 'demandKva', 'demandKw', 'actions']
+      basic: ['select', 'source', 'tag', 'description', 'voltage', 'loadType', 'mccUnitType', 'starterType', 'controlScheme', 'breakerTripA', 'breakerFrameA', 'duty', 'kw', 'hp', 'powerFactor', 'phases', 'circuit', 'kva', 'current', 'actions'],
+      electrical: ['select', 'source', 'tag', 'description', 'voltage', 'mccUnitType', 'starterType', 'controlScheme', 'breakerTripA', 'breakerFrameA', 'kw', 'hp', 'powerFactor', 'phases', 'kva', 'current', 'circuit', 'actions'],
+      demand: ['select', 'source', 'tag', 'demandFactor', 'demandKva', 'demandKw', 'kw', 'hp', 'loadFactor', 'description', 'loadType', 'mccUnitType', 'starterType', 'controlScheme', 'breakerTripA', 'breakerFrameA', 'duty', 'actions'],
+      procurement: ['select', 'source', 'tag', 'description', 'manufacturer', 'model', 'voltage', 'hp', 'loadType', 'mccUnitType', 'starterType', 'controlScheme', 'breakerTripA', 'breakerFrameA', 'notes', 'actions'],
+      full: ['select', 'source', 'tag', 'description', 'manufacturer', 'model', 'voltage', 'loadType', 'mccUnitType', 'starterType', 'controlScheme', 'breakerTripA', 'breakerFrameA', 'duty', 'kw', 'hp', 'powerFactor', 'loadFactor', 'efficiency', 'demandFactor', 'phases', 'circuit', 'notes', 'kva', 'current', 'demandKva', 'demandKw', 'actions']
     };
     const loadFields = [
       { key: 'source', label: 'Source / Panel', aliases: ['source', 'panel', 'source panel', 'source/panel', 'feed from'] },
@@ -174,11 +178,14 @@ if (typeof window !== 'undefined') {
       { key: 'description', label: 'Description', aliases: ['description', 'load description', 'name', 'load name'] },
       { key: 'manufacturer', label: 'Manufacturer', aliases: ['manufacturer', 'mfr', 'make'] },
       { key: 'model', label: 'Model', aliases: ['model', 'catalog', 'part number'] },
-      { key: 'quantity', label: 'Qty', aliases: ['qty', 'quantity', 'count'] },
       { key: 'voltage', label: 'Voltage', aliases: ['voltage', 'volts', 'v', 'voltage v'] },
       { key: 'loadType', label: 'Load Type', aliases: ['load type', 'type', 'category', 'load category'] },
       { key: 'mccUnitType', label: 'MCC Unit Type', aliases: ['mcc unit type', 'mcc bucket type', 'bucket type', 'controller type', 'starter vfd feeder type'] },
       { key: 'starterType', label: 'Starter Type', aliases: ['starter type', 'starter method', 'motor starter type', 'motor controller type'] },
+      { key: 'controlScheme', label: 'Control Scheme', aliases: ['control scheme', 'control station', 'operator controls', 'selector switch', 'hoa joa ss'] },
+      { key: 'breakerTripA', label: 'Breaker Trip (A)', aliases: ['breaker trip', 'breaker trip a', 'trip amps', 'trip amperes', 'breaker at', 'ocpd trip'] },
+      { key: 'breakerFrameA', label: 'Breaker Frame (A)', aliases: ['breaker frame', 'breaker frame a', 'frame amps', 'frame amperes', 'breaker af', 'amp frame'] },
+      { key: 'breakerA', label: 'Legacy Breaker AT / AF', aliases: ['breaker at af', 'breaker at/af', 'breaker rating', 'ocpd rating'] },
       { key: 'duty', label: 'Duty', aliases: ['duty', 'duty cycle', 'service'] },
       { key: 'kw', label: 'kW', aliases: ['kw', 'power', 'load kw', 'kilowatt', 'kilowatts'] },
       { key: 'hp', label: 'HP', aliases: ['hp', 'horsepower', 'motor hp', 'nameplate hp', 'rated hp'] },
@@ -196,11 +203,13 @@ if (typeof window !== 'undefined') {
       description: '',
       manufacturer: '',
       model: '',
-      quantity: '',
       voltage: '',
       loadType: '',
       mccUnitType: '',
       starterType: '',
+      controlScheme: '',
+      breakerTripA: '',
+      breakerFrameA: '',
       duty: '',
       kw: '',
       hp: '',
@@ -228,11 +237,13 @@ if (typeof window !== 'undefined') {
         'description',
         'manufacturer',
         'model',
-        'quantity',
         'voltage',
         'loadType',
         'mccUnitType',
         'starterType',
+        'controlScheme',
+        'breakerTripA',
+        'breakerFrameA',
         'kw',
         'hp',
         'powerFactor',
@@ -259,9 +270,7 @@ if (typeof window !== 'undefined') {
     }
 
     function connectedKw(load) {
-      const qty = parseFloat(load.quantity) || 1;
-      const kw = parseFloat(load.kw) || 0;
-      return qty * kw;
+      return parseFloat(load.kw) || 0;
     }
 
     function normalizeHeader(value) {
@@ -269,19 +278,82 @@ if (typeof window !== 'undefined') {
     }
 
     function usesStarterType(mccUnitType, loadType) {
-      const unitType = String(mccUnitType || '').trim().toLowerCase();
-      if (unitType) return unitType === 'starter';
-      return String(loadType || '').trim().toLowerCase().includes('motor');
+      return effectiveMccUnitType(mccUnitType, loadType) === 'starter';
     }
 
-    function syncRowStarterTypeControl(tr) {
+    function effectiveMccUnitType(mccUnitType, loadType) {
+      const unitType = String(mccUnitType || '').trim().toLowerCase().replace(/[\s_]+/g, '-');
+      if (unitType) return unitType;
+      const kind = String(loadType || '').trim().toLowerCase();
+      if (kind.includes('vfd') || kind.includes('variable frequency')) return 'vfd';
+      if (kind.includes('motor')) return 'starter';
+      if (kind.includes('spare')) return 'spare';
+      if (kind.includes('breaker')) return 'breaker';
+      return 'feeder';
+    }
+
+    function normalizeLoadControlScheme(load = {}) {
+      return normalizeMccControlScheme(load.controlScheme, {
+        type: effectiveMccUnitType(load.mccUnitType, load.loadType),
+        starterType: load.starterType
+      });
+    }
+
+    function controlSchemeOptionList(load = {}) {
+      const selected = normalizeLoadControlScheme(load);
+      return mccControlSchemeChoices({
+        type: effectiveMccUnitType(load.mccUnitType, load.loadType),
+        starterType: load.starterType
+      }).map(option => `<option value="${escapeAttr(option.value)}"${option.value === selected ? ' selected' : ''}>${escapeHtml(option.label)}</option>`).join('');
+    }
+
+    function breakerTripExceedsFrame(load = {}) {
+      const tripText = String(load.breakerTripA ?? '').trim();
+      const frameText = String(load.breakerFrameA ?? '').trim();
+      if (!tripText || !frameText) return false;
+      const tripA = Number.parseFloat(tripText);
+      const frameA = Number.parseFloat(frameText);
+      return Number.isFinite(tripA) && Number.isFinite(frameA) && tripA > frameA;
+    }
+
+    function normalizeLoadBreakerRatings(load = {}) {
+      const next = { ...load };
+      const raw = String(next.breakerA || next.ocpdRating || '').trim();
+      if (!raw) return next;
+      const tripMatch = raw.match(/(\d[\d,.]*)\s*A?T\b/i);
+      const frameMatch = raw.match(/(\d[\d,.]*)\s*A?F\b/i);
+      const ratings = raw.match(/\d[\d,.]*/g) || [];
+      if (!String(next.breakerTripA || '').trim()) {
+        next.breakerTripA = (tripMatch?.[1] || (ratings.length ? ratings[0] : '')).replace(/,/g, '');
+      }
+      if (!String(next.breakerFrameA || '').trim()) {
+        next.breakerFrameA = (frameMatch?.[1] || (ratings.length >= 2 ? ratings[1] : '')).replace(/,/g, '');
+      }
+      return next;
+    }
+
+    function syncRowMccControls(tr) {
       const unitType = tr.querySelector('[name="mccUnitType"]')?.value;
       const loadType = tr.querySelector('[name="loadType"]')?.value;
       const starterType = tr.querySelector('[name="starterType"]');
-      if (!starterType) return;
-      const enabled = usesStarterType(unitType, loadType);
-      starterType.disabled = !enabled;
-      if (!enabled) starterType.value = '';
+      const controlScheme = tr.querySelector('[name="controlScheme"]');
+      const starterEnabled = usesStarterType(unitType, loadType);
+      if (starterType) {
+        starterType.disabled = !starterEnabled;
+        if (!starterEnabled) starterType.value = '';
+      }
+      if (controlScheme) {
+        const load = {
+          mccUnitType: unitType,
+          loadType,
+          starterType: starterType?.value || '',
+          controlScheme: controlScheme.value
+        };
+        const enabled = ['starter', 'vfd'].includes(effectiveMccUnitType(unitType, loadType));
+        controlScheme.innerHTML = controlSchemeOptionList(load);
+        controlScheme.disabled = !enabled;
+        if (!enabled) controlScheme.value = '';
+      }
     }
 
     function createIcon(path) {
@@ -325,8 +397,9 @@ if (typeof window !== 'undefined') {
     const idx = getStoreIndex(tr);
     const load = gatherRow(tr);
     if (!usesStarterType(load.mccUnitType, load.loadType)) load.starterType = '';
-    const numericFields = ['quantity','voltage','kw','hp','powerFactor','loadFactor','efficiency','demandFactor','phases'];
-    const nonNegativeFields = ['hp'];
+    load.controlScheme = normalizeLoadControlScheme(load);
+    const numericFields = ['voltage','kw','hp','breakerTripA','breakerFrameA','powerFactor','loadFactor','efficiency','demandFactor','phases'];
+    const nonNegativeFields = ['hp', 'breakerTripA', 'breakerFrameA'];
     const rangeFields = [
       { name: 'powerFactor', min: 0, max: 1 },
       { name: 'loadFactor', min: 0, max: 100 },
@@ -368,6 +441,25 @@ if (typeof window !== 'undefined') {
         input.removeAttribute('title');
       }
     });
+    const breakerTripInput = tr.querySelector('input[name="breakerTripA"]');
+    const breakerFrameInput = tr.querySelector('input[name="breakerFrameA"]');
+    const breakerTripA = Number.parseFloat(breakerTripInput?.value);
+    const breakerFrameA = Number.parseFloat(breakerFrameInput?.value);
+    if (breakerTripExceedsFrame({ breakerTripA, breakerFrameA })) {
+      [breakerTripInput, breakerFrameInput].forEach(input => {
+        input.classList.add('input-error');
+        input.title = 'Breaker trip rating cannot exceed the breaker frame rating.';
+        input.setAttribute('aria-invalid', 'true');
+      });
+      valid = false;
+    } else {
+      [breakerTripInput, breakerFrameInput].forEach(input => {
+        if (!input || !input.title?.includes('cannot exceed')) return;
+        input.classList.remove('input-error');
+        input.removeAttribute('title');
+        input.removeAttribute('aria-invalid');
+      });
+    }
     if (isMeaningfulLoad(load)) {
       Object.entries(requiredFields).forEach(([name, label]) => {
         const input = tr.querySelector(`[name="${name}"]`);
@@ -669,6 +761,7 @@ if (typeof window !== 'undefined') {
     tr.classList.add(rowClass);
     const starterTypeEnabled = usesStarterType(load.mccUnitType, load.loadType);
     const starterTypeValue = starterTypeEnabled ? String(load.starterType || '') : '';
+    const controlSchemeEnabled = ['starter', 'vfd'].includes(effectiveMccUnitType(load.mccUnitType, load.loadType));
     tr.innerHTML = `
       <td data-column="select" class="load-sticky-select"><input type="checkbox" class="row-select" aria-label="Select row"></td>
       <td data-column="source" class="load-sticky-source"><input name="source" type="text" list="load-source-list" value="${escapeAttr(load.source || '')}" placeholder="SWBD-101"></td>
@@ -676,7 +769,6 @@ if (typeof window !== 'undefined') {
       <td data-column="description" class="load-sticky-description"><input name="description" type="text" value="${escapeAttr(load.description || '')}" placeholder="Load description"></td>
       <td data-column="manufacturer"><input name="manufacturer" type="text" class="manufacturer-input" value="${escapeAttr(load.manufacturer || '')}"></td>
       <td data-column="model"><input name="model" type="text" class="model-input" value="${escapeAttr(load.model || '')}"></td>
-      <td data-column="quantity"><input name="quantity" type="number" step="any" min="0" maxlength="15" value="${escapeAttr(load.quantity || '')}" placeholder="1"></td>
       <td data-column="voltage"><input name="voltage" type="number" step="any" min="0" maxlength="15" value="${escapeAttr(load.voltage || '')}" placeholder="480"></td>
       <td data-column="loadType"><input name="loadType" type="text" list="load-type-list" value="${escapeAttr(load.loadType || '')}" placeholder="Motor"></td>
       <td data-column="mccUnitType"><select name="mccUnitType" aria-label="MCC unit type" title="Sets the generated MCC bucket type; leave Auto to infer it from Load Type.">
@@ -685,6 +777,11 @@ if (typeof window !== 'undefined') {
       <td data-column="starterType"><select name="starterType" aria-label="Starter type" title="Starter method used for MCC generation and preliminary NEMA sizing."${starterTypeEnabled ? '' : ' disabled'}>
         ${MCC_STARTER_TYPE_CHOICES.map(type => `<option value="${escapeAttr(type.value)}"${starterTypeValue === type.value ? ' selected' : ''}>${escapeHtml(type.label)}</option>`).join('')}
       </select></td>
+      <td data-column="controlScheme"><select name="controlScheme" aria-label="Control scheme" title="Operator control arrangement. Available choices follow the MCC unit and starter type."${controlSchemeEnabled ? '' : ' disabled'}>
+        ${controlSchemeOptionList(load)}
+      </select></td>
+      <td data-column="breakerTripA"><input name="breakerTripA" type="number" step="any" min="0" value="${escapeAttr(load.breakerTripA || '')}" aria-label="Breaker trip amperes" title="Protective-device trip rating in amperes; kept separate from the breaker frame rating."></td>
+      <td data-column="breakerFrameA"><input name="breakerFrameA" type="number" step="any" min="0" value="${escapeAttr(load.breakerFrameA || '')}" aria-label="Breaker frame amperes" title="Breaker amp-frame rating used for preliminary feeder-breaker bucket sizing."></td>
       <td data-column="duty"><select name="duty">
         <option value=""></option>
         <option value="Continuous"${load.duty === 'Continuous' ? ' selected' : ''}>Continuous</option>
@@ -709,10 +806,13 @@ if (typeof window !== 'undefined') {
     Array.from(tr.querySelectorAll('input[type="text"],input[type="number"],select,textarea')).forEach(input => {
       const td = input.parentElement;
       input.addEventListener('focus', () => { input.dataset.prevValue = input.value; });
-      input.addEventListener('blur', () => saveRow(tr));
+      input.addEventListener('blur', () => {
+        if (['loadType', 'mccUnitType', 'starterType'].includes(input.name)) syncRowMccControls(tr);
+        saveRow(tr);
+      });
       if (input.tagName === 'SELECT') {
         input.addEventListener('change', () => {
-          if (input.name === 'mccUnitType') syncRowStarterTypeControl(tr);
+          if (['mccUnitType', 'starterType'].includes(input.name)) syncRowMccControls(tr);
           saveRow(tr);
         });
       }
@@ -852,11 +952,13 @@ if (typeof window !== 'undefined') {
       <td data-column="description" class="load-sticky-description"></td>
       <td data-column="manufacturer"></td>
       <td data-column="model"></td>
-      <td data-column="quantity"></td>
       <td data-column="voltage"></td>
       <td data-column="loadType"></td>
       <td data-column="mccUnitType"></td>
       <td data-column="starterType"></td>
+      <td data-column="controlScheme"></td>
+      <td data-column="breakerTripA"></td>
+      <td data-column="breakerFrameA"></td>
       <td data-column="duty"></td>
       <td data-column="kw">${totals.kW.toFixed(2)}</td>
       <td data-column="hp"></td>
@@ -928,6 +1030,9 @@ if (typeof window !== 'undefined') {
       load.loadType,
       load.mccUnitType,
       load.starterType,
+      load.controlScheme,
+      load.breakerTripA,
+      load.breakerFrameA,
       load.hp,
       load.circuit,
       load.notes
@@ -952,7 +1057,7 @@ if (typeof window !== 'undefined') {
         .filter(entry => matchesLoadFilter(entry.load, filterQuery));
 
       if (hasStoredLoads && !filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="24" class="empty-state">No matching loads for the current search.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${viewPresets.full.length}" class="empty-state">No matching loads for the current search.</td></tr>`;
       } else {
         filtered.forEach((entry, idx) => tbody.appendChild(createRow(entry.load, idx, entry.storeIndex)));
       }
@@ -987,11 +1092,13 @@ if (typeof window !== 'undefined') {
       'description',
       'manufacturer',
       'model',
-      'quantity',
       'voltage',
       'loadType',
       'mccUnitType',
       'starterType',
+      'controlScheme',
+      'breakerTripA',
+      'breakerFrameA',
       'duty',
       'kw',
       'hp',
@@ -1010,7 +1117,7 @@ if (typeof window !== 'undefined') {
       'demandKw'
     ].join(delimiter);
     const lines = loads.map(l => {
-      const base = { source: '', manufacturer: '', model: '', notes: '', panelId: '', breaker: '', duty: '', hp: '', ...l };
+      const base = { source: '', manufacturer: '', model: '', notes: '', panelId: '', breaker: '', duty: '', hp: '', controlScheme: '', breakerTripA: '', breakerFrameA: '', ...l };
       const full = { ...base, ...calculateDerived(base) };
       const vals = [
         full.source,
@@ -1018,11 +1125,13 @@ if (typeof window !== 'undefined') {
         full.description,
         full.manufacturer,
         full.model,
-        full.quantity,
         full.voltage,
         full.loadType,
         full.mccUnitType,
         full.starterType,
+        full.controlScheme,
+        full.breakerTripA,
+        full.breakerFrameA,
         full.duty,
         full.kw,
         full.hp,
@@ -1209,8 +1318,9 @@ if (typeof window !== 'undefined') {
       ? mergeLoadRows(dataStore.getLoads(), incomingLoads)
       : incomingLoads;
     dataStore.setLoads(nextLoads.map(load => {
-      const next = { ...load };
+      const next = normalizeLoadBreakerRatings(load);
       if (!usesStarterType(next.mccUnitType, next.loadType)) next.starterType = '';
+      next.controlScheme = normalizeLoadControlScheme(next);
       return { ...next, ...calculateDerived(next) };
     }));
     render();
@@ -1250,11 +1360,13 @@ if (typeof window !== 'undefined') {
         description: '',
         manufacturer: '',
         model: '',
-        quantity: '',
         voltage: '',
         loadType: '',
         mccUnitType: '',
         starterType: '',
+        controlScheme: '',
+        breakerTripA: '',
+        breakerFrameA: '',
         duty: '',
         kw: '',
         hp: '',
@@ -1289,17 +1401,17 @@ if (typeof window !== 'undefined') {
       let load;
       if (cols.length === 13 || cols.length === 14 || cols.length === 16 || cols.length === 17) {
         let source = '';
-        let tag, description, manufacturer = '', model = '', quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit, notes = '';
+        let tag, description, manufacturer = '', model = '', legacyQuantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit, notes = '';
         if (cols.length === 13) {
-          [tag, description, quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit] = cols;
+          [tag, description, legacyQuantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit] = cols;
         } else if (cols.length === 14) {
-          [source, tag, description, quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit] = cols;
+          [source, tag, description, legacyQuantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit] = cols;
         } else if (cols.length === 16) {
-          [tag, description, manufacturer, model, quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit, notes] = cols;
+          [tag, description, manufacturer, model, legacyQuantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit, notes] = cols;
         } else {
-          [source, tag, description, manufacturer, model, quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit, notes] = cols;
+          [source, tag, description, manufacturer, model, legacyQuantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit, notes] = cols;
         }
-        const nums = [quantity, voltage, kw, powerFactor, loadFactor, efficiency, demandFactor];
+        const nums = [legacyQuantity, voltage, kw, powerFactor, loadFactor, efficiency, demandFactor];
         if (nums.some(n => n && isNaN(Number(n)))) throw new Error('Invalid CSV data');
         load = {
           source,
@@ -1307,7 +1419,6 @@ if (typeof window !== 'undefined') {
           description,
           manufacturer,
           model,
-          quantity,
           voltage,
           loadType,
           duty,
@@ -1324,12 +1435,12 @@ if (typeof window !== 'undefined') {
         };
       } else if (cols.length === 19 || cols.length === 20 || cols.length === 22 || cols.length === 23) {
         let source = '';
-        let tag, description, manufacturer = '', model = '', quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit, notes = '', panelId, breaker, kva, current, demandKva, demandKw;
+        let tag, description, manufacturer = '', model = '', legacyQuantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit, notes = '', panelId, breaker, kva, current, demandKva, demandKw;
         if (cols.length === 19) {
           [
             tag,
             description,
-            quantity,
+            legacyQuantity,
             voltage,
             loadType,
             duty,
@@ -1352,7 +1463,7 @@ if (typeof window !== 'undefined') {
             source,
             tag,
             description,
-            quantity,
+            legacyQuantity,
             voltage,
             loadType,
             duty,
@@ -1376,7 +1487,7 @@ if (typeof window !== 'undefined') {
             description,
             manufacturer,
             model,
-            quantity,
+            legacyQuantity,
             voltage,
             loadType,
             duty,
@@ -1402,7 +1513,7 @@ if (typeof window !== 'undefined') {
             description,
             manufacturer,
             model,
-            quantity,
+            legacyQuantity,
             voltage,
             loadType,
             duty,
@@ -1422,7 +1533,7 @@ if (typeof window !== 'undefined') {
             demandKw
           ] = cols;
         }
-        const nums = [quantity, voltage, kw, powerFactor, loadFactor, efficiency, demandFactor, kva, current, demandKva, demandKw];
+        const nums = [legacyQuantity, voltage, kw, powerFactor, loadFactor, efficiency, demandFactor, kva, current, demandKva, demandKw];
         if (nums.some(n => n && isNaN(Number(n)))) throw new Error('Invalid CSV data');
         load = {
           source,
@@ -1430,7 +1541,6 @@ if (typeof window !== 'undefined') {
           description,
           manufacturer,
           model,
-          quantity,
           voltage,
           loadType,
           duty,
@@ -1515,8 +1625,18 @@ if (typeof window !== 'undefined') {
           </select>
         </label>
         <label class="modal-form-field">
-          <span>Qty</span>
-          <input name="quantity" type="number" min="0" step="any" value="${escapeAttr(load.quantity || '')}" placeholder="1">
+          <span>Control Scheme</span>
+          <select name="controlScheme">
+            ${controlSchemeOptionList(load)}
+          </select>
+        </label>
+        <label class="modal-form-field">
+          <span>Breaker Trip (A)</span>
+          <input name="breakerTripA" type="number" min="0" step="any" value="${escapeAttr(load.breakerTripA || '')}" title="Protective-device trip rating in amperes.">
+        </label>
+        <label class="modal-form-field">
+          <span>Breaker Frame (A)</span>
+          <input name="breakerFrameA" type="number" min="0" step="any" value="${escapeAttr(load.breakerFrameA || '')}" title="Amp-frame rating used for preliminary feeder-breaker bucket sizing.">
         </label>
         <label class="modal-form-field">
           <span>Voltage (V)</span>
@@ -1556,17 +1676,28 @@ if (typeof window !== 'undefined') {
           <input name="circuit" type="text" value="${escapeAttr(load.circuit || '')}" placeholder="L1-01">
         </label>
       </div>
-      <p class="field-hint">Motor HP is optional and supports preliminary MCC starter sizing; it does not replace kW. Use Full Detail view for manufacturer, model, notes, and advanced factors.</p>
+      <p class="field-hint">Control Scheme choices follow the selected MCC unit and starter type. Motor HP supports preliminary starter sizing. Breaker trip and frame ratings are separate; feeder-breaker bucket sizing uses the frame rating. These fields do not replace manufacturer selection or verification.</p>
     `;
     body.appendChild(form);
     controller.registerForm(form);
     const typeSelect = form.querySelector('[name="loadType"]');
     const unitTypeSelect = form.querySelector('[name="mccUnitType"]');
     const starterTypeSelect = form.querySelector('[name="starterType"]');
-    const syncFormStarterType = () => {
-      const enabled = usesStarterType(unitTypeSelect.value, typeSelect.value);
-      starterTypeSelect.disabled = !enabled;
-      if (!enabled) starterTypeSelect.value = '';
+    const controlSchemeSelect = form.querySelector('[name="controlScheme"]');
+    const syncFormMccControls = () => {
+      const starterEnabled = usesStarterType(unitTypeSelect.value, typeSelect.value);
+      starterTypeSelect.disabled = !starterEnabled;
+      if (!starterEnabled) starterTypeSelect.value = '';
+      const next = {
+        mccUnitType: unitTypeSelect.value,
+        loadType: typeSelect.value,
+        starterType: starterTypeSelect.value,
+        controlScheme: controlSchemeSelect.value
+      };
+      const controlEnabled = ['starter', 'vfd'].includes(effectiveMccUnitType(next.mccUnitType, next.loadType));
+      controlSchemeSelect.innerHTML = controlSchemeOptionList(next);
+      controlSchemeSelect.disabled = !controlEnabled;
+      if (!controlEnabled) controlSchemeSelect.value = '';
     };
     typeSelect.addEventListener('change', () => {
       const next = applyLoadTypeDefaults(collectFormLoad(form), typeSelect.value);
@@ -1574,10 +1705,11 @@ if (typeof window !== 'undefined') {
         const field = form.querySelector(`[name="${key}"]`);
         if (field) field.value = value;
       });
-      syncFormStarterType();
+      syncFormMccControls();
     });
-    unitTypeSelect.addEventListener('change', syncFormStarterType);
-    syncFormStarterType();
+    unitTypeSelect.addEventListener('change', syncFormMccControls);
+    starterTypeSelect.addEventListener('change', syncFormMccControls);
+    syncFormMccControls();
     return form.querySelector('[name="description"]');
   }
 
@@ -1594,8 +1726,13 @@ if (typeof window !== 'undefined') {
         const form = controller.body.querySelector('.load-entry-form');
         let load = collectFormLoad(form);
         load = applyLoadTypeDefaults(load, load.loadType);
+        load.controlScheme = normalizeLoadControlScheme(load);
         if (!String(load.description || '').trim() && !String(load.tag || '').trim()) {
           showAlertModal('Load Required', 'Enter a description or tag before adding the load.');
+          return false;
+        }
+        if (breakerTripExceedsFrame(load)) {
+          showAlertModal('Breaker Ratings', 'Breaker trip rating cannot exceed the breaker frame rating.');
           return false;
         }
         dataStore.addLoad({ ...load, ...calculateDerived(load) });
@@ -1636,6 +1773,14 @@ if (typeof window !== 'undefined') {
           <select data-batch-field="starterType">
             ${MCC_STARTER_TYPE_CHOICES.map(type => `<option value="${escapeAttr(type.value)}">${escapeHtml(type.label)}</option>`).join('')}
           </select>
+          <label><input data-batch-toggle="controlScheme" type="checkbox"> Control Scheme</label>
+          <select data-batch-field="controlScheme">
+            ${MCC_CONTROL_SCHEME_CHOICES.map(option => `<option value="${escapeAttr(option.value)}">${escapeHtml(option.label)}</option>`).join('')}
+          </select>
+          <label><input data-batch-toggle="breakerTripA" type="checkbox"> Breaker Trip (A)</label>
+          <input data-batch-field="breakerTripA" type="number" min="0" step="any">
+          <label><input data-batch-toggle="breakerFrameA" type="checkbox"> Breaker Frame (A)</label>
+          <input data-batch-field="breakerFrameA" type="number" min="0" step="any">
           <label><input data-batch-toggle="voltage" type="checkbox"> Voltage</label>
           <input data-batch-field="voltage" type="number" min="0" step="any" placeholder="480">
           <label><input data-batch-toggle="phases" type="checkbox"> Phases</label>
@@ -1671,8 +1816,13 @@ if (typeof window !== 'undefined') {
           if (!indices.includes(idx)) return load;
           const next = { ...load, ...updates };
           if (!usesStarterType(next.mccUnitType, next.loadType)) next.starterType = '';
+          next.controlScheme = normalizeLoadControlScheme(next);
           return { ...next, ...calculateDerived(next) };
         });
+        if (loads.some(breakerTripExceedsFrame)) {
+          showAlertModal('Breaker Ratings', 'The batch update would make a breaker trip rating exceed its frame rating.');
+          return false;
+        }
         dataStore.setLoads(loads);
         render();
         return true;

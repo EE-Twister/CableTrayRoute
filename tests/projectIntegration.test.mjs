@@ -21,13 +21,14 @@ import {
 } from '../analysis/projectIntegration.mjs';
 
 const loads = [
-  { id: 'L-1', description: 'Critical lighting', kw: 20, demandFactor: 1 },
+  { id: 'L-1', description: 'Critical lighting', kw: 20, quantity: 4, demandFactor: 1 },
   { id: 'L-2', description: 'HVAC', kw: 75, demandFactor: 0.8 },
   { id: 'L-3', description: 'Pump', hp: 100, efficiency: 0.9, demandFactor: 0.5 },
 ];
 
 const normalizedLoads = projectLoadRows(loads);
 assert.equal(normalizedLoads.length, 3);
+assert.equal(normalizedLoads[0].kw, 20, 'legacy quantity must not multiply a uniquely tagged project load');
 assert.equal(normalizedLoads[2].kw, 82.889);
 assert.equal(normalizedLoads[2].sourcePath, 'loads.L-3');
 

@@ -21,6 +21,7 @@ describe('MCC lineup page', () => {
   const pageJs = fs.readFileSync(path.join(root, 'src', 'mccLineupPage.js'), 'utf8');
   const modelJs = fs.readFileSync(path.join(root, 'src', 'mccLineupModel.mjs'), 'utf8');
   const loadListSyncJs = fs.readFileSync(path.join(root, 'src', 'mcc-lineup', 'loadListSync.mjs'), 'utf8');
+  const projectIntegrationJs = fs.readFileSync(path.join(root, 'src', 'mcc-lineup', 'projectIntegration.mjs'), 'utf8');
   const dataStoreJs = fs.readFileSync(path.join(root, 'dataStore.mjs'), 'utf8');
   const arrangementHtml = fs.readFileSync(path.join(root, 'equipmentarrangements.html'), 'utf8');
   const arrangementJs = fs.readFileSync(path.join(root, 'equipmentarrangements.js'), 'utf8');
@@ -55,6 +56,13 @@ describe('MCC lineup page', () => {
     assert.ok(html.includes('data-mcc-lineup-field="verticalBusRatingA"'), 'mcclineup.html missing vertical bus rating field');
     assert.ok(html.includes('data-mcc-lineup-field="topHorizontalWirewayHeightIn"'), 'mcclineup.html missing top horizontal wireway field');
     assert.ok(html.includes('data-mcc-lineup-field="bottomHorizontalWirewayHeightIn"'), 'mcclineup.html missing bottom horizontal wireway field');
+    assert.ok(html.includes('id="mcc-project-data-panel"'), 'mcclineup.html missing linked project data panel');
+    assert.ok(html.includes('data-mcc-system-field="availableFaultCurrentKa"'), 'mcclineup.html missing available fault current field');
+    assert.ok(html.includes('data-mcc-system-field="frequencyHz"'), 'mcclineup.html missing system frequency field');
+    assert.ok(html.includes('data-mcc-system-field="certifications"'), 'mcclineup.html missing certification choices');
+    assert.ok(html.includes('data-mcc-installation-field="incomingCableSummary"'), 'mcclineup.html missing incoming conductor interface field');
+    assert.ok(html.includes('data-mcc-installation-field="shippingSplitRequirements"'), 'mcclineup.html missing shipping split field');
+    assert.ok(html.includes('data-mcc-installation-field="hazardousAreaClassification"'), 'mcclineup.html missing hazardous area classification field');
     assert.ok(html.includes('class="mcc-spec-details"'), 'mcclineup.html missing specification dropdown');
     assert.ok(html.includes('data-mcc-spec-field="busMaterial"'), 'mcclineup.html missing bus material specification field');
     assert.ok(html.includes('data-mcc-spec-field="busPlating"'), 'mcclineup.html missing bus plating specification field');
@@ -111,6 +119,8 @@ describe('MCC lineup page', () => {
       'export function renderMccOneLineSvg',
       'export function findMccLineupForEquipment',
       'export function normalizeMccSpecRequirements',
+      'export function normalizeMccSystemRequirements',
+      'export function normalizeMccInstallationRequirements',
       'export function normalizeMccReportTitleBlock',
       'export function mccSpecSummary',
       'export function mccBucketPositionLabel',
@@ -130,6 +140,9 @@ describe('MCC lineup page', () => {
       'MCC_MOTOR_PROTECTION_DEVICE_TYPES',
       'MCC_STARTER_TYPES',
       'MCC_STARTER_TYPE_CHOICES',
+      'MCC_CONTROL_SCHEME_CHOICES',
+      'mccControlSchemeChoices',
+      'mccControlSchemeLabel',
       'mccMainDeviceLabel',
       'mccStarterTypeLabel',
       'mccStarterTypeSizeLabel',
@@ -144,6 +157,11 @@ describe('MCC lineup page', () => {
       'mcc-oneline-position',
       'DEFAULT_MCC_VERTICAL_WIREWAY_WIDTH_IN',
       'specRequirements',
+      'systemRequirements',
+      'installationRequirements',
+      'projectDataLinkedFields',
+      'projectDataOverrides',
+      'projectDataSources',
       'reportTitleBlock',
       'equipmentTag',
       'equipmentDescription',
@@ -156,11 +174,29 @@ describe('MCC lineup page', () => {
       'motorSpaceHeaterRequired',
       'motorSpaceHeaterVa',
       'starterType',
+      'controlScheme',
       'horizontalBusRatingA',
       'verticalBusRatingA',
       'topHorizontalWirewayHeightIn',
       'bottomHorizontalWirewayHeightIn'
     ].forEach(fragment => assert.ok(modelJs.includes(fragment), `mccLineupModel.mjs missing ${fragment}`));
+  });
+
+  it('reuses upstream project data while preserving MCC manual overrides', () => {
+    [
+      'export function buildMccProjectInputSuggestions',
+      'export function applyMccProjectInputSuggestions',
+      'export function markMccProjectFieldOverride',
+      'export function mccProjectFieldSource',
+      'projectMeta',
+      'designBasis',
+      'equipment',
+      'oneLine',
+      'studies',
+      'cables',
+      'projectDataOverrides',
+      'force'
+    ].forEach(fragment => assert.ok(projectIntegrationJs.includes(fragment), `projectIntegration.mjs missing ${fragment}`));
   });
 
   it('wires page controls to storage and equipment sync', () => {
@@ -181,8 +217,15 @@ describe('MCC lineup page', () => {
       'doc.save',
       'pdfSpecRows',
       'addSpecificationRequirements',
-      'Specification Requirements',
+      'System, Specification, and Installation Requirements',
       'Specified Value',
+      'Source / Status',
+      'buildMccProjectInputSuggestions',
+      'applyMccProjectInputSuggestions',
+      'replaceDefaults: true',
+      'renderProjectInputPanel',
+      'data-mcc-system-field',
+      'data-mcc-installation-field',
       'pdfOneLineBranchCount',
       'addPdfOneLinePages',
       'branchesPerRow',
@@ -197,6 +240,9 @@ describe('MCC lineup page', () => {
       'heightIn = 12',
       'data-bucket-field="starterType"',
       'starterTypeOptionList',
+      'data-bucket-field="controlScheme"',
+      'controlSchemeOptionList',
+      'Control Scheme',
       'starterSizeChartTooltip',
       'NEMA Size Motor Starters',
       'mcc-starter-chart-tooltip',
@@ -271,12 +317,14 @@ describe('MCC lineup page', () => {
       pageJs.indexOf('<th>Move / Drag</th>') > pageJs.indexOf('<th>Notes</th>'),
       'mccLineupPage.js should keep bucket controls at the right side of the table'
     );
-    assert.ok(styleCss.includes('.mcc-bucket-table th:nth-child(9)'), 'style.css should explicitly size the Starter Size column');
+    assert.ok(styleCss.includes('.mcc-bucket-table th:nth-child(9)'), 'style.css should explicitly size the Control Scheme column');
+    assert.ok(styleCss.includes('width:220px'), 'style.css should widen the Control Scheme column');
+    assert.ok(styleCss.includes('.mcc-bucket-table th:nth-child(10)'), 'style.css should explicitly size the Starter Size column');
     assert.ok(styleCss.includes('width:180px'), 'style.css should widen the Starter Size column');
     assert.ok(styleCss.includes('.mcc-starter-chart-tooltip'), 'style.css should style the NEMA starter size chart tooltip');
     assert.ok(styleCss.includes('.mcc-info-button'), 'style.css should style the starter size info button');
-    assert.ok(styleCss.includes('.mcc-bucket-table th:nth-child(12)'), 'style.css should explicitly size the Notes column');
-    assert.ok(styleCss.includes('min-width:1750px'), 'style.css should keep the MCC bucket table wide enough for motor heater, notes, and action buttons');
+    assert.ok(styleCss.includes('.mcc-bucket-table th:nth-child(13)'), 'style.css should explicitly size the Notes column');
+    assert.ok(styleCss.includes('min-width:1970px'), 'style.css should keep the MCC bucket table wide enough for control scheme, motor heater, notes, and action buttons');
     assert.ok(styleCss.includes('.mcc-bucket-check-cell'), 'style.css should center bucket-level checkbox controls');
     assert.ok(styleCss.includes('.mcc-bucket-actions .mcc-bucket-icon-btn .control-icon'), 'style.css should style bucket action icons');
     assert.ok(styleCss.includes('flex:0 0 32px'), 'style.css should keep all bucket action buttons the same fixed size');

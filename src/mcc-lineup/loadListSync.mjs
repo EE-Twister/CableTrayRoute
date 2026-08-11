@@ -4,13 +4,14 @@ import {
   MCC_STARTER_TYPES,
   bucketHeightFromUnits,
   createMccUniqueId,
+  normalizeMccControlScheme,
   normalizeMccLineup
 } from '../mccLineupModel.mjs';
 import {
   approximateMccBucketSizeFromNema,
   approximateNemaStarterSize
 } from './nemaStarterSizing.mjs';
-import { approximateFeederBreakerBucketSize } from './breakerBucketSizing.mjs';
+import { approximateFeederBreakerBucketSize, parseBreakerAmpFrame } from './breakerBucketSizing.mjs';
 
 const LOAD_MANAGED_BUCKET_FIELDS = [
   'label',
@@ -29,6 +30,7 @@ const LOAD_MANAGED_BUCKET_FIELDS = [
   'breakerA',
   'breakerFrameA',
   'starterType',
+  'controlScheme',
   'starterSize',
   'starterSizeEstimated',
   'starterSizeBasis',
@@ -74,13 +76,17 @@ function bucketSourceValues(load, lineup) {
   const status = type === 'space' ? 'space' : (type === 'spare' ? 'spare' : 'active');
   const requestedStarterType = token(explicitValue(load, ['starterType', 'starter_type'])).replace(/[\s_]+/g, '-');
   const starterType = MCC_STARTER_TYPES.includes(requestedStarterType) ? requestedStarterType : '';
+  const controlScheme = normalizeMccControlScheme(
+    explicitValue(load, ['controlScheme', 'control_scheme']),
+    { type, starterType }
+  );
   const hp = explicitValue(load, ['hp', 'horsepower', 'motorHp', 'motorHP']);
   const explicitStarterSize = explicitValue(load, ['starterSize', 'starter_size']);
   const starterSizing = type === 'starter' && !explicitStarterSize
     ? approximateNemaStarterSize({ hp, voltage: load.voltage, phases: load.phases, starterType: requestedStarterType || starterType })
     : { size: null, reason: explicitStarterSize ? 'explicit-size' : 'not-starter' };
   const starterSize = explicitStarterSize || starterSizing.label || '';
-  const breakerA = explicitValue(load, ['breakerA', 'breaker', 'ocpdRating', 'ocpd_rating', 'breakerTripA', 'breaker_trip_a']);
+  const breakerA = explicitValue(load, ['breakerTripA', 'breaker_trip_a', 'breakerA', 'breaker', 'ocpdRating', 'ocpd_rating']);
   const breakerFrameA = explicitValue(load, ['breakerFrameA', 'breakerFrame', 'breaker_frame_a', 'breaker_frame', 'frameA', 'frame_a']);
   const requestedUnits = Number.parseFloat(load.mccBucketUnits ?? load.bucketUnits ?? load.sizeUnits);
   const hasExplicitBucketSize = Number.isFinite(requestedUnits) && requestedUnits > 0;
@@ -124,6 +130,7 @@ function bucketSourceValues(load, lineup) {
     breakerA,
     breakerFrameA,
     starterType,
+    controlScheme,
     starterSize,
     starterSizeEstimated: Boolean(starterSizing.size),
     starterSizeBasis: starterSizing.size ? starterSizing.basis : '',
@@ -140,11 +147,11 @@ function sourceMetadata(load) {
     sourceCircuit: text(load.circuit),
     sourceLoadType: text(load.loadType || load.type),
     sourceMccUnitType: text(load.mccUnitType || load.mccBucketType || load.bucketType),
+    sourceControlScheme: text(load.controlScheme || load.control_scheme),
     sourceKw: text(load.kw),
     sourceHp: explicitValue(load, ['hp', 'horsepower', 'motorHp', 'motorHP']),
     sourceVoltage: text(load.voltage),
-    sourcePhases: text(load.phases),
-    sourceQuantity: text(load.quantity)
+    sourcePhases: text(load.phases)
   };
 }
 
@@ -216,6 +223,10 @@ function refreshManagedBucket(bucket, load, lineup) {
     next.starterSizeBasis = 'Manual MCC starter selection override; verify against the selected starter method and manufacturer ratings.';
   }
   if (breakerSizingOverridden && !physicalSizingOverridden && ['breaker', 'feeder', 'spare'].includes(next.type)) {
+    const parsedManualBreaker = parseBreakerAmpFrame({ breakerA: next.breakerA });
+    if (parsedManualBreaker.frameA && ['af-label', 'rating-pair'].includes(parsedManualBreaker.source)) {
+      next.breakerFrameA = String(parsedManualBreaker.frameA);
+    }
     const manualBreakerEstimate = approximateFeederBreakerBucketSize({
       breakerA: next.breakerA,
       breakerFrameA: next.breakerFrameA,
@@ -250,7 +261,7 @@ function voltageNumber(value) {
 }
 
 function loadHasMeaningfulData(load) {
-  return ['tag', 'ref', 'id', 'description', 'kw', 'loadType', 'mccUnitType', 'starterType'].some(field => text(load?.[field]));
+  return ['tag', 'ref', 'id', 'description', 'kw', 'loadType', 'mccUnitType', 'starterType', 'controlScheme'].some(field => text(load?.[field]));
 }
 
 export function mccLoadListTarget(lineup = {}) {
@@ -267,10 +278,6 @@ function loadWarnings(loads, lineup, createdCount) {
   const warnings = [];
   const lineupVoltage = voltageNumber(lineup.voltage);
   const missingTags = loads.filter(load => !text(load.tag || load.ref)).length;
-  const quantityRows = loads.filter(load => {
-    const quantity = Number.parseFloat(load.quantity);
-    return Number.isFinite(quantity) && quantity > 1;
-  }).length;
   const voltageMismatches = loads.filter(load => {
     const loadVoltage = voltageNumber(load.voltage);
     return lineupVoltage !== null && loadVoltage !== null && Math.abs(lineupVoltage - loadVoltage) > 0.5;
@@ -283,6 +290,11 @@ function loadWarnings(loads, lineup, createdCount) {
   const preliminaryStarterSizes = sourceValues.filter(values => values.starterSizeEstimated).length;
   const preliminaryStarterBucketSizes = sourceValues.filter(values => values.bucketSizeEstimateKind === 'starter').length;
   const preliminaryBreakerBucketSizes = sourceValues.filter(values => values.bucketSizeEstimateKind === 'breaker-frame').length;
+  const invalidBreakerPairs = sourceValues.filter(values => {
+    const tripA = Number.parseFloat(values.breakerA);
+    const frameA = Number.parseFloat(values.breakerFrameA);
+    return Number.isFinite(tripA) && Number.isFinite(frameA) && tripA > frameA;
+  }).length;
   const unsupportedStarterSizes = loads.filter(load => {
     if (loadBucketType(load) !== 'starter') return false;
     if (!explicitValue(load, ['hp', 'horsepower', 'motorHp', 'motorHP'])) return false;
@@ -298,12 +310,12 @@ function loadWarnings(loads, lineup, createdCount) {
 
   if (!loads.length) warnings.push(`No Load List records use ${mccLoadListTarget(lineup)} as their Source / Panel.`);
   if (missingTags) warnings.push(`${missingTags} matching load${missingTags === 1 ? '' : 's'} lack a tag; generated project IDs will be used.`);
-  if (quantityRows) warnings.push(`${quantityRows} load row${quantityRows === 1 ? ' has' : 's have'} quantity above 1; each row creates one bucket pending equipment-level confirmation.`);
   if (voltageMismatches) warnings.push(`${voltageMismatches} load${voltageMismatches === 1 ? '' : 's'} do not match the lineup voltage.`);
   if (motorsMissingHp) warnings.push(`${motorsMissingHp} motor load${motorsMissingHp === 1 ? '' : 's'} lack explicit horsepower; horsepower, starter size, and protective-device ratings remain unassigned.`);
   if (preliminaryStarterSizes) warnings.push(`${preliminaryStarterSizes} starter size${preliminaryStarterSizes === 1 ? ' uses' : 's use'} a preliminary NEMA horsepower-table estimate; confirm motor nameplate current, starter method, duty, and manufacturer ratings.`);
   if (preliminaryStarterBucketSizes) warnings.push(`${preliminaryStarterBucketSizes} MCC bucket height${preliminaryStarterBucketSizes === 1 ? ' uses' : 's use'} a conservative generic FVNR planning estimate; confirm the selected MCC manufacturer, starter construction, and options.`);
   if (preliminaryBreakerBucketSizes) warnings.push(`${preliminaryBreakerBucketSizes} feeder-breaker bucket height${preliminaryBreakerBucketSizes === 1 ? ' uses' : 's use'} a conservative amp-frame planning estimate; confirm the selected breaker frame, MCC manufacturer, lug and cable space, interrupting rating, and options.`);
+  if (invalidBreakerPairs) warnings.push(`${invalidBreakerPairs} load${invalidBreakerPairs === 1 ? ' has a' : 's have'} breaker trip rating above its frame rating; correct the ratings before using the bucket-size estimate.`);
   if (unsupportedStarterSizes) warnings.push(`${unsupportedStarterSizes} motor load${unsupportedStarterSizes === 1 ? '' : 's'} could not be assigned a preliminary NEMA starter size because the phase, voltage, horsepower, or starter method is outside the supported table scope.`);
   if (createdCount && missingBucketSize) warnings.push(`${missingBucketSize} load${missingBucketSize === 1 ? '' : 's'} lack an explicit MCC bucket size; new buckets use one MCC unit for preliminary layout.`);
   return warnings;
@@ -372,6 +384,9 @@ export function reconcileMccLineupFromLoads(lineup = {}, loads = []) {
       loadType: text(load.loadType),
       mccUnitType: text(load.mccUnitType || load.mccBucketType || load.bucketType),
       starterType: text(load.starterType || load.starter_type),
+      controlScheme: text(load.controlScheme || load.control_scheme),
+      breakerTripA: explicitValue(load, ['breakerTripA', 'breaker_trip_a', 'breakerA', 'breaker', 'ocpdRating', 'ocpd_rating']),
+      breakerFrameA: explicitValue(load, ['breakerFrameA', 'breakerFrame', 'breaker_frame_a', 'breaker_frame', 'frameA', 'frame_a']),
       kw: text(load.kw),
       hp: explicitValue(load, ['hp', 'horsepower', 'motorHp', 'motorHP']),
       voltage: text(load.voltage)

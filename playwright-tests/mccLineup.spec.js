@@ -125,7 +125,7 @@ test.describe("MCC Lineups", () => {
     await firstEquipmentTag.evaluate(node => node.dispatchEvent(new Event("change", { bubbles: true })));
     await firstEquipmentDescription.fill("Boiler Main Pump A");
     await firstEquipmentDescription.evaluate(node => node.dispatchEvent(new Event("change", { bubbles: true })));
-    await page.click(".mcc-spec-details summary");
+    await page.locator("summary").filter({ hasText: "Additional Information" }).click();
     await page.selectOption('[data-mcc-spec-field="busMaterial"]', "aluminum");
     await page.selectOption('[data-mcc-spec-field="busPlating"]', "other");
     await expect(page.locator('[data-mcc-spec-field="busPlatingOther"]')).toBeEnabled();
@@ -293,6 +293,90 @@ test.describe("MCC Lineups", () => {
     await page.click("#equipment-mcc-edit-link");
     await expect(page).toHaveURL(/mcclineup\.html\?mccLineupId=/);
     await expect(page.locator('[data-mcc-lineup-field="tag"]')).toHaveValue("MCC-TEST");
+  });
+
+  test("reuses project requirements while preserving manual MCC overrides", async ({ page }) => {
+    await installCleanProject(page);
+    await page.addInitScript(() => {
+      localStorage.setItem("base:equipment", JSON.stringify([{
+        id: "eq-mcc-1",
+        tag: "MCC-1",
+        voltage: 600,
+        phase: 3,
+        wires: 3,
+        frequency_hz: 60,
+        groundingConfiguration: "Solidly grounded wye",
+        sccrKa: 42,
+        arrangement: "Process Electrical Room"
+      }]));
+      localStorage.setItem("base:oneLineDiagram", JSON.stringify({
+        activeSheet: 0,
+        sheets: [{
+          components: [{
+            id: "ol-mcc-1",
+            label: "MCC-1",
+            props: { neutralRequirement: "No neutral", serviceEntrance: false }
+          }]
+        }]
+      }));
+      localStorage.setItem("base:studyResults", JSON.stringify({
+        shortCircuit: {
+          _meta: { method: "ANSI" },
+          "ol-mcc-1": { equipmentTag: "MCC-1", method: "ANSI", threePhaseKA: 31.5 }
+        }
+      }));
+      localStorage.setItem("base:cableSchedule", JSON.stringify([{
+        tag: "CBL-SWBD-MCC-1",
+        from_tag: "SWBD-1",
+        to_tag: "MCC-1",
+        parallel_count: 2,
+        conductors: 3,
+        conductor_size: "500 kcmil",
+        conductor_material: "Copper",
+        insulation_type: "XHHW-2"
+      }]));
+      localStorage.setItem("base:projectMeta", JSON.stringify({
+        name: "Process Expansion",
+        revision: "C",
+        altitudeFt: 750,
+        minAmbientTempC: -10,
+        maxAmbientTempC: 45
+      }));
+      localStorage.setItem("base:designBasis", JSON.stringify({
+        codeBasis: { primaryCode: "NEC", edition: "2023", jurisdiction: "Texas", ahj: "City Electrical" }
+      }));
+    });
+
+    await page.goto(pageUrl("mcclineup.html?e2e=1"));
+
+    await expect(page.locator("#mcc-project-data-panel")).toContainText("Equipment List");
+    await expect(page.locator("#mcc-project-data-panel")).toContainText("Short Circuit");
+    await expect(page.locator('[data-mcc-lineup-field="voltage"]')).toHaveValue("600V");
+    await expect(page.locator('[data-mcc-system-field="phases"]')).toHaveValue("3");
+    await expect(page.locator('[data-mcc-system-field="availableFaultCurrentKa"]')).toHaveValue("31.5");
+    await expect(page.locator('[data-mcc-spec-field="shortCircuitRatingKa"]')).toHaveValue("42");
+    await expect(page.locator('[data-mcc-installation-field="incomingCableSummary"]')).toHaveValue(/2 parallel runs/);
+    await expect(page.locator('[data-mcc-installation-field="maxAmbientTempC"]')).toHaveValue("45");
+    await expect(page.locator('[data-mcc-installation-field="maxAmbientTempC"]')).toHaveAttribute("data-project-input-state", "linked");
+
+    await page.locator("summary").filter({ hasText: "Installation Interfaces" }).click();
+    const maximumAmbient = page.locator('[data-mcc-installation-field="maxAmbientTempC"]');
+    await maximumAmbient.fill("50");
+    await maximumAmbient.evaluate(node => node.dispatchEvent(new Event("change", { bubbles: true })));
+    await expect(maximumAmbient).toHaveAttribute("data-project-input-state", "override");
+
+    const anchorage = page.locator('[data-mcc-installation-field="anchorageRequirements"]');
+    await anchorage.fill("Engineer-designed anchors");
+    await anchorage.evaluate(node => node.dispatchEvent(new Event("change", { bubbles: true })));
+    await page.reload();
+    await expect(maximumAmbient).toHaveValue("50");
+    await expect(maximumAmbient).toHaveAttribute("data-project-input-state", "override");
+    await expect(anchorage).toHaveValue("Engineer-designed anchors");
+
+    await page.locator("#mcc-project-data-panel").getByRole("button", { name: "Refresh from project" }).click();
+    await expect(maximumAmbient).toHaveValue("45");
+    await expect(maximumAmbient).toHaveAttribute("data-project-input-state", "linked");
+    await expect(anchorage).toHaveValue("Engineer-designed anchors");
   });
 
   test("places a standalone MCC lineup without an Equipment List row", async ({ page }) => {

@@ -88,7 +88,7 @@ global.navigator = { clipboard: { writeText: () => Promise.resolve() } };
   global.document = dom.document;
 
   const dataStore = await import('../dataStore.mjs');
-  dataStore.addLoad({ source: 'S1', description: 'L1', kw: '10', hp: '15', voltage: '120', mccUnitType: 'starter', starterType: 'fvr', manufacturer: 'ACME', model: 'X1', notes: 'n1' });
+  dataStore.addLoad({ source: 'S1', description: 'L1', quantity: '4', kw: '10', hp: '15', voltage: '120', mccUnitType: 'starter', starterType: 'fvr', controlScheme: 'forward-off-reverse', breakerTripA: '100', breakerFrameA: '250', manufacturer: 'ACME', model: 'X1', notes: 'n1' });
   dataStore.addLoad({ source: 'S2', description: 'L2', kw: '20', voltage: '240', manufacturer: 'Other', model: 'Y2', notes: 'n2' });
   const before = dataStore.getLoads();
 
@@ -108,5 +108,9 @@ global.navigator = { clipboard: { writeText: () => Promise.resolve() } };
   assert.deepStrictEqual(after, before);
   assert.strictEqual(after[0].hp, '15');
   assert.strictEqual(after[0].starterType, 'fvr');
+  assert.strictEqual(Object.hasOwn(after[0], 'quantity'), false);
+  assert.strictEqual(after[0].controlScheme, 'forward-off-reverse');
+  assert.strictEqual(after[0].breakerTripA, '100');
+  assert.strictEqual(after[0].breakerFrameA, '250');
   console.log('\u2713 loadlist persistence');
 })().catch(err => { console.error(err); process.exitCode = 1; });

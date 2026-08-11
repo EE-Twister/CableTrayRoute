@@ -11,8 +11,16 @@ assert.deepEqual(parseBreakerAmpFrame({ breakerA: '100AT/250AF' }), {
   tripA: 100,
   source: 'af-label'
 });
-assert.equal(parseBreakerAmpFrame({ breakerA: '100/250' }).frameA, 250);
-assert.equal(parseBreakerAmpFrame({ breakerFrameA: '400', breakerA: '300AT' }).frameA, 400);
+assert.deepEqual(parseBreakerAmpFrame({ breakerA: '100/250' }), {
+  frameA: 250,
+  tripA: 100,
+  source: 'rating-pair'
+});
+assert.deepEqual(parseBreakerAmpFrame({ breakerFrameA: '400', breakerA: '300' }), {
+  frameA: 400,
+  tripA: 300,
+  source: 'frame-field'
+});
 assert.equal(parseBreakerAmpFrame({ breakerA: '250' }).reason, 'missing-explicit-frame', 'a lone rating must not be treated as amp frame');
 assert.equal(parseBreakerAmpFrame({ breakerA: '400AT/250AF' }).reason, 'trip-above-frame');
 

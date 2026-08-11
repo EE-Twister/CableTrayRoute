@@ -646,7 +646,7 @@ body.dark-mode .table-row-focusable:focus-within::after {
 }
 
 .load-list-table {
-    min-width: 150rem;
+    min-width: 170rem;
     border-collapse: separate;
     border-spacing: 0;
 }
@@ -1066,10 +1066,10 @@ td.raceway-action-cell {
   margin-bottom: 0;
 }
 
-.load-list-table[data-view-preset="basic"] { min-width: 108rem; }
-.load-list-table[data-view-preset="electrical"] { min-width: 96rem; }
-.load-list-table[data-view-preset="demand"] { min-width: 88rem; }
-.load-list-table[data-view-preset="procurement"] { min-width: 96rem; }
+.load-list-table[data-view-preset="basic"] { min-width: 128rem; }
+.load-list-table[data-view-preset="electrical"] { min-width: 116rem; }
+.load-list-table[data-view-preset="demand"] { min-width: 116rem; }
+.load-list-table[data-view-preset="procurement"] { min-width: 116rem; }
 .load-list-table[data-view-preset="demand"] .load-sticky-description {
     position: static;
 }

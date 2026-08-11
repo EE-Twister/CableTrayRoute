@@ -103,9 +103,8 @@ function loadPhase(load) {
 }
 
 function connectedKw(load) {
-  const qty = numberValue(load?.quantity) || 1;
   const kw = numberValue(fieldValue(load, ['kw', 'kW', 'power_kw', 'power'])) || 0;
-  return qty * kw;
+  return kw;
 }
 
 function isContinuous(load, policy = 'assume-continuous') {

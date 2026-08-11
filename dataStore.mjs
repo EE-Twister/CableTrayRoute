@@ -1022,6 +1022,9 @@ export const getLoads = () => {
  */
 function ensureLoadFields(load) {
   const l = { ...load };
+  delete l.quantity;
+  delete l.qty;
+  delete l.count;
   if ('power' in l && !('kw' in l)) {
     l.kw = l.power;
     delete l.power;
@@ -1037,11 +1040,13 @@ function ensureLoadFields(load) {
     source: '',
     tag: '',
     description: '',
-    quantity: '',
     voltage: '',
     loadType: '',
     mccUnitType: '',
     starterType: '',
+    controlScheme: '',
+    breakerTripA: '',
+    breakerFrameA: '',
     duty: '',
     kw: '',
     hp: '',

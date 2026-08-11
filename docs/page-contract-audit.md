@@ -299,31 +299,31 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `equipment`
-  - loadlist.mjs:621 getEquipment()
+  - loadlist.mjs:713 getEquipment()
 - `loadList`
-  - loadlist.mjs:1172 getLoads()
-  - loadlist.mjs:1209 getLoads()
-  - loadlist.mjs:1670 getLoads()
-  - loadlist.mjs:1684 getLoads()
-  - loadlist.mjs:1696 getLoads()
+  - loadlist.mjs:1048 getLoads()
+  - loadlist.mjs:1281 getLoads()
+  - loadlist.mjs:1318 getLoads()
+  - loadlist.mjs:1815 getLoads()
+  - loadlist.mjs:1834 getLoads()
   - ... 18 more
 - `oneLineDiagram`
   - src/crossProbe.js:139 getOneLine()
   - src/crossProbe.js:152 getOneLine()
   - src/crossProbe.js:201 getOneLine()
 - `settings.loadListViewPreset`
-  - loadlist.mjs:134 getItem(settings.loadListViewPreset)
+  - loadlist.mjs:138 getItem(settings.loadListViewPreset)
 
 **Detected Writes**
 - `loadList`
-  - loadlist.mjs:1211 setLoads()
-  - loadlist.mjs:1601 addLoad()
-  - loadlist.mjs:1676 setLoads()
-  - loadlist.mjs:1687 setLoads()
-  - loadlist.mjs:1699 setLoads()
+  - loadlist.mjs:1320 setLoads()
+  - loadlist.mjs:1738 addLoad()
+  - loadlist.mjs:1826 setLoads()
+  - loadlist.mjs:1837 setLoads()
+  - loadlist.mjs:1849 setLoads()
   - ... 11 more
 - `settings.loadListViewPreset`
-  - loadlist.mjs:1799 setItem(settings.loadListViewPreset)
+  - loadlist.mjs:1949 setItem(settings.loadListViewPreset)
 
 ### One-Line (`oneline.html`)
 

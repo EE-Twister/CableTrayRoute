@@ -5,8 +5,11 @@ import {
   createDefaultMccLineup,
   findMccLineupForEquipment,
   mccBucketPositionLabel,
+  mccControlSchemeChoices,
+  mccControlSchemeLabel,
   mccLineupDimensions,
   mccSpecSummary,
+  normalizeMccControlScheme,
   normalizeMccLineup,
   renderMccElevationSvg,
   renderMccOneLineSvg,
@@ -50,6 +53,43 @@ const lineup = normalizeMccLineup({
     finish: 'ANSI 49 gray',
     notes: 'Owner standard MCC spec'
   },
+  systemRequirements: {
+    phases: 3,
+    wires: 3,
+    frequencyHz: 60,
+    groundingConfiguration: 'Solidly grounded wye',
+    neutralRequirement: 'No neutral',
+    availableFaultCurrentKa: 22.4,
+    faultCurrentMethod: 'ANSI',
+    faultCurrentBasis: 'Location-specific result for MCC-A',
+    serviceEntrance: 'no',
+    certifications: ['UL 845', 'NEMA ICS 18'],
+    arcResistantRequirement: 'not required',
+    seismicQualification: 'IBC project criteria',
+    codeBasis: 'NEC 2023',
+    jurisdiction: 'Texas',
+    ahj: 'City Electrical'
+  },
+  installationRequirements: {
+    installationLocation: 'Boiler Electrical Room',
+    incomingCableSummary: 'CBL-SWBD-MCC-A - 2 parallel runs, 3 conductors, 500 kcmil, Copper',
+    outgoingCableSummary: 'Five outgoing motor feeders',
+    incomingLugType: 'Mechanical Cu/Al',
+    cableEntryArea: 'bottom',
+    conduitEntryNotes: 'Coordinate bottom conduit window',
+    accessRequirement: 'front and rear',
+    frontWorkingClearanceIn: 48,
+    rearWorkingClearanceIn: 36,
+    shippingSplitRequirements: 'Maximum two sections per split',
+    maxShippingWidthIn: 40,
+    baseChannelRequired: 'yes',
+    housekeepingPadHeightIn: 4,
+    altitudeFt: 750,
+    minAmbientTempC: -10,
+    maxAmbientTempC: 45,
+    environmentClassification: 'Indoor, dry, non-corrosive',
+    hazardousAreaClassification: 'Unclassified'
+  },
   reportTitleBlock: {
     projectName: 'Boiler Upgrade',
     drawingNumber: 'E-601',
@@ -63,8 +103,8 @@ const lineup = normalizeMccLineup({
       verticalWirewayWidthIn: 4,
       buckets: [
         { label: 'MAIN', type: 'main', status: 'active', mainDevice: 'mlo', sizeUnits: 1, loadTag: 'Incoming' },
-        { label: 'P-101', type: 'starter', status: 'active', sizeUnits: 1, equipmentTag: '11-MP-001A', equipmentDescription: 'Boiler Main Pump A', loadTag: 'P-101', starterType: 'soft_starter', motorSpaceHeaterRequired: true, motorSpaceHeaterVa: 300 },
-        { label: 'VFD-101', type: 'vfd', status: 'active', sizeUnits: 1, equipmentTag: '11-VFD-001A', equipmentDescription: 'Pump VFD', loadTag: 'VFD-101' },
+        { label: 'P-101', type: 'starter', status: 'active', sizeUnits: 1, equipmentTag: '11-MP-001A', equipmentDescription: 'Boiler Main Pump A', loadTag: 'P-101', starterType: 'soft_starter', controlScheme: 'HOA', motorSpaceHeaterRequired: true, motorSpaceHeaterVa: 300 },
+        { label: 'VFD-101', type: 'vfd', status: 'active', sizeUnits: 1, equipmentTag: '11-VFD-001A', equipmentDescription: 'Pump VFD', loadTag: 'VFD-101', controlScheme: 'network-speed-control' },
         { label: 'SPACE', type: 'space', status: 'space', sizeUnits: 1 },
         { label: 'SPARE', type: 'spare', status: 'spare', heightIn: 6, breakerA: '100/250' }
       ]
@@ -80,6 +120,13 @@ assert.equal(lineup.sections[0].buckets[0].equipmentTag, 'Incoming');
 assert.equal(lineup.sections[0].buckets[1].equipmentTag, '11-MP-001A');
 assert.equal(lineup.sections[0].buckets[1].equipmentDescription, 'Boiler Main Pump A');
 assert.equal(lineup.sections[0].buckets[1].starterType, 'soft-starter');
+assert.equal(lineup.sections[0].buckets[1].controlScheme, 'hoa');
+assert.equal(mccControlSchemeLabel(lineup.sections[0].buckets[1]), 'Hand-Off-Auto (HOA)');
+assert.equal(lineup.sections[0].buckets[2].controlScheme, 'network-speed-control');
+assert.ok(mccControlSchemeChoices({ type: 'starter', starterType: 'fvr' }).some(option => option.value === 'forward-off-reverse'));
+assert.ok(!mccControlSchemeChoices({ type: 'starter', starterType: 'fvnr' }).some(option => option.value === 'forward-off-reverse'));
+assert.ok(mccControlSchemeChoices({ type: 'vfd' }).some(option => option.value === 'hoa-speed-pot'));
+assert.equal(normalizeMccControlScheme('F/O/R', { type: 'starter', starterType: 'fvr' }), 'forward-off-reverse');
 assert.equal(lineup.sections[0].buckets[1].motorSpaceHeaterRequired, true);
 assert.equal(lineup.sections[0].buckets[1].motorSpaceHeaterVa, '300');
 assert.equal(lineup.busRatingA, 1200);
@@ -103,6 +150,12 @@ assert.equal(lineup.specRequirements.motorProtectionDevice, 'magnetic');
 assert.equal(lineup.reportTitleBlock.projectName, 'Boiler Upgrade');
 assert.equal(lineup.reportTitleBlock.drawingNumber, 'E-601');
 assert.equal(lineup.reportTitleBlock.revision, 'B');
+assert.equal(lineup.systemRequirements.phases, '3');
+assert.equal(lineup.systemRequirements.frequencyHz, 60);
+assert.equal(lineup.systemRequirements.availableFaultCurrentKa, 22.4);
+assert.deepEqual(lineup.systemRequirements.certifications, ['ul-845', 'nema-ics-18']);
+assert.equal(lineup.installationRequirements.accessRequirement, 'front-and-rear');
+assert.equal(lineup.installationRequirements.maxAmbientTempC, 45);
 assert.ok(mccSpecSummary(lineup.specRequirements).includes('aluminum bus'));
 assert.ok(mccSpecSummary(lineup.specRequirements).includes('silver-plated bus plating'));
 assert.ok(mccSpecSummary(lineup.specRequirements).includes('incoming line power Left side cable pull box'));
@@ -160,6 +213,21 @@ const missingMotorHeaterVa = normalizeMccLineup({
 });
 assert.ok(validateMccLineup(missingMotorHeaterVa).some(message => message.message.includes('motor space heater feed but has no VA rating')));
 
+const inadequateSccr = normalizeMccLineup({
+  tag: 'MCC-SCCR',
+  specRequirements: { shortCircuitRatingKa: 25 },
+  systemRequirements: { availableFaultCurrentKa: 31.5 },
+  sections: []
+});
+assert.ok(validateMccLineup(inadequateSccr).some(message => message.severity === 'error' && message.message.includes('exceeds the specified 25 kA')));
+
+const reversedAmbient = normalizeMccLineup({
+  tag: 'MCC-AMBIENT',
+  installationRequirements: { minAmbientTempC: 45, maxAmbientTempC: -5 },
+  sections: []
+});
+assert.ok(validateMccLineup(reversedAmbient).some(message => message.severity === 'error' && message.message.includes('Minimum ambient temperature')));
+
 const equipment = syncMccLineupsToEquipment(
   [{ tag: 'MCC-A', manufacturer: 'Existing', notes: 'Keep me' }],
   [lineup]
@@ -171,6 +239,8 @@ assert.equal(equipment[0].subCategory, 'MCC');
 assert.equal(equipment[0].width, '3.33');
 assert.equal(equipment[0].depth, '2');
 assert.equal(equipment[0].height, '7.5');
+assert.equal(equipment[0].phases, '3');
+assert.equal(equipment[0].availableFaultCurrentKa, 22.4);
 const newEquipment = syncMccLineupsToEquipment([], [lineup]);
 assert.ok(newEquipment[0].notes.includes('1200 A horizontal bus'));
 assert.ok(newEquipment[0].notes.includes('600 A vertical bus'));
@@ -203,6 +273,8 @@ assert.equal(seeded.specRequirements.busJoinPlating, 'manufacturer-standard');
 assert.equal(seeded.specRequirements.groundBusRequired, 'yes');
 assert.equal(seeded.specRequirements.groundBusLocation, 'horizontal-bottom');
 assert.equal(seeded.specRequirements.motorProtectionDevice, 'thermal-magnetic');
+assert.equal(seeded.systemRequirements.frequencyHz, '');
+assert.equal(seeded.installationRequirements.incomingCableSummary, '');
 const seededElevation = renderMccElevationSvg(seeded);
 assert.ok(seededElevation.includes('mcc-lineup-elevation-svg'));
 assert.ok(seededElevation.includes('H Bus 1600A / V Bus 600A'));

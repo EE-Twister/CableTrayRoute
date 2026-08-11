@@ -9,8 +9,11 @@ The Load List page is designed for fast load entry first, with deeper engineerin
 - Use **Sample** to seed starter loads for motors, lighting, receptacles, HVAC, and UPS examples.
 - Use **Basic Entry** view for the common fields needed to define and review loads.
 - Enter optional motor nameplate horsepower in **HP**. HP is stored separately from kW and is not derived from it.
+- Each row represents one uniquely tagged load. The Load List does not use a quantity multiplier; enter the total connected kW for that tagged load or create separate tagged rows for separate equipment.
 - **MCC Unit Type** uses the same choices as the MCC page: Main-MLO, Main-Breaker, Starter, VFD, Breaker, Feeder, Space, and Spare. Leave it on **Auto** to infer the MCC unit from Load Type.
 - For starter units, use **Starter Type** to select FVNR, FVR, Soft Starter, Wye-Delta, Part-Winding, Two-Speed, Reduced Voltage Autotransformer, or Other. The field is disabled and cleared for non-starter units.
+- Use **Control Scheme** to capture the operator-control arrangement. Starter and VFD units offer Start/Stop, HOA, Local/Remote, and Custom choices. Starter units also offer JOA; FVR starters add forward/reverse choices, two-speed starters add speed-selection choices, and VFD units add keypad, speed-potentiometer, analog-reference, and network/PLC speed-control choices. Incompatible selections are cleared when the MCC unit or starter type changes.
+- Enter protective-device ratings separately in **Breaker Trip (A)** and **Breaker Frame (A)**. Trip amperes describe the selected trip rating; frame amperes describe the breaker frame and drive preliminary feeder-breaker bucket sizing. A trip rating cannot exceed its frame rating.
 - Required readiness fields are Source, kW, Voltage, Power Factor, and Phases.
 
 ## Views
@@ -18,21 +21,22 @@ The Load List page is designed for fast load entry first, with deeper engineerin
 - **Basic Entry** keeps source, tag, description, electrical basics, circuit, and calculated values visible.
 - **Electrical** focuses on voltage, kW, motor HP, power factor, phases, kVA, and current.
 - **Demand** places demand factor and calculated demand kW/kVA immediately after source and tag so its defining values are visible without horizontal hunting.
-- **Procurement** focuses on manufacturer, model, quantity, type, and notes.
+- **Procurement** focuses on manufacturer, model, voltage, type, and notes.
 - **Full Detail** shows all available columns.
-- **MCC Unit Type** and **Starter Type** remain visible in every view preset so MCC classifications are not hidden by a previously saved view.
+- **MCC Unit Type**, **Starter Type**, **Control Scheme**, **Breaker Trip (A)**, and **Breaker Frame (A)** remain visible in every view preset so MCC classifications and sizing inputs are not hidden by a previously saved view.
 - On narrow screens, the active view is rendered as editable row cards rather than a desktop-width grid. Secondary workflow shortcuts collapse so the first load record stays close to the top of the page.
 
 ## Batch Editing
 
-- Select load rows with the row checkboxes and use **Batch** to apply shared source, load type, MCC unit type, starter type, voltage, phases, duty, or demand factor values.
+- Select load rows with the row checkboxes and use **Batch** to apply shared source, load type, MCC unit type, starter type, control scheme, breaker trip/frame ratings, voltage, phases, duty, or demand factor values. Each updated load retains the control scheme only when it is compatible with that load's resulting controller type.
 
 ## Import And Export
 
 - **Import CSV** opens a mapping step when headers are present so non-native column names can be matched to Load List fields.
 - **Import JSON** accepts native load data and can also map non-native object keys.
 - Imports show replace and merge counts before changes are applied. Merge matches by `ref`, `id`, `tag`, or description and does not delete existing rows absent from the import.
-- **Export CSV**, **Export JSON**, and **Copy Table** preserve HP, MCC unit type, and starter type, and include calculated kVA, current, demand kVA, and demand kW.
+- **Export CSV**, **Export JSON**, and **Copy Table** preserve HP, MCC unit type, starter type, control scheme, breaker trip amperes, and breaker frame amperes, and include calculated kVA, current, demand kVA, and demand kW.
+- Legacy imported `quantity`, `qty`, or `count` values are discarded because one Load List row represents one tagged load.
 
 ## Downstream Workflow
 
@@ -40,5 +44,5 @@ The Load List page is designed for fast load entry first, with deeper engineerin
 - Source / Panel fields suggest Equipment List tags when equipment records are available.
 - Validation groups blockers by missing source, kW, voltage, power factor, and phases.
 - The source summary groups totals by Source / Panel.
-- When a load is sourced from an MCC, an explicit MCC Unit Type overrides the unit inferred from Load Type during lineup generation. For starter units, explicit HP, voltage, phases, and starter method can support a preliminary NEMA starter-size estimate when the MCC lineup is built or refreshed. Supported FVNR starters then receive a conservative generic bucket-height allowance from the estimated NEMA size. Explicit imported bucket dimensions take precedence, and other starter constructions remain unassigned. These are screening estimates, not procurement selections.
+- When a load is sourced from an MCC, an explicit MCC Unit Type overrides the unit inferred from Load Type during lineup generation. Starter type and control scheme transfer into compatible starter/VFD buckets. Control scheme alone does not increase the preliminary bucket height; manufacturer-specific pilot-device, control-power, and wiring requirements still require verification. For starter units, explicit HP, voltage, phases, and starter method can support a preliminary NEMA starter-size estimate when the MCC lineup is built or refreshed. Supported FVNR starters then receive a conservative generic bucket-height allowance from the estimated NEMA size. Breaker and feeder units pass their separate trip and frame ratings to the MCC; the frame rating can support a conservative bucket-height estimate. Explicit imported bucket dimensions take precedence, and unsupported constructions remain unassigned. These are screening estimates, not procurement selections.
 - Use the next-action strip to continue to One-Line once loads are complete, or continue directly to Cable Schedule when the project path does not need a diagram first.

@@ -187,8 +187,7 @@ export function normalizeDemandProfile(profile) {
  * @property {string}  [tag]
  * @property {string}  [description]
  * @property {string}  [loadType]    Free-text load type
- * @property {string|number} [kw]    Connected kW per unit
- * @property {string|number} [quantity]
+ * @property {string|number} [kw]    Connected kW for this uniquely tagged load
  * @property {string|number} [powerFactor]
  * @property {string|number} [phases]
  * @property {string|number} [voltage]
@@ -206,8 +205,7 @@ export function normalizeDemandProfile(profile) {
  * @property {string}  loadType
  * @property {string}  necCategory
  * @property {string}  categoryLabel
- * @property {number}  quantity
- * @property {number}  connectedKw     kW per unit × quantity
+ * @property {number}  connectedKw     Connected kW for this uniquely tagged load
  * @property {number}  powerFactor
  * @property {number}  connectedKva
  * @property {number}  demandFactor    Final factor applied (0-1)
@@ -240,11 +238,10 @@ export function normalizeDemandProfile(profile) {
  * @returns {number}
  */
 function connectedKw(load) {
-  const qty = parseFloat(load.quantity) || 1;
   const kw  = parseFloat(load.kw)       || 0;
   const lf  = parseFloat(load.loadFactor);
   const eff = parseFloat(load.efficiency);
-  let base  = kw * qty;
+  let base  = kw;
   if (!isNaN(lf))          base *= lf / 100;
   if (!isNaN(eff) && eff)  base /= eff / 100;
   return base;
@@ -333,10 +330,10 @@ export function buildDemandSchedule(loads, options = {}) {
   for (const e of enriched) byCategory[e.category].push(e);
 
   // Pre-compute category-level demand kW totals & factors
-  // Motor: need largest unit kW for NEC 430.24 adder
+  // Motor: each row is one uniquely tagged load, so use its connected kW.
   const motorEntries = byCategory['motor'];
   const largestMotorKw = motorEntries.length
-    ? Math.max(...motorEntries.map(e => (parseFloat(e.load.kw) || 0) * (parseFloat(e.load.quantity) || 1)))
+    ? Math.max(...motorEntries.map(e => parseFloat(e.load.kw) || 0))
     : 0;
 
   // Receptacle total connected kW
@@ -344,9 +341,9 @@ export function buildDemandSchedule(loads, options = {}) {
   // Lighting total
   const lightingTotal   = byCategory['lighting'].reduce((s, e) => s + e.connKw, 0);
   // Kitchen: count of units
-  const kitchenUnitCount = byCategory['kitchen'].reduce((s, e) => s + (parseFloat(e.load.quantity) || 1), 0);
+  const kitchenUnitCount = byCategory['kitchen'].length;
   // Appliance count
-  const applianceCount   = byCategory['appliance'].reduce((s, e) => s + (parseFloat(e.load.quantity) || 1), 0);
+  const applianceCount   = byCategory['appliance'].length;
 
   // EV charger ordinal counter (reset per source group for simplicity)
   let evOrdinal = 0;
@@ -476,7 +473,6 @@ function _makeRow(load, category, connKw, connKva, pf, df, note, standard) {
     loadType:      String(load.loadType || ''),
     necCategory:   category,
     categoryLabel: NEC_CATEGORIES[category]?.label || category,
-    quantity:      parseFloat(load.quantity) || 1,
     connectedKw:   round2(connKw),
     powerFactor:   round2(pf),
     connectedKva:  round2(connKva),

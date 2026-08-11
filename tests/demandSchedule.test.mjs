@@ -254,16 +254,16 @@ describe('buildDemandSchedule() — NEC 430.24 motor demand', () => {
 // ---------------------------------------------------------------------------
 describe('buildDemandSchedule() — NEC 220.56 kitchen demand', () => {
   it('applies 100% for 1–2 kitchen units', () => {
-    const loads = [{ tag: 'K1', kw: '10', quantity: '2', loadType: 'commercial oven', powerFactor: '1' }];
+    const loads = Array.from({ length: 2 }, (_, index) => ({ tag: `K${index + 1}`, kw: '10', loadType: 'commercial oven', powerFactor: '1' }));
     const result = buildDemandSchedule(loads, { mode: 'nec' });
     assert.strictEqual(result.rows[0].demandFactor, 1.0);
   });
 
   it('applies 65% for 6+ kitchen units', () => {
-    const loads = [{ tag: 'K1', kw: '5', quantity: '6', loadType: 'commercial fryer', powerFactor: '1' }];
+    const loads = Array.from({ length: 6 }, (_, index) => ({ tag: `K${index + 1}`, kw: '5', loadType: 'commercial fryer', powerFactor: '1' }));
     const result = buildDemandSchedule(loads, { mode: 'nec' });
     assert.strictEqual(result.rows[0].demandFactor, 0.65);
-    // 5 kW × 6 qty × 0.65 = 19.5 kW demand
+    // Six uniquely tagged 5 kW loads at 65% = 19.5 kW demand.
     assert.strictEqual(result.summary.totalDemandKw, 19.5);
   });
 });
@@ -323,11 +323,12 @@ describe('buildDemandSchedule() — IEC 60439-1 mode', () => {
 });
 
 // ---------------------------------------------------------------------------
-describe('buildDemandSchedule() — quantity and power factor', () => {
-  it('multiplies kW by quantity', () => {
+describe('buildDemandSchedule() — unique rows and power factor', () => {
+  it('ignores legacy quantity because each tagged row is one load', () => {
     const loads = [{ tag: 'P1', kw: '5', quantity: '3', loadType: 'general', powerFactor: '1' }];
     const result = buildDemandSchedule(loads, { mode: 'nec' });
-    assert.strictEqual(result.rows[0].connectedKw, 15);
+    assert.strictEqual(result.rows[0].connectedKw, 5);
+    assert.strictEqual(Object.hasOwn(result.rows[0], 'quantity'), false);
   });
 
   it('computes kVA correctly from kW and power factor', () => {

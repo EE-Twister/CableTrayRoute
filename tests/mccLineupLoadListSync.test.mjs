@@ -67,7 +67,7 @@ assert.equal(first.summary.matched, 3);
 assert.equal(first.summary.created, 3);
 assert.equal(first.summary.manualBucketsPreserved, 2);
 assert.equal(first.summary.generatedSections, 3, 'buckets should pack into sections using the usable stack height');
-assert.ok(first.summary.warnings.some(message => message.includes('quantity above 1')));
+assert.ok(!first.summary.warnings.some(message => message.includes('quantity')), 'legacy quantity must not affect one-row-per-load MCC generation');
 assert.ok(first.summary.warnings.some(message => message.includes('do not match the lineup voltage')));
 assert.ok(first.summary.warnings.some(message => message.includes('lack explicit horsepower')));
 
@@ -83,13 +83,14 @@ assert.equal(motorBucket.breakerA, '', 'calculated load current must not be used
 const vfdBucket = firstBuckets.find(bucket => bucket.sourceLoadId === 'load-fan');
 assert.equal(vfdBucket.type, 'vfd');
 assert.equal(vfdBucket.sizeUnits, 2);
+assert.equal(Object.hasOwn(vfdBucket, 'sourceQuantity'), false);
 const heaterBucket = firstBuckets.find(bucket => bucket.sourceLoadId === 'load-heater');
 assert.equal(heaterBucket.type, 'feeder');
 
 const explicitUnitTypes = reconcileMccLineupFromLoads(baseLineup, [
-  { ...loads[0], id: 'load-explicit-vfd', tag: 'P-201', mccUnitType: 'vfd' },
-  { ...loads[2], id: 'load-explicit-starter', tag: 'HTR-201', mccUnitType: 'starter', starterType: 'fvr' },
-  { ...loads[0], id: 'load-explicit-feeder', tag: 'P-202', mccUnitType: 'feeder' },
+  { ...loads[0], id: 'load-explicit-vfd', tag: 'P-201', mccUnitType: 'vfd', controlScheme: 'hoa-speed-pot' },
+  { ...loads[2], id: 'load-explicit-starter', tag: 'HTR-201', mccUnitType: 'starter', starterType: 'fvr', controlScheme: 'forward-off-reverse' },
+  { ...loads[0], id: 'load-explicit-feeder', tag: 'P-202', mccUnitType: 'feeder', controlScheme: 'forward-off-reverse' },
   { ...loads[0], id: 'load-explicit-main-mlo', tag: 'MAIN-MLO', mccUnitType: 'main-mlo' },
   { ...loads[0], id: 'load-explicit-main-breaker', tag: 'MAIN-BKR', mccUnitType: 'main-breaker' },
   { ...loads[0], id: 'load-explicit-space', tag: 'SPACE', mccUnitType: 'space' },
@@ -99,6 +100,9 @@ const explicitBuckets = explicitUnitTypes.lineup.sections.flatMap(section => sec
 assert.equal(explicitBuckets.find(bucket => bucket.sourceLoadId === 'load-explicit-vfd').type, 'vfd');
 assert.equal(explicitBuckets.find(bucket => bucket.sourceLoadId === 'load-explicit-starter').type, 'starter');
 assert.equal(explicitBuckets.find(bucket => bucket.sourceLoadId === 'load-explicit-starter').starterType, 'fvr');
+assert.equal(explicitBuckets.find(bucket => bucket.sourceLoadId === 'load-explicit-starter').controlScheme, 'forward-off-reverse');
+assert.equal(explicitBuckets.find(bucket => bucket.sourceLoadId === 'load-explicit-vfd').controlScheme, 'hoa-speed-pot');
+assert.equal(explicitBuckets.find(bucket => bucket.sourceLoadId === 'load-explicit-feeder').controlScheme, '', 'non-controller buckets must discard control schemes');
 assert.equal(explicitBuckets.find(bucket => bucket.sourceLoadId === 'load-explicit-feeder').type, 'feeder');
 assert.deepEqual(
   {
@@ -197,13 +201,16 @@ const estimatedBreaker = reconcileMccLineupFromLoads(standardHeightLineup, [{
   tag: 'FDR-250',
   description: 'Distribution Feeder',
   loadType: 'Breaker',
-  breakerA: '100AT/250AF',
+  breakerTripA: '100',
+  breakerFrameA: '250',
   voltage: '480'
 }]);
 const estimatedBreakerBucket = estimatedBreaker.lineup.sections
   .flatMap(section => section.buckets)
   .find(bucket => bucket.sourceLoadId === 'load-feeder-250');
 assert.equal(estimatedBreakerBucket.type, 'breaker');
+assert.equal(estimatedBreakerBucket.breakerA, '100');
+assert.equal(estimatedBreakerBucket.breakerFrameA, '250');
 assert.equal(estimatedBreakerBucket.sizeUnits, 3);
 assert.equal(estimatedBreakerBucket.heightIn, 18);
 assert.equal(estimatedBreakerBucket.bucketSizeEstimated, true);
@@ -218,16 +225,42 @@ const manualBreakerSelection = reconcileMccLineupFromLoads(estimatedBreaker.line
   tag: 'FDR-250',
   description: 'Distribution Feeder',
   loadType: 'Breaker',
-  breakerA: '100AT/250AF',
+  breakerTripA: '100',
+  breakerFrameA: '250',
   voltage: '480'
 }]);
 const manualBreakerBucket = manualBreakerSelection.lineup.sections
   .flatMap(section => section.buckets)
   .find(bucket => bucket.sourceLoadId === 'load-feeder-250');
 assert.equal(manualBreakerBucket.breakerA, '300AT/400AF');
+assert.equal(manualBreakerBucket.breakerFrameA, '400');
 assert.equal(manualBreakerBucket.sizeUnits, 5, 'a manual explicit frame selection should recompute its dependent estimate');
 assert.equal(manualBreakerBucket.bucketSizeEstimated, true);
 assert.match(manualBreakerBucket.bucketSizeBasis, /400 AF/);
+
+const legacyCombinedBreaker = reconcileMccLineupFromLoads(standardHeightLineup, [{
+  id: 'load-feeder-legacy',
+  source: 'MCC-101',
+  tag: 'FDR-LEGACY',
+  loadType: 'Breaker',
+  breakerA: '100AT/250AF',
+  voltage: '480'
+}]);
+const legacyCombinedBreakerBucket = legacyCombinedBreaker.lineup.sections
+  .flatMap(section => section.buckets)
+  .find(bucket => bucket.sourceLoadId === 'load-feeder-legacy');
+assert.equal(legacyCombinedBreakerBucket.sizeUnits, 3, 'legacy combined AT/AF ratings must remain compatible');
+
+const invalidBreakerPair = reconcileMccLineupFromLoads(standardHeightLineup, [{
+  id: 'load-feeder-invalid',
+  source: 'MCC-101',
+  tag: 'FDR-INVALID',
+  loadType: 'Breaker',
+  breakerTripA: '400',
+  breakerFrameA: '250',
+  voltage: '480'
+}]);
+assert.ok(invalidBreakerPair.summary.warnings.some(message => message.includes('trip rating above its frame rating')));
 
 const automaticBeforeManualStarter = reconcileMccLineupFromLoads(baseLineup, [{
   ...loads[0],
