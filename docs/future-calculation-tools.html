@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Future Calculation Tools — CableTrayRoute Docs</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <div class="nav-links" role="list">
+      <a href="../index.html">Home</a>
+      <a href="index.html">Docs</a>
+      <a href="quickstart.html">Quick Start</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <h1>Future Calculation Tools</h1>
+    <p>Scoping guidance for potential engineering calculators requested by users.</p>
+  </header>
+
+  <main id="main-content" class="doc-main">
+    <section class="card">
+      <h2>What it takes to ship reliable calculators</h2>
+      <p>Each topic can be delivered as a practical engineering tool if the workflow is split into: (1) required inputs, (2) transparent calculation method, (3) code/standard references, and (4) a report-ready output page with assumptions clearly shown.</p>
+      <p>This document provides a scoped MVP approach for Heat Trace Sizing, Cathodic Protection, and Dissimilar Metal Corrosion checks.</p>
+    </section>
+
+    <section class="card">
+      <h2>1) Heat Trace Sizing</h2>
+      <h3>Minimum input data model</h3>
+      <ul>
+        <li>Pipe/tray geometry (diameter, length, fittings, supports, elevation profile).</li>
+        <li>Insulation system (material, thickness, thermal conductivity, weather barrier).</li>
+        <li>Process constraints (minimum maintain temperature, startup temperature, ambient design minimum).</li>
+        <li>Electrical limits (available voltage, circuit length limits, breaker type, hazardous area class/division zone).</li>
+        <li>Operational profile (continuous maintain, intermittent freeze protection, startup duty cycle).</li>
+      </ul>
+      <h3>Core calculations to implement</h3>
+      <ul>
+        <li>Steady-state heat loss by segment (straight run + fitting correction factors).</li>
+        <li>Startup heat-up load check (mass of process + pipe + insulation lag effects).</li>
+        <li>Circuit selection logic for constant watt vs. self-regulating cable families.</li>
+        <li>Electrical validation (voltage drop, max circuit length, current, breaker utilization).</li>
+      </ul>
+      <h3>MVP output</h3>
+      <ul>
+        <li>Recommended cable type/watt density by segment.</li>
+        <li>Segmented bill of material (cable length, terminations, power connection kits).</li>
+        <li>One-page design basis with assumptions and pass/fail checks.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>2) Cathodic Protection</h2>
+      <h3>Minimum input data model</h3>
+      <ul>
+        <li>Asset geometry and coating condition (surface area, coating efficiency, defect factors).</li>
+        <li>Electrolyte/soil data (resistivity by layer, moisture, pH, chloride/sulfate where available).</li>
+        <li>Design life, protection criteria, and operating environment.</li>
+        <li>Current drainage/interference sources (nearby DC systems, rail, rectifiers, foreign structures).</li>
+      </ul>
+      <h3>Core calculations to implement</h3>
+      <ul>
+        <li>Design current density and total protection current demand.</li>
+        <li>Anode bed sizing (impressed current and sacrificial options).</li>
+        <li>Anode consumption/life estimation and rectifier range checks.</li>
+        <li>Voltage drop and attenuation checks for long structures.</li>
+      </ul>
+      <h3>MVP output</h3>
+      <ul>
+        <li>Recommended CP method (sacrificial vs. impressed current) with rationale.</li>
+        <li>Anode quantity, spacing, and expected life range.</li>
+        <li>Monitoring plan fields (test station interval, baseline potentials, acceptance limits).</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>3) Dissimilar Metal Corrosion Risk</h2>
+      <h3>Minimum input data model</h3>
+      <ul>
+        <li>Base and fastener alloys (e.g., aluminum tray with stainless hardware grade).</li>
+        <li>Area ratio and contact geometry (cathode-to-anode ratio has major impact).</li>
+        <li>Environment class (indoor dry, coastal, chemical washdown, buried, splash-zone).</li>
+        <li>Barrier strategy (isolation washers, coatings, sealants, anti-oxidant compounds).</li>
+      </ul>
+      <h3>Core calculations to implement</h3>
+      <ul>
+        <li>Galvanic potential difference scoring by alloy pair.</li>
+        <li>Electrolyte severity multiplier based on environment exposure.</li>
+        <li>Area-ratio risk amplification and coating effectiveness derating.</li>
+        <li>Estimated corrosion-rate banding (low/medium/high risk, not false precision).</li>
+      </ul>
+      <h3>MVP output</h3>
+      <ul>
+        <li>Risk rating with confidence band and key drivers.</li>
+        <li>Mitigation recommendations prioritized by impact/cost.</li>
+        <li>Inspection interval guidance tied to environment severity.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Implementation roadmap</h2>
+      <ol>
+        <li>Define calculation assumptions and reference equations in a standards-backed spec.</li>
+        <li>Build a shared material/environment library so all three tools reuse one source of truth.</li>
+        <li>Add transparent report export that lists equations, inputs, and safety margins.</li>
+        <li>Pilot with sample projects from users to calibrate defaults and reduce bad assumptions.</li>
+      </ol>
+      <p>A realistic first release is a decision-support calculator with clear uncertainty flags, followed by deeper modeling once field feedback is collected.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="../icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="index.html">Docs</a>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="../index.html">Home</a>
+    </nav>
+  </footer>
+</body>
+</html>
