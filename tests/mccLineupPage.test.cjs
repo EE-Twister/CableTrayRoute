@@ -347,7 +347,7 @@ describe('MCC lineup page', () => {
     assert.ok(dataStoreJs.includes("mccLineups: 'mccLineups'"), 'dataStore.mjs missing mccLineups key');
     assert.ok(dataStoreJs.includes('export const getMccLineups'), 'dataStore.mjs missing getMccLineups helper');
     assert.ok(dataStoreJs.includes('export const setMccLineups'), 'dataStore.mjs missing setMccLineups helper');
-    assert.ok(dataStoreJs.includes('mccLineups: getMccLineups()'), 'dataStore.mjs export/save missing mccLineups');
+    assert.ok(dataStoreJs.includes('mccLineups: read(EXTRA_KEYS.mccLineups, [], scenario)'), 'dataStore.mjs export/save missing scenario-scoped mccLineups');
     assert.ok(dataStoreJs.includes('setMccLineups(Array.isArray(data.mccLineups)'), 'dataStore.mjs import missing mccLineups');
   });
 

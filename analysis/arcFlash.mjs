@@ -1,5 +1,8 @@
 import { defaultProtectiveDeviceCatalog, runShortCircuit } from './shortCircuit.mjs';
 import { scaleCurve } from './tccUtils.js';
+import { evaluateTimeCurrentCurve } from './timeCurrentCurve.mjs';
+import { assessProtectiveDeviceLibraryEntry } from './protectiveDeviceLibrary.mjs';
+import { fingerprintStudySource } from './studyResultReadiness.mjs';
 import { getOneLine, getItem } from '../dataStore.mjs';
 import { showAlertModal } from '../src/components/modal.js';
 import { createProtectiveDeviceCatalogLoader } from '../src/protectiveDevices/catalogLoader.mjs';
@@ -309,35 +312,44 @@ async function loadDevices(ids = [], providedDevices = []) {
   return uniqueIds.map(id => deviceCache.get(id)).filter(Boolean);
 }
 
-function interpolateTime(curve = [], currentA) {
-  if (!curve.length) return 0.2;
-  curve.sort((a, b) => a.current - b.current);
-  if (currentA <= curve[0].current) return curve[0].time;
-  for (let i = 0; i < curve.length - 1; i++) {
-    const p1 = curve[i];
-    const p2 = curve[i + 1];
-    if (currentA >= p1.current && currentA <= p2.current) {
-      const frac = (currentA - p1.current) / (p2.current - p1.current);
-      return p1.time + frac * (p2.time - p1.time);
-    }
-  }
-  return curve[curve.length - 1].time;
-}
-
 // Determine the protective device clearing time. Per IEEE 1584-2018 the device
 // is evaluated at the ARCING current (evalKA), not the bolted fault current —
 // the arc current is lower, so it generally clears more slowly.
 function clearingTime(comp, evalKA, devices, protectiveComp, scResults, protectiveDevice) {
   const compClearing = parseNumeric(pickValue(comp, 'clearing_time'));
-  if (compClearing !== null) return compClearing;
+  if (compClearing !== null) {
+    return { time: compClearing, source: 'equipment-explicit', curveStatus: null, issue: null, domain: null };
+  }
   if (protectiveComp && protectiveComp !== comp) {
     const protectiveClearing = parseNumeric(pickValue(protectiveComp, 'clearing_time'));
-    if (protectiveClearing !== null) return protectiveClearing;
+    if (protectiveClearing !== null) {
+      return { time: protectiveClearing, source: 'protective-device-explicit', curveStatus: null, issue: null, domain: null };
+    }
   }
   const deviceComp = protectiveComp || comp;
-  if (!deviceComp?.tccId || !isProtectiveComponent(deviceComp)) return 0.2;
+  if (!deviceComp?.tccId || !isProtectiveComponent(deviceComp)) {
+    return {
+      time: 0.2,
+      source: 'default-assumption',
+      curveStatus: 'not-linked',
+      issue: 'No protective-device curve or explicit clearing time was linked; 0.2 s is only a screening assumption.',
+      domain: null,
+    };
+  }
   const dev = protectiveDevice || devices.find(d => d.id === deviceComp.tccId);
-  if (!dev) return 0.2;
+  if (!dev) {
+    return {
+      time: 0.2,
+      source: 'default-assumption',
+      curveStatus: 'device-not-found',
+      issue: 'The linked protective-device record was not found; 0.2 s is only a screening assumption.',
+      domain: null,
+    };
+  }
+  const readiness = assessProtectiveDeviceLibraryEntry(dev);
+  const readinessIssue = readiness.status === 'calculation_ready'
+    ? null
+    : `Protective-device record ${dev.id} is ${readiness.status}, not calculation-ready; its clearing time is screening-only.`;
   const saved = getItem('tccSettings', { devices: [], settings: {}, componentOverrides: {} });
   const deviceOverride = saved.settings?.[dev.id] || {};
   const componentOverride = saved.componentOverrides?.[deviceComp.id] || {};
@@ -363,12 +375,38 @@ function clearingTime(comp, evalKA, devices, protectiveComp, scResults, protecti
         ? downstreamKA
         : 0.001;
   if (settings.instantaneous && effectiveKA * 1000 >= settings.instantaneous) {
-    return Math.max(settings.instantaneousDelay || 0.01, 0.005);
+    return {
+      time: Math.max(settings.instantaneousDelay || 0.01, 0.005),
+      source: 'protective-device-instantaneous-setting',
+      curveStatus: 'instantaneous',
+      issue: readinessIssue,
+      domain: null,
+    };
   }
   const clearingCurve = Array.isArray(scaled.maxCurve) && scaled.maxCurve.length
     ? scaled.maxCurve
     : scaled.curve || [];
-  return interpolateTime(clearingCurve, effectiveKA * 1000);
+  const evaluation = evaluateTimeCurrentCurve(clearingCurve, effectiveKA * 1000, {
+    boundary: 'upper',
+    outOfRange: 'reject',
+  });
+  if (!Number.isFinite(evaluation.time) || evaluation.time <= 0) {
+    return {
+      time: 0.2,
+      source: 'default-assumption',
+      curveStatus: evaluation.status,
+      issue: `Arcing current ${(effectiveKA * 1000).toFixed(1)} A is outside the usable protective-device curve domain; 0.2 s is only a screening assumption.`,
+      readinessIssue,
+      domain: evaluation.domain,
+    };
+  }
+  return {
+    time: evaluation.time,
+    source: 'protective-device-total-clearing-curve',
+    curveStatus: evaluation.status,
+    issue: readinessIssue,
+    domain: evaluation.domain,
+  };
 }
 
 /**
@@ -388,9 +426,11 @@ function clearingTime(comp, evalKA, devices, protectiveComp, scResults, protecti
  *   - working distance:        455 mm (18 in) when not provided
  *   - enclosure size:          508 mm cube when dimensions are not provided
  *   - system voltage:          0.48 kV when not provided
- *   - clearing time:           0.2 s when no protective-device curve is linked
+ *   - clearing time:           0.2 s screening assumption when no usable,
+ *                              reviewed curve or explicit input is available
  *
- * Returns a map id -> { incidentEnergy, boundary, minimumArcRatingCalCm2, clearingTime }
+ * Returns a map id -> { incidentEnergy, boundary, minimumArcRatingCalCm2,
+ * calculationStatus, clearingTime }
  * where energy is in cal/cm^2 and boundary in millimeters.
  */
 export async function runArcFlash(options = {}) {
@@ -403,7 +443,8 @@ export async function runArcFlash(options = {}) {
       scOptions = options;
     }
   }
-  const { sheets } = getOneLine();
+  const oneLine = getOneLine();
+  const { sheets } = oneLine;
   const comps = (Array.isArray(sheets[0]?.components)
     ? sheets.flatMap(s => s.components)
     : sheets).filter(c => c && c.type !== 'annotation' && c.type !== 'dimension');
@@ -460,14 +501,18 @@ export async function runArcFlash(options = {}) {
     let modelCF = 1;       // enclosure size correction factor
     let modelEES = null;   // equivalent enclosure size, inches
     let governingCase = null;
+    let fullClearing = null;
+    let reducedClearing = null;
     let afError = null;
     if (Ibf > 0) {
       try {
         const ac = arcingCurrents({ ...afParams, height_mm: h, width_mm: w, depth_mm: de });
         modelCF = ac.CF;
         modelEES = ac.EES;
-        const tFull = clearingTime(comp, ac.full.iArc, devices, protectiveComp, sc, protectiveDevice);
-        const tReduced = clearingTime(comp, ac.reduced.iArc, devices, protectiveComp, sc, protectiveDevice);
+        fullClearing = clearingTime(comp, ac.full.iArc, devices, protectiveComp, sc, protectiveDevice);
+        reducedClearing = clearingTime(comp, ac.reduced.iArc, devices, protectiveComp, sc, protectiveDevice);
+        const tFull = fullClearing.time;
+        const tReduced = reducedClearing.time;
         const eFull = incidentEnergy(afParams, ac, 'full', tFull);
         const eReduced = incidentEnergy(afParams, ac, 'reduced', tReduced);
         const reducedGoverns = Number.isFinite(eReduced.E_cal) && eReduced.E_cal > eFull.E_cal;
@@ -495,6 +540,13 @@ export async function runArcFlash(options = {}) {
     const addRequired = message => {
       if (message && !requiredInputs.includes(message)) requiredInputs.push(message);
     };
+    [fullClearing, reducedClearing].filter(Boolean).forEach(evaluation => {
+      addNote(evaluation.issue);
+      addNote(evaluation.readinessIssue);
+      if (evaluation.issue || evaluation.readinessIssue) {
+        addRequired('Provide a calculation-ready protective-device record or a reviewed explicit clearing time covering both full and reduced arcing currents.');
+      }
+    });
     if (!shortCircuitAvailable) {
       addNote('No short-circuit study current was available; bolted fault current was assumed.');
       addRequired('Provide a short-circuit result for this location to validate the incident energy.');
@@ -554,6 +606,7 @@ export async function runArcFlash(options = {}) {
       addNote(`Worst-case incident energy governed by the ${governingCase} scenario per IEEE 1584-2018.`);
     }
     const upstreamDeviceName = formatProtectiveDeviceName(protectiveComp, protectiveDevice);
+    const governingClearing = governingCase?.startsWith('reduced') ? reducedClearing : fullClearing;
     const entry = {
       incidentEnergy: Number(energy.toFixed(2)),
       boundary: Number(boundary.toFixed(1)),
@@ -568,11 +621,22 @@ export async function runArcFlash(options = {}) {
       equipmentTag: resolveEquipmentTag(comp),
       upstreamDevice: upstreamDeviceName,
       studyDate,
+      calculationStatus: requiredInputs.length ? 'incomplete' : 'calculated',
       calculationInputs: {
         model: 'IEEE 1584-2018',
         boltedFaultCurrentKA: Number(Math.max(Ibf, 0).toFixed(2)),
         arcingCurrentKA: Number(Ia.toFixed(2)),
         clearingTimeSeconds: Number(time.toFixed(3)),
+        clearingTimeSource: governingClearing?.source || 'unavailable',
+        clearingCurveStatus: governingClearing?.curveStatus || null,
+        clearingCurveDomainA: governingClearing?.domain || null,
+        protectiveDeviceId: protectiveDevice?.id || protectiveComp?.tccId || null,
+        protectiveDeviceLibraryStatus: protectiveDevice
+          ? assessProtectiveDeviceLibraryEntry(protectiveDevice).status
+          : null,
+        protectiveDeviceSourceFingerprint: protectiveDevice
+          ? fingerprintStudySource(protectiveDevice)
+          : null,
         governingScenario: governingCase || 'n/a',
         electrodeConfiguration: cfg,
         enclosureType: enclosure,
@@ -592,6 +656,14 @@ export async function runArcFlash(options = {}) {
     if (requiredInputs.length) entry.requiredInputs = requiredInputs;
     results[comp.id] = entry;
   });
+  const resultEntries = Object.values(results);
+  results._runMetadata = {
+    studyKey: 'arcFlash',
+    runAt: new Date().toISOString(),
+    sourceFingerprint: fingerprintStudySource(oneLine),
+    resultCount: resultEntries.length,
+    incompleteCount: resultEntries.filter(result => result.calculationStatus === 'incomplete').length,
+  };
   return results;
 }
 

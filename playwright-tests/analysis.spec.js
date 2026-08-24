@@ -66,7 +66,39 @@ test.describe('Load Flow', () => {
 // ---------------------------------------------------------------------------
 test.describe('Arc Flash', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto(pageUrl('arcFlash.html?e2e=1&e2e_reset=1'));
+    await page.addInitScript(() => {
+      const oneLine = {
+        activeSheet: 0,
+        sheets: [{
+          name: 'Arc Flash Fixture',
+          components: [{
+            id: 'CB-1',
+            label: 'CB-1',
+            type: 'breaker',
+            subtype: 'Breaker',
+            kV: 0.48,
+            clearing_time: 0.1,
+            enclosure: 'box',
+            gap: 32,
+            working_distance: 455,
+            electrode_config: 'VCB',
+            enclosure_height: 508,
+            enclosure_width: 508,
+            enclosure_depth: 508,
+            z1: { r: 0.012, x: 0.045 },
+            z2: { r: 0.012, x: 0.045 },
+            z0: { r: 0.03, x: 0.09 },
+            sources: [{
+              z1: { r: 0, x: 0.02 },
+              z2: { r: 0, x: 0.02 },
+              z0: { r: 0, x: 0.02 },
+            }],
+          }],
+        }],
+      };
+      localStorage.setItem('base:oneLineDiagram', JSON.stringify(oneLine));
+    });
+    await page.goto(pageUrl('arcFlash.html?e2e=1'));
     await page.waitForLoadState('networkidle');
   });
 
@@ -82,6 +114,10 @@ test.describe('Arc Flash', () => {
     await page.locator('#arcflash-form button[type="submit"]').click();
     const output = page.locator('#arcflash-output');
     await expect(output).not.toBeEmpty();
+    await expect(page.locator('#arcflash-readiness')).toHaveAttribute('data-status', /ready|review/);
+    await expect(page.locator('#arcflash-results-table')).toBeVisible();
+    await expect(page.locator('#arcflash-results-table')).toContainText('Clearing time basis');
+    await expect(page.locator('#arcflash-export-btn')).toBeEnabled();
   });
 });
 

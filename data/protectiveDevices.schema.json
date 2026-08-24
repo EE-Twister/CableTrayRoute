@@ -80,6 +80,56 @@
         }
       ]
     },
+    "curveToleranceProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profileId",
+        "plottedBoundary",
+        "variationAxis",
+        "variationDirection",
+        "variationPercent",
+        "operationalBoundary",
+        "sourceId"
+      ],
+      "properties": {
+        "profileId": { "type": "string", "minLength": 1 },
+        "plottedBoundary": {
+          "type": "string",
+          "enum": ["minimum_test_points", "maximum_test_points", "nominal", "other"]
+        },
+        "variationAxis": {
+          "type": "string",
+          "enum": ["current", "time", "manufacturer_curve"]
+        },
+        "variationDirection": {
+          "type": "string",
+          "enum": ["plus", "minus", "plus_minus", "not_quantified"]
+        },
+        "variationPercent": { "type": ["number", "null"], "minimum": 0 },
+        "operationalBoundary": { "type": "string", "enum": ["lower", "upper", "nominal"] },
+        "sourceId": { "type": "string", "minLength": 1 },
+        "notes": { "$ref": "#/definitions/nullableString" }
+      }
+    },
+    "curveTolerance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeLower": { "type": "number", "exclusiveMinimum": 0 },
+        "timeUpper": { "type": "number", "exclusiveMinimum": 0 },
+        "profileSemantics": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/curveToleranceProfile" }
+        }
+      },
+      "anyOf": [
+        { "required": ["timeLower"] },
+        { "required": ["timeUpper"] },
+        { "required": ["profileSemantics"] }
+      ]
+    },
     "interruptingRating": {
       "type": "object",
       "additionalProperties": false,
@@ -232,7 +282,7 @@
           }
         },
         "curveReduction": { "type": ["object", "null"], "additionalProperties": true },
-        "tolerance": { "type": ["object", "null"], "additionalProperties": { "type": "number" } },
+        "tolerance": { "oneOf": [{ "$ref": "#/definitions/curveTolerance" }, { "type": "null" }] },
         "letThrough": { "type": ["object", "null"], "additionalProperties": true },
         "openingTime": { "type": ["object", "null"], "additionalProperties": true, "description": "Relay/contact output, mechanism, and arcing time components in seconds or cycles with a stated basis." },
         "formula": { "type": ["object", "null"], "additionalProperties": true },

@@ -25,7 +25,9 @@ test.describe('Validation & Standards — smoke', () => {
   test('smoke: at-a-glance KPI cards are rendered', async ({ page }) => {
     await page.goto(e2ePage('validation.html'));
     const kpiCards = page.locator('.kpi-card');
-    await expect(kpiCards).toHaveCount(4);
+    await expect(kpiCards).toHaveCount(6);
+    await expect(page.locator('#kpi-published-benchmarks')).not.toHaveText('—');
+    await expect(page.locator('#kpi-published-coverage')).toContainText('/');
   });
 
   test('smoke: standards section is visible', async ({ page }) => {

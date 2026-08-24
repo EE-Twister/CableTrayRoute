@@ -10,6 +10,8 @@
 
 export const MANIFEST_HEADERS = [
   'Device ID', 'Name', 'Vendor', 'Relay Model',
+  'Catalog / Trip Unit', 'Device Readiness', 'Curve Source', 'Curve Reference',
+  'Fault Current (A)', 'Fault Current Source', 'Input Fingerprint', 'Intended Use',
   'Settings Hash', 'File Name', 'Format', 'Warnings',
 ];
 
@@ -44,9 +46,11 @@ function sanitizeInlineValue(value) {
  * @param {Array} entries - TCC device entry array
  * @returns {Array}
  */
-export function filterExportableEntries(entries = []) {
+export function filterExportableEntries(entries = [], { requireCalculationReady = true } = {}) {
   return entries.filter(e =>
-    e.baseDevice && Object.keys(e.baseDevice.settings || {}).length > 0
+    e.baseDevice
+    && Object.keys(e.baseDevice.settings || {}).length > 0
+    && (!requireCalculationReady || e.libraryAssessment?.status === 'calculation_ready')
   );
 }
 
@@ -334,11 +338,17 @@ export function selectVendorFormat(entry = {}) {
  *   warnings: string[]
  * }}
  */
-export function buildExportFiles(entries = []) {
+export function buildExportFiles(entries = [], { studyContext = {} } = {}) {
   const exportable = filterExportableEntries(entries);
   const files = [];
   const manifestRows = [];
-  const warnings = [];
+  const blockedEntries = entries.filter(entry => (
+    entry?.baseDevice
+    && Object.keys(entry.baseDevice.settings || {}).length > 0
+    && entry.libraryAssessment?.status !== 'calculation_ready'
+  ));
+  const warnings = blockedEntries.map(entry => `${entry.name || entry.baseDevice?.id}: draft settings export blocked because the device is not calculation-ready`);
+  const provenance = studyContext.provenance || {};
 
   exportable.forEach(entry => {
     const dev = entry.baseDevice || {};
@@ -372,6 +382,14 @@ export function buildExportFiles(entries = []) {
       'Name':          entry.name || dev.name  || '',
       'Vendor':        dev.vendor || '',
       'Relay Model':   dev.name   || '',
+      'Catalog / Trip Unit': dev.catalogNumber || dev.tripUnitModel || '',
+      'Device Readiness': entry.libraryAssessment?.label || 'Calculation-ready',
+      'Curve Source': dev.curveEvidence?.document || dev.datasheetUrl || '',
+      'Curve Reference': dev.curveEvidence?.curveNumber || dev.curveEvidence?.curveId || dev.curveEvidence?.page || '',
+      'Fault Current (A)': Number.isFinite(studyContext.faultCurrentA) ? studyContext.faultCurrentA : '',
+      'Fault Current Source': studyContext.faultCurrentSource || '',
+      'Input Fingerprint': provenance.inputFingerprint || '',
+      'Intended Use': provenance.intendedUse || 'Draft settings package — qualified human review and vendor validation required.',
       'Settings Hash': hash,
       'File Name':     filename,
       'Format':        fmt,
@@ -379,5 +397,5 @@ export function buildExportFiles(entries = []) {
     });
   });
 
-  return { files, manifestRows, warnings };
+  return { files, manifestRows, warnings, blockedEntries };
 }

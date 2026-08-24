@@ -106,4 +106,4 @@ For network-constrained results, pair this study with the **Load Flow**, **Quasi
 ## References
 
 - Wood, Wollenberg & Sheblé, *Power Generation, Operation, and Control*, 3rd ed., §3 (Economic Dispatch of Thermal Units).
-- IEEE Std 399-1997 (Brown Book) §3 — System economics.
+- IEEE Std 3002.2-2018 — current industrial and commercial load-flow and optimal-power-flow study-practice context.

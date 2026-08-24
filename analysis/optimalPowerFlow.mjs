@@ -25,7 +25,8 @@
  * References:
  *   Wood, Wollenberg & Sheblé, "Power Generation, Operation, and Control",
  *     3rd ed., §3 (Economic Dispatch of Thermal Units) — canonical 3-unit example.
- *   IEEE Std 399-1997 (Brown Book) §3 — system economics.
+ *   IEEE Std 3002.2-2018 — current industrial and commercial load-flow and
+ *     optimal-power-flow study-practice context.
  */
 
 /** Threshold below which a unit's quadratic term is treated as linear. */

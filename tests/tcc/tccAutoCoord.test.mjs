@@ -238,6 +238,22 @@ describe('checkCoordination', () => {
     assert.strictEqual(typeof result.coordinated, 'boolean');
     assert(Array.isArray(result.violations));
   });
+
+  it('does not claim coordination above either published curve domain', () => {
+    const result = checkCoordination(upstreamOk, downstream, [2000], 0.3);
+    assert.strictEqual(result.coordinated, false);
+    assert.strictEqual(result.violations.length, 0);
+    assert.strictEqual(result.unevaluated.length, 1);
+    assert.strictEqual(result.unevaluated[0].upstreamStatus, 'above-domain');
+    assert.strictEqual(result.unevaluated[0].downstreamStatus, 'above-domain');
+  });
+
+  it('does not claim coordination when every sample is below downstream pickup', () => {
+    const result = checkCoordination(upstreamOk, downstream, [50, 100], 0.3);
+    assert.strictEqual(result.coordinated, false);
+    assert.strictEqual(result.comparisonCount, 0);
+    assert.strictEqual(result.violations.length, 0);
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -262,11 +278,11 @@ describe('findCoordinatingTimeDial', () => {
   });
 
   it('uses longTimeDelay dial key for long-time devices when override already exists', () => {
-    const longTimeDownstream = scaleCurve(ge, { pickup: 1.5, longTimeDelay: 0.2, instantaneous: 0, shortTimePickup: 0 });
+    const longTimeDownstream = scaleCurve(ge, { pickup: 150, longTimeDelay: 0.2, instantaneous: 0, shortTimePickup: 0 });
     const longTimeFaultCurrents = generateFaultCurrents(100, 700, 50);
     const r = findCoordinatingTimeDial(
       ge,
-      { pickup: 1.5, longTimeDelay: 0.15, instantaneous: 0, shortTimePickup: 0 },
+      { pickup: 150, longTimeDelay: 0.15, instantaneous: 0, shortTimePickup: 0 },
       longTimeDownstream,
       longTimeFaultCurrents,
       0.3

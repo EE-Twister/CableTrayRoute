@@ -21,6 +21,11 @@ const ANALYSIS_DIR = path.join(ROOT, 'analysis');
 const BENCHMARKS_FILE = path.join(ROOT, 'data', 'validationBenchmarks.json');
 const OUTPUT_FILE = path.join(ROOT, 'dist', 'validationManifest.json');
 const TEST_FILE_RE = /\.(?:test|spec)\.(?:mjs|cjs|js)$/;
+const ANALYSIS_MODULE_RE = /\.(?:mjs|cjs|js)$/;
+const ANALYSIS_INFRASTRUCTURE = new Set([
+  'analysis/benchmarkLibrary.mjs',
+  'analysis/benchmarkRunner.mjs',
+]);
 
 // ---------------------------------------------------------------------------
 // Parse test files for group names and assertion counts
@@ -84,6 +89,69 @@ function collectTestSuites() {
   return suites;
 }
 
+function collectAnalysisModules() {
+  const modules = [];
+  if (!fs.existsSync(ANALYSIS_DIR)) return modules;
+
+  function walk(dir) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const filePath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(filePath);
+      } else if (ANALYSIS_MODULE_RE.test(entry.name) && !TEST_FILE_RE.test(entry.name)) {
+        const relativePath = path.relative(ROOT, filePath).replace(/\\/g, '/');
+        if (!ANALYSIS_INFRASTRUCTURE.has(relativePath)) modules.push(relativePath);
+      }
+    }
+  }
+
+  walk(ANALYSIS_DIR);
+  return modules.sort();
+}
+
+function buildEvidenceCoverage(benchmarks, evidenceLedger, evidenceMethodology) {
+  const analysisModules = collectAnalysisModules();
+  const publishedClasses = new Set(evidenceMethodology?.publishedEvidenceClasses || []);
+  const evidenceByModule = new Map(analysisModules.map(module => [module, []]));
+
+  for (const benchmark of benchmarks || []) {
+    const evidence = evidenceLedger?.[benchmark.id];
+    for (const module of evidence?.implementationModules || []) {
+      if (!evidenceByModule.has(module)) evidenceByModule.set(module, []);
+      evidenceByModule.get(module).push({
+        benchmarkId: benchmark.id,
+        evidenceClass: evidence.evidenceClass,
+        evidenceStrength: evidence.evidenceStrength,
+        published: publishedClasses.has(evidence.evidenceClass),
+      });
+    }
+  }
+
+  const moduleEvidence = analysisModules.map(module => ({
+    module,
+    evidence: evidenceByModule.get(module) || [],
+  }));
+  const modulesWithAnyEvidence = moduleEvidence.filter(item => item.evidence.length > 0).length;
+  const modulesWithPublishedEvidence = moduleEvidence.filter(item =>
+    item.evidence.some(evidence => evidence.published)
+  ).length;
+  const publishedBenchmarkCount = (benchmarks || []).filter(benchmark =>
+    publishedClasses.has(evidenceLedger?.[benchmark.id]?.evidenceClass)
+  ).length;
+
+  return {
+    analysisModuleCount: analysisModules.length,
+    modulesWithAnyEvidence,
+    modulesWithPublishedEvidence,
+    modulesWithoutPublishedEvidence: analysisModules.length - modulesWithPublishedEvidence,
+    publishedEvidencePercent: analysisModules.length
+      ? Number((modulesWithPublishedEvidence / analysisModules.length * 100).toFixed(1))
+      : 0,
+    publishedBenchmarkCount,
+    moduleEvidence,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Load benchmarks
 // ---------------------------------------------------------------------------
@@ -91,7 +159,7 @@ function collectTestSuites() {
 function loadBenchmarks() {
   if (!fs.existsSync(BENCHMARKS_FILE)) {
     console.warn('[manifest] data/validationBenchmarks.json not found');
-    return { benchmarks: [], standards: [], necComplianceMatrix: [] };
+    return { benchmarks: [], standards: [], necComplianceMatrix: [], evidenceLedger: {}, evidenceMethodology: {} };
   }
   return JSON.parse(fs.readFileSync(BENCHMARKS_FILE, 'utf8'));
 }
@@ -102,9 +170,20 @@ function loadBenchmarks() {
 
 function buildManifest() {
   const suites = collectTestSuites();
-  const { benchmarks, standards, necComplianceMatrix } = loadBenchmarks();
+  const {
+    benchmarks,
+    standards,
+    necComplianceMatrix,
+    evidenceLedger,
+    evidenceMethodology,
+  } = loadBenchmarks();
 
   const totalAssertions = suites.reduce((s, t) => s + t.assertionCount, 0);
+  const evidenceCoverage = buildEvidenceCoverage(benchmarks, evidenceLedger, evidenceMethodology);
+  const enrichedBenchmarks = (benchmarks || []).map(benchmark => ({
+    ...benchmark,
+    evidence: evidenceLedger?.[benchmark.id] || null,
+  }));
 
   const manifest = {
     generatedAt: new Date().toISOString(),
@@ -112,13 +191,19 @@ function buildManifest() {
       testSuiteCount: suites.length,
       totalAssertions,
       benchmarkCount: benchmarks ? benchmarks.length : 0,
+      publishedBenchmarkCount: evidenceCoverage.publishedBenchmarkCount,
+      analysisModuleCount: evidenceCoverage.analysisModuleCount,
+      analysisModulesWithPublishedEvidence: evidenceCoverage.modulesWithPublishedEvidence,
+      publishedEvidencePercent: evidenceCoverage.publishedEvidencePercent,
       standardCount: standards ? standards.length : 0,
       necComplianceCount: necComplianceMatrix ? necComplianceMatrix.length : 0,
     },
     testSuites: suites,
-    benchmarks: benchmarks || [],
+    benchmarks: enrichedBenchmarks,
     standards: standards || [],
     necComplianceMatrix: necComplianceMatrix || [],
+    evidenceMethodology: evidenceMethodology || {},
+    evidenceCoverage,
   };
 
   // Ensure dist/ exists

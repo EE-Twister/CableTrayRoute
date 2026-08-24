@@ -18,8 +18,8 @@
  *   Lower: 0.95 pu
  *
  * References:
- *   IEEE Std 399-1997 — Brown Book: Recommended Practice for Industrial
- *     and Commercial Power Systems Analysis §14 (Load Flow)
+ *   IEEE Std 3002.2-2018 — current industrial and commercial load-flow
+ *     study-practice context; the time-series extension is application-specific
  *   IEC 61968-13:2008 — CIM for distribution networks (profile representation)
  */
 

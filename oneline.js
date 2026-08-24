@@ -144,6 +144,7 @@ import {
   getPropertyEditorDeviceLabel
 } from './src/one-line/propertyEditorController.mjs';
 import { renderConnections } from './src/one-line/connectionRenderController.mjs';
+import { resolveRenderedConnectionLabelCollisions, symmetricOffsets } from './src/one-line/connectionLabelLayout.mjs';
 import { createLiveTelemetryViewController } from './src/one-line/liveTelemetryViewController.mjs';
 import { createStudyPanelController } from './src/one-line/studyPanelController.mjs';
 import { createSheetPersistenceController } from './src/one-line/sheetPersistenceController.mjs';
@@ -9562,7 +9563,7 @@ function render() {
     return { left, top: position.y - 9, right: left + width, bottom: position.y + 9 };
   };
   const resolveConnectionLabelPosition = (position, text) => {
-    const offsets = [0, -18, 18, -36, 36, -54, 54, -72, 72, -90, 90, -108, 108, -126, 126];
+    const offsets = symmetricOffsets(18, 216);
     for (const offset of offsets) {
       const candidate = { ...position, y: position.y + offset };
       const box = connectionLabelBox(candidate, text);
@@ -9571,7 +9572,7 @@ function render() {
         return candidate;
       }
     }
-    const fallback = { ...position, y: position.y - 144 };
+    const fallback = { ...position, y: position.y - 234 };
     const fallbackBox = connectionLabelBox(fallback, text);
     labelCollisionBoxes.push(fallbackBox); labelCollisionIndex.add(fallbackBox);
     return fallback;
@@ -9704,10 +9705,9 @@ function render() {
     dot.style.pointerEvents = 'none';
     renderSurface.appendChild(dot);
   });
-
   commitRenderSurface();
+  resolveRenderedConnectionLabelCollisions({ connectionLabels: Array.from(svg.querySelectorAll('.conn-label')), obstacleLabels: Array.from(svg.querySelectorAll('.component-label')) });
   if (!engineeringPrint) applyValidationIssueMarkers(svg);
-
   if (!engineeringPrint && marquee && marquee.active) {
     const rect = document.createElementNS(svgNS, 'rect');
     const x = Math.min(marquee.x1, marquee.x2);

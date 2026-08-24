@@ -5,7 +5,7 @@ import './workflowStatus.js';
 import { initStudyApprovalPanel } from './components/studyApproval.js';
 import { initStudyBasisPanel } from './components/studyBasis.js';
 
-document.addEventListener('DOMContentLoaded', () => {
+function initializeArcFlashPanels() {
   initStudyBasisPanel('arcFlash', {
     standard: 'IEEE 1584-2018',
     clause: 'Section 4 - Arcing current and incident energy',
@@ -27,4 +27,10 @@ document.addEventListener('DOMContentLoaded', () => {
     benchmarkId: 'ieee1584-arc-flash',
   });
   initStudyApprovalPanel('arcFlash');
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeArcFlashPanels, { once: true });
+} else {
+  initializeArcFlashPanels();
+}

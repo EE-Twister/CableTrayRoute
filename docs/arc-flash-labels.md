@@ -4,7 +4,7 @@
 
 CableTrayRoute generates draft arc-flash warning labels from the one-line diagram after running an arc-flash study. The label format supports NFPA 70E field-marking review, but the software does not certify compliance. Labels are withheld whenever required study inputs remain unresolved.
 
-- **Printed as a label sheet** — a print-optimized page with all equipment labels arranged in a 2-column grid, ready to cut and apply to switchgear
+- **Printed as a draft label sheet** — a print-optimized page with calculation-complete equipment labels arranged in a 2-column grid for controlled engineering review
 - **Viewed as overlay badges** on the one-line diagram — compact signal-color badges showing incident energy and study status at a glance
 
 The project engineer and employer remain responsible for the risk assessment, study validation, label content, field application, and applicable NFPA 70E edition.
@@ -47,14 +47,14 @@ calculation.
 2. Open the **Studies** panel (toolbar button or keyboard shortcut)
 3. Click **Arc Flash** — this automatically runs Short Circuit first, then computes IEEE 1584-2018 incident energy for every bus component
 
-### Step 2 – Print Labels
+### Step 2 – Export Draft Labels for Review
 
-After the arc flash study completes, label export is available only for results with no unresolved `requiredInputs` and with complete voltage, working-distance, clearing-time, boundary, and upstream-device data.
+After the arc flash study completes, label export is available only for results with no unresolved `requiredInputs` and with complete voltage, working-distance, clearing-time, boundary, and upstream-device data. A protective-device curve below `calculation_ready`, or an arcing current outside the recorded total-clearing curve domain, leaves a required input unresolved and withholds that location from label export. A 0.2 s fallback remains a screening assumption, not an issue-ready clearing time.
 
-1. Click **Print Labels**
-2. A new browser window opens containing the issue-ready draft labels in a 2-column grid; incomplete locations are omitted
-3. Click **Print All Labels** in that window — the browser print dialog opens
-4. Select your label stock (landscape, ½ in margins), print, cut, and apply to switchgear
+1. Click **Export Draft Report & Eligible Labels**
+2. The report includes every calculated location, including calculation status, unresolved inputs, clearing-time provenance, protective-device evidence status, source fingerprint, model assumptions, and model-range status
+3. Only calculation-complete locations produce label drafts; incomplete locations are withheld and remain identified in the report
+4. Every generated label carries a visible **DRAFT** watermark. Complete the authenticated engineering review and the employer's field-label controls outside this export before producing labels for field application
 
 **Label size:** 6 in × 4 in per label (matches standard industrial arc flash label stock)
 
@@ -96,7 +96,7 @@ Each label is a 6 in × 4 in SVG document. The default layout:
 
 ## Individual SVG Downloads
 
-When the arc flash study runs, CableTrayRoute also automatically downloads one individual `.svg` label file per equipment piece (alongside the `arcflash.csv` and `arcflash.pdf` reports). These individual files can be opened in any SVG editor or sent to a label printer directly.
+When the user explicitly exports, CableTrayRoute downloads one individual, watermarked `.svg` label draft per eligible equipment item alongside the `arcflash.csv` and `arcflash.pdf` reports. These files are review artifacts and are not authorized for field application by the software.
 
 File names are derived from the equipment tag (e.g., `MCC-1.svg`).
 

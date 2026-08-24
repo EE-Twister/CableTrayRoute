@@ -965,15 +965,16 @@ export function listSavedProjects() {
   return Object.keys(savedProjectsCache).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 }
 
-export function writeSavedProject(projectId, sections = {}) {
+export function writeSavedProject(projectId, sections = {}, options = {}) {
   const name = typeof projectId === 'string' ? projectId.trim() : '';
   if (!name) return;
   ensureSavedProjectsCache();
   if (savedProjectsError) throw savedProjectsError;
   const entries = sections && typeof sections === 'object' ? Object.entries(sections) : [];
   if (!entries.length) return;
-  const current = isPlainObject(savedProjectsCache[name]) ? { ...savedProjectsCache[name] } : {};
-  const previousMeta = isPlainObject(current.__meta) ? current.__meta : {};
+  const previous = isPlainObject(savedProjectsCache[name]) ? savedProjectsCache[name] : {};
+  const current = options.replace === true ? {} : { ...previous };
+  const previousMeta = isPlainObject(previous.__meta) ? previous.__meta : {};
   for (const [key, value] of entries) {
     if (key === '__meta') continue;
     const cloned = cloneSavedProjectValue(value);

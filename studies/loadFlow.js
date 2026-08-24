@@ -17,7 +17,7 @@ export function validateLoadFlowModel(model) {
   if (buses.length < 2) errors.push('At least two connected buses are required.');
   if (!branches.length) errors.push('At least one branch is required.');
 
-  const slackBuses = buses.filter(bus => `${bus?.type || ''}`.toLowerCase() === 'slack');
+  const slackBuses = buses.filter(bus => `${bus?.busType || bus?.type || ''}`.toLowerCase() === 'slack');
   if (!slackBuses.length) errors.push('A source or slack bus is required.');
   if (slackBuses.length > 1) warnings.push('Multiple slack buses were found; confirm the intended source configuration.');
 

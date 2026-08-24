@@ -798,6 +798,7 @@ const BRANCH_KEYWORDS = [
   'conductor',
   'transformer',
   'breaker',
+  'fuse',
   'switch',
   'recloser',
   'disconnect',
@@ -934,7 +935,7 @@ function extractImpedance(comp) {
   for (const cand of candidates) {
     if (cand && typeof cand === 'object') return normalizeImpedance(cand);
   }
-  if (typeof comp?.r === 'number' || typeof comp?.x === 'number') {
+  if (comp?.y === undefined && (typeof comp?.r === 'number' || typeof comp?.x === 'number')) {
     return normalizeImpedance({ r: comp.r, x: comp.x });
   }
   const derived = deriveLinearSegmentImpedance(comp);
@@ -1039,6 +1040,15 @@ export function buildLoadFlowModel(oneLine = {}) {
   }
   const busMap = new Map(buses.map(b => [b.id, b]));
   const nearestBusByNode = mapNearestBusIds(adjacency, busMap);
+  const hasExplicitSlack = buses.some(bus => String(bus.busType || bus.type || '').toLowerCase() === 'slack');
+  if (!hasExplicitSlack) {
+    const source = components.find(isGeneratorDevice);
+    const sourceBusId = source
+      ? nearestBusByNode.get(source.id) || findNearestBusId(source, busMap, adjacency)
+      : null;
+    const sourceBus = sourceBusId ? busMap.get(sourceBusId) : null;
+    if (sourceBus) sourceBus.busType = 'slack';
+  }
 
   components.forEach(comp => {
     if (!comp || isBusComponent(comp) || typeof comp.busType === 'string' && comp.busType) return;

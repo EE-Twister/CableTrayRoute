@@ -86,6 +86,7 @@ import {
   stripWorkflowNumber
 } from "./src/homepageSummary.js";
 import { createAutoSaveScheduler as createAutoSaveSchedulerModel } from "./src/autoSaveScheduler.js";
+import { recoverActiveProjectName } from "./src/projectContext.js";
 
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
 const CHECKPOINT_KEY='CTR_CHECKPOINT';
@@ -622,8 +623,7 @@ function displayProjectName(rawName){
 }
 
 if(typeof window!=='undefined'){
-  const initialProject=currentProjectFromHash()||(window.currentProjectId||'');
-  window.currentProjectId=initialProject||'default';
+  window.currentProjectId=recoverActiveProjectName({hashName:currentProjectFromHash(),currentProjectId:window.currentProjectId,readStoredProjectName:()=>getProjectState()?.name,onReadError:err=>console.warn('Failed to recover active project name',err)})||'default';
 }
 
 function getDirtyTracker(){

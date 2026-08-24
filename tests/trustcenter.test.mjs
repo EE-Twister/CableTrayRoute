@@ -224,6 +224,22 @@ describe('benchmarkLibrary — canonical benchmark results', () => {
     const result = runBenchmark(bm);
     assert.strictEqual(result.pass, true, `VDROP-002 failed: ${JSON.stringify(result.checks)}`);
   });
+
+  it('ANSI-SC-001: independently derived ANSI-path currents pass', () => {
+    const bm = BENCHMARKS.find(b => b.id === 'ANSI-SC-001');
+    assert.ok(bm, 'ANSI-SC-001 not found');
+    const result = runBenchmark(bm);
+    assert.strictEqual(result.pass, true, `ANSI-SC-001 failed: ${JSON.stringify(result.checks)}`);
+  });
+
+  it('primary-source manufacturer benchmarks execute against the live engines', () => {
+    for (const id of ['MSTART-ABB-001', 'TCC-SC-001']) {
+      const benchmark = BENCHMARKS.find(item => item.id === id);
+      assert.ok(benchmark, `${id} not found`);
+      const result = runBenchmark(benchmark);
+      assert.strictEqual(result.pass, true, `${id} failed: ${JSON.stringify(result.checks)}`);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

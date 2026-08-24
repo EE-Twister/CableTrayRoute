@@ -1,5 +1,33 @@
 {
-  "version": "1",
+  "version": "2",
+  "evidenceMethodology": {
+    "schemaVersion": 1,
+    "publishedEvidenceClasses": ["published_worked_example", "manufacturer_data", "recognized_test_case"],
+    "classes": {
+      "published_worked_example": "Expected outputs are stated in an identified published worked example.",
+      "manufacturer_data": "Expected outputs or source geometry are published by the equipment manufacturer.",
+      "recognized_test_case": "Inputs are a publicly identified industry or research test case; expected outputs must identify their independent solver source.",
+      "independent_analytical": "Expected outputs were independently derived from stated equations but are not published worked-example values.",
+      "cross_tool_comparison": "Expected outputs were compared with another calculation tool; source records must be retained before promotion.",
+      "screening_fixture": "Regression or plausibility fixture only; it is not independently published validation evidence."
+    },
+    "notice": "Published benchmark coverage is narrower than automated regression coverage. Passing tests do not constitute standards compliance, licensed-engineer approval, or project-specific design acceptance."
+  },
+  "evidenceLedger": {
+    "ieee1584-arc-flash": { "evidenceClass": "published_worked_example", "sourceAccess": "paywalled_primary", "evidenceStrength": "strong", "implementationModules": ["analysis/ieee1584.mjs", "analysis/arcFlash.mjs"], "executableBenchmarkId": null },
+    "ieee1584-arc-flash-lv": { "evidenceClass": "published_worked_example", "sourceAccess": "paywalled_primary", "evidenceStrength": "strong", "implementationModules": ["analysis/ieee1584.mjs", "analysis/arcFlash.mjs"], "executableBenchmarkId": null },
+    "ieee3002-load-flow-radial": { "evidenceClass": "independent_analytical", "sourceAccess": "public_primary_context_only", "evidenceStrength": "moderate", "implementationModules": ["analysis/loadFlow.js"], "executableBenchmarkId": "LFLOW-001" },
+    "ansi-short-circuit-thevenin": { "evidenceClass": "independent_analytical", "sourceAccess": "public_primary_context_only", "evidenceStrength": "moderate", "implementationModules": ["analysis/shortCircuit.mjs"], "executableBenchmarkId": "ANSI-SC-001" },
+    "nec2023-conduit-fill-count": { "evidenceClass": "independent_analytical", "sourceAccess": "paywalled_primary", "evidenceStrength": "moderate", "implementationModules": ["analysis/conduitFill.mjs"], "executableBenchmarkId": null },
+    "iec60909-short-circuit": { "evidenceClass": "independent_analytical", "sourceAccess": "paywalled_primary", "evidenceStrength": "moderate", "implementationModules": ["analysis/iec60909.mjs"], "executableBenchmarkId": "IEC60909-001" },
+    "iec60287-cable-rating": { "evidenceClass": "screening_fixture", "sourceAccess": "source_record_incomplete", "evidenceStrength": "limited", "implementationModules": ["analysis/iec60287.mjs"], "executableBenchmarkId": "IEC60287-001" },
+    "ieee80-ground-grid": { "evidenceClass": "published_worked_example", "sourceAccess": "paywalled_primary", "evidenceStrength": "moderate", "implementationModules": ["analysis/groundGrid.mjs"], "executableBenchmarkId": null },
+    "heat-trace-screening": { "evidenceClass": "screening_fixture", "sourceAccess": "source_record_incomplete", "evidenceStrength": "limited", "implementationModules": ["analysis/heatTraceSizing.mjs"], "executableBenchmarkId": null },
+    "ductbank-thermal": { "evidenceClass": "cross_tool_comparison", "sourceAccess": "source_record_incomplete", "evidenceStrength": "limited", "implementationModules": ["analysis/iec60287.mjs", "analysis/cableThermalEnvironment.mjs"], "executableBenchmarkId": null },
+    "cable-thermal-env-unified": { "evidenceClass": "screening_fixture", "sourceAccess": "internal_cross_check", "evidenceStrength": "limited", "implementationModules": ["analysis/cableThermalEnvironment.mjs"], "executableBenchmarkId": null },
+    "sc-smu20-tcc-source-points": { "evidenceClass": "manufacturer_data", "sourceAccess": "public_primary", "evidenceStrength": "strong", "implementationModules": ["analysis/timeCurrentCurve.mjs"], "executableBenchmarkId": "TCC-SC-001" },
+    "abb-fpm2555ts-motor-current": { "evidenceClass": "manufacturer_data", "sourceAccess": "public_primary", "evidenceStrength": "strong", "implementationModules": ["analysis/motorStartCalc.mjs"], "executableBenchmarkId": "MSTART-ABB-001" }
+  },
   "benchmarks": [
     {
       "id": "ieee1584-arc-flash",
@@ -29,12 +57,104 @@
       "sampleFile": "samples/benchmark-ieee1584-arc-flash.json"
     },
     {
+      "id": "ieee1584-arc-flash-lv",
+      "title": "IEEE 1584-2018 Arc Flash — Annex D.2 (LV, enclosed VCB)",
+      "studyPage": "arcFlash.html",
+      "standard": "IEEE 1584-2018",
+      "clause": "Annex D.2 — Low-voltage worked example",
+      "description": "Annex D.2 low-voltage worked example covering the full and reduced arcing-current cases for 0.48 kV enclosed VCB equipment.",
+      "inputs": {
+        "systemVoltageKV": 0.48,
+        "boltedFaultKA": 45,
+        "gapMm": 32,
+        "workingDistanceMm": 609.6,
+        "equipmentConfig": "enclosed",
+        "conductorConfig": "VCB",
+        "enclosureHeightMm": 610,
+        "enclosureWidthMm": 610,
+        "enclosureDepthMm": 254,
+        "fullArcDurationS": 0.0613,
+        "reducedArcDurationS": 0.319
+      },
+      "expectedOutputs": {
+        "fullArcingCurrentKA": { "value": 28.793, "tolerance": 0.01 },
+        "reducedArcingCurrentKA": { "value": 25.244, "tolerance": 0.01 },
+        "reducedIncidentEnergyCalCm2": { "value": 12.705, "tolerance": 0.01 },
+        "arcFlashBoundaryMm": { "value": 2669, "tolerance": 3 }
+      },
+      "reference": "IEEE 1584-2018 Annex D.2 worked example",
+      "sourceUrl": "https://standards.ieee.org/ieee/1584/5802/"
+    },
+    {
+      "id": "ieee3002-load-flow-radial",
+      "title": "IEEE 3002.2 Study Practice — Two-Bus Radial Load-Flow Known Answer",
+      "studyPage": "loadFlow.html",
+      "standard": "IEEE 3002.2-2018",
+      "clause": "Study-practice context; independently derived two-bus solution",
+      "description": "A 13.8 kV slack bus supplies 1,000 kW and 400 kvar through a 0.01 + j0.04 ohm branch on a 100 MVA base. The expected receiving voltage is derived independently from the exact two-bus quadratic after converting branch impedance to per unit.",
+      "inputs": {
+        "baseKV": 13.8,
+        "baseMVA": 100,
+        "loadKW": 1000,
+        "loadKvar": 400,
+        "branchROhm": 0.01,
+        "branchXOhm": 0.04
+      },
+      "expectedOutputs": {
+        "receivingVoltagePU": { "value": 0.9998634, "tolerance": 0.000001 }
+      },
+      "reference": "Independent exact two-bus quadratic; IEEE 3002.2-2018 provides the current load-flow study-practice context",
+      "sourceUrl": "https://standards.ieee.org/ieee/3002.2/4773/"
+    },
+    {
+      "id": "ansi-short-circuit-thevenin",
+      "title": "ANSI-Path Short Circuit — Thevenin and Symmetrical-Component Known Answer",
+      "studyPage": "shortCircuit.html",
+      "standard": "IEEE 3002.3-2018 study practice",
+      "clause": "Independent Thevenin and symmetrical-component arithmetic check",
+      "description": "A 13.8 kV bus is checked using independently evaluated Thevenin and symmetrical-component equations. This validates the application screening path; it is not a published breaker-duty example or full ANSI C37 rating validation.",
+      "inputs": {
+        "systemKV": 13.8,
+        "voltageFactor": 1,
+        "z1Ohm": { "r": 0.01, "x": 0.1 },
+        "z2Ohm": { "r": 0.01, "x": 0.1 },
+        "z0Ohm": { "r": 0.03, "x": 0.3 },
+        "xrRatio": 10
+      },
+      "expectedOutputs": {
+        "threePhaseKA": { "value": 79.28, "tolerance": 0.01 },
+        "lineToGroundKA": { "value": 47.57, "tolerance": 0.01 },
+        "asymmetricalPeakKA": { "value": 194.01, "tolerance": 0.01 }
+      },
+      "reference": "Independent Thevenin/symmetrical-component fixture; IEEE 3002.3-2018 provides the current short-circuit study-practice context",
+      "sourceUrl": "https://standards.ieee.org/ieee/3002.3/4774/"
+    },
+    {
+      "id": "nec2023-conduit-fill-count",
+      "title": "NEC 2023 Chapter 9 — Conduit Fill Count Limits",
+      "studyPage": "conduitfill.html",
+      "standard": "NFPA 70 (NEC) 2023",
+      "clause": "Chapter 9, Table 1",
+      "description": "A 0.4 in cable in a raceway with 0.304 in² internal area verifies the edition-pinned one-, two-, and three-or-more-cable fill limits.",
+      "inputs": {
+        "racewayInternalAreaIn2": 0.304,
+        "cableOutsideDiameterIn": 0.4
+      },
+      "expectedOutputs": {
+        "oneCableLimitPercent": { "value": 53, "tolerance": 0 },
+        "twoCableLimitPercent": { "value": 31, "tolerance": 0 },
+        "threeOrMoreCableLimitPercent": { "value": 40, "tolerance": 0 },
+        "oneCableFillPercent": { "value": 41.3367, "tolerance": 0.0001 }
+      },
+      "reference": "NEC 2023 Chapter 9, Table 1; application raceway tables are edition-pinned to NEC 2023"
+    },
+    {
       "id": "iec60909-short-circuit",
       "title": "IEC 60909-0:2016 Short-Circuit — Three-Phase Maximum Current",
       "studyPage": "iec60909.html",
       "standard": "IEC 60909-0:2016",
       "clause": "§4.2 — Three-phase short-circuit, maximum current (c_max)",
-      "description": "110 kV / 10 kV transformer network. Known I\"k3, peak current ip, thermal equivalent Ith from IEC 60909 §4 example.",
+      "description": "Version-pinned 10 kV sequence-impedance regression for the IEC 60909-0:2016 calculation path. It does not validate the 2026 edition.",
       "inputs": {
         "systemKV": 10,
         "scMvaSource": 500,
@@ -48,7 +168,8 @@
         "kappa": { "value": 1.809, "tolerance": 0.05 },
         "ipKA": { "value": 40.3, "tolerance": 1.5 }
       },
-      "reference": "IEC 60909-0:2016 §4.3 worked example",
+      "reference": "Independent analytical fixture using IEC 60909-0:2016 equations; IEC 60909-0:2026 is not claimed",
+      "sourceUrl": "https://webstore.iec.ch/en/publication/24100",
       "sampleFile": "samples/benchmark-iec60909-short-circuit.json"
     },
     {
@@ -176,6 +297,37 @@
       },
       "reference": "IEC 60287-2-1 Tables 1–8; NEC Table 310.16; cross-check against iec60287-cable-rating benchmark",
       "sampleFile": "samples/benchmark-cable-thermal-env.json"
+    },
+    {
+      "id": "sc-smu20-tcc-source-points",
+      "title": "S&C SMU-20 25E Fuse — Published Minimum-Melting Source Geometry",
+      "studyPage": "protectivedevices.html",
+      "standard": "S&C TCC 153-2",
+      "clause": "25E minimum-melting curve; spreadsheet range 153_2!P10:Q95",
+      "description": "Manufacturer-published source points verify that the curve evaluator preserves the 49.5972 A vertical segment and selects the shortest time for the minimum-melting boundary. This validates curve-geometry handling only; it does not authorize coordination settings or calculation-ready device promotion.",
+      "inputs": { "currentA": 49.5972, "boundary": "lower", "matchingSourcePointCount": 28 },
+      "expectedOutputs": {
+        "minimumMeltingTimeS": { "value": 32.1639, "tolerance": 0.0001 },
+        "maximumSourcePointTimeS": { "value": 602.961, "tolerance": 0.001 },
+        "matchingPointCount": { "value": 28, "tolerance": 0 }
+      },
+      "reference": "S&C Electric Company TCC 153-2 source spreadsheet, 25E curve",
+      "sourceUrl": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.xlsx"
+    },
+    {
+      "id": "abb-fpm2555ts-motor-current",
+      "title": "ABB/Baldor FPM2555TS — Published Full-Load and Starting Current",
+      "studyPage": "motorstarting.html",
+      "standard": "ABB/Baldor manufacturer performance data",
+      "clause": "FPM2555TS 100 hp, 460 V, 60 Hz performance-data sheet",
+      "description": "Published 100 hp, 460 V, 0.85 power-factor, 94.1% efficiency data independently checks the application's three-phase full-load-current conversion against the listed 117 A value. The 680 A starting-current check verifies application of the published current ratio; source-impedance voltage sag and acceleration time are outside this benchmark's scope.",
+      "inputs": { "horsepower": 100, "voltageV": 460, "powerFactor": 0.85, "efficiency": 0.941, "publishedStartingCurrentA": 680 },
+      "expectedOutputs": {
+        "fullLoadCurrentA": { "value": 117, "tolerance": 0.5 },
+        "startingCurrentA": { "value": 680, "tolerance": 1 }
+      },
+      "reference": "ABB/Baldor FPM2555TS performance-data sheet",
+      "sourceUrl": "https://library.e.abb.com/public/ad9edd95b42f44ddac04b5e6ee921429/FPM2555TS.pdf"
     }
   ],
   "standards": [
@@ -392,11 +544,11 @@
       "sampleFile": "samples/benchmark-ground-grid-advanced.json"
     },
     {
-      "id": "ieee399",
-      "name": "IEEE 399-1997",
-      "title": "Recommended Practice for Industrial and Commercial Power System Analysis (Brown Book)",
+      "id": "ieee3002-2",
+      "name": "IEEE 3002.2-2018",
+      "title": "Recommended Practice for Conducting Load-Flow Studies and Analysis of Industrial and Commercial Power Systems",
       "studyPage": "loadFlow.html",
-      "scope": "Newton-Raphson load flow for industrial power systems",
+      "scope": "Current study-practice context for load-flow studies in industrial and commercial power systems",
       "assumptions": [
         "Balanced three-phase system in per-unit on common MVA base",
         "PQ (load) buses and PV (generator) buses; one slack bus required",
@@ -404,8 +556,10 @@
       ],
       "limitations": [
         "Unbalanced (unsymmetrical) load flow not supported",
-        "DC power flow approximation not available"
-      ]
+        "DC power flow approximation not available",
+        "The application benchmark is independently derived and is not represented as a published IEEE worked example"
+      ],
+      "sourceUrl": "https://standards.ieee.org/ieee/3002.2/4773/"
     }
   ],
   "necComplianceMatrix": [

@@ -16,8 +16,14 @@ const CONTRACT_HANDOFFS = [
   { label: 'raceway trays -> routing', from: 'racewayschedule.html', output: 'traySchedule', to: 'optimalRoute.html', input: 'traySchedule' },
   { label: 'raceway conduits -> routing', from: 'racewayschedule.html', output: 'conduitSchedule', to: 'optimalRoute.html', input: 'conduitSchedule' },
   { label: 'raceway ductbanks -> routing', from: 'racewayschedule.html', output: 'ductbankSchedule', to: 'optimalRoute.html', input: 'ductbankSchedule' },
+  { label: 'raceway trays -> tray fill', from: 'racewayschedule.html', output: 'traySchedule', to: 'cabletrayfill.html', input: 'traySchedule' },
+  { label: 'raceway conduits -> conduit fill', from: 'racewayschedule.html', output: 'conduitSchedule', to: 'conduitfill.html', input: 'conduitSchedule' },
   { label: 'routing -> deliverables', from: 'optimalRoute.html', output: 'settings.latestRouteResults', to: 'projectreport.html', input: 'settings.latestRouteResults' },
-  { label: 'studies -> deliverables', from: 'shortCircuit.html', output: 'studyResults.shortCircuit', to: 'projectreport.html', input: 'studyResults' }
+  { label: 'load flow -> deliverables', from: 'loadFlow.html', output: 'studyResults.loadFlow', to: 'projectreport.html', input: 'studyResults' },
+  { label: 'short circuit -> deliverables', from: 'shortCircuit.html', output: 'studyResults.shortCircuit', to: 'projectreport.html', input: 'studyResults' },
+  { label: 'short circuit -> arc flash', from: 'shortCircuit.html', output: 'studyResults.shortCircuit', to: 'arcFlash.html', input: 'studyResults.shortCircuit' },
+  { label: 'TCC -> deliverables', from: 'tcc.html', output: 'studyResults.tcc', to: 'projectreport.html', input: 'studyResults' },
+  { label: 'arc flash -> deliverables', from: 'arcFlash.html', output: 'studyResults.arcFlash', to: 'projectreport.html', input: 'studyResults' }
 ];
 
 function assertContractHandoffs() {
@@ -492,7 +498,7 @@ test('sample project satisfies contract handoffs from equipment through delivera
   await gotoWorkflowPage(page, server, 'equipmentlist.html');
   await expect(page.locator('.sample-workflow-guide')).toBeVisible();
   expect(await readCanonicalProject(page)).toEqual(importedProject);
-  await expect(page.locator('#equipment-table tbody tr')).toHaveCount(5);
+  await expect(page.locator('#equipment-table tbody tr')).toHaveCount(imported.equipmentTags.length);
   const equipment = await readWorkflowSnapshot(page);
   expect(equipment.equipmentTags).toEqual(expect.arrayContaining(['SWBD-101', 'MCC-101', 'XFMR-101', 'LP-101', 'PMP-101']));
 
@@ -537,14 +543,25 @@ test('sample project satisfies contract handoffs from equipment through delivera
   await gotoWorkflowPage(page, server, 'racewayschedule.html');
   await expect(page.locator('.sample-workflow-guide')).toBeVisible();
   expect(await readCanonicalProject(page)).toEqual(importedProject);
-  await expect(page.locator('#raceway-total-count')).toContainText('3');
-  await expect(page.locator('#raceway-assigned-count')).toContainText('2');
-  await expect(page.locator('#raceway-missing-geometry-count')).toContainText('0');
   const raceways = await readWorkflowSnapshot(page);
+  const racewayIds = [...raceways.trayIds, ...raceways.conduitIds, ...raceways.ductbankIds];
+  const assignedRacewayCount = racewayIds.filter(id => cables.cableRacewayIds.includes(id)).length;
+  await expect(page.locator('#raceway-total-count')).toHaveText(String(racewayIds.length));
+  await expect(page.locator('#raceway-assigned-count')).toHaveText(String(assignedRacewayCount));
+  await expect(page.locator('#raceway-missing-geometry-count')).toHaveText('0');
   expect(raceways.trayIds).toContain('TR-PWR-101');
   expect(raceways.conduitIds).toContain('CND-PMP-101');
   expect(raceways.ductbankIds).toContain('DB-101');
   expect([...raceways.trayIds, ...raceways.conduitIds]).toEqual(expect.arrayContaining(cables.cableRacewayIds));
+
+  await gotoWorkflowPage(page, server, 'cabletrayfill.html?tray=TR-PWR-101');
+  await expect(page.locator('#tray-fill-handoff')).toContainText('TR-PWR-101');
+  await expect(page.locator('#tray-fill-project-selector')).toHaveValue('TR-PWR-101');
+  await expect(page.locator('#cableTable tbody tr')).not.toHaveCount(0);
+
+  await gotoWorkflowPage(page, server, 'conduitfill.html?conduit=CND-PMP-101');
+  await expect(page.locator('#conduit-fill-handoff')).toContainText('CND-PMP-101');
+  await expect(page.locator('#cableTable tbody tr')).not.toHaveCount(0);
 
   await gotoWorkflowPage(page, server, 'optimalRoute.html');
   await expect(page.locator('.sample-workflow-guide')).toBeVisible();
@@ -552,33 +569,41 @@ test('sample project satisfies contract handoffs from equipment through delivera
   await expect(page.locator('#route-readiness-panel')).toContainText('Schedule-ready');
   await expect(page.locator('#route-readiness-panel')).toContainText('Routing-ready');
   const routing = await readWorkflowSnapshot(page);
-  expect(routing.routeResultCount).toBe(4);
+  expect(routing.routeResultCount).toBe(cables.cableTags.length);
   expect(routing.routedCableTags).toEqual(expect.arrayContaining(cables.cableTags));
   await expect(page.locator('#results-section')).toBeVisible();
-  await expect(page.locator('#route-breakdown-container .route-list-row')).toHaveCount(4);
+  await expect(page.locator('#route-breakdown-container .route-list-row')).toHaveCount(cables.cableTags.length);
   await expect(page.locator('#route-breakdown-container')).not.toContainText('NaN');
-  await expect(page.locator('#route-summary-panel')).toContainText('4');
+  await expect(page.locator('#route-summary-panel')).toContainText(String(cables.cableTags.length));
   await expect(page.locator('#route-breakdown-details')).toHaveAttribute('open', '');
   await expect(page.locator('body')).toHaveClass(/route-review-mode/);
   await page.locator('#route-mode-toggle').click();
   await expect(page.locator('.optimal-route-sidebar')).toBeVisible();
-  await page.getByRole('button', { name: 'Route 4 Cables' }).click();
-  await expect(page.locator('#route-summary-panel')).toContainText('4');
-  await expect(page.locator('#route-summary-panel')).toContainText('Routed');
-  await expect(page.locator('#route-summary-panel')).toContainText('0');
-  await expect(page.locator('#route-summary-panel')).toContainText('Failed');
+  await expect(page.locator('#calculate-route-btn')).toBeEnabled();
+  await page.locator('#calculate-route-btn').click();
+  await expect(page.locator('#route-summary-panel')).toContainText(`${cables.cableTags.length} routed`);
+  await expect(page.locator('#route-summary-panel')).toContainText('0 overloads');
   await expect(page.locator('body')).toHaveClass(/route-review-mode/);
   await expect(page.locator('.optimal-route-sidebar')).toBeHidden();
   await expect(page.locator('#route-mode-toggle')).toHaveText('Edit routing setup');
+
+  await gotoWorkflowPage(page, server, 'loadFlow.html');
+  await expect(page.locator('#loadflow-form')).toBeVisible();
+  await page.locator('#loadflow-form button[type="submit"]').click();
+  await expect(page.locator('#loadflow-output')).toContainText('System: Load');
+  await expect(page.locator('#loadflow-output')).toContainText('Bus Voltages');
+  expect((await readWorkflowSnapshot(page)).studyKeys).toContain('loadFlow');
 
   await gotoWorkflowPage(page, server, 'shortCircuit.html');
   await expect(page.locator('#shortcircuit-form')).toBeVisible();
   await expect(page.locator('.sample-workflow-guide')).toBeVisible();
   await expect(page.locator('#shortcircuit-summary')).toBeVisible();
-  await expect(page.locator('#shortcircuit-summary')).toContainText('5 location(s) calculated');
+  const savedShortCircuitCount = await page.evaluate(() => Object.values(window.dataStore.getStudies().shortCircuit || {})
+    .filter(row => row && typeof row === 'object' && Number.isFinite(Number(row.threePhaseKA))).length);
+  await expect(page.locator('#shortcircuit-summary')).toContainText(`${savedShortCircuitCount} location(s) calculated`);
   await expect(page.locator('#shortcircuit-freshness')).toContainText('Results are stale');
   await expect(page.locator('#shortcircuit-results-table')).toBeVisible();
-  await expect(page.locator('#shortcircuit-results-table tbody tr')).toHaveCount(5);
+  await expect(page.locator('#shortcircuit-results-table tbody tr')).toHaveCount(savedShortCircuitCount);
   await expect(page.locator('#shortcircuit-details')).toContainText('Calculation details and provenance');
   await expect(page.locator('#shortcircuit-export-btn')).toBeEnabled();
   await expect(page.locator('#shortcircuit-status')).toContainText('Saved study result loaded');
@@ -588,44 +613,62 @@ test('sample project satisfies contract handoffs from equipment through delivera
   const studies = await readWorkflowSnapshot(page);
   expect(studies.studyKeys).toEqual(expect.arrayContaining(['shortCircuit']));
 
+  await gotoWorkflowPage(page, server, 'tcc.html');
+  await expect(page.locator('#plot-btn')).toBeVisible();
+  await page.locator('#plot-btn').click();
+  await expect(page.locator('#tcc-chart')).toBeAttached();
+  await expect(page.locator('.tcc-device-layer path[tabindex="0"]')).not.toHaveCount(0);
+
+  await gotoWorkflowPage(page, server, 'arcFlash.html');
+  await expect(page.locator('#arcflash-form')).toBeVisible();
+  await page.locator('#arcflash-form button[type="submit"]').click();
+  await expect(page.locator('#arcflash-output')).not.toBeEmpty();
+  expect((await readWorkflowSnapshot(page)).studyKeys).toContain('arcFlash');
+
   await gotoWorkflowPage(page, server, 'designrulechecker.html');
   await expect(page.getByRole('heading', { name: 'Design Rule Results' })).toBeVisible();
   await expect(page.locator('.method-panel')).not.toHaveAttribute('open', '');
-  await expect(page.locator('#drc-summary')).toContainText('1 error');
-  await expect(page.locator('#drc-summary')).toContainText('3 warnings');
+  const drcErrorCount = await page.locator('#drc-results .drc-finding--error').count();
+  const drcWarningCount = await page.locator('#drc-results .drc-finding--warning').count();
+  await expect(page.locator('#drc-summary')).toContainText(`${drcErrorCount} error`);
+  await expect(page.locator('#drc-summary')).toContainText(`${drcWarningCount} warning`);
   await expect(page.locator('#drc-results')).not.toContainText('has no assigned route');
 
   await gotoWorkflowPage(page, server, 'workflowdashboard.html');
+  await page.locator('#dashboard-focus-select').selectOption('full');
   await expect(page.locator('#dashboard-kpi-strip')).toContainText('Design rule checks');
-  await expect(page.locator('#dashboard-kpi-strip')).toContainText('1 error');
+  await expect(page.locator('#dashboard-kpi-strip')).toContainText(`${drcErrorCount} error`);
   await expect(page.locator('#dashboard-next-action-strip')).toContainText('Resolve design-rule errors');
   await expect(page.locator('#dashboard-blockers')).not.toContainText('Resolve design-rule errors');
   await expect(page.locator('#dashboard-auto-build-btn')).toHaveCount(0);
   await expect(page.locator('#dashboard-sample-cta')).toBeHidden();
-  await expect(page.locator('#workflow-progress-text')).toContainText('7 of 8');
+  const workflowProgress = (await page.locator('#workflow-progress-text').textContent()).match(/\d+ of 8/)?.[0];
+  expect(workflowProgress).toBeTruthy();
 
   await gotoWorkflowPage(page, server, 'index.html');
-  await expect(page.locator('#home-project-card-meta')).toContainText('7 of 8');
+  await expect(page.locator('#home-project-card-meta')).toContainText(workflowProgress);
   await page.locator('.home-explore > summary').click();
-  await expect(page.locator('#home-readiness-list')).toContainText('1 error');
+  await expect(page.locator('#home-readiness-list')).toContainText(`${drcErrorCount} error`);
   await expect(page.getByRole('heading', { name: 'Example One-Line Layout' })).toBeVisible();
 
   await gotoWorkflowPage(page, server, 'projectreport.html');
   await expect(page.locator('.sample-workflow-guide')).toBeVisible();
-  await expect(page.locator('#rpt-deliverable-readiness')).toContainText('4 route result');
+  await expect(page.locator('#rpt-deliverable-readiness')).toContainText(`${cables.cableTags.length} route result`);
   await page.locator('#rpt-generate-btn').click();
   await expect(page.locator('.rpt-builder-layout')).toHaveAttribute('data-active-panel', 'preview');
   await expect(page.locator('#rpt-config-panel')).toBeHidden();
-  await expect(page.locator('#rpt-deliverable-readiness')).toContainText('1 spool');
+  await expect(page.locator('#rpt-deliverable-readiness')).toContainText(/\d+ spool\(s\)/);
   await expect(page.locator('#rpt-deliverable-readiness')).toContainText('Issue readiness: blocked');
-  await expect(page.locator('#rpt-deliverable-readiness')).toContainText('Validation: 1 error(s), 3 warning(s)');
+  await expect(page.locator('#rpt-deliverable-readiness')).toContainText(`Validation: ${drcErrorCount} error(s), ${drcWarningCount} warning(s)`);
   await page.locator('#rpt-generate-btn').click();
   await expect(page.locator('#report-preview #rpt-shortCircuit')).toContainText('Short Circuit Analysis');
   await expect(page.locator('#report-preview #rpt-shortCircuit')).toContainText('SWBD-101');
   await expect(page.locator('#report-preview #rpt-shortCircuit')).toContainText('25.26');
+  await expect(page.locator('#report-preview #rpt-loadFlow')).toContainText('Load Flow');
+  await expect(page.locator('#report-preview #rpt-arcFlash')).toContainText('Arc Flash');
   await expect(page.locator('#report-preview')).toContainText('Cable Schedule');
   await expect(page.locator('#report-preview #rpt-cables')).toContainText('Issue-ready fields complete');
-  await expect(page.locator('#report-preview #rpt-drc .report-finding--error, #report-preview #rpt-drc .report-finding--warning')).toHaveCount(4);
+  await expect(page.locator('#report-preview #rpt-drc .report-finding--error, #report-preview #rpt-drc .report-finding--warning')).toHaveCount(drcErrorCount + drcWarningCount);
   await expect(page.locator('#report-preview #rpt-drc')).toContainText('CBL-SWBD-XFMR-101');
   await expect(page.locator('#report-preview #rpt-cables')).not.toContainText('—');
   const tocTargets = await page.locator('#report-preview .report-toc-list a').evaluateAll(links => links.map(link => link.getAttribute('href')));

@@ -50,18 +50,41 @@ const margin = 0.3;
 
 // ──────────────────────────────────────────────────────────────────────────────
 describe('CTI_HEADERS', () => {
-  it('exports an array of 8 column header strings', () => {
+  it('exports an array of 12 column header strings', () => {
     assert.strictEqual(Array.isArray(CTI_HEADERS), true);
-    assert.strictEqual(CTI_HEADERS.length, 8);
+    assert.strictEqual(CTI_HEADERS.length, 12);
     CTI_HEADERS.forEach(h => assert.strictEqual(typeof h, 'string'));
   });
 
   it('contains required column names', () => {
     assert(CTI_HEADERS.includes('Upstream Device'), 'missing Upstream Device');
     assert(CTI_HEADERS.includes('Downstream Device'), 'missing Downstream Device');
+    assert(CTI_HEADERS.includes('Study Readiness'), 'missing Study Readiness');
+    assert(CTI_HEADERS.includes('Fault Current Source'), 'missing Fault Current Source');
     assert(CTI_HEADERS.includes('Test Current (A)'), 'missing Test Current (A)');
     assert(CTI_HEADERS.includes('Margin (s)'), 'missing Margin (s)');
     assert(CTI_HEADERS.includes('Pass/Fail'), 'missing Pass/Fail');
+  });
+});
+
+describe('buildCTIRows — study provenance', () => {
+  const studyContext = {
+    faultCurrentSource: 'Short Circuit study — BUS-1 (three-phase)',
+    provenance: {
+      heading: 'Device evidence is calculation-ready',
+      inputFingerprint: '1234abcd',
+      intendedUse: 'Qualified human review required.',
+    },
+  };
+  const rows = buildCTIRows(deviceEntries2, coordResult2, faultCurrentA, margin, { studyContext });
+
+  it('preserves readiness and fault-current provenance on every exported row', () => {
+    rows.forEach(row => {
+      assert.strictEqual(row['Study Readiness'], 'Device evidence is calculation-ready');
+      assert.strictEqual(row['Fault Current Source'], 'Short Circuit study — BUS-1 (three-phase)');
+      assert.strictEqual(row['Input Fingerprint'], '1234abcd');
+      assert.strictEqual(row['Intended Use'], 'Qualified human review required.');
+    });
   });
 });
 

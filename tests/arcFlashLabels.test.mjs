@@ -188,6 +188,12 @@ describe('generateArcFlashLabel', () => {
     assert.ok(!unresolved, `Unresolved tokens found: ${JSON.stringify(unresolved)}`);
   });
 
+  it('marks generated labels as draft engineering-review artifacts', () => {
+    const data = buildArcFlashLabelData('bus1', warningInfo);
+    const svg = generateArcFlashLabel(data);
+    assert.ok(svg.includes('>DRAFT</text>'), 'Expected visible DRAFT watermark in label SVG');
+  });
+
   it('escapes xml/html special characters in substituted values', () => {
     const svg = generateArcFlashLabel({
       signalColor: '#f57c00',

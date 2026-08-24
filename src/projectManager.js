@@ -13,6 +13,8 @@ import {
   removeSavedProject
 } from '../projectStorage.js';
 import { openModal, showAlertModal, ensureFieldAssistiveText } from './components/modal.js';
+import { resolveActiveProjectName } from './projectContext.js';
+import { summarizeSavedProjectRecord } from './projectSnapshot.js';
 import { mountProfileControl, signOutCurrentUser, updateAuthSessionControls } from './authProfileControl.js';
 import {
   createAuthContextFromSupabaseSession,
@@ -56,37 +58,6 @@ function dispatchProjectSyncStatus({ label, state = 'local', detail = '' } = {})
       detail
     }
   }));
-}
-
-function countArray(value) {
-  return Array.isArray(value) ? value.length : 0;
-}
-
-function countOneLineComponentsFromRecord(record = {}) {
-  const oneLine = record.oneLine;
-  if (Array.isArray(oneLine)) return oneLine.length;
-  if (!oneLine || typeof oneLine !== 'object') return 0;
-  const sheets = Array.isArray(oneLine.sheets) ? oneLine.sheets : [];
-  return sheets.reduce((sum, sheet) => sum + countArray(sheet?.components), 0);
-}
-
-function summarizeSavedProjectRecord(name, record = {}) {
-  const raceways = record.raceways && typeof record.raceways === 'object' ? record.raceways : {};
-  const meta = record.__meta && typeof record.__meta === 'object' ? record.__meta : {};
-  return {
-    name,
-    source: 'local',
-    sources: ['local'],
-    createdAt: typeof meta.createdAt === 'string' ? meta.createdAt : null,
-    updatedAt: typeof meta.updatedAt === 'string' ? meta.updatedAt : null,
-    counts: {
-      equipment: countArray(record.equipment),
-      loads: countArray(record.loads),
-      cables: countArray(record.cables),
-      raceways: countArray(raceways.trays) + countArray(raceways.conduits) + countArray(raceways.ductbanks),
-      oneLineComponents: countOneLineComponentsFromRecord(record)
-    }
-  };
 }
 
 function mergeProjectSummaries(localSummaries, cloudSummaries) {
@@ -155,8 +126,17 @@ function normalizeProjectName(name) {
 
 function currentProjectName() {
   const hashName = normalizeProjectName(currentProject());
-  if (hashName) return hashName;
-  return '';
+  let storedProjectName = '';
+  try {
+    storedProjectName = normalizeProjectName(getProjectState()?.name);
+  } catch (e) {
+    console.warn('Failed to read active project name', e);
+  }
+  return resolveActiveProjectName(
+    hashName,
+    typeof window !== 'undefined' ? window.currentProjectId : '',
+    storedProjectName
+  );
 }
 
 
@@ -556,6 +536,7 @@ async function saveProject(options = {}) {
   }
   if (!name) return;
   setProjectHash(name);
+  applyProjectStateName(name);
   // Save locally and attempt server sync if logged in
   dsSaveProject(name);
   const storageError = getSavedProjectsError();
@@ -622,6 +603,7 @@ async function loadProject() {
     await showAlertModal('Project Not Found', `Project "${name}" could not be loaded from local storage.`);
     return;
   }
+  applyProjectStateName(name);
   location.reload();
 }
 
@@ -636,6 +618,7 @@ async function openProjectByName(name) {
     await showAlertModal('Project Not Found', `Project "${trimmed}" could not be loaded from your saved projects.`);
     return false;
   }
+  applyProjectStateName(trimmed);
   location.reload();
   return true;
 }
@@ -675,16 +658,19 @@ async function deleteProject(name) {
 function currentProjectSummary() {
   const state = getProjectState();
   const settings = state.settings && typeof state.settings === 'object' ? state.settings : {};
-  return {
-    name: currentProjectName() || normalizeProjectName(state.name) || 'Untitled Project',
-    counts: {
-      equipment: countArray(settings.equipment),
-      loads: countArray(settings.loadList),
-      cables: countArray(state.cables),
-      raceways: countArray(state.trays) + countArray(state.conduits) + countArray(state.ductbanks),
-      oneLineComponents: countOneLineComponentsFromRecord({ oneLine: settings.oneLineDiagram })
+  const { name, counts } = summarizeSavedProjectRecord(
+    currentProjectName() || normalizeProjectName(state.name) || 'Untitled Project',
+    {
+      equipment: settings.equipment,
+      loads: settings.loadList,
+      cables: state.cables,
+      trays: state.trays,
+      conduits: state.conduits,
+      ductbanks: state.ductbanks,
+      oneLine: settings.oneLineDiagram
     }
-  };
+  );
+  return { name, counts };
 }
 
 function renderProjectEmptyState(container) {

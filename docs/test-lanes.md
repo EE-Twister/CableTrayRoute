@@ -15,6 +15,7 @@ This lane is intended for pull requests and rapid iteration. It validates:
 - Core computational/unit regression paths (routing, analysis, validation, collaboration/security)
 - Selected Playwright smoke/integration scenarios for high-risk user journeys:
   - workflow creation and dirty-state prompts
+  - named-project recovery across hashless navigation, persistence, and reload
   - design-basis review gates, Auto-Build reachability, and blocked report exports
   - Cable Schedule sample hydration
   - one-line editing behavior

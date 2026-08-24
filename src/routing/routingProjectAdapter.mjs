@@ -1,3 +1,4 @@
+import { normalizeRacewayPath } from './racewayGeometry.mjs';
 const normalizeAlias = value => String(value || '').trim().toUpperCase();
 
 export function formatConduitCountText(count, hasSchedule) {
@@ -49,6 +50,7 @@ export function expandScheduledRaceways(rawDuctbanks = [], rawConduits = []) {
                 end_x: conduit.end_x,
                 end_y: conduit.end_y,
                 end_z: conduit.end_z,
+                path: Array.isArray(conduit.path) ? conduit.path.map(point => [...point]) : undefined,
                 allowed_cable_group: conduit.allowed_cable_group
             };
             if (!getConduitAliases(normalized, ductbankTag).some(alias => topLevelAliases.has(alias))) {
@@ -183,21 +185,22 @@ export function normalizeDuctbankSchedule(ductbanks = [], conduits = []) {
         }
     });
     const normalizedDuctbanks = ductbanks.map(ductbank => {
-        const tag = ductbank.tag;
+        const tag = ductbank.tag || ductbank.id || ductbank.ductbank_id;
         const key = normalizeAlias(tag);
+        const ductbankOutline = normalizeRacewayPath(ductbank.outline) || normalizeRacewayPath([[ductbank.start_x, ductbank.start_y, ductbank.start_z],
+            [ductbank.end_x, ductbank.end_y, ductbank.end_z]]);
         return {
             id: ductbank.id || ductbank.tag || ductbank.ductbank_id,
             tag,
             width: ductbank.width ?? ductbank.inside_width,
             height: ductbank.height ?? ductbank.depth,
             conduit_spacing: ductbank.conduit_spacing ?? ductbank.spacing,
-            outline: [
-                [parseFloat(ductbank.start_x), parseFloat(ductbank.start_y), parseFloat(ductbank.start_z)],
-                [parseFloat(ductbank.end_x), parseFloat(ductbank.end_y), parseFloat(ductbank.end_z)]
-            ],
+            outline: ductbankOutline || [],
             conduits: (conduitsByDuctbank[key] || []).map(conduit => {
                 const conduitId = conduit.conduit_id || conduit.id;
                 const trayId = conduit.tray_id || `${tag}-${conduitId}`;
+                const conduitPath = normalizeRacewayPath(conduit.path) || normalizeRacewayPath([[conduit.start_x, conduit.start_y, conduit.start_z],
+                    [conduit.end_x, conduit.end_y, conduit.end_z]]) || ductbankOutline?.map(point => [...point]) || [];
                 return {
                     id: conduitId,
                     tag: trayId,
@@ -210,10 +213,7 @@ export function normalizeDuctbankSchedule(ductbanks = [], conduits = []) {
                     diameter: conduit.diameter,
                     row: conduit.row,
                     column: conduit.column ?? conduit.col,
-                    path: [
-                        [parseFloat(conduit.start_x), parseFloat(conduit.start_y), parseFloat(conduit.start_z)],
-                        [parseFloat(conduit.end_x), parseFloat(conduit.end_y), parseFloat(conduit.end_z)]
-                    ],
+                    path: conduitPath,
                     allowed_cable_group: conduit.allowed_cable_group
                 };
             })

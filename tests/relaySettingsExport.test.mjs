@@ -35,6 +35,8 @@ function it(name, fn) {
 
 // ─── Fixture entries ──────────────────────────────────────────────────────
 
+const READY_ASSESSMENT = { status: 'calculation_ready', label: 'Calculation-ready' };
+
 const GE_RELAY_ENTRY = {
   uid: 'library:ge_multilin_750',
   name: 'GE Multilin 750',
@@ -53,6 +55,7 @@ const GE_RELAY_ENTRY = {
       instantaneousPickup: 600,
     },
   },
+  libraryAssessment: READY_ASSESSMENT,
   overrideSource: {},
 };
 
@@ -74,6 +77,7 @@ const SEL_RELAY_ENTRY = {
       tapSetting: 1.0,
     },
   },
+  libraryAssessment: READY_ASSESSMENT,
   overrideSource: {},
 };
 
@@ -88,6 +92,7 @@ const ABB_BREAKER_ENTRY = {
     name: 'ABB Tmax T3 160A',
     settings: { pickup: 160, time: 0.2, instantaneous: 800 },
   },
+  libraryAssessment: READY_ASSESSMENT,
   overrideSource: { pickup: 125 },
 };
 
@@ -102,6 +107,7 @@ const SIEMENS_BREAKER_ENTRY = {
     name: 'Siemens 3VA 125A',
     settings: { pickup: 125, time: 0.25, instantaneous: 600 },
   },
+  libraryAssessment: READY_ASSESSMENT,
   overrideSource: {},
 };
 
@@ -116,6 +122,7 @@ const UNKNOWN_VENDOR_ENTRY = {
     name: 'Acme Generic Relay',
     settings: { pickup: 100, tms: 0.5 },
   },
+  libraryAssessment: READY_ASSESSMENT,
   overrideSource: {},
 };
 
@@ -131,6 +138,7 @@ const NO_SETTINGS_ENTRY = {
   uid: 'library:bare',
   name: 'Bare Device',
   baseDevice: { id: 'bare', type: 'relay', vendor: 'SEL', name: 'Bare', settings: {} },
+  libraryAssessment: READY_ASSESSMENT,
   overrideSource: {},
 };
 
@@ -196,6 +204,11 @@ describe('filterExportableEntries', () => {
 
   it('returns empty array for empty input', () => {
     assert.deepStrictEqual(filterExportableEntries([]), []);
+  });
+
+  it('blocks settings-bearing entries that are not calculation-ready', () => {
+    const screening = { ...GE_RELAY_ENTRY, libraryAssessment: { status: 'screening', label: 'Screening only' } };
+    assert.deepStrictEqual(filterExportableEntries([screening]), []);
   });
 });
 
@@ -550,6 +563,27 @@ describe('buildExportFiles', () => {
     assert.strictEqual(warnings.length, 0);
   });
 
+  it('returns blocked entries instead of producing screening settings files', () => {
+    const screening = { ...GE_RELAY_ENTRY, libraryAssessment: { status: 'screening', label: 'Screening only' } };
+    const { files, manifestRows, warnings, blockedEntries } = buildExportFiles([screening]);
+    assert.strictEqual(files.length, 0);
+    assert.strictEqual(manifestRows.length, 0);
+    assert.strictEqual(blockedEntries.length, 1);
+    assert.match(warnings[0], /not calculation-ready/);
+  });
+
+  it('records the project fault-current and readiness basis in the manifest', () => {
+    const studyContext = {
+      faultCurrentA: 12000,
+      faultCurrentSource: 'Short Circuit study — BUS-1 (three-phase)',
+      provenance: { inputFingerprint: '1234abcd', intendedUse: 'Qualified human review required.' },
+    };
+    const { manifestRows } = buildExportFiles([GE_RELAY_ENTRY], { studyContext });
+    assert.strictEqual(manifestRows[0]['Device Readiness'], 'Calculation-ready');
+    assert.strictEqual(manifestRows[0]['Fault Current (A)'], 12000);
+    assert.strictEqual(manifestRows[0]['Input Fingerprint'], '1234abcd');
+  });
+
   it('override values appear in exported content', () => {
     const { files } = buildExportFiles([ABB_BREAKER_ENTRY]);
     // ABB_BREAKER_ENTRY override pickup=125 (base was 160)
@@ -561,9 +595,11 @@ describe('buildExportFiles', () => {
 // ─── MANIFEST_HEADERS ─────────────────────────────────────────────────────
 
 describe('MANIFEST_HEADERS', () => {
-  it('exports the expected 8 columns', () => {
+  it('exports identity, readiness, provenance, and file columns', () => {
     assert.deepStrictEqual(MANIFEST_HEADERS, [
       'Device ID', 'Name', 'Vendor', 'Relay Model',
+      'Catalog / Trip Unit', 'Device Readiness', 'Curve Source', 'Curve Reference',
+      'Fault Current (A)', 'Fault Current Source', 'Input Fingerprint', 'Intended Use',
       'Settings Hash', 'File Name', 'Format', 'Warnings',
     ]);
   });

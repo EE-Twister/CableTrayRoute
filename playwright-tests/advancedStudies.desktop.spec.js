@@ -48,8 +48,8 @@ test.describe('advanced study desktop workflows', () => {
 
     await page.goto('trustcenter.html');
     await page.locator('#run-benchmarks-btn').click();
-    await expect(page.locator('#summary-card')).toContainText('15 / 15');
-    await expect(page.locator('#results-tbody tr')).toHaveCount(15);
+    await expect(page.locator('#summary-card')).toContainText('16 / 16');
+    await expect(page.locator('#results-tbody tr')).toHaveCount(16);
     await page.locator('tr[data-benchmark-id="IEC60909-001"] button').click();
     await expect(page.locator('#detail-panel')).toContainText('Official source');
     await expect(page.locator('#detail-panel')).toContainText('iec60909-short-circuit');

@@ -70,6 +70,6 @@ Optional **clamp min / clamp max** bounds are applied after sampling to keep mul
 
 ## References
 
-- IEEE Std 399-1997 (Brown Book) §14 — Load Flow.
+- IEEE Std 3002.2-2018 — current industrial and commercial load-flow study-practice context; the probabilistic extension is application-specific.
 - Borkowska, B. (1974), "Probabilistic Load Flow", *IEEE Transactions on Power Apparatus and Systems*, PAS-93.
 - Allan, Borkowska & Grigg (1974), "Probabilistic analysis of power flows".

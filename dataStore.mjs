@@ -19,6 +19,12 @@
 // both the browser and Node test environments.
 import { parseRevit } from './src/importers/revit.mjs';
 import { startPerformanceMeasurement } from './src/performance/performanceMetrics.js';
+import { resolveActiveProjectName } from './src/projectContext.js';
+import {
+  createImportableProjectSnapshot,
+  isVersionedProjectSnapshot,
+  prepareProjectSnapshotForSave
+} from './src/projectSnapshot.js';
 import { buildOneLineProjectView, hashProjectInputs, normalizeOneLineReferences, normalizeProjectEntities } from './analysis/projectIntegration.mjs';
 import {
   getProjectEntityDeletionImpact as buildProjectEntityDeletionImpact,
@@ -276,10 +282,17 @@ function hasNamedProjectContext() {
   if (!window.location?.href || /jsdom/i.test(window.navigator?.userAgent || '')) return true;
   const params = new URLSearchParams(window.location?.search || '');
   if (params.has('e2e')) return true;
-  const projectId = typeof window.currentProjectId === 'string'
-    ? window.currentProjectId.trim()
-    : '';
-  return Boolean(projectId && projectId !== 'default');
+  let storedProjectName = '';
+  try {
+    storedProjectName = getProjectState()?.name || '';
+  } catch (e) {
+    console.warn('Failed to read active project context', e);
+  }
+  const projectId = resolveActiveProjectName(window.currentProjectId, storedProjectName);
+  if (projectId && window.currentProjectId !== projectId) {
+    window.currentProjectId = projectId;
+  }
+  return Boolean(projectId);
 }
 
 function write(key, value, scenario = getCurrentScenarioNameState(), options = {}) {
@@ -1189,40 +1202,19 @@ export const keys = (scenario = getCurrentScenarioNameState()) => {
 export function saveProject(projectId, scenario = getCurrentScenarioNameState()) {
   if (!projectId) return false;
   try {
+    const activeProjectName = resolveActiveProjectName(projectId);
+    if (activeProjectName) {
+      const state = getProjectState();
+      if (state?.name !== activeProjectName) {
+        setProjectState({ ...state, name: activeProjectName });
+      }
+      if (typeof window !== 'undefined') window.currentProjectId = activeProjectName;
+    }
     const pendingFieldObservationQueue = getFieldObservationQueue();
-    const payload = {
-      equipment: getEquipment(),
-      panels: getPanels(),
-      loads: getLoads(),
-      cables: getCables(),
-      cableTypicals: getCableTypicals(),
-      cableTemplates: getCableTemplates(),
-      cableTagSettings: getCableTagSettings(),
-      cableChangeLog: getCableChangeLog(),
-      designBasis: getDesignBasis(),
-      designGateApprovals: getDesignGateApprovals(),
-      workflowArtifacts: {
-        deliverableArtifacts: getDeliverableArtifacts(),
-        fieldExecutionRecords: getFieldExecutionRecords(),
-        fieldObservations: getFieldObservations(),
-        fieldObservationQueue: [],
-        procurementRegister: getProcurementRegister(),
-        reportSnapshots: getReportSnapshots(),
-        lifecyclePackages: getLifecyclePackages(),
-        pullPlanArtifact: getItem('pullPlanArtifact', null),
-        costEstimateArtifact: getItem('costEstimateArtifact', null),
-        latestRouteResults: getItem('latestRouteResults', null),
-        switchingProcedures: getSwitchingProcedures(),
-      },
-      mccLineups: getMccLineups(),
-      raceways: {
-        trays: getTrays(),
-        conduits: getConduits(),
-        ductbanks: getDuctbanks()
-      },
-      oneLine: getOneLine(scenario)
-    };
-    writeSavedProject(projectId, payload);
+    const payload = prepareProjectSnapshotForSave(exportProject(scenario), {
+      transientSettingKeys: [EXTRA_KEYS.fieldObservationQueue]
+    });
+    writeSavedProject(projectId, payload, { replace: true });
     if (pendingFieldObservationQueue.length) setFieldObservationQueue([]);
     // Notify collaboration layer so remote clients receive the update
     if (typeof document !== 'undefined') {
@@ -1244,6 +1236,20 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
     if (!rawPayload) return false;
     const payload = rawPayload;
     const migrated = wasSavedProjectMigrated(projectId);
+    if (isVersionedProjectSnapshot(payload)) {
+      const snapshot = createImportableProjectSnapshot(payload);
+      const imported = importProject(snapshot);
+      if (!imported) return false;
+      const activeProjectName = resolveActiveProjectName(projectId);
+      if (activeProjectName) {
+        const state = getProjectState();
+        if (state?.name !== activeProjectName) {
+          setProjectState({ ...state, name: activeProjectName });
+        }
+        if (typeof window !== 'undefined') window.currentProjectId = activeProjectName;
+      }
+      return true;
+    }
     const equipment = payload.equipment;
     const panels = payload.panels;
     const loads = payload.loads;
@@ -1294,6 +1300,14 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
         setOneLine({ activeSheet: 0, sheets: oneLine }, scenario, { captureRevision: false });
       } else {
         setOneLine(oneLine || { activeSheet: 0, sheets: [] }, scenario, { captureRevision: false });
+      }
+      const activeProjectName = resolveActiveProjectName(projectId);
+      if (activeProjectName) {
+        const state = getProjectState();
+        if (state?.name !== activeProjectName) {
+          setProjectState({ ...state, name: activeProjectName });
+        }
+        if (typeof window !== 'undefined') window.currentProjectId = activeProjectName;
       }
     } finally {
       endProjectMutationBatch();
@@ -1391,32 +1405,32 @@ export function applyRemoteSnapshot(snapshot, projectId) {
 /**
  * Export current project data.
  */
-export function exportProject() {
+export function exportProject(scenario = getCurrentScenarioNameState()) {
   const project = {
     schemaVersion: PROJECT_SCHEMA_VERSION,
-    ductbanks: getDuctbanks(),
-    conduits: getConduits(),
-    trays: getTrays(),
-    cables: getCables(),
-    cableTypicals: getCableTypicals(),
-    panels: getPanels(),
-    equipment: getEquipment(),
-    loads: getLoads(),
-    oneLine: getOneLine(),
-    mccLineups: getMccLineups(),
+    ductbanks: read(KEYS.ductbanks, [], scenario),
+    conduits: read(KEYS.conduits, [], scenario),
+    trays: read(KEYS.trays, [], scenario),
+    cables: read(KEYS.cables, [], scenario),
+    cableTypicals: read(KEYS.cableTypicals, [], scenario),
+    panels: read(KEYS.panels, [], scenario),
+    equipment: read(KEYS.equipment, [], scenario),
+    loads: read(KEYS.loads, [], scenario),
+    oneLine: read(KEYS.oneLine, { activeSheet: 0, sheets: [] }, scenario),
+    mccLineups: read(EXTRA_KEYS.mccLineups, [], scenario),
     settings: {}
   };
   const reserved = new Set([...Object.values(KEYS), EXTRA_KEYS.mccLineups, REVISION_KEY, 'CTR_PROJECT_V1', LEGACY_STUDIES_SETTING_KEY]);
-  for (const key of keys()) {
+  for (const key of keys(scenario)) {
     if (!reserved.has(key)) {
-      project.settings[key] = getItem(key);
+      project.settings[key] = read(key, null, scenario);
     }
   }
-  const studyResults = getStudies();
+  const studyResults = read(KEYS.studies, {}, scenario);
   if (studyResults && typeof studyResults === 'object' && !Array.isArray(studyResults) && Object.keys(studyResults).length) {
     project.settings.studyResults = studyResults;
   }
-  const meta = { version: 1, scenario: getCurrentScenarioNameState(), scenarios: listScenarios() };
+  const meta = { version: 1, scenario, scenarios: listScenarios() };
   return { meta, ...project };
 }
 

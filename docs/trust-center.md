@@ -1,5 +1,7 @@
 # Trust Center
 
+Published benchmark depth and ordinary regression coverage are reported separately. See [Validation Evidence Coverage](validation-evidence-coverage.md) for the evidence taxonomy, generated coverage denominator, current baseline, and promotion requirements.
+
 The Trust Center separates live executable known-answer checks from the broader catalog of published reference fixtures maintained by Validation & Standards.
 
 ## Purpose
@@ -23,7 +25,7 @@ Results are shown in a table. Click any row or its **Details** button to expand 
 
 ## Benchmark Coverage
 
-The live suite currently contains 15 checks across 11 study families. The Published Reference Fixtures table remains the complete catalog of documented cases. Two of those fixtures now have explicitly linked live regressions (`IEC60909-001` and `IEC60287-001`); a fixture without a linked executable check remains evidence and a reproducible input set, not a passing live check.
+The live suite currently contains 16 checks across 12 study families. The Published Reference Fixtures table remains the complete catalog of documented cases. Two of those fixtures now have explicitly linked live regressions (`IEC60909-001` and `IEC60287-001`); a fixture without a linked executable check remains evidence and a reproducible input set, not a passing live check.
 
 | ID | Study Type | Governing Standard | What It Verifies |
 |----|-----------|-------------------|-----------------|
@@ -34,7 +36,8 @@ The live suite currently contains 15 checks across 11 study families. The Publis
 | BAT-002 | Battery / UPS Sizing | Application screening heuristic (not within IEEE 485 scope) | Li-ion preliminary energy capacity at 25 °C, 10 % margin: 15.44 kWh |
 | VDROP-001 | Voltage Drop | NEC 2023 Art. 210.19(A)(1) Informational Note | #12 AWG Cu / 10 A / 30 ft -> below 3 % recommendation, status = pass |
 | VDROP-002 | Voltage Drop | NEC 2023 Art. 210.19(A)(1) Informational Note | #14 AWG Cu / 20 A / 150 ft -> above 3 % recommendation, status = warn or fail |
-| LFLOW-001 | Load Flow | Newton-Raphson power-flow equations | Two-bus 13.8 kV radial case converges at the recorded receiving-bus voltage |
+| LFLOW-001 | Load Flow | IEEE 3002.2-2018 study practice; independently derived Newton-Raphson equations | Two-bus 13.8 kV radial case converges at the recorded receiving-bus voltage |
+| ANSI-SC-001 | ANSI Short Circuit | IEEE 3002.3-2018 study practice; independently derived symmetrical-component arithmetic | Thevenin three-phase, line-to-ground, and empirical asymmetrical-peak screening results |
 | REL-001 | Reliability | IEEE Std 493 availability arithmetic | Complete input coverage and radial breaker N-1 detection |
 | MSTART-001 | Motor Starting | Thevenin equivalent screening model | 100 hp direct-on-line starting current and voltage sag |
 | IEC60909-001 | IEC Short Circuit | IEC 60909-0:2016 | Version-pinned sequence-impedance current, voltage factor, peak factor, and peak current |

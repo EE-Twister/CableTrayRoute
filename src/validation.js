@@ -25,6 +25,11 @@ function renderKPIs(manifest) {
   const s = manifest.summary || {};
   document.getElementById('kpi-standards').textContent = s.standardCount ?? '—';
   document.getElementById('kpi-benchmarks').textContent = s.benchmarkCount ?? '—';
+  document.getElementById('kpi-published-benchmarks').textContent = s.publishedBenchmarkCount ?? '—';
+  document.getElementById('kpi-published-coverage').textContent =
+    s.analysisModulesWithPublishedEvidence != null && s.analysisModuleCount != null
+      ? `${s.analysisModulesWithPublishedEvidence}/${s.analysisModuleCount} (${s.publishedEvidencePercent}%)`
+      : '—';
   document.getElementById('kpi-suites').textContent = s.testSuiteCount ?? '—';
   document.getElementById('kpi-assertions').textContent =
     s.totalAssertions != null ? s.totalAssertions.toLocaleString() : '—';
@@ -130,9 +135,12 @@ function renderBenchmarks(benchmarks) {
       </summary>
       <div class="validation-item__body">
         <p><em>${esc(b.standard)} ${b.clause ? `— ${esc(b.clause)}` : ''}</em></p>
+        ${b.evidence ? `<p><strong>Evidence:</strong> ${esc(b.evidence.evidenceClass.replaceAll('_', ' '))} · ${esc(b.evidence.evidenceStrength)} strength · ${esc(b.evidence.sourceAccess.replaceAll('_', ' '))}</p>` : ''}
         <p>${esc(b.description)}</p>
         ${b.expectedOutputs ? renderExpectedOutputs(b.expectedOutputs) : ''}
         <p class="field-hint">${esc(b.reference)}</p>
+        ${b.sourceUrl ? `<p><a href="${esc(b.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open primary/reference source</a></p>` : ''}
+        ${b.evidence?.implementationModules?.length ? `<p class="field-hint">Implementation: ${b.evidence.implementationModules.map(esc).join(', ')}</p>` : ''}
         ${b.sampleFile ? `<p><a href="${esc(b.sampleFile)}" download>Download fixture project (JSON)</a></p>` : ''}
       </div>
     </details>`).join('');
@@ -224,11 +232,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         const data = await resp.json();
         renderStandards(data.standards || []);
         renderComplianceMatrix(data.necComplianceMatrix || []);
-        renderBenchmarks(data.benchmarks || []);
+        const publishedClasses = new Set(data.evidenceMethodology?.publishedEvidenceClasses || []);
+        const benchmarks = (data.benchmarks || []).map(benchmark => ({
+          ...benchmark,
+          evidence: data.evidenceLedger?.[benchmark.id] || null,
+        }));
+        renderBenchmarks(benchmarks);
 
         // Update KPI placeholders with what we know
         document.getElementById('kpi-standards').textContent = (data.standards || []).length;
         document.getElementById('kpi-benchmarks').textContent = (data.benchmarks || []).length;
+        document.getElementById('kpi-published-benchmarks').textContent = benchmarks.filter(benchmark =>
+          publishedClasses.has(benchmark.evidence?.evidenceClass)
+        ).length;
+        document.getElementById('kpi-published-coverage').textContent = 'Build manifest required';
         document.getElementById('kpi-suites').textContent = '—';
         document.getElementById('kpi-assertions').textContent = '—';
         document.getElementById('manifest-timestamp').textContent =

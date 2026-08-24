@@ -1,5 +1,10 @@
 # UI Refinement Log
 
+## 2026-08-24
+
+- Reworked the TCC study entry state around explicit device-evidence readiness, concise device selection, and a guided plot empty state. The workspace now distinguishes calculation-ready, review-pending, and screening curves before plotting; removes the hidden catalog select from the accessibility tree; and keeps screening curves clearly excluded from issued settings and arc-flash clearing-time use.
+- Extended that readiness boundary through TCC actions and exports: automatic coordination now requires calculation-ready curves and a project short-circuit result, draft settings export excludes screening devices, and review/CTI/settings packages preserve device identity, curve provenance, fault-current source, intended use, and an input fingerprint.
+
 ## 2026-08-03
 
 - Consolidated Load Flow, Motor Start, Contingency, and Transient Stability into production route entries so project controls, calculations, persistence, and Engineer Review initialize once per page instead of through browser-visible source-module waterfalls. Replaced Transient Stability's public Plotly CDN request with the build-managed local asset, and added bundle-size and browser-startup contracts to preserve the resulting headroom.

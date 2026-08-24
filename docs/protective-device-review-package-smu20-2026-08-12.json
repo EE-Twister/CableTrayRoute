@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "packageId": "SMU20-14KV-COHORT-2026-08-12",
+  "assessmentDate": "2026-08-12",
+  "packageStatus": "not_ready_for_qualified_human_review",
+  "disposition": "retain_source_verified_peer_review_pending",
+  "notice": "Technical evidence assembly only. This package is not licensed-engineer approval and does not authorize calculation-ready promotion, coordination settings, or arc-flash clearing-time use.",
+  "sourceGeometryEvidence": {
+    "file": "protective-device-source-geometry-smu20-2026-08-12.json",
+    "status": "technical_candidate_only_not_for_promotion",
+    "officialPointCount": 522,
+    "candidateMaximumBoundaryLog10Error": 0,
+    "canonicalLibraryChanged": false
+  },
+  "records": [
+    { "id": "sc_smu20_25e_standard_14kv", "catalog": "612025", "rating": "25E", "nominalVoltageKV": 14.4 },
+    { "id": "sc_smu20_65e_standard_14kv", "catalog": "612065", "rating": "65E", "nominalVoltageKV": 14.4 },
+    { "id": "sc_smu20_100e_standard_14kv", "catalog": "612100", "rating": "100E", "nominalVoltageKV": 14.4 }
+  ],
+  "sourceDocuments": [
+    {
+      "documentNumber": "153-2",
+      "title": "SMU-20 and SMU-40 Standard Speed Minimum Melting Time-Current Characteristic Curves",
+      "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.xlsx",
+      "sourceDate": "2015-07-14",
+      "accessedOn": "2026-08-12",
+      "sheet": "153_2",
+      "semantics": "Minimum-melting curves; plus 10 percent current tolerance for 10E through 400E"
+    },
+    {
+      "documentNumber": "153-2-2",
+      "title": "SMU-20 14.4-kV Total Clearing Time-Current Characteristic Curves",
+      "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2-2.xlsx",
+      "sourceDate": "1988-08-29",
+      "accessedOn": "2026-08-12",
+      "sheet": "153_22",
+      "semantics": "Total-clearing curves plotted to maximum test points; all variations are minus"
+    },
+    {
+      "documentNumber": "242-31",
+      "title": "S&C SMU-20 Fuse Units Specification Bulletin",
+      "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/specification-bulletin-242-31.pdf",
+      "sourceDate": "2026-06-29",
+      "accessedOn": "2026-08-12",
+      "purpose": "Catalog, rating, voltage, mounting, and interrupting-rating application identity"
+    }
+  ],
+  "curveComparisons": [
+    { "rating": "25E", "profile": "minimum_melting", "sourceRange": "153_2!P10:Q95", "sourcePointCount": 86, "maxRawSourceLogError": 1.1813, "worstPoint": { "currentA": 49.5972, "officialTimeS": 602.961, "storedInterpolatedTimeS": 39.7197 } },
+    { "rating": "65E", "profile": "minimum_melting", "sourceRange": "153_2!X10:Y95", "sourcePointCount": 86, "maxRawSourceLogError": 0.1998, "worstPoint": { "currentA": 129.785, "officialTimeS": 359.549, "storedInterpolatedTimeS": 569.554 } },
+    { "rating": "100E", "profile": "minimum_melting", "sourceRange": "153_2!AB10:AC95", "sourcePointCount": 86, "maxRawSourceLogError": 0.0105, "worstPoint": { "currentA": 247.629, "officialTimeS": 17.3544, "storedInterpolatedTimeS": 17.7791 } },
+    { "rating": "25E", "profile": "total_clearing_14_4kv", "sourceRange": "153_22!N8:O95", "sourcePointCount": 88, "maxRawSourceLogError": 0.1411, "worstPoint": { "currentA": 54.0513, "officialTimeS": 46.5184, "storedInterpolatedTimeS": 33.6108 } },
+    { "rating": "65E", "profile": "total_clearing_14_4kv", "sourceRange": "153_22!V8:W95", "sourcePointCount": 88, "maxRawSourceLogError": 0.0098, "worstPoint": { "currentA": 484.894, "officialTimeS": 0.537858, "storedInterpolatedTimeS": 0.550144 } },
+    { "rating": "100E", "profile": "total_clearing_14_4kv", "sourceRange": "153_22!Z8:AA95", "sourcePointCount": 88, "maxRawSourceLogError": 0.0102, "worstPoint": { "currentA": 253.644, "officialTimeS": 28.6985, "storedInterpolatedTimeS": 29.3813 } }
+  ],
+  "resolvedChecks": [
+    "Catalog numbers 612025, 612065, and 612100 correspond to 25E, 65E, and 100E units in the current manufacturer bulletin.",
+    "TCC 153-2 is the minimum-melting source and TCC 153-2-2 is the 14.4-kV total-clearing source.",
+    "Stored total-clearing curves remain above stored minimum-melting curves in the existing 41-point screening sample.",
+    "The runtime curve evaluator preserves duplicate-current and near-vertical point geometry, applies explicit lower/upper boundary rules, and rejects out-of-domain arc-duration and coordination claims.",
+    "A non-canonical technical evidence file retains all 522 official source coordinates; each selected operational boundary point evaluates with zero log10 error against that raw-coordinate candidate."
+  ],
+  "blockers": [
+    "The 25E minimum-melting reduction collapses a long-time near-vertical source segment and materially differs from raw source points.",
+    "The 65E minimum-melting raw-source difference exceeds the metadata-reported normalized reduction error and needs technical disposition.",
+    "The raw-coordinate evidence has not yet been converted into governed research candidates with complete field-source mappings, asymmetric tolerance metadata, and acceptance criteria.",
+    "Manufacturer plus-current and minus-time tolerance semantics are not represented as governed curve-band metadata.",
+    "Legacy bulletin 665-31 references for the 65E and 100E records conflict with the currently located 242-31 ordering bulletin and require source mapping resolution.",
+    "Lifecycle, region, standards/edition, frequency, pole configuration, field-source mappings, field verification statuses, and three governed spot checks per record are incomplete.",
+    "Independent qualified human review has not occurred."
+  ],
+  "nextTechnicalActions": [
+    "Convert the raw-coordinate evidence into governed research candidates outside the canonical library without reducing or collapsing source geometry.",
+    "Attach asymmetric manufacturer tolerance semantics, field-level source mappings, governed spot checks, and an engineering acceptance criterion.",
+    "Attach asymmetric manufacturer tolerance semantics and an engineering acceptance criterion.",
+    "Complete structured field-level source mappings and resolve the bulletin identity conflict.",
+    "Only after the package is technically complete, submit it to an independent qualified human reviewer; that reviewer alone may populate review or approval fields and authorize promotion."
+  ]
+}

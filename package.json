@@ -18,7 +18,7 @@
     "test:critical": "node tests/ampacity.test.mjs && node tests/racewayRoute.test.cjs && node tests/analysis.test.cjs && node tests/serverSecurity.test.mjs && node tests/collaborationServer.test.mjs && node tests/projectDisplayScheduler.test.mjs && node tests/revitImporter.test.mjs && node tests/validation.test.mjs && node tests/validationManifest.test.mjs && node tests/studyBasis.test.mjs",
     "test:full": "node scripts/runNodeTests.mjs",
     "test:enterprise-auth": "node tests/auditLog.test.mjs && node tests/rbac.test.mjs && node tests/oidc.test.mjs",
-    "e2e:critical": "playwright test --config playwright.config.cjs playwright-tests/workflow.spec.js playwright-tests/cableschedule.spec.js playwright-tests/oneline.spec.js playwright-tests/nextFeatures.smoke.spec.js --grep \"create DB-01|design basis gates|dirty-state prompts|load sample cables populates table|editing a source voltage|smoke:\"",
+    "e2e:critical": "playwright test --config playwright.config.cjs playwright-tests/workflow.spec.js playwright-tests/workflow-smoke.spec.js playwright-tests/cableschedule.spec.js playwright-tests/oneline.spec.js playwright-tests/nextFeatures.smoke.spec.js --grep \"create DB-01|design basis gates|dirty-state prompts|load sample cables populates table|editing a source voltage|one-line drag recovers|smoke:\"",
     "e2e:full": "playwright test --config playwright.config.cjs",
     "visual:regression": "playwright test --config playwright.visual.config.cjs",
     "visual:regression:update": "playwright test --config playwright.visual.config.cjs --update-snapshots",

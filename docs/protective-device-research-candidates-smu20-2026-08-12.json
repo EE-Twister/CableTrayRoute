@@ -1,0 +1,3695 @@
+{
+  "schemaVersion": 1,
+  "purpose": "protective_device_research_candidates",
+  "researchedOn": "2026-08-12",
+  "scope": "Replacement research candidates for S&C SMU-20 25E, 65E, and 100E standard-speed fuse units in 14.4-kV SMD-20 outdoor distribution mountings; full manufacturer source geometry retained and canonical production data left unchanged.",
+  "records": [
+    {
+      "id": "sc_smu20_25e_standard_14kv",
+      "type": "fuse",
+      "subtype": "medium_voltage_power_fuse_e_standard",
+      "voltageClass": "MV",
+      "vendor": "S&C Electric Company",
+      "manufacturer": "S&C Electric Company",
+      "series": "SMU-20 in SMD-20",
+      "name": "S&C SMU-20 25E Standard Speed (14.4 kV)",
+      "catalogNumber": "612025",
+      "tripUnitModel": null,
+      "lifecycleStatus": "current",
+      "region": [
+        "US"
+      ],
+      "standards": [
+        "IEEE C37.41-2016 (edition derived from publication history; manufacturer TCC cites IEEE C37.41 without edition)",
+        "IEEE C37.46-2010 (final edition; manufacturer TCC cites IEEE C37.46 without edition)"
+      ],
+      "frequencyHz": [
+        50,
+        60
+      ],
+      "poles": [
+        1
+      ],
+      "ratedVoltageVac": 14400,
+      "ratedVoltageVdc": null,
+      "maximumVoltageVac": 17000,
+      "continuousCurrentA": 25,
+      "frameA": null,
+      "sensorA": null,
+      "tripRatingA": null,
+      "interruptRating": null,
+      "interruptingRatings": [
+        {
+          "voltageVac": 14400,
+          "currentKA": 14,
+          "currentType": "AC",
+          "ratingType": "RMS symmetrical",
+          "standard": "IEEE C37.46 (manufacturer-stated compliance; edition not stated)",
+          "frequencyHz": 60,
+          "poles": 1,
+          "basis": "Complete SMD-20 mounting with the selected SMU-20 fuse unit; X/R basis is 15 in Specification Bulletin 242-31.",
+          "sourceId": "sc_smd20_product"
+        },
+        {
+          "voltageVac": 14400,
+          "currentKA": 11.2,
+          "currentType": "AC",
+          "ratingType": "RMS symmetrical",
+          "standard": "IEEE C37.46 (manufacturer-stated compliance; edition not stated)",
+          "frequencyHz": 50,
+          "poles": 1,
+          "basis": "Complete SMD-20 mounting with the selected SMU-20 fuse unit.",
+          "sourceId": "sc_smd20_product"
+        }
+      ],
+      "makingCapacityKApeak": null,
+      "withstandRatingKA": null,
+      "withstandCycles": null,
+      "shortTimeWithstand": [],
+      "installationRequirement": "Use the SMU-20 fuse unit with compatible SMD-20 mounting and end fittings. Match fuse-unit and mounting voltage ratings; apply the interrupting rating of the complete assembly.",
+      "settings": {
+        "ampRating": 25,
+        "speed": "standard"
+      },
+      "settingOptions": {
+        "ampRating": [
+          25
+        ],
+        "speed": [
+          "standard"
+        ]
+      },
+      "protectionSettings": {},
+      "curve": null,
+      "curveProfiles": [
+        {
+          "id": "smu20_25e_minimum_melting",
+          "name": "SMU-20 25E minimum melting",
+          "role": "melting",
+          "curve": [
+            {
+              "current": 49.4486,
+              "time": 39.7197
+            },
+            {
+              "current": 49.4981,
+              "time": 49.0013
+            },
+            {
+              "current": 49.5476,
+              "time": 65.03
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 602.961
+            },
+            {
+              "current": 49.5972,
+              "time": 577.006
+            },
+            {
+              "current": 49.5972,
+              "time": 520.533
+            },
+            {
+              "current": 49.5972,
+              "time": 429.17
+            },
+            {
+              "current": 49.5972,
+              "time": 227.887
+            },
+            {
+              "current": 49.5972,
+              "time": 169.839
+            },
+            {
+              "current": 49.5972,
+              "time": 123.451
+            },
+            {
+              "current": 49.5972,
+              "time": 85.443
+            },
+            {
+              "current": 49.5972,
+              "time": 32.1639
+            },
+            {
+              "current": 49.6468,
+              "time": 306.081
+            },
+            {
+              "current": 49.9956,
+              "time": 26.4921
+            },
+            {
+              "current": 50.5991,
+              "time": 22.0397
+            },
+            {
+              "current": 51.4152,
+              "time": 18.0626
+            },
+            {
+              "current": 52.3491,
+              "time": 15.2235
+            },
+            {
+              "current": 53.3532,
+              "time": 13.1292
+            },
+            {
+              "current": 54.1595,
+              "time": 11.6446
+            },
+            {
+              "current": 55.4196,
+              "time": 10.2046
+            },
+            {
+              "current": 57.1646,
+              "time": 8.88038
+            },
+            {
+              "current": 58.6703,
+              "time": 7.92359
+            },
+            {
+              "current": 60.3363,
+              "time": 7.06281
+            },
+            {
+              "current": 62.2983,
+              "time": 6.26415
+            },
+            {
+              "current": 64.5819,
+              "time": 5.53916
+            },
+            {
+              "current": 66.9492,
+              "time": 4.94236
+            },
+            {
+              "current": 69.4033,
+              "time": 4.41869
+            },
+            {
+              "current": 73.4007,
+              "time": 3.76912
+            },
+            {
+              "current": 77.3959,
+              "time": 3.25386
+            },
+            {
+              "current": 81.6902,
+              "time": 2.8316
+            },
+            {
+              "current": 84.8541,
+              "time": 2.5724
+            },
+            {
+              "current": 90.0112,
+              "time": 2.2341
+            },
+            {
+              "current": 95.1956,
+              "time": 1.95392
+            },
+            {
+              "current": 99.9763,
+              "time": 1.75039
+            },
+            {
+              "current": 106.264,
+              "time": 1.51867
+            },
+            {
+              "current": 111.936,
+              "time": 1.35505
+            },
+            {
+              "current": 119.454,
+              "time": 1.18156
+            },
+            {
+              "current": 128.115,
+              "time": 1.02515
+            },
+            {
+              "current": 137.13,
+              "time": 0.887666
+            },
+            {
+              "current": 146.926,
+              "time": 0.774018
+            },
+            {
+              "current": 159.641,
+              "time": 0.658915
+            },
+            {
+              "current": 174.85,
+              "time": 0.552025
+            },
+            {
+              "current": 193.24,
+              "time": 0.452412
+            },
+            {
+              "current": 219.627,
+              "time": 0.353044
+            },
+            {
+              "current": 238.157,
+              "time": 0.300544
+            },
+            {
+              "current": 260.325,
+              "time": 0.251789
+            },
+            {
+              "current": 282.571,
+              "time": 0.214775
+            },
+            {
+              "current": 303.363,
+              "time": 0.186903
+            },
+            {
+              "current": 322.445,
+              "time": 0.165107
+            },
+            {
+              "current": 355.289,
+              "time": 0.136536
+            },
+            {
+              "current": 382.96,
+              "time": 0.117635
+            },
+            {
+              "current": 412.787,
+              "time": 0.101149
+            },
+            {
+              "current": 449.408,
+              "time": 0.085849
+            },
+            {
+              "current": 491.731,
+              "time": 0.071492
+            },
+            {
+              "current": 551.108,
+              "time": 0.056974
+            },
+            {
+              "current": 596.412,
+              "time": 0.048744
+            },
+            {
+              "current": 644.15,
+              "time": 0.041955
+            },
+            {
+              "current": 709.053,
+              "time": 0.034625
+            },
+            {
+              "current": 768.877,
+              "time": 0.029417
+            },
+            {
+              "current": 829.589,
+              "time": 0.02532
+            },
+            {
+              "current": 897.785,
+              "time": 0.021641
+            },
+            {
+              "current": 980.371,
+              "time": 0.018276
+            },
+            {
+              "current": 1053.56,
+              "time": 0.015841
+            },
+            {
+              "current": 1151.62,
+              "time": 0.013271
+            },
+            {
+              "current": 1222.83,
+              "time": 0.011747
+            },
+            {
+              "current": 1295.86,
+              "time": 0.01045
+            },
+            {
+              "current": 1326.01,
+              "time": 0.01
+            }
+          ],
+          "curveEvidence": {
+            "document": "S&C TCC Number 153-2 PDF and manufacturer spreadsheet",
+            "date": "2019-06-03 (PDF); 2015-07-14 (worksheet source)",
+            "curveNumber": "153-2",
+            "page": "1 / cited worksheet range",
+            "representation": "minimum_melt",
+            "currentUnit": "A",
+            "timeUnit": "s",
+            "frequencyHz": null,
+            "referenceAmbientC": 25,
+            "scalingBasis": "No scaling. Full manufacturer spreadsheet coordinates are retained in source order, including duplicate-current and near-vertical geometry.",
+            "extractionMethod": "manufacturer spreadsheet; full source-point transcription with duplicate-current points preserved; no curve reduction",
+            "extractionDate": "2026-08-12",
+            "sourceId": "sc_tcc_153_2_xlsx",
+            "reviewer": null
+          },
+          "settings": {
+            "ampRating": 25,
+            "speed": "standard",
+            "sourceRange": "153_2!P10:Q95",
+            "sourcePointCount": 86,
+            "operationalBoundary": "lower",
+            "duplicateCurrentPolicy": "select shortest time"
+          }
+        },
+        {
+          "id": "smu20_25e_total_clearing_14_4kv",
+          "name": "SMU-20 25E 14.4-kV total clearing",
+          "role": "clearing",
+          "curve": [
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.6206,
+              "time": 601.155
+            },
+            {
+              "current": 53.7817,
+              "time": 259.265
+            },
+            {
+              "current": 53.9433,
+              "time": 68.7068
+            },
+            {
+              "current": 53.9973,
+              "time": 33.6108
+            },
+            {
+              "current": 54.0513,
+              "time": 46.5184
+            },
+            {
+              "current": 54.2137,
+              "time": 25.4533
+            },
+            {
+              "current": 54.8134,
+              "time": 20.6114
+            },
+            {
+              "current": 55.9766,
+              "time": 15.9721
+            },
+            {
+              "current": 57.7968,
+              "time": 12.7285
+            },
+            {
+              "current": 60.2158,
+              "time": 10.1233
+            },
+            {
+              "current": 63.3664,
+              "time": 8.1649
+            },
+            {
+              "current": 66.6153,
+              "time": 6.70493
+            },
+            {
+              "current": 70.3114,
+              "time": 5.60043
+            },
+            {
+              "current": 75.0334,
+              "time": 4.58983
+            },
+            {
+              "current": 79.2759,
+              "time": 3.87615
+            },
+            {
+              "current": 83.5073,
+              "time": 3.30303
+            },
+            {
+              "current": 88.3171,
+              "time": 2.84579
+            },
+            {
+              "current": 94.5316,
+              "time": 2.39849
+            },
+            {
+              "current": 103.641,
+              "time": 1.95197
+            },
+            {
+              "current": 111.936,
+              "time": 1.64681
+            },
+            {
+              "current": 122.355,
+              "time": 1.35369
+            },
+            {
+              "current": 131.49,
+              "time": 1.1698
+            },
+            {
+              "current": 143.873,
+              "time": 0.981022
+            },
+            {
+              "current": 164.668,
+              "time": 0.764021
+            },
+            {
+              "current": 194.597,
+              "time": 0.559808
+            },
+            {
+              "current": 228.59,
+              "time": 0.421826
+            },
+            {
+              "current": 273.672,
+              "time": 0.308769
+            },
+            {
+              "current": 337.961,
+              "time": 0.215205
+            },
+            {
+              "current": 397.395,
+              "time": 0.163955
+            },
+            {
+              "current": 457.113,
+              "time": 0.129618
+            },
+            {
+              "current": 517.459,
+              "time": 0.104751
+            },
+            {
+              "current": 588.708,
+              "time": 0.085165
+            },
+            {
+              "current": 666.427,
+              "time": 0.070923
+            },
+            {
+              "current": 737.253,
+              "time": 0.061288
+            },
+            {
+              "current": 820.514,
+              "time": 0.053495
+            },
+            {
+              "current": 910.443,
+              "time": 0.047209
+            },
+            {
+              "current": 1021.4,
+              "time": 0.041913
+            },
+            {
+              "current": 1141.3,
+              "time": 0.037697
+            },
+            {
+              "current": 1290.68,
+              "time": 0.03411
+            },
+            {
+              "current": 1427.85,
+              "time": 0.031804
+            },
+            {
+              "current": 1578.02,
+              "time": 0.029892
+            },
+            {
+              "current": 1759.75,
+              "time": 0.028207
+            },
+            {
+              "current": 2000.05,
+              "time": 0.026805
+            },
+            {
+              "current": 2212.61,
+              "time": 0.025909
+            },
+            {
+              "current": 2450.21,
+              "time": 0.024993
+            },
+            {
+              "current": 2726.92,
+              "time": 0.024303
+            },
+            {
+              "current": 2983.73,
+              "time": 0.023703
+            },
+            {
+              "current": 3294.23,
+              "time": 0.023002
+            },
+            {
+              "current": 3684.64,
+              "time": 0.022389
+            },
+            {
+              "current": 4721.72,
+              "time": 0.020897
+            },
+            {
+              "current": 6386.41,
+              "time": 0.019503
+            },
+            {
+              "current": 8777.33,
+              "time": 0.018608
+            },
+            {
+              "current": 12455.6,
+              "time": 0.017594
+            },
+            {
+              "current": 17835.1,
+              "time": 0.016504
+            }
+          ],
+          "curveEvidence": {
+            "document": "S&C TCC Number 153-2-2 PDF and manufacturer spreadsheet",
+            "date": "2019-06-03 (PDF); 1988-08-29 (worksheet source)",
+            "curveNumber": "153-2-2",
+            "page": "1 / cited worksheet range",
+            "representation": "total_clearing",
+            "currentUnit": "A",
+            "timeUnit": "s",
+            "frequencyHz": null,
+            "referenceAmbientC": 25,
+            "scalingBasis": "No scaling. Full manufacturer spreadsheet coordinates are retained in source order, including duplicate-current and near-vertical geometry.",
+            "extractionMethod": "manufacturer spreadsheet; full source-point transcription with duplicate-current points preserved; no curve reduction",
+            "extractionDate": "2026-08-12",
+            "sourceId": "sc_tcc_153_2_2_xlsx",
+            "reviewer": null
+          },
+          "settings": {
+            "ampRating": 25,
+            "speed": "standard",
+            "sourceRange": "153_22!N8:O95",
+            "sourcePointCount": 88,
+            "operationalBoundary": "upper",
+            "duplicateCurrentPolicy": "select longest time"
+          }
+        }
+      ],
+      "curveEvidence": {
+        "document": "S&C TCC Numbers 153-2 and 153-2-2 with manufacturer spreadsheets",
+        "date": "2019-06-03 PDFs; worksheet source dates retained in profile evidence",
+        "curveNumber": "153-2 / 153-2-2",
+        "page": "1 / cited worksheet ranges",
+        "representation": "tolerance_band",
+        "currentUnit": "A",
+        "timeUnit": "s",
+        "frequencyHz": null,
+        "referenceAmbientC": 25,
+        "scalingBasis": "Minimum-melting profile is the lower operational boundary; total-clearing profile is the upper operational boundary. No scaling or reduced proxy curve is used.",
+        "extractionMethod": "manufacturer spreadsheets; full source-point transcription with duplicate-current points preserved; no curve reduction",
+        "extractionDate": "2026-08-12",
+        "sourceId": "sc_tcc_153_2_2_xlsx",
+        "reviewer": null
+      },
+      "curveValidation": {
+        "spotChecks": [
+          {
+            "profileId": "smu20_25e_minimum_melting",
+            "current": 49.4486,
+            "expectedTime": 39.7197,
+            "actualTime": 39.7197,
+            "relativeError": 0,
+            "sourceId": "sc_tcc_153_2_xlsx"
+          },
+          {
+            "profileId": "smu20_25e_minimum_melting",
+            "current": 128.115,
+            "expectedTime": 1.02515,
+            "actualTime": 1.02515,
+            "relativeError": 0,
+            "sourceId": "sc_tcc_153_2_xlsx"
+          },
+          {
+            "profileId": "smu20_25e_minimum_melting",
+            "current": 1326.01,
+            "expectedTime": 0.01,
+            "actualTime": 0.01,
+            "relativeError": 0,
+            "sourceId": "sc_tcc_153_2_xlsx"
+          },
+          {
+            "profileId": "smu20_25e_total_clearing_14_4kv",
+            "current": 53.6206,
+            "expectedTime": 601.155,
+            "actualTime": 601.155,
+            "relativeError": 0,
+            "sourceId": "sc_tcc_153_2_2_xlsx"
+          },
+          {
+            "profileId": "smu20_25e_total_clearing_14_4kv",
+            "current": 273.672,
+            "expectedTime": 0.308769,
+            "actualTime": 0.308769,
+            "relativeError": 0,
+            "sourceId": "sc_tcc_153_2_2_xlsx"
+          },
+          {
+            "profileId": "smu20_25e_total_clearing_14_4kv",
+            "current": 17835.1,
+            "expectedTime": 0.016504,
+            "actualTime": 0.016504,
+            "relativeError": 0,
+            "sourceId": "sc_tcc_153_2_2_xlsx"
+          }
+        ],
+        "notes": "Six automated source-point checks per record: three minimum-melting lower-boundary checks and three total-clearing upper-boundary checks. Exact duplicate-current checks use the documented boundary policy. These are extraction/software checks, not independent engineering review."
+      },
+      "curveReduction": {
+        "method": "none_full_source_geometry",
+        "interpolation": "bounded log-current/log-time; extrapolation rejected",
+        "minimumMelting": {
+          "sourcePoints": 86,
+          "retainedPoints": 86,
+          "duplicateCurrentPolicy": "lower boundary selects shortest time"
+        },
+        "totalClearing": {
+          "sourcePoints": 88,
+          "retainedPoints": 88,
+          "duplicateCurrentPolicy": "upper boundary selects longest time"
+        }
+      },
+      "tolerance": {
+        "profileSemantics": [
+          {
+            "profileId": "smu20_25e_minimum_melting",
+            "plottedBoundary": "minimum_test_points",
+            "variationAxis": "current",
+            "variationDirection": "plus",
+            "variationPercent": 10,
+            "operationalBoundary": "lower",
+            "sourceId": "sc_tcc_153_2_pdf",
+            "notes": "Manufacturer statement for 10E through 400E ratings. The published minimum-test-point curve is retained directly; no symmetric time multiplier is inferred."
+          },
+          {
+            "profileId": "smu20_25e_total_clearing_14_4kv",
+            "plottedBoundary": "maximum_test_points",
+            "variationAxis": "manufacturer_curve",
+            "variationDirection": "minus",
+            "variationPercent": null,
+            "operationalBoundary": "upper",
+            "sourceId": "sc_tcc_153_2_2_pdf",
+            "notes": "Manufacturer states all variations are minus and provides no percentage. The published maximum-test-point curve is retained directly; no symmetric tolerance is invented."
+          }
+        ]
+      },
+      "letThrough": null,
+      "openingTime": null,
+      "formula": null,
+      "iec60255": null,
+      "curveFamily": "SMU-20 standard-speed E-rated fuse-unit TCC 153-2 / 153-2-2",
+      "groundFault": null,
+      "sensorType": null,
+      "nec230_95": null,
+      "zoneType": null,
+      "harmonicRestraint": null,
+      "sourceUrls": [
+        "https://www.sandc.com/en/products--services/products/smd-power-fuses-outdoor-distribution/",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/specification-bulletin-242-31.pdf",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/instruction-sheet-252-550.pdf",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/specification-bulletin-665-31.pdf",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.pdf",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.xlsx",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2-2.pdf",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2-2.xlsx",
+        "https://standards.ieee.org/ieee/C37.41/5578/",
+        "https://standards.ieee.org/ieee/C37.46/4619/"
+      ],
+      "sourceDocuments": [
+        {
+          "id": "sc_smd20_product",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "technical_data",
+            "lifecycle",
+            "market_prevalence"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "SMD Power Fuses - Outdoor Distribution",
+          "url": "https://www.sandc.com/en/products--services/products/smd-power-fuses-outdoor-distribution/",
+          "accessedOn": "2026-08-12",
+          "notes": "Current manufacturer product page; identifies SMU-20 use, 14.4-kV SMD-20 ratings, 50/60-Hz interrupting ratings, and the applicable TCC documents."
+        },
+        {
+          "id": "sc_smu20_spec_242_31",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "technical_data",
+            "lifecycle",
+            "market_prevalence"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "Types SM-4, SM-5, SMD-20, and SMD-40 Power Fuses - Outdoor Distribution Specifications",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/specification-bulletin-242-31.pdf",
+          "documentNumber": "242-31",
+          "revision": "November 24, 2025",
+          "date": "2025-11-24",
+          "accessedOn": "2026-08-12",
+          "page": "10 (Table 4)",
+          "notes": "Direct SMD-20/SMU-20 ordering source for 14.4-kV standard-speed 25E, 65E, and 100E fuse-unit catalog numbers."
+        },
+        {
+          "id": "sc_smu20_instruction_252_550",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "technical_data",
+            "lifecycle"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "SMU-20 Fuse Units",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/instruction-sheet-252-550.pdf",
+          "documentNumber": "252-550",
+          "accessedOn": "2026-08-12",
+          "notes": "Current installation publication; states that SMU-20 ratings are listed in Specification Bulletin 242-31 and describes each fuse unit as a separately installed device."
+        },
+        {
+          "id": "sc_smu20_spec_665_31_cross_application",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "technical_data"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "S&C Manual PME Pad-Mounted Gear",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/specification-bulletin-665-31.pdf",
+          "documentNumber": "665-31",
+          "accessedOn": "2026-08-12",
+          "notes": "Cross-application source only. It lists SMU-20 units for PME gear and notes other compatible mountings; it is not the direct SMD-20 outdoor ordering bulletin and is intentionally excluded from catalog/applicability field provenance."
+        },
+        {
+          "id": "sc_tcc_153_2_pdf",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "curve_data",
+            "standards"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "SMU Fuse Units - S&C Standard Speed Minimum Melting Time-Current Characteristic Curves",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.pdf",
+          "documentNumber": "153-2",
+          "date": "2019-06-03",
+          "accessedOn": "2026-08-12",
+          "page": "1",
+          "notes": "Defines minimum-test-point plotting, plus 10% current variation for 10E through 400E ratings, 25 C/no-initial-load basis, and IEEE C37.41/C37.46 basis."
+        },
+        {
+          "id": "sc_tcc_153_2_xlsx",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "curve_data"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "TCC Number 153-2 manufacturer spreadsheet",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.xlsx",
+          "documentNumber": "153-2",
+          "date": "2015-07-14",
+          "accessedOn": "2026-08-12",
+          "page": "Worksheet 153_2",
+          "notes": "Structured manufacturer points transcribed without curve reduction; source ranges are retained in profile settings."
+        },
+        {
+          "id": "sc_tcc_153_2_2_pdf",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "curve_data",
+            "standards"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "SMU Fuse Units - S&C Standard Speed Total Clearing Time-Current Characteristic Curves",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2-2.pdf",
+          "documentNumber": "153-2-2",
+          "date": "2019-06-03",
+          "accessedOn": "2026-08-12",
+          "page": "1",
+          "notes": "Defines maximum-test-point plotting, minus-only variation, total-clearing semantics, 25 C/no-initial-load basis, and IEEE C37.41/C37.46 basis."
+        },
+        {
+          "id": "sc_tcc_153_2_2_xlsx",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "curve_data"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "TCC Number 153-2-2 manufacturer spreadsheet",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2-2.xlsx",
+          "documentNumber": "153-2-2",
+          "date": "1988-08-29",
+          "accessedOn": "2026-08-12",
+          "page": "Worksheet 153_22",
+          "notes": "Structured manufacturer points transcribed without curve reduction; worksheet source date retained separately from the 2019 PDF publication."
+        },
+        {
+          "id": "ieee_c37_41_2016",
+          "sourceType": "standards_body",
+          "purposes": [
+            "standards"
+          ],
+          "publisher": "IEEE Standards Association",
+          "title": "IEEE C37.41-2016 - IEEE Standard Design Tests for High-Voltage (>1000 V) Fuses and Accessories",
+          "url": "https://standards.ieee.org/ieee/C37.41/5578/",
+          "documentNumber": "IEEE C37.41-2016",
+          "date": "2016-12-09",
+          "accessedOn": "2026-08-12",
+          "notes": "Edition in force when the manufacturer TCC publications dated 2019-06-03 were issued; the manufacturer publications cite C37.41 without an edition."
+        },
+        {
+          "id": "ieee_c37_46_2010",
+          "sourceType": "standards_body",
+          "purposes": [
+            "standards"
+          ],
+          "publisher": "IEEE Standards Association",
+          "title": "IEEE C37.46-2010 - IEEE Standard Specifications for High-Voltage (>1000 V) Expulsion and Current-Limiting Power Class Fuses and Fuse Disconnecting Switches",
+          "url": "https://standards.ieee.org/ieee/C37.46/4619/",
+          "documentNumber": "IEEE C37.46-2010",
+          "date": "2010-10-29",
+          "accessedOn": "2026-08-12",
+          "notes": "Final C37.46 edition. IEEE identifies it as superseded by C37.42-2016; the manufacturer TCC publications nevertheless cite C37.46 without an edition."
+        }
+      ],
+      "fieldSources": {
+        "/type": [
+          "sc_smd20_product"
+        ],
+        "/vendor": [
+          "sc_smd20_product"
+        ],
+        "/series": [
+          "sc_smd20_product",
+          "sc_smu20_spec_242_31"
+        ],
+        "/catalogNumber": [
+          "sc_smu20_spec_242_31"
+        ],
+        "/lifecycleStatus": [
+          "sc_smd20_product",
+          "sc_smu20_spec_242_31",
+          "sc_smu20_instruction_252_550"
+        ],
+        "/region": [
+          "sc_smd20_product",
+          "sc_smu20_spec_242_31"
+        ],
+        "/standards": [
+          "sc_tcc_153_2_pdf",
+          "sc_tcc_153_2_2_pdf",
+          "ieee_c37_41_2016",
+          "ieee_c37_46_2010"
+        ],
+        "/frequencyHz": [
+          "sc_smd20_product"
+        ],
+        "/poles": [
+          "sc_smu20_spec_242_31",
+          "sc_smu20_instruction_252_550"
+        ],
+        "/ratedVoltageVac": [
+          "sc_smd20_product",
+          "sc_smu20_spec_242_31"
+        ],
+        "/continuousCurrentA": [
+          "sc_smu20_spec_242_31",
+          "sc_tcc_153_2_pdf"
+        ],
+        "/interruptingRatings": [
+          "sc_smd20_product",
+          "sc_smu20_spec_242_31"
+        ],
+        "/settings": [
+          "sc_smu20_spec_242_31"
+        ],
+        "/settingOptions": [
+          "sc_smu20_spec_242_31"
+        ],
+        "/curveProfiles": [
+          "sc_tcc_153_2_xlsx",
+          "sc_tcc_153_2_2_xlsx",
+          "sc_tcc_153_2_pdf",
+          "sc_tcc_153_2_2_pdf"
+        ],
+        "/curveEvidence": [
+          "sc_tcc_153_2_xlsx",
+          "sc_tcc_153_2_2_xlsx",
+          "sc_tcc_153_2_pdf",
+          "sc_tcc_153_2_2_pdf"
+        ],
+        "/curveValidation": [
+          "sc_tcc_153_2_xlsx",
+          "sc_tcc_153_2_2_xlsx"
+        ]
+      },
+      "fieldStatus": {
+        "/type": "verified",
+        "/vendor": "verified",
+        "/series": "verified",
+        "/catalogNumber": "verified",
+        "/tripUnitModel": "not_applicable",
+        "/lifecycleStatus": "derived",
+        "/region": "derived",
+        "/standards": "derived",
+        "/frequencyHz": "verified",
+        "/poles": "derived",
+        "/ratedVoltageVac": "verified",
+        "/ratedVoltageVdc": "not_applicable",
+        "/continuousCurrentA": "verified",
+        "/frameA": "not_applicable",
+        "/sensorA": "not_applicable",
+        "/tripRatingA": "not_applicable",
+        "/interruptingRatings": "verified",
+        "/makingCapacityKApeak": "not_applicable",
+        "/shortTimeWithstand": "not_applicable",
+        "/settings": "derived",
+        "/settingOptions": "derived",
+        "/protectionSettings": "not_applicable",
+        "/curve": "not_applicable",
+        "/curveProfiles": "verified",
+        "/curveEvidence": "verified",
+        "/curveValidation": "derived",
+        "/openingTime": "not_applicable"
+      },
+      "lastVerified": "2026-08-12",
+      "missingForProduction": [
+        "independent engineering review"
+      ],
+      "researchStatus": "candidate",
+      "libraryStatus": "screening",
+      "review": {
+        "reviewer": null,
+        "reviewedOn": null,
+        "notes": "Candidate for qualified human review. Bulletin 242-31 is the direct SMD-20/SMU-20 ordering source; Bulletin 665-31 is retained only as a PME cross-application reference. Automated checks do not constitute independent engineering review or licensed-engineer approval."
+      }
+    },
+    {
+      "id": "sc_smu20_65e_standard_14kv",
+      "type": "fuse",
+      "subtype": "medium_voltage_power_fuse_e_standard",
+      "voltageClass": "MV",
+      "vendor": "S&C Electric Company",
+      "manufacturer": "S&C Electric Company",
+      "series": "SMU-20 in SMD-20",
+      "name": "S&C SMU-20 65E Standard Speed (14.4 kV)",
+      "catalogNumber": "612065",
+      "tripUnitModel": null,
+      "lifecycleStatus": "current",
+      "region": [
+        "US"
+      ],
+      "standards": [
+        "IEEE C37.41-2016 (edition derived from publication history; manufacturer TCC cites IEEE C37.41 without edition)",
+        "IEEE C37.46-2010 (final edition; manufacturer TCC cites IEEE C37.46 without edition)"
+      ],
+      "frequencyHz": [
+        50,
+        60
+      ],
+      "poles": [
+        1
+      ],
+      "ratedVoltageVac": 14400,
+      "ratedVoltageVdc": null,
+      "maximumVoltageVac": 17000,
+      "continuousCurrentA": 65,
+      "frameA": null,
+      "sensorA": null,
+      "tripRatingA": null,
+      "interruptRating": null,
+      "interruptingRatings": [
+        {
+          "voltageVac": 14400,
+          "currentKA": 14,
+          "currentType": "AC",
+          "ratingType": "RMS symmetrical",
+          "standard": "IEEE C37.46 (manufacturer-stated compliance; edition not stated)",
+          "frequencyHz": 60,
+          "poles": 1,
+          "basis": "Complete SMD-20 mounting with the selected SMU-20 fuse unit; X/R basis is 15 in Specification Bulletin 242-31.",
+          "sourceId": "sc_smd20_product"
+        },
+        {
+          "voltageVac": 14400,
+          "currentKA": 11.2,
+          "currentType": "AC",
+          "ratingType": "RMS symmetrical",
+          "standard": "IEEE C37.46 (manufacturer-stated compliance; edition not stated)",
+          "frequencyHz": 50,
+          "poles": 1,
+          "basis": "Complete SMD-20 mounting with the selected SMU-20 fuse unit.",
+          "sourceId": "sc_smd20_product"
+        }
+      ],
+      "makingCapacityKApeak": null,
+      "withstandRatingKA": null,
+      "withstandCycles": null,
+      "shortTimeWithstand": [],
+      "installationRequirement": "Use the SMU-20 fuse unit with compatible SMD-20 mounting and end fittings. Match fuse-unit and mounting voltage ratings; apply the interrupting rating of the complete assembly.",
+      "settings": {
+        "ampRating": 65,
+        "speed": "standard"
+      },
+      "settingOptions": {
+        "ampRating": [
+          65
+        ],
+        "speed": [
+          "standard"
+        ]
+      },
+      "protectionSettings": {},
+      "curve": null,
+      "curveProfiles": [
+        {
+          "id": "smu20_65e_minimum_melting",
+          "name": "SMU-20 65E minimum melting",
+          "role": "melting",
+          "curve": [
+            {
+              "current": 129.65572,
+              "time": 601.757
+            },
+            {
+              "current": 129.65572,
+              "time": 601.757
+            },
+            {
+              "current": 129.65572,
+              "time": 601.757
+            },
+            {
+              "current": 129.65572,
+              "time": 601.757
+            },
+            {
+              "current": 129.65572,
+              "time": 601.757
+            },
+            {
+              "current": 129.65572,
+              "time": 601.757
+            },
+            {
+              "current": 129.65572,
+              "time": 601.757
+            },
+            {
+              "current": 129.785,
+              "time": 569.554
+            },
+            {
+              "current": 129.785,
+              "time": 461.21
+            },
+            {
+              "current": 129.785,
+              "time": 359.549
+            },
+            {
+              "current": 130.17486,
+              "time": 278.621
+            },
+            {
+              "current": 130.30515,
+              "time": 216.34
+            },
+            {
+              "current": 130.69702999999998,
+              "time": 170.69
+            },
+            {
+              "current": 131.22020999999998,
+              "time": 141.012
+            },
+            {
+              "current": 132.27465,
+              "time": 115.451
+            },
+            {
+              "current": 133.07053,
+              "time": 98.0865
+            },
+            {
+              "current": 134.27344,
+              "time": 76.3898
+            },
+            {
+              "current": 135.35212,
+              "time": 64.0618
+            },
+            {
+              "current": 136.43887999999998,
+              "time": 53.4554
+            },
+            {
+              "current": 138.22456,
+              "time": 40.7659
+            },
+            {
+              "current": 139.89308,
+              "time": 34.2897
+            },
+            {
+              "current": 141.58180000000002,
+              "time": 29.1614
+            },
+            {
+              "current": 143.14831,
+              "time": 25.9415
+            },
+            {
+              "current": 144.73199,
+              "time": 22.3281
+            },
+            {
+              "current": 146.47827999999998,
+              "time": 19.6651
+            },
+            {
+              "current": 148.24679,
+              "time": 17.4239
+            },
+            {
+              "current": 150.18699999999998,
+              "time": 15.4382
+            },
+            {
+              "current": 152.30396,
+              "time": 13.969
+            },
+            {
+              "current": 154.29770000000002,
+              "time": 12.5264
+            },
+            {
+              "current": 156.78533000000002,
+              "time": 11.1656
+            },
+            {
+              "current": 159.79311,
+              "time": 9.94276
+            },
+            {
+              "current": 162.04642,
+              "time": 8.93382
+            },
+            {
+              "current": 165.31983,
+              "time": 7.9633
+            },
+            {
+              "current": 168.49123,
+              "time": 7.16239
+            },
+            {
+              "current": 172.06663,
+              "time": 6.41631
+            },
+            {
+              "current": 175.54204000000001,
+              "time": 5.83482
+            },
+            {
+              "current": 179.62648000000002,
+              "time": 5.23749
+            },
+            {
+              "current": 183.62204,
+              "time": 4.7915
+            },
+            {
+              "current": 188.27107,
+              "time": 4.37035
+            },
+            {
+              "current": 192.45853,
+              "time": 4.01823
+            },
+            {
+              "current": 198.71649,
+              "time": 3.61048
+            },
+            {
+              "current": 206.20665,
+              "time": 3.24411
+            },
+            {
+              "current": 212.69994,
+              "time": 2.94421
+            },
+            {
+              "current": 220.27595,
+              "time": 2.66137
+            },
+            {
+              "current": 226.75712000000001,
+              "time": 2.44206
+            },
+            {
+              "current": 233.89681,
+              "time": 2.21852
+            },
+            {
+              "current": 241.74451,
+              "time": 2.02555
+            },
+            {
+              "current": 248.60948,
+              "time": 1.87543
+            },
+            {
+              "current": 259.27306000000004,
+              "time": 1.6885
+            },
+            {
+              "current": 272.29398000000003,
+              "time": 1.48563
+            },
+            {
+              "current": 284.82707,
+              "time": 1.33755
+            },
+            {
+              "current": 300.63054,
+              "time": 1.17802
+            },
+            {
+              "current": 319.2206,
+              "time": 1.02926
+            },
+            {
+              "current": 337.60664,
+              "time": 0.909227
+            },
+            {
+              "current": 357.76725000000005,
+              "time": 0.799187
+            },
+            {
+              "current": 383.70808999999997,
+              "time": 0.68512
+            },
+            {
+              "current": 404.59287,
+              "time": 0.609473
+            },
+            {
+              "current": 432.19718,
+              "time": 0.530911
+            },
+            {
+              "current": 449.83480999999995,
+              "time": 0.490583
+            },
+            {
+              "current": 467.72595,
+              "time": 0.451057
+            },
+            {
+              "current": 487.78859,
+              "time": 0.413473
+            },
+            {
+              "current": 515.88376,
+              "time": 0.370774
+            },
+            {
+              "current": 548.33203,
+              "time": 0.330165
+            },
+            {
+              "current": 589.26834,
+              "time": 0.285886
+            },
+            {
+              "current": 625.0809200000001,
+              "time": 0.253558
+            },
+            {
+              "current": 669.73403,
+              "time": 0.221316
+            },
+            {
+              "current": 726.96669,
+              "time": 0.18784
+            },
+            {
+              "current": 797.0213,
+              "time": 0.156115
+            },
+            {
+              "current": 874.7004,
+              "time": 0.129359
+            },
+            {
+              "current": 1004.13392,
+              "time": 0.098651
+            },
+            {
+              "current": 1098.6982,
+              "time": 0.082154
+            },
+            {
+              "current": 1202.1626,
+              "time": 0.068758
+            },
+            {
+              "current": 1311.4345,
+              "time": 0.057546
+            },
+            {
+              "current": 1432.0689000000002,
+              "time": 0.048308
+            },
+            {
+              "current": 1589.033,
+              "time": 0.039197
+            },
+            {
+              "current": 1770.2573,
+              "time": 0.031677
+            },
+            {
+              "current": 1935.0286999999998,
+              "time": 0.026485
+            },
+            {
+              "current": 2147.1085,
+              "time": 0.021641
+            },
+            {
+              "current": 2318.9701000000005,
+              "time": 0.018571
+            },
+            {
+              "current": 2489.5995,
+              "time": 0.016112
+            },
+            {
+              "current": 2686.1859,
+              "time": 0.013868
+            },
+            {
+              "current": 2790.226,
+              "time": 0.012827
+            },
+            {
+              "current": 2904.1034999999997,
+              "time": 0.011889
+            },
+            {
+              "current": 3010.5474,
+              "time": 0.011041
+            },
+            {
+              "current": 3120.9101,
+              "time": 0.010336
+            },
+            {
+              "current": 3164.9057000000003,
+              "time": 0.01
+            }
+          ],
+          "curveEvidence": {
+            "document": "S&C TCC Number 153-2 PDF and manufacturer spreadsheet",
+            "date": "2019-06-03 (PDF); 2015-07-14 (worksheet source)",
+            "curveNumber": "153-2",
+            "page": "1 / cited worksheet range",
+            "representation": "minimum_melt",
+            "currentUnit": "A",
+            "timeUnit": "s",
+            "frequencyHz": null,
+            "referenceAmbientC": 25,
+            "scalingBasis": "No scaling. Full manufacturer spreadsheet coordinates are retained in source order, including duplicate-current and near-vertical geometry.",
+            "extractionMethod": "manufacturer spreadsheet; full source-point transcription with duplicate-current points preserved; no curve reduction",
+            "extractionDate": "2026-08-12",
+            "sourceId": "sc_tcc_153_2_xlsx",
+            "reviewer": null
+          },
+          "settings": {
+            "ampRating": 65,
+            "speed": "standard",
+            "sourceRange": "153_2!X10:Y95",
+            "sourcePointCount": 86,
+            "operationalBoundary": "lower",
+            "duplicateCurrentPolicy": "select shortest time"
+          }
+        },
+        {
+          "id": "smu20_65e_total_clearing_14_4kv",
+          "name": "SMU-20 65E 14.4-kV total clearing",
+          "role": "clearing",
+          "curve": [
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.18,
+              "time": 602.359
+            },
+            {
+              "current": 140.602,
+              "time": 514.838
+            },
+            {
+              "current": 141.024,
+              "time": 360.269
+            },
+            {
+              "current": 141.306,
+              "time": 247.114
+            },
+            {
+              "current": 141.589,
+              "time": 171.545
+            },
+            {
+              "current": 143.155,
+              "time": 121.492
+            },
+            {
+              "current": 145.028,
+              "time": 86.1293
+            },
+            {
+              "current": 146.633,
+              "time": 63.6786
+            },
+            {
+              "current": 148.106,
+              "time": 50.2418
+            },
+            {
+              "current": 150.194,
+              "time": 38.2386
+            },
+            {
+              "current": 153.229,
+              "time": 29.4545
+            },
+            {
+              "current": 155.389,
+              "time": 23.1003
+            },
+            {
+              "current": 159.482,
+              "time": 18.1531
+            },
+            {
+              "current": 164.503,
+              "time": 13.9411
+            },
+            {
+              "current": 169.005,
+              "time": 11.4483
+            },
+            {
+              "current": 174.327,
+              "time": 9.34503
+            },
+            {
+              "current": 179.995,
+              "time": 7.6971
+            },
+            {
+              "current": 184.737,
+              "time": 6.67149
+            },
+            {
+              "current": 189.982,
+              "time": 5.79991
+            },
+            {
+              "current": 195.964,
+              "time": 5.04725
+            },
+            {
+              "current": 202.539,
+              "time": 4.42311
+            },
+            {
+              "current": 210.173,
+              "time": 3.89168
+            },
+            {
+              "current": 219.408,
+              "time": 3.42754
+            },
+            {
+              "current": 232.277,
+              "time": 2.93833
+            },
+            {
+              "current": 247.134,
+              "time": 2.47154
+            },
+            {
+              "current": 263.995,
+              "time": 2.0935
+            },
+            {
+              "current": 288.28,
+              "time": 1.6885
+            },
+            {
+              "current": 321.8,
+              "time": 1.30322
+            },
+            {
+              "current": 367.209,
+              "time": 0.976129
+            },
+            {
+              "current": 422.391,
+              "time": 0.721689
+            },
+            {
+              "current": 484.894,
+              "time": 0.537858
+            },
+            {
+              "current": 574.173,
+              "time": 0.388228
+            },
+            {
+              "current": 676.499,
+              "time": 0.287032
+            },
+            {
+              "current": 802.66,
+              "time": 0.210312
+            },
+            {
+              "current": 920.513,
+              "time": 0.1671
+            },
+            {
+              "current": 1083.47,
+              "time": 0.12923
+            },
+            {
+              "current": 1222.83,
+              "time": 0.108266
+            },
+            {
+              "current": 1410.82,
+              "time": 0.088022
+            },
+            {
+              "current": 1601.87,
+              "time": 0.073596
+            },
+            {
+              "current": 1822.43,
+              "time": 0.062277
+            },
+            {
+              "current": 2113.14,
+              "time": 0.052018
+            },
+            {
+              "current": 2370.67,
+              "time": 0.045494
+            },
+            {
+              "current": 2635.76,
+              "time": 0.04039
+            },
+            {
+              "current": 3028.82,
+              "time": 0.035502
+            },
+            {
+              "current": 3421.82,
+              "time": 0.032285
+            },
+            {
+              "current": 3804.46,
+              "time": 0.029594
+            },
+            {
+              "current": 4302.4,
+              "time": 0.027292
+            },
+            {
+              "current": 4909.5,
+              "time": 0.025396
+            },
+            {
+              "current": 5825.08,
+              "time": 0.02349
+            },
+            {
+              "current": 6620.51,
+              "time": 0.0223
+            },
+            {
+              "current": 7600.19,
+              "time": 0.021297
+            },
+            {
+              "current": 8603.53,
+              "time": 0.020401
+            },
+            {
+              "current": 9575.16,
+              "time": 0.019601
+            },
+            {
+              "current": 11214.1,
+              "time": 0.018908
+            },
+            {
+              "current": 14485.8,
+              "time": 0.017507
+            },
+            {
+              "current": 17817.3,
+              "time": 0.016504
+            }
+          ],
+          "curveEvidence": {
+            "document": "S&C TCC Number 153-2-2 PDF and manufacturer spreadsheet",
+            "date": "2019-06-03 (PDF); 1988-08-29 (worksheet source)",
+            "curveNumber": "153-2-2",
+            "page": "1 / cited worksheet range",
+            "representation": "total_clearing",
+            "currentUnit": "A",
+            "timeUnit": "s",
+            "frequencyHz": null,
+            "referenceAmbientC": 25,
+            "scalingBasis": "No scaling. Full manufacturer spreadsheet coordinates are retained in source order, including duplicate-current and near-vertical geometry.",
+            "extractionMethod": "manufacturer spreadsheet; full source-point transcription with duplicate-current points preserved; no curve reduction",
+            "extractionDate": "2026-08-12",
+            "sourceId": "sc_tcc_153_2_2_xlsx",
+            "reviewer": null
+          },
+          "settings": {
+            "ampRating": 65,
+            "speed": "standard",
+            "sourceRange": "153_22!V8:W95",
+            "sourcePointCount": 88,
+            "operationalBoundary": "upper",
+            "duplicateCurrentPolicy": "select longest time"
+          }
+        }
+      ],
+      "curveEvidence": {
+        "document": "S&C TCC Numbers 153-2 and 153-2-2 with manufacturer spreadsheets",
+        "date": "2019-06-03 PDFs; worksheet source dates retained in profile evidence",
+        "curveNumber": "153-2 / 153-2-2",
+        "page": "1 / cited worksheet ranges",
+        "representation": "tolerance_band",
+        "currentUnit": "A",
+        "timeUnit": "s",
+        "frequencyHz": null,
+        "referenceAmbientC": 25,
+        "scalingBasis": "Minimum-melting profile is the lower operational boundary; total-clearing profile is the upper operational boundary. No scaling or reduced proxy curve is used.",
+        "extractionMethod": "manufacturer spreadsheets; full source-point transcription with duplicate-current points preserved; no curve reduction",
+        "extractionDate": "2026-08-12",
+        "sourceId": "sc_tcc_153_2_2_xlsx",
+        "reviewer": null
+      },
+      "curveValidation": {
+        "spotChecks": [
+          {
+            "profileId": "smu20_65e_minimum_melting",
+            "current": 129.65572,
+            "expectedTime": 601.757,
+            "actualTime": 601.757,
+            "relativeError": 0,
+            "sourceId": "sc_tcc_153_2_xlsx"
+          },
+          {
+            "profileId": "smu20_65e_minimum_melting",
+            "current": 241.74451,
+            "expectedTime": 2.02555,
+            "actualTime": 2.02555,
+            "relativeError": 0,
+            "sourceId": "sc_tcc_153_2_xlsx"
+          },
+          {
+            "profileId": "smu20_65e_minimum_melting",
+            "current": 3164.9057000000003,
+            "expectedTime": 0.01,
+            "actualTime": 0.01,
+            "relativeError": 0,
+            "sourceId": "sc_tcc_153_2_xlsx"
+          },
+          {
+            "profileId": "smu20_65e_total_clearing_14_4kv",
+            "current": 140.18,
+            "expectedTime": 602.359,
+            "actualTime": 602.359,
+            "relativeError": 0,
+            "sourceId": "sc_tcc_153_2_2_xlsx"
+          },
+          {
+            "profileId": "smu20_65e_total_clearing_14_4kv",
+            "current": 321.8,
+            "expectedTime": 1.30322,
+            "actualTime": 1.30322,
+            "relativeError": 0,
+            "sourceId": "sc_tcc_153_2_2_xlsx"
+          },
+          {
+            "profileId": "smu20_65e_total_clearing_14_4kv",
+            "current": 17817.3,
+            "expectedTime": 0.016504,
+            "actualTime": 0.016504,
+            "relativeError": 0,
+            "sourceId": "sc_tcc_153_2_2_xlsx"
+          }
+        ],
+        "notes": "Six automated source-point checks per record: three minimum-melting lower-boundary checks and three total-clearing upper-boundary checks. Exact duplicate-current checks use the documented boundary policy. These are extraction/software checks, not independent engineering review."
+      },
+      "curveReduction": {
+        "method": "none_full_source_geometry",
+        "interpolation": "bounded log-current/log-time; extrapolation rejected",
+        "minimumMelting": {
+          "sourcePoints": 86,
+          "retainedPoints": 86,
+          "duplicateCurrentPolicy": "lower boundary selects shortest time"
+        },
+        "totalClearing": {
+          "sourcePoints": 88,
+          "retainedPoints": 88,
+          "duplicateCurrentPolicy": "upper boundary selects longest time"
+        }
+      },
+      "tolerance": {
+        "profileSemantics": [
+          {
+            "profileId": "smu20_65e_minimum_melting",
+            "plottedBoundary": "minimum_test_points",
+            "variationAxis": "current",
+            "variationDirection": "plus",
+            "variationPercent": 10,
+            "operationalBoundary": "lower",
+            "sourceId": "sc_tcc_153_2_pdf",
+            "notes": "Manufacturer statement for 10E through 400E ratings. The published minimum-test-point curve is retained directly; no symmetric time multiplier is inferred."
+          },
+          {
+            "profileId": "smu20_65e_total_clearing_14_4kv",
+            "plottedBoundary": "maximum_test_points",
+            "variationAxis": "manufacturer_curve",
+            "variationDirection": "minus",
+            "variationPercent": null,
+            "operationalBoundary": "upper",
+            "sourceId": "sc_tcc_153_2_2_pdf",
+            "notes": "Manufacturer states all variations are minus and provides no percentage. The published maximum-test-point curve is retained directly; no symmetric tolerance is invented."
+          }
+        ]
+      },
+      "letThrough": null,
+      "openingTime": null,
+      "formula": null,
+      "iec60255": null,
+      "curveFamily": "SMU-20 standard-speed E-rated fuse-unit TCC 153-2 / 153-2-2",
+      "groundFault": null,
+      "sensorType": null,
+      "nec230_95": null,
+      "zoneType": null,
+      "harmonicRestraint": null,
+      "sourceUrls": [
+        "https://www.sandc.com/en/products--services/products/smd-power-fuses-outdoor-distribution/",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/specification-bulletin-242-31.pdf",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/instruction-sheet-252-550.pdf",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/specification-bulletin-665-31.pdf",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.pdf",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.xlsx",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2-2.pdf",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2-2.xlsx",
+        "https://standards.ieee.org/ieee/C37.41/5578/",
+        "https://standards.ieee.org/ieee/C37.46/4619/"
+      ],
+      "sourceDocuments": [
+        {
+          "id": "sc_smd20_product",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "technical_data",
+            "lifecycle",
+            "market_prevalence"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "SMD Power Fuses - Outdoor Distribution",
+          "url": "https://www.sandc.com/en/products--services/products/smd-power-fuses-outdoor-distribution/",
+          "accessedOn": "2026-08-12",
+          "notes": "Current manufacturer product page; identifies SMU-20 use, 14.4-kV SMD-20 ratings, 50/60-Hz interrupting ratings, and the applicable TCC documents."
+        },
+        {
+          "id": "sc_smu20_spec_242_31",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "technical_data",
+            "lifecycle",
+            "market_prevalence"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "Types SM-4, SM-5, SMD-20, and SMD-40 Power Fuses - Outdoor Distribution Specifications",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/specification-bulletin-242-31.pdf",
+          "documentNumber": "242-31",
+          "revision": "November 24, 2025",
+          "date": "2025-11-24",
+          "accessedOn": "2026-08-12",
+          "page": "10 (Table 4)",
+          "notes": "Direct SMD-20/SMU-20 ordering source for 14.4-kV standard-speed 25E, 65E, and 100E fuse-unit catalog numbers."
+        },
+        {
+          "id": "sc_smu20_instruction_252_550",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "technical_data",
+            "lifecycle"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "SMU-20 Fuse Units",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/instruction-sheet-252-550.pdf",
+          "documentNumber": "252-550",
+          "accessedOn": "2026-08-12",
+          "notes": "Current installation publication; states that SMU-20 ratings are listed in Specification Bulletin 242-31 and describes each fuse unit as a separately installed device."
+        },
+        {
+          "id": "sc_smu20_spec_665_31_cross_application",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "technical_data"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "S&C Manual PME Pad-Mounted Gear",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/specification-bulletin-665-31.pdf",
+          "documentNumber": "665-31",
+          "accessedOn": "2026-08-12",
+          "notes": "Cross-application source only. It lists SMU-20 units for PME gear and notes other compatible mountings; it is not the direct SMD-20 outdoor ordering bulletin and is intentionally excluded from catalog/applicability field provenance."
+        },
+        {
+          "id": "sc_tcc_153_2_pdf",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "curve_data",
+            "standards"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "SMU Fuse Units - S&C Standard Speed Minimum Melting Time-Current Characteristic Curves",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.pdf",
+          "documentNumber": "153-2",
+          "date": "2019-06-03",
+          "accessedOn": "2026-08-12",
+          "page": "1",
+          "notes": "Defines minimum-test-point plotting, plus 10% current variation for 10E through 400E ratings, 25 C/no-initial-load basis, and IEEE C37.41/C37.46 basis."
+        },
+        {
+          "id": "sc_tcc_153_2_xlsx",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "curve_data"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "TCC Number 153-2 manufacturer spreadsheet",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.xlsx",
+          "documentNumber": "153-2",
+          "date": "2015-07-14",
+          "accessedOn": "2026-08-12",
+          "page": "Worksheet 153_2",
+          "notes": "Structured manufacturer points transcribed without curve reduction; source ranges are retained in profile settings."
+        },
+        {
+          "id": "sc_tcc_153_2_2_pdf",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "curve_data",
+            "standards"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "SMU Fuse Units - S&C Standard Speed Total Clearing Time-Current Characteristic Curves",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2-2.pdf",
+          "documentNumber": "153-2-2",
+          "date": "2019-06-03",
+          "accessedOn": "2026-08-12",
+          "page": "1",
+          "notes": "Defines maximum-test-point plotting, minus-only variation, total-clearing semantics, 25 C/no-initial-load basis, and IEEE C37.41/C37.46 basis."
+        },
+        {
+          "id": "sc_tcc_153_2_2_xlsx",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "curve_data"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "TCC Number 153-2-2 manufacturer spreadsheet",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2-2.xlsx",
+          "documentNumber": "153-2-2",
+          "date": "1988-08-29",
+          "accessedOn": "2026-08-12",
+          "page": "Worksheet 153_22",
+          "notes": "Structured manufacturer points transcribed without curve reduction; worksheet source date retained separately from the 2019 PDF publication."
+        },
+        {
+          "id": "ieee_c37_41_2016",
+          "sourceType": "standards_body",
+          "purposes": [
+            "standards"
+          ],
+          "publisher": "IEEE Standards Association",
+          "title": "IEEE C37.41-2016 - IEEE Standard Design Tests for High-Voltage (>1000 V) Fuses and Accessories",
+          "url": "https://standards.ieee.org/ieee/C37.41/5578/",
+          "documentNumber": "IEEE C37.41-2016",
+          "date": "2016-12-09",
+          "accessedOn": "2026-08-12",
+          "notes": "Edition in force when the manufacturer TCC publications dated 2019-06-03 were issued; the manufacturer publications cite C37.41 without an edition."
+        },
+        {
+          "id": "ieee_c37_46_2010",
+          "sourceType": "standards_body",
+          "purposes": [
+            "standards"
+          ],
+          "publisher": "IEEE Standards Association",
+          "title": "IEEE C37.46-2010 - IEEE Standard Specifications for High-Voltage (>1000 V) Expulsion and Current-Limiting Power Class Fuses and Fuse Disconnecting Switches",
+          "url": "https://standards.ieee.org/ieee/C37.46/4619/",
+          "documentNumber": "IEEE C37.46-2010",
+          "date": "2010-10-29",
+          "accessedOn": "2026-08-12",
+          "notes": "Final C37.46 edition. IEEE identifies it as superseded by C37.42-2016; the manufacturer TCC publications nevertheless cite C37.46 without an edition."
+        }
+      ],
+      "fieldSources": {
+        "/type": [
+          "sc_smd20_product"
+        ],
+        "/vendor": [
+          "sc_smd20_product"
+        ],
+        "/series": [
+          "sc_smd20_product",
+          "sc_smu20_spec_242_31"
+        ],
+        "/catalogNumber": [
+          "sc_smu20_spec_242_31"
+        ],
+        "/lifecycleStatus": [
+          "sc_smd20_product",
+          "sc_smu20_spec_242_31",
+          "sc_smu20_instruction_252_550"
+        ],
+        "/region": [
+          "sc_smd20_product",
+          "sc_smu20_spec_242_31"
+        ],
+        "/standards": [
+          "sc_tcc_153_2_pdf",
+          "sc_tcc_153_2_2_pdf",
+          "ieee_c37_41_2016",
+          "ieee_c37_46_2010"
+        ],
+        "/frequencyHz": [
+          "sc_smd20_product"
+        ],
+        "/poles": [
+          "sc_smu20_spec_242_31",
+          "sc_smu20_instruction_252_550"
+        ],
+        "/ratedVoltageVac": [
+          "sc_smd20_product",
+          "sc_smu20_spec_242_31"
+        ],
+        "/continuousCurrentA": [
+          "sc_smu20_spec_242_31",
+          "sc_tcc_153_2_pdf"
+        ],
+        "/interruptingRatings": [
+          "sc_smd20_product",
+          "sc_smu20_spec_242_31"
+        ],
+        "/settings": [
+          "sc_smu20_spec_242_31"
+        ],
+        "/settingOptions": [
+          "sc_smu20_spec_242_31"
+        ],
+        "/curveProfiles": [
+          "sc_tcc_153_2_xlsx",
+          "sc_tcc_153_2_2_xlsx",
+          "sc_tcc_153_2_pdf",
+          "sc_tcc_153_2_2_pdf"
+        ],
+        "/curveEvidence": [
+          "sc_tcc_153_2_xlsx",
+          "sc_tcc_153_2_2_xlsx",
+          "sc_tcc_153_2_pdf",
+          "sc_tcc_153_2_2_pdf"
+        ],
+        "/curveValidation": [
+          "sc_tcc_153_2_xlsx",
+          "sc_tcc_153_2_2_xlsx"
+        ]
+      },
+      "fieldStatus": {
+        "/type": "verified",
+        "/vendor": "verified",
+        "/series": "verified",
+        "/catalogNumber": "verified",
+        "/tripUnitModel": "not_applicable",
+        "/lifecycleStatus": "derived",
+        "/region": "derived",
+        "/standards": "derived",
+        "/frequencyHz": "verified",
+        "/poles": "derived",
+        "/ratedVoltageVac": "verified",
+        "/ratedVoltageVdc": "not_applicable",
+        "/continuousCurrentA": "verified",
+        "/frameA": "not_applicable",
+        "/sensorA": "not_applicable",
+        "/tripRatingA": "not_applicable",
+        "/interruptingRatings": "verified",
+        "/makingCapacityKApeak": "not_applicable",
+        "/shortTimeWithstand": "not_applicable",
+        "/settings": "derived",
+        "/settingOptions": "derived",
+        "/protectionSettings": "not_applicable",
+        "/curve": "not_applicable",
+        "/curveProfiles": "verified",
+        "/curveEvidence": "verified",
+        "/curveValidation": "derived",
+        "/openingTime": "not_applicable"
+      },
+      "lastVerified": "2026-08-12",
+      "missingForProduction": [
+        "independent engineering review"
+      ],
+      "researchStatus": "candidate",
+      "libraryStatus": "screening",
+      "review": {
+        "reviewer": null,
+        "reviewedOn": null,
+        "notes": "Candidate for qualified human review. Bulletin 242-31 is the direct SMD-20/SMU-20 ordering source; Bulletin 665-31 is retained only as a PME cross-application reference. Automated checks do not constitute independent engineering review or licensed-engineer approval."
+      }
+    },
+    {
+      "id": "sc_smu20_100e_standard_14kv",
+      "type": "fuse",
+      "subtype": "medium_voltage_power_fuse_e_standard",
+      "voltageClass": "MV",
+      "vendor": "S&C Electric Company",
+      "manufacturer": "S&C Electric Company",
+      "series": "SMU-20 in SMD-20",
+      "name": "S&C SMU-20 100E Standard Speed (14.4 kV)",
+      "catalogNumber": "612100",
+      "tripUnitModel": null,
+      "lifecycleStatus": "current",
+      "region": [
+        "US"
+      ],
+      "standards": [
+        "IEEE C37.41-2016 (edition derived from publication history; manufacturer TCC cites IEEE C37.41 without edition)",
+        "IEEE C37.46-2010 (final edition; manufacturer TCC cites IEEE C37.46 without edition)"
+      ],
+      "frequencyHz": [
+        50,
+        60
+      ],
+      "poles": [
+        1
+      ],
+      "ratedVoltageVac": 14400,
+      "ratedVoltageVdc": null,
+      "maximumVoltageVac": 17000,
+      "continuousCurrentA": 100,
+      "frameA": null,
+      "sensorA": null,
+      "tripRatingA": null,
+      "interruptRating": null,
+      "interruptingRatings": [
+        {
+          "voltageVac": 14400,
+          "currentKA": 14,
+          "currentType": "AC",
+          "ratingType": "RMS symmetrical",
+          "standard": "IEEE C37.46 (manufacturer-stated compliance; edition not stated)",
+          "frequencyHz": 60,
+          "poles": 1,
+          "basis": "Complete SMD-20 mounting with the selected SMU-20 fuse unit; X/R basis is 15 in Specification Bulletin 242-31.",
+          "sourceId": "sc_smd20_product"
+        },
+        {
+          "voltageVac": 14400,
+          "currentKA": 11.2,
+          "currentType": "AC",
+          "ratingType": "RMS symmetrical",
+          "standard": "IEEE C37.46 (manufacturer-stated compliance; edition not stated)",
+          "frequencyHz": 50,
+          "poles": 1,
+          "basis": "Complete SMD-20 mounting with the selected SMU-20 fuse unit.",
+          "sourceId": "sc_smd20_product"
+        }
+      ],
+      "makingCapacityKApeak": null,
+      "withstandRatingKA": null,
+      "withstandCycles": null,
+      "shortTimeWithstand": [],
+      "installationRequirement": "Use the SMU-20 fuse unit with compatible SMD-20 mounting and end fittings. Match fuse-unit and mounting voltage ratings; apply the interrupting rating of the complete assembly.",
+      "settings": {
+        "ampRating": 100,
+        "speed": "standard"
+      },
+      "settingOptions": {
+        "ampRating": [
+          100
+        ],
+        "speed": [
+          "standard"
+        ]
+      },
+      "protectionSettings": {},
+      "curve": null,
+      "curveProfiles": [
+        {
+          "id": "smu20_100e_minimum_melting",
+          "name": "SMU-20 100E minimum melting",
+          "role": "melting",
+          "curve": [
+            {
+              "current": 195.182,
+              "time": 601.155
+            },
+            {
+              "current": 195.182,
+              "time": 601.155
+            },
+            {
+              "current": 195.182,
+              "time": 601.155
+            },
+            {
+              "current": 195.182,
+              "time": 601.155
+            },
+            {
+              "current": 195.182,
+              "time": 601.155
+            },
+            {
+              "current": 195.964,
+              "time": 553.827
+            },
+            {
+              "current": 196.749,
+              "time": 446.684
+            },
+            {
+              "current": 197.933,
+              "time": 362.075
+            },
+            {
+              "current": 198.926,
+              "time": 299.122
+            },
+            {
+              "current": 200.123,
+              "time": 251.602
+            },
+            {
+              "current": 201.327,
+              "time": 209.108
+            },
+            {
+              "current": 203.35,
+              "time": 178.19
+            },
+            {
+              "current": 205.394,
+              "time": 146.767
+            },
+            {
+              "current": 207.458,
+              "time": 122.101
+            },
+            {
+              "current": 209.963,
+              "time": 101.58
+            },
+            {
+              "current": 212.285,
+              "time": 88.7523
+            },
+            {
+              "current": 214.633,
+              "time": 76.6193
+            },
+            {
+              "current": 217.442,
+              "time": 64.4473
+            },
+            {
+              "current": 220.287,
+              "time": 56.2524
+            },
+            {
+              "current": 222.946,
+              "time": 48.4168
+            },
+            {
+              "current": 225.638,
+              "time": 42.8132
+            },
+            {
+              "current": 228.819,
+              "time": 37.0344
+            },
+            {
+              "current": 232.045,
+              "time": 32.0676
+            },
+            {
+              "current": 235.316,
+              "time": 27.7114
+            },
+            {
+              "current": 238.634,
+              "time": 24.1635
+            },
+            {
+              "current": 243.698,
+              "time": 20.0022
+            },
+            {
+              "current": 247.629,
+              "time": 17.3544
+            },
+            {
+              "current": 251.623,
+              "time": 15.2846
+            },
+            {
+              "current": 255.937,
+              "time": 13.3543
+            },
+            {
+              "current": 260.846,
+              "time": 11.5518
+            },
+            {
+              "current": 265.85,
+              "time": 10.1537
+            },
+            {
+              "current": 270.949,
+              "time": 9.05072
+            },
+            {
+              "current": 277.253,
+              "time": 7.86045
+            },
+            {
+              "current": 282.854,
+              "time": 7.10532
+            },
+            {
+              "current": 287.992,
+              "time": 6.44847
+            },
+            {
+              "current": 292.929,
+              "time": 5.89346
+            },
+            {
+              "current": 299.445,
+              "time": 5.30602
+            },
+            {
+              "current": 305.8,
+              "time": 4.82998
+            },
+            {
+              "current": 312.29,
+              "time": 4.40986
+            },
+            {
+              "current": 318.28,
+              "time": 4.07488
+            },
+            {
+              "current": 326.991,
+              "time": 3.69079
+            },
+            {
+              "current": 335.268,
+              "time": 3.37313
+            },
+            {
+              "current": 345.479,
+              "time": 3.06437
+            },
+            {
+              "current": 358.143,
+              "time": 2.75617
+            },
+            {
+              "current": 370.158,
+              "time": 2.49638
+            },
+            {
+              "current": 382.96,
+              "time": 2.26334
+            },
+            {
+              "current": 399.787,
+              "time": 2.0074
+            },
+            {
+              "current": 414.856,
+              "time": 1.81637
+            },
+            {
+              "current": 429.633,
+              "time": 1.64681
+            },
+            {
+              "current": 441.833,
+              "time": 1.52781
+            },
+            {
+              "current": 458.487,
+              "time": 1.39492
+            },
+            {
+              "current": 482.476,
+              "time": 1.22978
+            },
+            {
+              "current": 510.776,
+              "time": 1.07233
+            },
+            {
+              "current": 543.446,
+              "time": 0.923892
+            },
+            {
+              "current": 569.598,
+              "time": 0.828482
+            },
+            {
+              "current": 609.069,
+              "time": 0.711656
+            },
+            {
+              "current": 638.378,
+              "time": 0.640721
+            },
+            {
+              "current": 673.125,
+              "time": 0.570546
+            },
+            {
+              "current": 713.321,
+              "time": 0.502499
+            },
+            {
+              "current": 756.673,
+              "time": 0.440801
+            },
+            {
+              "current": 801.056,
+              "time": 0.390565
+            },
+            {
+              "current": 866.04,
+              "time": 0.33182
+            },
+            {
+              "current": 914.092,
+              "time": 0.294887
+            },
+            {
+              "current": 968.677,
+              "time": 0.260758
+            },
+            {
+              "current": 1026.52,
+              "time": 0.230579
+            },
+            {
+              "current": 1089.99,
+              "time": 0.2043
+            },
+            {
+              "current": 1183.14,
+              "time": 0.172706
+            },
+            {
+              "current": 1295.86,
+              "time": 0.143824
+            },
+            {
+              "current": 1435.01,
+              "time": 0.117166
+            },
+            {
+              "current": 1563.88,
+              "time": 0.098651
+            },
+            {
+              "current": 1709.45,
+              "time": 0.082648
+            },
+            {
+              "current": 1861.11,
+              "time": 0.069937
+            },
+            {
+              "current": 2067.15,
+              "time": 0.056917
+            },
+            {
+              "current": 2246.05,
+              "time": 0.048019
+            },
+            {
+              "current": 2509.72,
+              "time": 0.03869
+            },
+            {
+              "current": 2743.33,
+              "time": 0.032414
+            },
+            {
+              "current": 3034.88,
+              "time": 0.026406
+            },
+            {
+              "current": 3261.45,
+              "time": 0.02291
+            },
+            {
+              "current": 3536.63,
+              "time": 0.019503
+            },
+            {
+              "current": 3789.27,
+              "time": 0.017023
+            },
+            {
+              "current": 4141.98,
+              "time": 0.014248
+            },
+            {
+              "current": 4354.34,
+              "time": 0.012879
+            },
+            {
+              "current": 4573.02,
+              "time": 0.011688
+            },
+            {
+              "current": 4731.17,
+              "time": 0.010931
+            },
+            {
+              "current": 4855.8,
+              "time": 0.010377
+            },
+            {
+              "current": 4929.18,
+              "time": 0.01
+            }
+          ],
+          "curveEvidence": {
+            "document": "S&C TCC Number 153-2 PDF and manufacturer spreadsheet",
+            "date": "2019-06-03 (PDF); 2015-07-14 (worksheet source)",
+            "curveNumber": "153-2",
+            "page": "1 / cited worksheet range",
+            "representation": "minimum_melt",
+            "currentUnit": "A",
+            "timeUnit": "s",
+            "frequencyHz": null,
+            "referenceAmbientC": 25,
+            "scalingBasis": "No scaling. Full manufacturer spreadsheet coordinates are retained in source order, including duplicate-current and near-vertical geometry.",
+            "extractionMethod": "manufacturer spreadsheet; full source-point transcription with duplicate-current points preserved; no curve reduction",
+            "extractionDate": "2026-08-12",
+            "sourceId": "sc_tcc_153_2_xlsx",
+            "reviewer": null
+          },
+          "settings": {
+            "ampRating": 100,
+            "speed": "standard",
+            "sourceRange": "153_2!AB10:AC95",
+            "sourcePointCount": 86,
+            "operationalBoundary": "lower",
+            "duplicateCurrentPolicy": "select shortest time"
+          }
+        },
+        {
+          "id": "smu20_100e_total_clearing_14_4kv",
+          "name": "SMU-20 100E 14.4-kV total clearing",
+          "role": "clearing",
+          "curve": [
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 212.285,
+              "time": 601.155
+            },
+            {
+              "current": 213.136,
+              "time": 442.24
+            },
+            {
+              "current": 215.709,
+              "time": 297.332
+            },
+            {
+              "current": 218.313,
+              "time": 210.998
+            },
+            {
+              "current": 223.84,
+              "time": 145.162
+            },
+            {
+              "current": 227.223,
+              "time": 104.569
+            },
+            {
+              "current": 233.675,
+              "time": 69.1895
+            },
+            {
+              "current": 239.83,
+              "time": 51.2568
+            },
+            {
+              "current": 246.887,
+              "time": 37.7825
+            },
+            {
+              "current": 253.644,
+              "time": 28.6985
+            },
+            {
+              "current": 260.846,
+              "time": 22.4849
+            },
+            {
+              "current": 266.915,
+              "time": 17.7227
+            },
+            {
+              "current": 272.307,
+              "time": 14.5101
+            },
+            {
+              "current": 281.162,
+              "time": 11.7616
+            },
+            {
+              "current": 289.725,
+              "time": 9.5529
+            },
+            {
+              "current": 300.045,
+              "time": 7.85259
+            },
+            {
+              "current": 311.666,
+              "time": 6.57874
+            },
+            {
+              "current": 322.445,
+              "time": 5.56136
+            },
+            {
+              "current": 333.263,
+              "time": 4.69662
+            },
+            {
+              "current": 346.863,
+              "time": 3.91902
+            },
+            {
+              "current": 361.38,
+              "time": 3.36303
+            },
+            {
+              "current": 381.05,
+              "time": 2.88015
+            },
+            {
+              "current": 405.018,
+              "time": 2.42018
+            },
+            {
+              "current": 425.358,
+              "time": 2.1061
+            },
+            {
+              "current": 450.308,
+              "time": 1.80189
+            },
+            {
+              "current": 491.731,
+              "time": 1.44316
+            },
+            {
+              "current": 542.903,
+              "time": 1.14664
+            },
+            {
+              "current": 608.46,
+              "time": 0.879712
+            },
+            {
+              "current": 678.532,
+              "time": 0.69617
+            },
+            {
+              "current": 768.108,
+              "time": 0.53464
+            },
+            {
+              "current": 867.774,
+              "time": 0.423517
+            },
+            {
+              "current": 963.845,
+              "time": 0.344672
+            },
+            {
+              "current": 1076.99,
+              "time": 0.277992
+            },
+            {
+              "current": 1196.23,
+              "time": 0.228741
+            },
+            {
+              "current": 1348.74,
+              "time": 0.185785
+            },
+            {
+              "current": 1477.24,
+              "time": 0.15895
+            },
+            {
+              "current": 1655.61,
+              "time": 0.131708
+            },
+            {
+              "current": 1857.39,
+              "time": 0.109026
+            },
+            {
+              "current": 2081.67,
+              "time": 0.092074
+            },
+            {
+              "current": 2302.91,
+              "time": 0.078775
+            },
+            {
+              "current": 2573.26,
+              "time": 0.067734
+            },
+            {
+              "current": 2858.15,
+              "time": 0.058826
+            },
+            {
+              "current": 3155.58,
+              "time": 0.051707
+            },
+            {
+              "current": 3483.97,
+              "time": 0.045998
+            },
+            {
+              "current": 3842.69,
+              "time": 0.041206
+            },
+            {
+              "current": 4196.17,
+              "time": 0.037697
+            },
+            {
+              "current": 4550.21,
+              "time": 0.034904
+            },
+            {
+              "current": 5028.76,
+              "time": 0.032188
+            },
+            {
+              "current": 5513.35,
+              "time": 0.029802
+            },
+            {
+              "current": 6111.5,
+              "time": 0.027788
+            },
+            {
+              "current": 6747.51,
+              "time": 0.026091
+            },
+            {
+              "current": 7661.23,
+              "time": 0.024109
+            },
+            {
+              "current": 8586.34,
+              "time": 0.022502
+            },
+            {
+              "current": 9623.16,
+              "time": 0.021191
+            },
+            {
+              "current": 10518.8,
+              "time": 0.020097
+            },
+            {
+              "current": 12087.5,
+              "time": 0.018795
+            },
+            {
+              "current": 14748.9,
+              "time": 0.017507
+            },
+            {
+              "current": 18177.2,
+              "time": 0.016405
+            }
+          ],
+          "curveEvidence": {
+            "document": "S&C TCC Number 153-2-2 PDF and manufacturer spreadsheet",
+            "date": "2019-06-03 (PDF); 1988-08-29 (worksheet source)",
+            "curveNumber": "153-2-2",
+            "page": "1 / cited worksheet range",
+            "representation": "total_clearing",
+            "currentUnit": "A",
+            "timeUnit": "s",
+            "frequencyHz": null,
+            "referenceAmbientC": 25,
+            "scalingBasis": "No scaling. Full manufacturer spreadsheet coordinates are retained in source order, including duplicate-current and near-vertical geometry.",
+            "extractionMethod": "manufacturer spreadsheet; full source-point transcription with duplicate-current points preserved; no curve reduction",
+            "extractionDate": "2026-08-12",
+            "sourceId": "sc_tcc_153_2_2_xlsx",
+            "reviewer": null
+          },
+          "settings": {
+            "ampRating": 100,
+            "speed": "standard",
+            "sourceRange": "153_22!Z8:AA95",
+            "sourcePointCount": 88,
+            "operationalBoundary": "upper",
+            "duplicateCurrentPolicy": "select longest time"
+          }
+        }
+      ],
+      "curveEvidence": {
+        "document": "S&C TCC Numbers 153-2 and 153-2-2 with manufacturer spreadsheets",
+        "date": "2019-06-03 PDFs; worksheet source dates retained in profile evidence",
+        "curveNumber": "153-2 / 153-2-2",
+        "page": "1 / cited worksheet ranges",
+        "representation": "tolerance_band",
+        "currentUnit": "A",
+        "timeUnit": "s",
+        "frequencyHz": null,
+        "referenceAmbientC": 25,
+        "scalingBasis": "Minimum-melting profile is the lower operational boundary; total-clearing profile is the upper operational boundary. No scaling or reduced proxy curve is used.",
+        "extractionMethod": "manufacturer spreadsheets; full source-point transcription with duplicate-current points preserved; no curve reduction",
+        "extractionDate": "2026-08-12",
+        "sourceId": "sc_tcc_153_2_2_xlsx",
+        "reviewer": null
+      },
+      "curveValidation": {
+        "spotChecks": [
+          {
+            "profileId": "smu20_100e_minimum_melting",
+            "current": 195.182,
+            "expectedTime": 601.155,
+            "actualTime": 601.155,
+            "relativeError": 0,
+            "sourceId": "sc_tcc_153_2_xlsx"
+          },
+          {
+            "profileId": "smu20_100e_minimum_melting",
+            "current": 370.158,
+            "expectedTime": 2.49638,
+            "actualTime": 2.49638,
+            "relativeError": 0,
+            "sourceId": "sc_tcc_153_2_xlsx"
+          },
+          {
+            "profileId": "smu20_100e_minimum_melting",
+            "current": 4929.18,
+            "expectedTime": 0.01,
+            "actualTime": 0.01,
+            "relativeError": 0,
+            "sourceId": "sc_tcc_153_2_xlsx"
+          },
+          {
+            "profileId": "smu20_100e_total_clearing_14_4kv",
+            "current": 212.285,
+            "expectedTime": 601.155,
+            "actualTime": 601.155,
+            "relativeError": 0,
+            "sourceId": "sc_tcc_153_2_2_xlsx"
+          },
+          {
+            "profileId": "smu20_100e_total_clearing_14_4kv",
+            "current": 678.532,
+            "expectedTime": 0.69617,
+            "actualTime": 0.69617,
+            "relativeError": 0,
+            "sourceId": "sc_tcc_153_2_2_xlsx"
+          },
+          {
+            "profileId": "smu20_100e_total_clearing_14_4kv",
+            "current": 18177.2,
+            "expectedTime": 0.016405,
+            "actualTime": 0.016405,
+            "relativeError": 0,
+            "sourceId": "sc_tcc_153_2_2_xlsx"
+          }
+        ],
+        "notes": "Six automated source-point checks per record: three minimum-melting lower-boundary checks and three total-clearing upper-boundary checks. Exact duplicate-current checks use the documented boundary policy. These are extraction/software checks, not independent engineering review."
+      },
+      "curveReduction": {
+        "method": "none_full_source_geometry",
+        "interpolation": "bounded log-current/log-time; extrapolation rejected",
+        "minimumMelting": {
+          "sourcePoints": 86,
+          "retainedPoints": 86,
+          "duplicateCurrentPolicy": "lower boundary selects shortest time"
+        },
+        "totalClearing": {
+          "sourcePoints": 88,
+          "retainedPoints": 88,
+          "duplicateCurrentPolicy": "upper boundary selects longest time"
+        }
+      },
+      "tolerance": {
+        "profileSemantics": [
+          {
+            "profileId": "smu20_100e_minimum_melting",
+            "plottedBoundary": "minimum_test_points",
+            "variationAxis": "current",
+            "variationDirection": "plus",
+            "variationPercent": 10,
+            "operationalBoundary": "lower",
+            "sourceId": "sc_tcc_153_2_pdf",
+            "notes": "Manufacturer statement for 10E through 400E ratings. The published minimum-test-point curve is retained directly; no symmetric time multiplier is inferred."
+          },
+          {
+            "profileId": "smu20_100e_total_clearing_14_4kv",
+            "plottedBoundary": "maximum_test_points",
+            "variationAxis": "manufacturer_curve",
+            "variationDirection": "minus",
+            "variationPercent": null,
+            "operationalBoundary": "upper",
+            "sourceId": "sc_tcc_153_2_2_pdf",
+            "notes": "Manufacturer states all variations are minus and provides no percentage. The published maximum-test-point curve is retained directly; no symmetric tolerance is invented."
+          }
+        ]
+      },
+      "letThrough": null,
+      "openingTime": null,
+      "formula": null,
+      "iec60255": null,
+      "curveFamily": "SMU-20 standard-speed E-rated fuse-unit TCC 153-2 / 153-2-2",
+      "groundFault": null,
+      "sensorType": null,
+      "nec230_95": null,
+      "zoneType": null,
+      "harmonicRestraint": null,
+      "sourceUrls": [
+        "https://www.sandc.com/en/products--services/products/smd-power-fuses-outdoor-distribution/",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/specification-bulletin-242-31.pdf",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/instruction-sheet-252-550.pdf",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/specification-bulletin-665-31.pdf",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.pdf",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.xlsx",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2-2.pdf",
+        "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2-2.xlsx",
+        "https://standards.ieee.org/ieee/C37.41/5578/",
+        "https://standards.ieee.org/ieee/C37.46/4619/"
+      ],
+      "sourceDocuments": [
+        {
+          "id": "sc_smd20_product",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "technical_data",
+            "lifecycle",
+            "market_prevalence"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "SMD Power Fuses - Outdoor Distribution",
+          "url": "https://www.sandc.com/en/products--services/products/smd-power-fuses-outdoor-distribution/",
+          "accessedOn": "2026-08-12",
+          "notes": "Current manufacturer product page; identifies SMU-20 use, 14.4-kV SMD-20 ratings, 50/60-Hz interrupting ratings, and the applicable TCC documents."
+        },
+        {
+          "id": "sc_smu20_spec_242_31",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "technical_data",
+            "lifecycle",
+            "market_prevalence"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "Types SM-4, SM-5, SMD-20, and SMD-40 Power Fuses - Outdoor Distribution Specifications",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/specification-bulletin-242-31.pdf",
+          "documentNumber": "242-31",
+          "revision": "November 24, 2025",
+          "date": "2025-11-24",
+          "accessedOn": "2026-08-12",
+          "page": "10 (Table 4)",
+          "notes": "Direct SMD-20/SMU-20 ordering source for 14.4-kV standard-speed 25E, 65E, and 100E fuse-unit catalog numbers."
+        },
+        {
+          "id": "sc_smu20_instruction_252_550",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "technical_data",
+            "lifecycle"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "SMU-20 Fuse Units",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/instruction-sheet-252-550.pdf",
+          "documentNumber": "252-550",
+          "accessedOn": "2026-08-12",
+          "notes": "Current installation publication; states that SMU-20 ratings are listed in Specification Bulletin 242-31 and describes each fuse unit as a separately installed device."
+        },
+        {
+          "id": "sc_smu20_spec_665_31_cross_application",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "technical_data"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "S&C Manual PME Pad-Mounted Gear",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/specification-bulletin-665-31.pdf",
+          "documentNumber": "665-31",
+          "accessedOn": "2026-08-12",
+          "notes": "Cross-application source only. It lists SMU-20 units for PME gear and notes other compatible mountings; it is not the direct SMD-20 outdoor ordering bulletin and is intentionally excluded from catalog/applicability field provenance."
+        },
+        {
+          "id": "sc_tcc_153_2_pdf",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "curve_data",
+            "standards"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "SMU Fuse Units - S&C Standard Speed Minimum Melting Time-Current Characteristic Curves",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.pdf",
+          "documentNumber": "153-2",
+          "date": "2019-06-03",
+          "accessedOn": "2026-08-12",
+          "page": "1",
+          "notes": "Defines minimum-test-point plotting, plus 10% current variation for 10E through 400E ratings, 25 C/no-initial-load basis, and IEEE C37.41/C37.46 basis."
+        },
+        {
+          "id": "sc_tcc_153_2_xlsx",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "curve_data"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "TCC Number 153-2 manufacturer spreadsheet",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.xlsx",
+          "documentNumber": "153-2",
+          "date": "2015-07-14",
+          "accessedOn": "2026-08-12",
+          "page": "Worksheet 153_2",
+          "notes": "Structured manufacturer points transcribed without curve reduction; source ranges are retained in profile settings."
+        },
+        {
+          "id": "sc_tcc_153_2_2_pdf",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "curve_data",
+            "standards"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "SMU Fuse Units - S&C Standard Speed Total Clearing Time-Current Characteristic Curves",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2-2.pdf",
+          "documentNumber": "153-2-2",
+          "date": "2019-06-03",
+          "accessedOn": "2026-08-12",
+          "page": "1",
+          "notes": "Defines maximum-test-point plotting, minus-only variation, total-clearing semantics, 25 C/no-initial-load basis, and IEEE C37.41/C37.46 basis."
+        },
+        {
+          "id": "sc_tcc_153_2_2_xlsx",
+          "sourceType": "manufacturer",
+          "purposes": [
+            "curve_data"
+          ],
+          "publisher": "S&C Electric Company",
+          "title": "TCC Number 153-2-2 manufacturer spreadsheet",
+          "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2-2.xlsx",
+          "documentNumber": "153-2-2",
+          "date": "1988-08-29",
+          "accessedOn": "2026-08-12",
+          "page": "Worksheet 153_22",
+          "notes": "Structured manufacturer points transcribed without curve reduction; worksheet source date retained separately from the 2019 PDF publication."
+        },
+        {
+          "id": "ieee_c37_41_2016",
+          "sourceType": "standards_body",
+          "purposes": [
+            "standards"
+          ],
+          "publisher": "IEEE Standards Association",
+          "title": "IEEE C37.41-2016 - IEEE Standard Design Tests for High-Voltage (>1000 V) Fuses and Accessories",
+          "url": "https://standards.ieee.org/ieee/C37.41/5578/",
+          "documentNumber": "IEEE C37.41-2016",
+          "date": "2016-12-09",
+          "accessedOn": "2026-08-12",
+          "notes": "Edition in force when the manufacturer TCC publications dated 2019-06-03 were issued; the manufacturer publications cite C37.41 without an edition."
+        },
+        {
+          "id": "ieee_c37_46_2010",
+          "sourceType": "standards_body",
+          "purposes": [
+            "standards"
+          ],
+          "publisher": "IEEE Standards Association",
+          "title": "IEEE C37.46-2010 - IEEE Standard Specifications for High-Voltage (>1000 V) Expulsion and Current-Limiting Power Class Fuses and Fuse Disconnecting Switches",
+          "url": "https://standards.ieee.org/ieee/C37.46/4619/",
+          "documentNumber": "IEEE C37.46-2010",
+          "date": "2010-10-29",
+          "accessedOn": "2026-08-12",
+          "notes": "Final C37.46 edition. IEEE identifies it as superseded by C37.42-2016; the manufacturer TCC publications nevertheless cite C37.46 without an edition."
+        }
+      ],
+      "fieldSources": {
+        "/type": [
+          "sc_smd20_product"
+        ],
+        "/vendor": [
+          "sc_smd20_product"
+        ],
+        "/series": [
+          "sc_smd20_product",
+          "sc_smu20_spec_242_31"
+        ],
+        "/catalogNumber": [
+          "sc_smu20_spec_242_31"
+        ],
+        "/lifecycleStatus": [
+          "sc_smd20_product",
+          "sc_smu20_spec_242_31",
+          "sc_smu20_instruction_252_550"
+        ],
+        "/region": [
+          "sc_smd20_product",
+          "sc_smu20_spec_242_31"
+        ],
+        "/standards": [
+          "sc_tcc_153_2_pdf",
+          "sc_tcc_153_2_2_pdf",
+          "ieee_c37_41_2016",
+          "ieee_c37_46_2010"
+        ],
+        "/frequencyHz": [
+          "sc_smd20_product"
+        ],
+        "/poles": [
+          "sc_smu20_spec_242_31",
+          "sc_smu20_instruction_252_550"
+        ],
+        "/ratedVoltageVac": [
+          "sc_smd20_product",
+          "sc_smu20_spec_242_31"
+        ],
+        "/continuousCurrentA": [
+          "sc_smu20_spec_242_31",
+          "sc_tcc_153_2_pdf"
+        ],
+        "/interruptingRatings": [
+          "sc_smd20_product",
+          "sc_smu20_spec_242_31"
+        ],
+        "/settings": [
+          "sc_smu20_spec_242_31"
+        ],
+        "/settingOptions": [
+          "sc_smu20_spec_242_31"
+        ],
+        "/curveProfiles": [
+          "sc_tcc_153_2_xlsx",
+          "sc_tcc_153_2_2_xlsx",
+          "sc_tcc_153_2_pdf",
+          "sc_tcc_153_2_2_pdf"
+        ],
+        "/curveEvidence": [
+          "sc_tcc_153_2_xlsx",
+          "sc_tcc_153_2_2_xlsx",
+          "sc_tcc_153_2_pdf",
+          "sc_tcc_153_2_2_pdf"
+        ],
+        "/curveValidation": [
+          "sc_tcc_153_2_xlsx",
+          "sc_tcc_153_2_2_xlsx"
+        ]
+      },
+      "fieldStatus": {
+        "/type": "verified",
+        "/vendor": "verified",
+        "/series": "verified",
+        "/catalogNumber": "verified",
+        "/tripUnitModel": "not_applicable",
+        "/lifecycleStatus": "derived",
+        "/region": "derived",
+        "/standards": "derived",
+        "/frequencyHz": "verified",
+        "/poles": "derived",
+        "/ratedVoltageVac": "verified",
+        "/ratedVoltageVdc": "not_applicable",
+        "/continuousCurrentA": "verified",
+        "/frameA": "not_applicable",
+        "/sensorA": "not_applicable",
+        "/tripRatingA": "not_applicable",
+        "/interruptingRatings": "verified",
+        "/makingCapacityKApeak": "not_applicable",
+        "/shortTimeWithstand": "not_applicable",
+        "/settings": "derived",
+        "/settingOptions": "derived",
+        "/protectionSettings": "not_applicable",
+        "/curve": "not_applicable",
+        "/curveProfiles": "verified",
+        "/curveEvidence": "verified",
+        "/curveValidation": "derived",
+        "/openingTime": "not_applicable"
+      },
+      "lastVerified": "2026-08-12",
+      "missingForProduction": [
+        "independent engineering review"
+      ],
+      "researchStatus": "candidate",
+      "libraryStatus": "screening",
+      "review": {
+        "reviewer": null,
+        "reviewedOn": null,
+        "notes": "Candidate for qualified human review. Bulletin 242-31 is the direct SMD-20/SMU-20 ordering source; Bulletin 665-31 is retained only as a PME cross-application reference. Automated checks do not constitute independent engineering review or licensed-engineer approval."
+      }
+    }
+  ]
+}

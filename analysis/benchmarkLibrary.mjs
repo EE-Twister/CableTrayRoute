@@ -29,8 +29,10 @@ import {
 
 import { evaluateCable } from './voltageDropStudy.mjs';
 import { runLoadFlow } from './loadFlow.js';
+import { runShortCircuit } from './shortCircuit.mjs';
 import { runReliability } from './reliability.js';
 import { calculateMotorStartCase } from './motorStartCalc.mjs';
+import { evaluateTimeCurrentCurve } from './timeCurrentCurve.mjs';
 import { computeIEC60909Bus } from './iec60909.mjs';
 import { calcAmpacity } from './iec60287.mjs';
 import { runFrequencyScan } from './frequencyScan.mjs';
@@ -293,9 +295,10 @@ export const BENCHMARKS = [
     id: 'LFLOW-001',
     label: 'Two-bus radial load-flow known answer',
     studyType: 'Load Flow',
-    standardRef: 'Newton-Raphson power-flow equations',
+    standardRef: 'IEEE 3002.2-2018 study practice; independently derived Newton-Raphson known answer',
+    sourceUrl: 'https://standards.ieee.org/ieee/3002.2/4773/',
     description:
-      'A 13.8 kV slack bus supplies a 1,000 kW / 400 kvar PQ load through a 0.01 + j0.04 pu branch. ' +
+      'A 13.8 kV slack bus supplies a 1,000 kW / 400 kvar PQ load through a 0.01 + j0.04 ohm branch on a 100 MVA base. ' +
       'The live solver must converge and reproduce the independently recorded receiving-bus voltage.',
     run() {
       const result = runLoadFlow({
@@ -315,6 +318,35 @@ export const BENCHMARKS = [
     checks: [
       { key: 'converged', description: 'Solver converges', expectedVal: true, tolerance: 0, type: 'boolean' },
       { key: 'receiving_voltage_pu', description: 'Receiving bus voltage (pu)', expectedVal: 0.9998634, tolerance: 0.000001 }
+    ]
+  },
+
+  {
+    id: 'ANSI-SC-001',
+    label: 'ANSI-path Thevenin fault-current known answer',
+    studyType: 'ANSI Short Circuit',
+    standardRef: 'IEEE 3002.3-2018 study practice; independent symmetrical-component arithmetic check',
+    sourceUrl: 'https://standards.ieee.org/ieee/3002.3/4774/',
+    description:
+      'A 13.8 kV bus with v-factor 1.0, Z1 = Z2 = 0.01 + j0.10 ohm, Z0 = 0.03 + j0.30 ohm, ' +
+      'and X/R = 10 is checked against separately evaluated Thevenin and symmetrical-component equations. ' +
+      'This validates the application screening path; it is not a published breaker-duty example or full C37 rating validation.',
+    run() {
+      const result = runShortCircuit([{
+        id: 'ANSI-BUS', type: 'bus', subtype: 'Bus', kV: 13.8,
+        z1: { r: 0.01, x: 0.10 }, z2: { r: 0.01, x: 0.10 }, z0: { r: 0.03, x: 0.30 },
+        xr_ratio: 10, v_factor: 1.0, method: 'ANSI'
+      }], { method: 'ANSI' })['ANSI-BUS'];
+      return {
+        three_phase_ka: result.threePhaseKA,
+        line_to_ground_ka: result.lineToGroundKA,
+        asymmetrical_peak_ka: result.asymKA
+      };
+    },
+    checks: [
+      { key: 'three_phase_ka', description: 'Three-phase symmetrical current (kA)', expectedVal: 79.28, tolerance: 0.01 },
+      { key: 'line_to_ground_ka', description: 'Single-line-to-ground current (kA)', expectedVal: 47.57, tolerance: 0.01 },
+      { key: 'asymmetrical_peak_ka', description: 'Empirical asymmetrical peak current (kA)', expectedVal: 194.01, tolerance: 0.01 }
     ]
   },
 
@@ -384,6 +416,77 @@ export const BENCHMARKS = [
       { key: 'inrush_ka', description: 'Starting current (kA)', expectedVal: 0.665, tolerance: 0.001 },
       { key: 'voltage_sag_pct', description: 'Voltage sag (%)', expectedVal: 3.10, tolerance: 0.01 }
     ]
+  },
+
+  {
+    id: 'MSTART-ABB-001',
+    fixtureId: 'abb-fpm2555ts-motor-current',
+    label: 'ABB FPM2555TS published motor-current data',
+    studyType: 'Motor Starting',
+    standardRef: 'ABB/Baldor FPM2555TS performance-data sheet',
+    sourceUrl: 'https://library.e.abb.com/public/ad9edd95b42f44ddac04b5e6ee921429/FPM2555TS.pdf',
+    description:
+      'Published 100 hp, 460 V, 0.85 power-factor, 94.1% efficiency, 117 A full-load, and ' +
+      '680 A starting-current data independently check the three-phase current conversion. ' +
+      'Voltage sag and acceleration time are outside this benchmark scope.',
+    run() {
+      const result = calculateMotorStartCase({
+        id: 'ABB-FPM2555TS',
+        hp: 100,
+        volts: 460,
+        powerFactor: 0.85,
+        efficiency: 0.941,
+        inrushMultiple: 680 / 117,
+        theveninR: 0.001,
+        theveninX: 0.001,
+        inertia: 0.1,
+        speedRpm: 1800,
+        type: 'dol',
+      });
+      return {
+        ready: result.ready,
+        full_load_a: result.fullLoadAmps,
+        starting_a: result.inrushKA * 1000,
+      };
+    },
+    checks: [
+      { key: 'ready', description: 'Published motor data accepted', expectedVal: true, tolerance: 0, type: 'boolean' },
+      { key: 'full_load_a', description: 'Full-load current (A)', expectedVal: 117, tolerance: 0.5 },
+      { key: 'starting_a', description: 'Starting current (A)', expectedVal: 680, tolerance: 1 },
+    ],
+  },
+
+  {
+    id: 'TCC-SC-001',
+    fixtureId: 'sc-smu20-tcc-source-points',
+    label: 'S&C SMU-20 25E minimum-melting vertical segment',
+    studyType: 'Protective Device Curves',
+    standardRef: 'S&C TCC 153-2, 25E curve, 153_2!P10:Q95',
+    sourceUrl: 'https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.xlsx',
+    description:
+      'Manufacturer-published source geometry contains 28 points at 49.5972 A spanning ' +
+      '32.1639 s through 602.961 s. The live evaluator must preserve the vertical segment ' +
+      'and select the shortest time for the minimum-melting boundary.',
+    run() {
+      const verticalSegment = Array.from({ length: 28 }, (_unused, index) => ({
+        current: 49.5972,
+        time: 32.1639 + (602.961 - 32.1639) * index / 27,
+      }));
+      const lower = evaluateTimeCurrentCurve(verticalSegment, 49.5972, { boundary: 'lower' });
+      const upper = evaluateTimeCurrentCurve(verticalSegment, 49.5972, { boundary: 'upper' });
+      return {
+        minimum_melting_s: lower.time,
+        maximum_source_time_s: upper.time,
+        matching_points: lower.matchingPointCount,
+        boundary_preserved: lower.status === 'duplicate-current-boundary',
+      };
+    },
+    checks: [
+      { key: 'minimum_melting_s', description: 'Minimum-melting time (s)', expectedVal: 32.1639, tolerance: 0.0001 },
+      { key: 'maximum_source_time_s', description: 'Maximum source-point time (s)', expectedVal: 602.961, tolerance: 0.001 },
+      { key: 'matching_points', description: 'Points retained at duplicate current', expectedVal: 28, tolerance: 0 },
+      { key: 'boundary_preserved', description: 'Vertical segment recognized', expectedVal: true, tolerance: 0, type: 'boolean' },
+    ],
   },
 
   {

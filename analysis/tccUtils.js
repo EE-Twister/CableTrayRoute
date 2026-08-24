@@ -1,4 +1,5 @@
 import { computeIecCurvePoints } from './iecRelayCurves.mjs';
+import { evaluateTimeCurrentCurve } from './timeCurrentCurve.mjs';
 
 const MIN_TIME = 1e-4;
 const DEFAULT_TOLERANCE = {
@@ -44,36 +45,11 @@ function normalizeProfileRole(value) {
 }
 
 function interpolateTimeAtCurrent(curve, current) {
-  if (!Array.isArray(curve) || !curve.length || !Number.isFinite(current) || current <= 0) {
-    return MIN_TIME;
-  }
-  const first = curve[0];
-  if (!first || first.current >= current) {
-    return Math.max(first?.time ?? MIN_TIME, MIN_TIME);
-  }
-  for (let index = 1; index < curve.length; index += 1) {
-    const prev = curve[index - 1];
-    const next = curve[index];
-    if (!next) continue;
-    if (current <= next.current) {
-      const prevCurrent = Math.max(prev.current, MIN_TIME);
-      const nextCurrent = Math.max(next.current, MIN_TIME);
-      if (Math.abs(nextCurrent - prevCurrent) < 1e-12) {
-        return Math.max(Math.min(prev.time, next.time), MIN_TIME);
-      }
-      const logPrevC = Math.log(prevCurrent);
-      const logNextC = Math.log(nextCurrent);
-      const span = logNextC - logPrevC;
-      const ratio = span === 0 ? 0 : (Math.log(current) - logPrevC) / span;
-      const clampedRatio = Number.isFinite(ratio) ? Math.min(Math.max(ratio, 0), 1) : 0;
-      const logPrevT = Math.log(Math.max(prev.time, MIN_TIME));
-      const logNextT = Math.log(Math.max(next.time, MIN_TIME));
-      const interpolated = logPrevT + clampedRatio * (logNextT - logPrevT);
-      return Math.exp(interpolated);
-    }
-  }
-  const last = curve[curve.length - 1];
-  return Math.max(last?.time ?? MIN_TIME, MIN_TIME);
+  const evaluation = evaluateTimeCurrentCurve(curve, current, {
+    boundary: 'lower',
+    outOfRange: 'clamp',
+  });
+  return Math.max(evaluation.time ?? MIN_TIME, MIN_TIME);
 }
 
 function buildEnvelopeFromCurves(lowerCurve = [], upperCurve = []) {

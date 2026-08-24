@@ -1,5 +1,8 @@
 import { downloadCSV, downloadPDF } from './reporting.mjs';
 import { generateArcFlashLabel } from './labels.mjs';
+import { isArcFlashLabelEligible } from '../studies/arcFlashReadiness.mjs';
+
+export { isArcFlashLabelEligible as isArcFlashLabelReady } from '../studies/arcFlashReadiness.mjs';
 
 const LABEL_SHEET_STYLE = `
   body { margin: 0; padding: 16px; font-family: Helvetica, Arial, sans-serif; background: #f5f5f5; }
@@ -81,24 +84,6 @@ function safeEntries(results = {}) {
   });
 }
 
-export function isArcFlashLabelReady(info = {}) {
-  const requiredInputs = Array.isArray(info.requiredInputs) ? info.requiredInputs : [];
-  return requiredInputs.length === 0
-    && Number.isFinite(info.incidentEnergy)
-    && info.incidentEnergy >= 0
-    && Number.isFinite(info.nominalVoltage)
-    && info.nominalVoltage > 0
-    && Number.isFinite(info.workingDistance)
-    && info.workingDistance > 0
-    && Number.isFinite(info.boundary)
-    && info.boundary >= 0
-    && Number.isFinite(info.clearingTime)
-    && info.clearingTime > 0
-    && typeof info.upstreamDevice === 'string'
-    && info.upstreamDevice.trim().length > 0
-    && info.upstreamDevice !== 'Not Specified';
-}
-
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -163,7 +148,7 @@ export function buildArcFlashLabelData(id, info = {}) {
  */
 export function buildLabelSheetHtml(results = {}, projectName = '') {
   const allEntries = safeEntries(results);
-  const entries = allEntries.filter(([, info]) => isArcFlashLabelReady(info));
+  const entries = allEntries.filter(([, info]) => isArcFlashLabelEligible(info));
   const omittedCount = allEntries.length - entries.length;
   const date = new Date().toISOString().split('T')[0];
   const heading = projectName ? `Arc Flash Warning Labels — ${projectName}` : 'Arc Flash Warning Labels';
@@ -183,8 +168,8 @@ export function buildLabelSheetHtml(results = {}, projectName = '') {
 <style>${LABEL_SHEET_STYLE}</style>
 </head>
 <body>
-<h1>${safeHeading}</h1>
-<p class="meta">Generated: ${date} &nbsp;|&nbsp; ${entries.length} issue-ready label(s)${omittedCount ? ` &nbsp;|&nbsp; ${omittedCount} incomplete result(s) withheld` : ''}</p>
+<h1>Draft — ${safeHeading}</h1>
+<p class="meta">Generated: ${date} &nbsp;|&nbsp; ${entries.length} calculation-complete label draft(s)${omittedCount ? ` &nbsp;|&nbsp; ${omittedCount} incomplete result(s) withheld` : ''} &nbsp;|&nbsp; Engineer review required before field use</p>
 <button class="no-print" onclick="window.print()">Print All Labels</button>
 <div class="label-grid">
 ${labelCells}
@@ -215,7 +200,7 @@ export function openLabelPrintWindow(results = {}, projectName = '') {
  */
 export function generateArcFlashReport(results = {}) {
   const entries = safeEntries(results);
-  const labelEntries = entries.filter(([, info]) => isArcFlashLabelReady(info));
+  const labelEntries = entries.filter(([, info]) => isArcFlashLabelEligible(info));
   const headers = [
     'bus',
     'equipmentTag',
@@ -229,7 +214,26 @@ export function generateArcFlashReport(results = {}) {
     'limitedApproach',
     'restrictedApproach',
     'upstreamDevice',
-    'studyDate'
+    'studyDate',
+    'calculationStatus',
+    'labelEligibility',
+    'requiredInputs',
+    'notes',
+    'calculationModel',
+    'boltedFaultCurrentKA',
+    'arcingCurrentKA',
+    'clearingTimeSource',
+    'clearingCurveStatus',
+    'clearingCurveDomainA',
+    'protectiveDeviceId',
+    'protectiveDeviceLibraryStatus',
+    'protectiveDeviceSourceFingerprint',
+    'governingScenario',
+    'electrodeConfiguration',
+    'gapMM',
+    'enclosureDimensionsMM',
+    'withinModelRange',
+    'faultCurrentSource'
   ];
   const rows = entries.map(([id, data]) => ({
     bus: id,
@@ -244,7 +248,34 @@ export function generateArcFlashReport(results = {}) {
     limitedApproach: data.limitedApproach ?? '',
     restrictedApproach: data.restrictedApproach ?? '',
     upstreamDevice: data.upstreamDevice || '',
-    studyDate: resolveStudyDate(data)
+    studyDate: resolveStudyDate(data),
+    calculationStatus: data.calculationStatus || 'not-recorded',
+    labelEligibility: isArcFlashLabelEligible(data) ? 'eligible-draft' : 'withheld',
+    requiredInputs: Array.isArray(data.requiredInputs) ? data.requiredInputs.join(' | ') : '',
+    notes: Array.isArray(data.notes) ? data.notes.join(' | ') : '',
+    calculationModel: data.calculationInputs?.model || '',
+    boltedFaultCurrentKA: data.calculationInputs?.boltedFaultCurrentKA ?? '',
+    arcingCurrentKA: data.calculationInputs?.arcingCurrentKA ?? '',
+    clearingTimeSource: data.calculationInputs?.clearingTimeSource || '',
+    clearingCurveStatus: data.calculationInputs?.clearingCurveStatus || '',
+    clearingCurveDomainA: data.calculationInputs?.clearingCurveDomainA
+      ? JSON.stringify(data.calculationInputs.clearingCurveDomainA)
+      : '',
+    protectiveDeviceId: data.calculationInputs?.protectiveDeviceId || '',
+    protectiveDeviceLibraryStatus: data.calculationInputs?.protectiveDeviceLibraryStatus || '',
+    protectiveDeviceSourceFingerprint: data.calculationInputs?.protectiveDeviceSourceFingerprint || '',
+    governingScenario: data.calculationInputs?.governingScenario || '',
+    electrodeConfiguration: data.calculationInputs?.electrodeConfiguration || '',
+    gapMM: data.calculationInputs?.gapMM ?? '',
+    enclosureDimensionsMM: [
+      data.calculationInputs?.boxHeightMM,
+      data.calculationInputs?.boxWidthMM,
+      data.calculationInputs?.boxDepthMM,
+    ].every(Number.isFinite)
+      ? `${data.calculationInputs.boxHeightMM} x ${data.calculationInputs.boxWidthMM} x ${data.calculationInputs.boxDepthMM}`
+      : '',
+    withinModelRange: data.calculationInputs?.withinModelRange ?? '',
+    faultCurrentSource: data.calculationInputs?.faultCurrentSource || ''
   }));
   if (!rows.length) return { reportCount: 0, labelCount: 0, omittedLabelCount: 0 };
   downloadCSV(headers, rows, 'arcflash.csv');

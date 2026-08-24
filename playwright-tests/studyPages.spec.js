@@ -227,6 +227,25 @@ test.describe('Time-Current Curves', () => {
   test('device selection controls are present', async ({ page }) => {
     await expect(page.locator('#device-modal-btn')).toBeVisible();
     await expect(page.locator('#device-select')).toBeAttached();
+    await expect(page.locator('#device-select')).toHaveAttribute('hidden', '');
+    await expect(page.locator('#device-select')).toHaveAttribute('aria-hidden', 'true');
+    await expect(page.locator('#device-modal-btn')).toContainText('Choose devices · 1 selected');
+    await expect(page.locator('.selected-device-role')).toContainText('Selected');
+  });
+
+  test('study readiness and the initial plot action are explicit', async ({ page }) => {
+    await expect(page.locator('#tcc-readiness-summary')).toHaveAttribute('data-status', 'screening');
+    await expect(page.locator('#tcc-readiness-heading')).toContainText('Screening-only study');
+    await expect(page.locator('#tcc-readiness-detail')).toContainText('not issued settings or arc-flash clearing times');
+    await expect(page.locator('#tcc-chart-empty-state')).toBeVisible();
+    await page.locator('#tcc-chart-empty-action').click();
+    await expect(page.locator('.tcc-device-layer path[tabindex="0"]')).toHaveCount(1);
+    await expect(page.locator('#tcc-chart-empty-state')).toBeHidden();
+    await expect(page.locator('#auto-coord-btn')).toBeDisabled();
+    await expect(page.locator('#auto-coord-btn')).toHaveAttribute('title', /at least two protective devices/i);
+    await expect(page.locator('#export-relay-settings-btn')).toBeDisabled();
+    await expect(page.locator('#export-relay-settings-btn')).toHaveAttribute('title', /calculation-ready/i);
+    await expect(page.locator('#coord-status-summary')).toContainText('at least two protective devices');
   });
 
   test('catalog startup loads metadata and hydrates a curve shard only when plotting', async ({ page }) => {

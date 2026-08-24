@@ -106,9 +106,7 @@ function buildEntryConfig([name, input]) {
   const isHarmonicsEntry = name === 'harmonics';
   return {
     input,
-    external: isHarmonicsEntry
-      ? isHarmonicNetworkLazyId
-      : undefined,
+    external: id => id === 'qrcode' || (isHarmonicsEntry && isHarmonicNetworkLazyId(id)),
     // Keep writes serial so synced Windows workspaces do not intermittently lock dist files.
     maxParallelFileOps: 1,
     output: {

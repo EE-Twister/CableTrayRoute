@@ -75,8 +75,21 @@
 
       <header class="page-header">
         <h1>Arc Flash</h1>
-        <p>Estimate incident energy per IEEE 1584.</p>
+        <p>Calculate incident energy, verify clearing-time evidence, and prepare review-controlled label drafts using IEEE 1584-2018.</p>
       </header>
+      <section id="arcflash-readiness" class="arcflash-readiness" data-status="empty" aria-labelledby="arcflash-readiness-title">
+        <div class="arcflash-readiness__copy">
+          <p class="arcflash-readiness__eyebrow">Study readiness</p>
+          <h2 id="arcflash-readiness-title">Run the study to establish readiness</h2>
+          <p id="arcflash-readiness-summary">Label eligibility is determined only after both arcing-current cases and their clearing-time evidence are checked.</p>
+        </div>
+        <dl class="arcflash-readiness__metrics" aria-label="Arc flash readiness metrics">
+          <div><dt>Locations</dt><dd id="arcflash-metric-locations">0</dd></div>
+          <div><dt>Label eligible</dt><dd id="arcflash-metric-eligible">0</dd></div>
+          <div><dt>Inputs required</dt><dd id="arcflash-metric-incomplete">0</dd></div>
+          <div><dt>Outside model range</dt><dd id="arcflash-metric-range">0</dd></div>
+        </dl>
+      </section>
       <section class="card study-workspace" aria-labelledby="arcflash-setup-heading">
         <div class="study-workspace__heading">
           <div>
@@ -92,14 +105,14 @@
           </label>
           <div class="study-actions">
             <button type="submit" class="primary-btn">Run Study</button>
-            <button id="arcflash-export-btn" type="button" class="btn" disabled>Export Report &amp; Labels</button>
+            <button id="arcflash-export-btn" type="button" class="btn" disabled>Export Draft Report &amp; Eligible Labels</button>
           </div>
         </form>
-        <p id="arcflash-status" class="field-hint" role="status" aria-live="polite">Run short circuit first for the best fault-current basis. Export is a separate action.</p>
+        <p id="arcflash-status" class="field-hint" role="status" aria-live="polite">The study calculates its short-circuit basis from the active One-Line. Export remains a separate, review-controlled action.</p>
         <div id="arcflash-summary" class="study-result-summary" hidden></div>
         <div class="table-scroll-container">
           <table id="arcflash-results-table" class="study-results-table" hidden>
-            <thead><tr><th>Equipment</th><th>Incident energy</th><th>PPE selection</th><th>Boundary</th><th>Clearing time</th><th>Input quality</th></tr></thead>
+            <thead><tr><th>Equipment</th><th>Incident energy</th><th>Minimum arc rating</th><th>Boundary</th><th>Clearing time basis</th><th>Readiness</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>

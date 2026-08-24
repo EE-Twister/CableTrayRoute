@@ -123,6 +123,9 @@ import { openDeviceSelectionModalView } from './tcc/deviceSelectionModal.mjs';
 import { openComponentBrowserModalView } from './tcc/componentBrowserModal.mjs';
 import { renderCoordinationOrderView } from './tcc/coordinationOrderView.mjs';
 import { renderOneLinePreviewView } from './tcc/oneLinePreviewView.mjs';
+import { createTccStudyReadinessView } from './tcc/studyReadinessView.mjs';
+import { renderSelectedDeviceSummaryView } from './tcc/selectedDeviceSummaryView.mjs';
+import { buildTccWorkflowContext } from './tcc/studyReadinessModel.mjs';
 import {
   describeSettingRange,
   formatCoordinationCurrent,
@@ -352,6 +355,11 @@ const deviceModalBtn = document.getElementById('device-modal-btn');
 const selectedSummary = document.getElementById('selected-device-summary');
 const settingsDiv = document.getElementById('device-settings');
 const plotBtn = document.getElementById('plot-btn');
+const renderStudyReadiness = createTccStudyReadinessView(document, {
+  getEntries: () => selectedDeviceIds().map(uid => deviceMap.get(uid)).filter(Boolean),
+  onChooseDevices: () => deviceModalBtn?.click(),
+  onUpdatePlot: () => plotBtn?.click(),
+});
 const customCurveBtn = document.getElementById('custom-curve-btn');
 const linkBtn = document.getElementById('link-btn');
 const openBtn = document.getElementById('open-btn');
@@ -984,72 +992,17 @@ function applySelectionSet(selection, { persist = false } = {}) {
 }
 
 function renderSelectedSummary() {
-  if (!selectedSummary) return;
-  selectedSummary.innerHTML = '';
   const ids = selectedDeviceIds();
-  if (deviceModalBtn) {
-    deviceModalBtn.textContent = ids.length ? `${ids.length} Devices Selected` : 'Choose Devices';
-  }
-  if (!ids.length) {
-    const empty = document.createElement('p');
-    empty.className = 'selected-device-empty';
-    empty.textContent = 'No devices selected.';
-    selectedSummary.appendChild(empty);
-    renderTccContextBanner();
-    return;
-  }
-  const list = document.createElement('div');
-  list.className = 'selected-device-list';
-  list.setAttribute('role', 'list');
   const relationshipMap = getContextDeviceRelationshipMap();
-  const summaryItems = ids.map(uid => ({
-    uid,
-    entry: deviceMap.get(uid),
-    relationship: getDeviceRelationship(uid, relationshipMap)
-  }));
-  const contextItems = summaryItems.filter(item => item.relationship.role !== 'additional');
-  const additionalItems = summaryItems.filter(item => item.relationship.role === 'additional');
-  const visibleItems = contextItems.length ? contextItems : summaryItems.slice(0, 4);
-  visibleItems.forEach(({ uid, entry, relationship }) => {
-    const chip = document.createElement('span');
-    chip.className = `selected-device-chip ${relationship.className}`;
-    chip.dataset.contextRole = relationship.role;
-    chip.setAttribute('role', 'listitem');
-    const role = document.createElement('span');
-    role.className = 'selected-device-role';
-    role.textContent = relationship.label;
-    const name = document.createElement('span');
-    name.className = 'selected-device-name';
-    name.textContent = entry ? entry.name : uid;
-    chip.append(role, name);
-    list.appendChild(chip);
+  const hasComponentContext = Boolean(getActiveComponentId());
+  renderSelectedDeviceSummaryView({
+    container: selectedSummary, deviceButton: deviceModalBtn, doc: document, ids,
+    getEntry: uid => deviceMap.get(uid),
+    getRelationship: uid => getDeviceRelationship(uid, relationshipMap),
+    selectedRelationship: { ...CONTEXT_ROLE_META.selected, label: 'Selected' },
+    hasComponentContext,
+    onRendered: () => { renderStudyReadiness(); renderTccContextBanner(); },
   });
-  const hiddenItems = contextItems.length ? additionalItems : summaryItems.slice(visibleItems.length);
-  if (hiddenItems.length) {
-    const chip = document.createElement('span');
-    chip.className = 'selected-device-chip is-additional is-summary-chip';
-    chip.dataset.contextRole = 'additional';
-    chip.setAttribute('role', 'listitem');
-    chip.title = hiddenItems
-      .map(item => item.entry ? item.entry.name : item.uid)
-      .join('\n');
-    chip.setAttribute(
-      'aria-label',
-      `${hiddenItems.length} additional selected ${hiddenItems.length === 1 ? 'reference' : 'references'}: ${chip.title}`
-    );
-    const role = document.createElement('span');
-    role.className = 'selected-device-role';
-    role.textContent = 'Additional';
-    const name = document.createElement('span');
-    name.className = 'selected-device-name';
-    name.textContent = hiddenItems.length === 1
-      ? '1 equipment reference selected'
-      : `${hiddenItems.length} equipment references selected`;
-    chip.append(role, name);
-    list.appendChild(chip);
-  }
-  selectedSummary.appendChild(list);
-  renderTccContextBanner();
 }
 
 function positionHoverTooltip(event) {
@@ -1305,6 +1258,20 @@ function setButtonAvailability(button, available, disabledTitle, readyTitle = ''
   }
 }
 
+function getTccWorkflowContext() {
+  const componentId = getActiveComponentId();
+  const component = componentLookup.get(componentId)?.component;
+  const faultCurrentKA = Number(componentId ? getStudies().shortCircuit?.[componentId]?.threePhaseKA : null);
+  return buildTccWorkflowContext(selectedDeviceIds().map(uid => deviceMap.get(uid)).filter(Boolean), {
+    componentId,
+    faultCurrentA: faultCurrentKA > 0 ? faultCurrentKA * 1000 : null,
+    faultCurrentSource: faultCurrentKA > 0 ? `Short Circuit study — ${componentLabel(component)} (three-phase)` : '',
+    coordinationMargin: Number(coordMarginInput?.value) || 0.3,
+    coordinationOrder: coordOrderIds,
+    rangePreset: activeRangePreset,
+  });
+}
+
 function updateCoordinationStatus(message, variant = 'neutral') {
   if (!coordStatusSummary) return;
   coordStatusSummary.textContent = message || '';
@@ -1351,6 +1318,7 @@ function hideCurveHoverTooltip() {
 }
 
 function setPlotAvailability(available) {
+  const workflow = getTccWorkflowContext();
   setButtonAvailability(printPlotBtn, available, 'Update the plot before printing.', 'Print the current TCC plot.');
   setButtonAvailability(exportSvgBtn, available, 'Update the plot before exporting SVG.');
   setButtonAvailability(exportPngBtn, available, 'Update the plot before exporting PNG.');
@@ -1360,7 +1328,9 @@ function setPlotAvailability(available) {
     disableAnnotationMode();
     hideCurveHoverTooltip();
   }
-  setButtonAvailability(exportRelaySettingsBtn, available, 'Update the plot before exporting relay settings.', 'Download vendor-native relay configuration files and manifest CSV.');
+  setButtonAvailability(autoCoordBtn, available && workflow.autoCoordination.allowed, workflow.autoCoordination.reason, 'Calculate settings against the project fault-current basis and governed device curves.');
+  setButtonAvailability(exportRelaySettingsBtn, available && workflow.settingsExport.allowed, workflow.settingsExport.reason, 'Download a draft settings package with provenance for qualified human and vendor review.');
+  if (available && !workflow.autoCoordination.allowed) queueMicrotask(() => updateCoordinationStatus(workflow.autoCoordination.reason, 'warning'));
 }
 
 function enableAnnotationMode() {
@@ -2012,7 +1982,8 @@ function handleExportReview() {
     metricsMarkup,
     coordinationMarkup,
     statusText: coordStatusSummary?.textContent || '',
-    rangeLabel
+    rangeLabel,
+    provenance: getTccWorkflowContext().provenance
   });
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const a = document.createElement('a');
@@ -2473,7 +2444,8 @@ function buildComponentEntries() {
       component,
       sheetName,
       overrideSource: overrides,
-      componentVendor: vendor
+      componentVendor: vendor,
+      libraryAssessment: assessProtectiveDeviceLibraryEntry(base)
     };
     entries.push(entry);
   });
@@ -2509,7 +2481,8 @@ function buildComponentDisplayEntries() {
       overrideSource: overrides,
       componentVendor: vendor,
       missingBase: !base,
-      plotDisabledReason
+      plotDisabledReason,
+      libraryAssessment: base ? assessProtectiveDeviceLibraryEntry(base) : null
     };
     entries.push(entry);
   });
@@ -3260,20 +3233,24 @@ if (autoCoordBtn) {
 if (exportCtiBtn) {
   exportCtiBtn.addEventListener('click', () => {
     if (!lastCoordState) return;
-    const { deviceEntries, result, gfpResult, maxFaultA, margin } = lastCoordState;
+    const { deviceEntries, result, gfpResult, maxFaultA, margin, studyContext } = lastCoordState;
     const phaseEntries = deviceEntries.filter(entry => !entry.device?.groundFault);
     const gfpEntries = deviceEntries.filter(entry => entry.device?.groundFault === true);
     const rows = [
-      ...buildCTIRows(phaseEntries, result, maxFaultA, margin),
-      ...buildCTIRows(gfpEntries, gfpResult, maxFaultA, margin)
+      ...buildCTIRows(phaseEntries, result, maxFaultA, margin, { studyContext }),
+      ...buildCTIRows(gfpEntries, gfpResult, maxFaultA, margin, { studyContext })
     ];
     downloadCSV(CTI_HEADERS, rows, 'coordination-cti-report.csv');
   });
 }
 if (exportRelaySettingsBtn) {
   exportRelaySettingsBtn.addEventListener('click', () => {
-    const allEntries = [...deviceMap.values()];
-    const { files, manifestRows, warnings } = buildExportFiles(allEntries);
+    const studyContext = getTccWorkflowContext();
+    if (!studyContext.settingsExport.allowed) {
+      showAlertModal(studyContext.settingsExport.reason, { title: 'Settings Export Blocked' });
+      return;
+    }
+    const { files, manifestRows, warnings } = buildExportFiles(studyContext.settingsEntries, { studyContext });
     if (!manifestRows.length) {
       showAlertModal('No relay settings to export. Add devices with configurable settings and plot first.', { title: 'No Data' });
       return;
@@ -4053,15 +4030,13 @@ function autoCoordinate() {
     showCoordResults(null, false, 'Plot devices first before running Auto-Coordinate.');
     return;
   }
+  const studyContext = getTccWorkflowContext();
+  if (!studyContext.autoCoordination.allowed) {
+    showCoordResults(null, false, studyContext.autoCoordination.reason);
+    return;
+  }
   updateCoordinationStatus('Checking coordination margins...', 'pending');
-
-  const contextId = getActiveComponentId();
-  const faultKA = contextId ? getStudies().shortCircuit?.[contextId]?.threePhaseKA : null;
-  const maxCurveA = activePlotted.reduce((acc, entry) => {
-    const last = entry.scaled?.curve?.[entry.scaled.curve.length - 1]?.current ?? 0;
-    return Math.max(acc, last);
-  }, 0);
-  const maxFaultA = faultKA ? faultKA * 1000 : Math.max(maxCurveA, 10000);
+  const maxFaultA = studyContext.faultCurrentA;
 
   // Build load→source order from coordOrderIds or reverse of plotted order
   let orderedEntries;
@@ -4132,7 +4107,7 @@ function autoCoordinate() {
     if (!gfpResult.allCoordinated) result.allCoordinated = false;
   }
 
-  lastCoordState = { deviceEntries, result, gfpResult, maxFaultA, margin };
+  lastCoordState = { deviceEntries, result, gfpResult, maxFaultA, margin, studyContext };
   exportCtiBtn?.classList.remove('hidden');
 
   if (activeCurvesUpdater) activeCurvesUpdater();
@@ -4164,8 +4139,8 @@ function showCoordResults(results, allCoordinated, message) {
 
   const lines = [];
   if (allCoordinated) {
-    lines.push('<p class="coord-status coord-ok">All adjacent device pairs are coordinated.</p>');
-    updateCoordinationStatus('All adjacent device pairs are coordinated.', 'ok');
+    lines.push('<p class="coord-status coord-ok">All adjacent device pairs meet the configured margin within the evaluated fault-current and curve domains. Qualified review is still required.</p>');
+    updateCoordinationStatus('All adjacent device pairs meet the configured margin within the evaluated domains. Qualified review is still required.', 'ok');
   } else {
     const violationEntries = results.flatMap((r, index) => (
       index === 0

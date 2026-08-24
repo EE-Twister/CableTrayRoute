@@ -97,6 +97,44 @@ describe('validationBenchmarks.json — schema', () => {
     }
   });
 
+  it('classifies every fixture without counting screening checks as published evidence', () => {
+    const { benchmarks, evidenceLedger, evidenceMethodology } = JSON.parse(
+      fs.readFileSync(benchmarksPath, 'utf8')
+    );
+    const allowedClasses = new Set(Object.keys(evidenceMethodology.classes));
+    const publishedClasses = new Set(evidenceMethodology.publishedEvidenceClasses);
+
+    for (const benchmark of benchmarks) {
+      const evidence = evidenceLedger[benchmark.id];
+      assert.ok(evidence, `${benchmark.id}: missing evidence-ledger entry`);
+      assert.ok(allowedClasses.has(evidence.evidenceClass), `${benchmark.id}: unknown evidence class`);
+      assert.ok(['strong', 'moderate', 'limited'].includes(evidence.evidenceStrength), `${benchmark.id}: invalid evidence strength`);
+      assert.ok(Array.isArray(evidence.implementationModules) && evidence.implementationModules.length > 0,
+        `${benchmark.id}: implementationModules must be non-empty`);
+      for (const modulePath of evidence.implementationModules) {
+        assert.ok(fs.existsSync(path.join(ROOT, modulePath)), `${benchmark.id}: missing implementation module ${modulePath}`);
+      }
+      if (publishedClasses.has(evidence.evidenceClass)) {
+        assert.ok(benchmark.sourceUrl || evidence.sourceAccess === 'paywalled_primary',
+          `${benchmark.id}: published evidence must identify a primary source`);
+      }
+    }
+
+    assert.ok(!publishedClasses.has(evidenceLedger['heat-trace-screening'].evidenceClass));
+    assert.ok(!publishedClasses.has(evidenceLedger['cable-thermal-env-unified'].evidenceClass));
+  });
+
+  it('includes executable primary-source manufacturer evidence for protection curves and motor current', () => {
+    const { benchmarks, evidenceLedger } = JSON.parse(fs.readFileSync(benchmarksPath, 'utf8'));
+    for (const id of ['sc-smu20-tcc-source-points', 'abb-fpm2555ts-motor-current']) {
+      const benchmark = benchmarks.find(item => item.id === id);
+      assert.ok(benchmark, `${id}: fixture not found`);
+      assert.match(benchmark.sourceUrl, /^https:\/\//);
+      assert.strictEqual(evidenceLedger[id].evidenceClass, 'manufacturer_data');
+      assert.ok(evidenceLedger[id].executableBenchmarkId, `${id}: missing executable benchmark link`);
+    }
+  });
+
   it('every benchmark id is unique', () => {
     const { benchmarks } = JSON.parse(fs.readFileSync(benchmarksPath, 'utf8'));
     const ids = benchmarks.map(b => b.id);
@@ -150,6 +188,8 @@ describe('generateValidationManifest.cjs — script', () => {
     const src = fs.readFileSync(scriptPath, 'utf8');
     assert.ok(src.includes('buildManifest'), 'Script must define buildManifest function');
     assert.ok(src.includes('collectTestSuites'), 'Script must define collectTestSuites function');
+    assert.ok(src.includes('collectAnalysisModules'), 'Script must inventory production analysis modules');
+    assert.ok(src.includes('buildEvidenceCoverage'), 'Script must calculate evidence coverage separately from test coverage');
     assert.ok(src.includes('loadBenchmarks'), 'Script must define loadBenchmarks function');
     assert.ok(src.includes('validationManifest.json'), 'Script must reference output file');
   });
@@ -217,6 +257,22 @@ describe('benchmark IDs — link integrity', () => {
     );
     for (const s of standards) {
       assert.ok(/\.html$/.test(s.studyPage), `Standard ${s.id} studyPage must end in .html`);
+    }
+  });
+
+  it('contains full and reduced-current IEEE 1584 Annex D.2 evidence', () => {
+    const { benchmarks } = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'validationBenchmarks.json'), 'utf8'));
+    const found = benchmarks.find(b => b.id === 'ieee1584-arc-flash-lv');
+    assert.ok(found, 'ieee1584-arc-flash-lv benchmark not found');
+    assert.ok(found.expectedOutputs.fullArcingCurrentKA);
+    assert.ok(found.expectedOutputs.reducedArcingCurrentKA);
+    assert.ok(found.expectedOutputs.reducedIncidentEnergyCalCm2);
+  });
+
+  it('contains independent load-flow, ANSI-path, and conduit-fill evidence', () => {
+    const { benchmarks } = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'validationBenchmarks.json'), 'utf8'));
+    for (const id of ['ieee3002-load-flow-radial', 'ansi-short-circuit-thevenin', 'nec2023-conduit-fill-count']) {
+      assert.ok(benchmarks.some(benchmark => benchmark.id === id), `${id} benchmark not found`);
     }
   });
 

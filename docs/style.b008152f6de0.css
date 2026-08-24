@@ -21,6 +21,8 @@
 @import "./src/styles/spoolsheets.css" layer(pages);
 @import "./src/styles/docs.css" layer(pages);
 @import "./src/styles/panel-schedule.css" layer(pages);
+@import "./src/styles/tcc.css" layer(pages);
+@import "./src/styles/arc-flash.css" layer(pages);
 @import "./src/styles/routing.css" layer(pages);
 @import "./src/styles/scenarioComparison.css" layer(pages);
 @import "./src/styles/dataManager.css" layer(pages);

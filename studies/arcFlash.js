@@ -2,23 +2,21 @@ import { runArcFlash } from '../analysis/arcFlash.mjs';
 import { getOneLine, getStudies, setStudies } from '../dataStore.mjs';
 import { getProjectState } from '../projectStorage.js';
 import { generateArcFlashReport } from '../reports/arcFlashReport.mjs';
+import { fingerprintStudySource } from '../analysis/studyResultReadiness.mjs';
+import {
+  arcFlashReadinessLabel,
+  arcFlashResultEntries,
+  formatArcFlashClearingBasis,
+  isArcFlashLabelEligible,
+  summarizeArcFlashResults,
+} from './arcFlashReadiness.mjs';
 
 function projectComponents() {
   const sheets = getOneLine()?.sheets;
-  return Array.isArray(sheets) ? sheets.flatMap(sheet => Array.isArray(sheet?.components) ? sheet.components : []) : [];
-}
-
-function resultEntries(results = {}, scope = 'project') {
-  return Object.entries(results).filter(([id, result]) => {
-    if (!result || typeof result !== 'object' || !Number.isFinite(Number(result.incidentEnergy))) return false;
-    return scope === 'project' || id === scope;
-  });
-}
-
-function inputQuality(result = {}) {
-  const required = Array.isArray(result.requiredInputs) ? result.requiredInputs : [];
-  const notes = Array.isArray(result.notes) ? result.notes : [];
-  return required.length ? `${required.length} required input(s)` : notes.length ? `${notes.length} note(s)` : 'Complete';
+  return Array.isArray(sheets)
+    ? sheets.flatMap(sheet => Array.isArray(sheet?.components) ? sheet.components : [])
+      .filter(component => component && component.type !== 'annotation' && component.type !== 'dimension')
+    : [];
 }
 
 export async function runArcFlashStudy() {
@@ -31,7 +29,7 @@ export async function runArcFlashStudy() {
 }
 
 function renderResults(results, scope = 'project') {
-  const entries = resultEntries(results, scope);
+  const entries = arcFlashResultEntries(results, scope);
   const table = document.getElementById('arcflash-results-table');
   const tbody = table?.querySelector('tbody');
   const summary = document.getElementById('arcflash-summary');
@@ -43,26 +41,71 @@ function renderResults(results, scope = 'project') {
     const row = document.createElement('tr');
     [
       result.equipmentTag || id,
-      `${Number(result.incidentEnergy).toFixed(2)} cal/cm2`,
+      `${Number(result.incidentEnergy).toFixed(2)} cal/cm²`,
       result.minimumArcRatingCalCm2 > 0
-        ? `Arc rating ≥ ${Number(result.minimumArcRatingCalCm2).toFixed(2)} cal/cm²`
-        : 'Below 1.2 cal/cm²',
+        ? `≥ ${Number(result.minimumArcRatingCalCm2).toFixed(2)} cal/cm²`
+        : 'Below 1.2 cal/cm² threshold',
       `${Number(result.boundary || 0).toFixed(0)} mm`,
-      `${Number(result.clearingTime || 0).toFixed(3)} s`,
-      inputQuality(result)
     ].forEach(value => {
       const cell = document.createElement('td');
       cell.textContent = value;
       row.appendChild(cell);
     });
+    const clearingCell = document.createElement('td');
+    clearingCell.className = 'arcflash-clearing-basis';
+    const clearingTime = document.createElement('span');
+    clearingTime.textContent = `${Number(result.clearingTime || 0).toFixed(3)} s`;
+    const clearingBasis = document.createElement('small');
+    clearingBasis.textContent = formatArcFlashClearingBasis(result);
+    clearingCell.append(clearingTime, clearingBasis);
+    row.appendChild(clearingCell);
+
+    const readinessCell = document.createElement('td');
+    const readiness = document.createElement('span');
+    readiness.className = `arcflash-readiness-pill${isArcFlashLabelEligible(result) ? ' arcflash-readiness-pill--ready' : ''}`;
+    readiness.textContent = arcFlashReadinessLabel(result);
+    readinessCell.appendChild(readiness);
+    if (Array.isArray(result.requiredInputs) && result.requiredInputs.length) {
+      const note = document.createElement('div');
+      note.className = 'arcflash-readiness-note';
+      note.textContent = `${result.requiredInputs.length} required input(s)`;
+      readinessCell.appendChild(note);
+    }
+    row.appendChild(readinessCell);
     tbody.appendChild(row);
   });
-  const incompleteCount = entries.filter(([, result]) => (result.requiredInputs || []).length > 0).length;
-  summary.textContent = `${entries.length} location(s) calculated; ${incompleteCount} location(s) require input confirmation before issue.`;
+  const readiness = summarizeArcFlashResults(results, scope);
+  summary.textContent = readiness.summary;
   summary.hidden = false;
-  table.hidden = false;
+  table.hidden = entries.length === 0;
   details.hidden = false;
   output.textContent = JSON.stringify(Object.fromEntries(entries), null, 2);
+}
+
+function renderReadiness(results = null, options = {}) {
+  const readiness = summarizeArcFlashResults(results || {});
+  const panel = document.getElementById('arcflash-readiness');
+  const title = document.getElementById('arcflash-readiness-title');
+  const summary = document.getElementById('arcflash-readiness-summary');
+  if (!panel || !title || !summary) return readiness;
+
+  const status = options.stale ? 'stale' : readiness.status;
+  panel.dataset.status = status;
+  title.textContent = options.title || (options.stale ? 'Saved results are stale' : readiness.title);
+  summary.textContent = options.summary || (options.stale
+    ? 'The active One-Line has changed since these results were calculated. Rerun before relying on the draft report or labels.'
+    : readiness.summary);
+  const metrics = {
+    'arcflash-metric-locations': readiness.total,
+    'arcflash-metric-eligible': readiness.labelEligible,
+    'arcflash-metric-incomplete': readiness.incomplete,
+    'arcflash-metric-range': readiness.outsideModelRange,
+  };
+  Object.entries(metrics).forEach(([id, value]) => {
+    const element = document.getElementById(id);
+    if (element) element.textContent = String(value);
+  });
+  return readiness;
 }
 
 function populateScope() {
@@ -82,12 +125,39 @@ function initializeArcFlashPage() {
     const status = document.getElementById('arcflash-status');
     const exportButton = document.getElementById('arcflash-export-btn');
     const projectContext = document.getElementById('study-project-context');
-    let latestResults = null;
+    const runButton = form?.querySelector('button[type="submit"]');
+    let latestResults = getStudies()?.arcFlash || null;
 
     populateScope();
     const componentCount = projectComponents().length;
     const projectName = String(getProjectState()?.name || 'Untitled').trim() || 'Untitled';
     if (projectContext) projectContext.textContent = `Project: ${projectName}. ${componentCount} One-Line component(s) available.`;
+    if (runButton) runButton.disabled = componentCount === 0;
+
+    if (!componentCount) {
+      renderReadiness(null, {
+        title: 'Add equipment to the One-Line to begin',
+        summary: 'Arc Flash needs connected project equipment and source/impedance data before it can calculate fault current and incident energy.',
+      });
+      if (status) status.textContent = 'Study blocked: the active project One-Line has no components to analyze.';
+    } else if (latestResults && arcFlashResultEntries(latestResults).length) {
+      const savedFingerprint = latestResults._runMetadata?.sourceFingerprint;
+      const currentFingerprint = fingerprintStudySource(getOneLine());
+      const stale = Boolean(savedFingerprint && savedFingerprint !== currentFingerprint);
+      renderResults(latestResults, scope?.value || 'project');
+      renderReadiness(latestResults, { stale });
+      if (exportButton) exportButton.disabled = stale;
+      if (status) {
+        status.textContent = stale
+          ? 'Saved results loaded, but the One-Line has changed. Rerun before export.'
+          : savedFingerprint
+            ? 'Current saved results loaded. Review required inputs and engineer-review status before export.'
+            : 'Saved results loaded. Source freshness was not recorded; rerun before relying on export.';
+      }
+      if (!savedFingerprint && exportButton) exportButton.disabled = true;
+    } else {
+      renderReadiness();
+    }
 
     form?.addEventListener('submit', async event => {
       event.preventDefault();
@@ -95,8 +165,13 @@ function initializeArcFlashPage() {
       try {
         latestResults = await runArcFlashStudy();
         renderResults(latestResults, scope?.value || 'project');
-        if (exportButton) exportButton.disabled = resultEntries(latestResults).length === 0;
-        if (status) status.textContent = 'Study complete and saved to the active project. Review required inputs before exporting.';
+        const readiness = renderReadiness(latestResults);
+        if (exportButton) exportButton.disabled = readiness.total === 0;
+        if (status) {
+          status.textContent = readiness.incomplete
+            ? `Study saved. ${readiness.incomplete} location(s) need input confirmation; only eligible label drafts will export.`
+            : 'Study saved. Results are calculation-complete; engineer review is still required before field use.';
+        }
       } catch (error) {
         if (status) status.textContent = `Study blocked: ${error.message}`;
         const output = document.getElementById('arcflash-output');
@@ -111,8 +186,8 @@ function initializeArcFlashPage() {
       const exportSummary = generateArcFlashReport(latestResults);
       if (status) {
         status.textContent = exportSummary?.omittedLabelCount
-          ? `Arc-flash report exported; ${exportSummary.omittedLabelCount} incomplete label(s) were withheld.`
-          : 'Arc-flash report and issue-ready labels exported.';
+          ? `Draft report exported; ${exportSummary.omittedLabelCount} incomplete label draft(s) were withheld.`
+          : 'Draft report and calculation-complete label drafts exported. Engineer review is required before field use.';
       }
     });
 }

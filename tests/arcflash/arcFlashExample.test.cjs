@@ -49,6 +49,11 @@ global.localStorage = {
       assert.strictEqual(af.minimumArcRatingCalCm2, 0);
       assert(Math.abs(af.clearingTime - 0.01) < 0.001);
       assert.strictEqual(af.calculationInputs.model, 'IEEE 1584-2018');
+      assert.strictEqual(af.calculationStatus, 'incomplete');
+      assert.strictEqual(af.calculationInputs.clearingTimeSource, 'protective-device-instantaneous-setting');
+      assert.strictEqual(af.calculationInputs.clearingCurveStatus, 'instantaneous');
+      assert.notStrictEqual(af.calculationInputs.protectiveDeviceLibraryStatus, 'calculation_ready');
+      assert(af.requiredInputs.some(input => input.includes('calculation-ready protective-device record')));
       assert.strictEqual(af.nominalVoltage, 480);
       assert.strictEqual(af.workingDistance, 455);
       assert.strictEqual(af.limitedApproach, 1067);

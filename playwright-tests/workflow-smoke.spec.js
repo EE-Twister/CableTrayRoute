@@ -530,6 +530,214 @@ test('core data entry requires a named project outside the test workspace', asyn
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('base:equipment') || '[]'))).toEqual([]);
 });
 
+test('one-line drag recovers a named project when navigation omitted the URL hash', async ({ page }) => {
+  const cloudRequests = [];
+  await page.route('https://supabase.test/**', async route => {
+    const request = route.request();
+    cloudRequests.push({
+      method: request.method(),
+      url: request.url(),
+      body: request.postDataJSON?.() || null
+    });
+    await route.fulfill({
+      status: request.method() === 'POST' ? 201 : 200,
+      contentType: 'application/json',
+      body: request.method() === 'GET' ? '[]' : '{}'
+    });
+  });
+  await page.addInitScript(() => {
+    if (localStorage.getItem('projectContextTestSeeded') === 'true') return;
+    localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem('projectContextTestSeeded', 'true');
+    localStorage.setItem('onelineTourDone', 'true');
+    localStorage.setItem('CTR_SUPABASE_URL', 'https://supabase.test');
+    localStorage.setItem('CTR_SUPABASE_ANON_KEY', 'test-anon-key');
+    localStorage.setItem('ctr-auth-provider', 'supabase');
+    localStorage.setItem('ctr-supabase-access-token', 'test-access-token');
+    localStorage.setItem('ctr-supabase-refresh-token', 'test-refresh-token');
+    localStorage.setItem('authExpiresAt', String(Date.now() + 60 * 60 * 1000));
+    localStorage.setItem('authUser', 'Project Context Tester');
+    localStorage.setItem('ctr-auth-user-id', 'project-context-user');
+    localStorage.setItem('ctr-user-role', 'engineer');
+    localStorage.setItem('ctr_scenarios_v1', JSON.stringify(['base', 'future']));
+    localStorage.setItem('ctr_current_scenario_v1', 'base');
+    localStorage.setItem('CTR_PROJECT_V1', JSON.stringify({
+      schemaVersion: 1,
+      name: 'Recovered One-Line Project',
+      ductbanks: [],
+      conduits: [],
+      trays: [],
+      cables: [],
+      cableTypicals: [],
+      settings: { session: {}, collapsedGroups: {}, units: 'imperial', theme: 'system' }
+    }));
+    localStorage.setItem('CTR_SAVED_PROJECTS_V1', JSON.stringify({
+      'Second Project': {
+        equipment: [{ id: 'eq-second', tag: 'SWBD-SECOND' }],
+        panels: [],
+        loads: [],
+        cables: [],
+        cableTypicals: [],
+        cableTemplates: [],
+        cableTagSettings: {},
+        cableChangeLog: [],
+        workflowArtifacts: {},
+        mccLineups: [],
+        raceways: { trays: [], conduits: [], ductbanks: [] },
+        oneLine: { activeSheet: 0, sheets: [] },
+        __meta: {
+          createdAt: '2026-08-12T00:00:00.000Z',
+          updatedAt: '2026-08-12T00:00:00.000Z'
+        }
+      }
+    }));
+    localStorage.setItem('base:oneLineDiagram', JSON.stringify({
+      activeSheet: 0,
+      sheets: [{
+        name: 'Main',
+        components: [{
+          id: 'MCC-RECOVERED',
+          type: 'mcc',
+          subtype: 'mcc',
+          label: 'MCC-RECOVERED',
+          x: 180,
+          y: 180,
+          width: 80,
+          height: 80,
+          ports: [{ x: 40, y: 0 }, { x: 40, y: 80 }],
+          connections: []
+        }],
+        connections: [],
+        layers: []
+      }]
+    }));
+  });
+
+  await page.goto(server.url('oneline.html'), { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-oneline-ready="1"]');
+  await expect.poll(() => page.evaluate(() => window.currentProjectId)).toBe('Recovered One-Line Project');
+
+  const component = page.locator('g.component[data-id="MCC-RECOVERED"]');
+  await expect(component).toBeVisible();
+  const before = await page.evaluate(() => {
+    const record = window.dataStore.getOneLine().sheets[0].components.find(item => item.id === 'MCC-RECOVERED');
+    return { x: record.x, y: record.y };
+  });
+  await page.evaluate(() => {
+    const svg = document.getElementById('diagram');
+    const node = svg?.querySelector('g.component[data-id="MCC-RECOVERED"]');
+    if (!svg || !node) throw new Error('Seeded One-Line component was not rendered.');
+    const rect = node.getBoundingClientRect();
+    const startX = rect.left + Math.min(20, rect.width / 3);
+    const startY = rect.top + Math.min(20, rect.height / 3);
+    node.dispatchEvent(new MouseEvent('mousedown', {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: startX,
+      clientY: startY
+    }));
+    svg.dispatchEvent(new MouseEvent('mousemove', {
+      bubbles: true,
+      cancelable: true,
+      buttons: 1,
+      clientX: startX + 70,
+      clientY: startY + 35
+    }));
+    svg.dispatchEvent(new MouseEvent('mouseup', {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: startX + 70,
+      clientY: startY + 35
+    }));
+  });
+
+  await expect(page.getByRole('dialog', { name: 'Create New Project' })).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => {
+    const record = window.dataStore.getOneLine().sheets[0].components.find(item => item.id === 'MCC-RECOVERED');
+    return { x: record.x, y: record.y };
+  })).not.toEqual(before);
+  const moved = await page.evaluate(() => {
+    const record = window.dataStore.getOneLine().sheets[0].components.find(item => item.id === 'MCC-RECOVERED');
+    return { x: record.x, y: record.y };
+  });
+  await expect(page.locator('a[href$="#Recovered%20One-Line%20Project"]')).not.toHaveCount(0);
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-oneline-ready="1"]');
+  await expect.poll(() => page.evaluate(() => window.currentProjectId)).toBe('Recovered One-Line Project');
+  await expect.poll(() => page.evaluate(() => {
+    const record = window.dataStore.getOneLine().sheets[0].components.find(item => item.id === 'MCC-RECOVERED');
+    return { x: record.x, y: record.y };
+  })).toEqual(moved);
+  await expect(page.getByRole('dialog', { name: 'Create New Project' })).toHaveCount(0);
+
+  const equipmentHref = await page.locator('a[href^="equipmentlist.html#"]').first().getAttribute('href');
+  expect(equipmentHref).toBe('equipmentlist.html#Recovered%20One-Line%20Project');
+  await page.goto(server.url(equipmentHref), { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => Boolean(window.dataStore));
+  await expect.poll(() => page.evaluate(() => window.currentProjectId)).toBe('Recovered One-Line Project');
+
+  await page.evaluate(() => {
+    window.dataStore.switchScenario('future');
+    window.dataStore.setEquipment([{ id: 'eq-future', tag: 'SWBD-FUTURE' }]);
+  });
+  await expect.poll(() => page.evaluate(() => ({
+    projectId: window.currentProjectId,
+    projectName: JSON.parse(localStorage.getItem('CTR_PROJECT_V1') || '{}').name,
+    scenario: window.dataStore.getCurrentScenario(),
+    futureTags: JSON.parse(localStorage.getItem('future:equipment') || '[]').map(item => item.tag)
+  }))).toEqual({
+    projectId: 'Recovered One-Line Project',
+    projectName: 'Recovered One-Line Project',
+    scenario: 'future',
+    futureTags: ['SWBD-FUTURE']
+  });
+  await page.evaluate(() => window.dataStore.switchScenario('base'));
+
+  await page.evaluate(() => {
+    window.__projectContextSave = window.projectManager.saveProject({ skipManual: true });
+  });
+  await expect(page.getByRole('dialog', { name: 'Project Saved' })).toContainText('successfully saved');
+  await page.getByRole('dialog', { name: 'Project Saved' }).getByRole('button').last().click();
+  await expect.poll(() => cloudRequests.find(request => request.method === 'POST')?.body?.name).toBe('Recovered One-Line Project');
+  await expect.poll(() => page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('CTR_SAVED_PROJECTS_V1') || '{}')))).toContain('Recovered One-Line Project');
+
+  const projectSwitchNavigation = page.waitForNavigation({ waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => {
+    window.__projectContextOpen = window.projectManager.openProjectByName('Second Project');
+  });
+  await projectSwitchNavigation;
+  await page.waitForURL(/#Second%20Project$/);
+  await expect.poll(() => page.evaluate(() => window.dataStore ? ({
+    projectId: window.currentProjectId,
+    projectName: JSON.parse(localStorage.getItem('CTR_PROJECT_V1') || '{}').name,
+    equipmentTags: window.dataStore.getEquipment().map(item => item.tag)
+  }) : null)).toEqual({
+    projectId: 'Second Project',
+    projectName: 'Second Project',
+    equipmentTags: ['SWBD-SECOND']
+  });
+
+  await page.goto(server.url('loadlist.html'), { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => Boolean(window.dataStore));
+  await expect.poll(() => page.evaluate(() => window.currentProjectId)).toBe('Second Project');
+
+  await page.evaluate(() => {
+    window.confirm = () => true;
+    window.__projectContextDelete = window.projectManager.deleteProject('Recovered One-Line Project');
+  });
+  await expect(page.getByRole('dialog', { name: 'Project Deleted' })).toBeVisible();
+  await page.getByRole('dialog', { name: 'Project Deleted' }).getByRole('button').last().click();
+  await expect.poll(() => page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('CTR_SAVED_PROJECTS_V1') || '{}')))).not.toContain('Recovered One-Line Project');
+  await expect.poll(() => cloudRequests.some(request => (
+    request.method === 'DELETE'
+      && new URL(request.url).searchParams.get('name') === 'eq.Recovered One-Line Project'
+  ))).toBe(true);
+});
+
 test('equipment tag changes propagate and deletions surface shared-link diagnostics', async ({ page }) => {
   await page.addInitScript(() => {
     if (localStorage.getItem('lifecycleTestSeeded') === 'true') return;

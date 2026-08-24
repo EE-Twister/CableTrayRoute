@@ -100,8 +100,24 @@ describe('routing project adapter', () => {
         assert.equal(result.ductbankData.ductbanks[0].conduits.length, 1);
         assert.equal(result.ductbankData.ductbanks[0].conduits[0].tray_id, 'DB-1-C01');
         assert.equal(result.ductbankData.ductbanks[0].conduits[0].column, 2);
+        assert.deepEqual(result.ductbankData.ductbanks[0].conduits[0].path, [[0, 0, -3], [100, 0, -3]]);
         assert.deepEqual(result.ductbanksWithoutConduits, ['DB-EMPTY']);
         assert.equal(result.standaloneConduits[0].conduit_id, 'STANDALONE');
+    });
+
+    it('inherits ductbank corridor geometry for embedded spare conduits', () => {
+        const expanded = expandScheduledRaceways([{
+            tag: 'DB-1',
+            start_x: 0, start_y: 5, start_z: -3,
+            end_x: 100, end_y: 5, end_z: -3,
+            conduits: [{ conduit_id: 'SPARE-1', type: 'PVC Sch 40', trade_size: '4' }]
+        }]);
+        const result = normalizeDuctbankSchedule(expanded.ductbanks, expanded.conduits);
+
+        assert.deepEqual(
+            result.ductbankData.ductbanks[0].conduits[0].path,
+            [[0, 5, -3], [100, 5, -3]]
+        );
     });
 
     it('builds tray, ductbank, and standalone-conduit routing geometry with diagnostics', () => {

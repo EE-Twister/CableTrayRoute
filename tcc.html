@@ -80,7 +80,7 @@
 
       <header class="page-header">
         <h1>Time-Current Curves</h1>
-        <p>Plot and compare protective device curves.</p>
+        <p>Review protective-device operation, equipment limits, and coordination margins.</p>
       </header>
       <section id="tcc-context-banner" class="tcc-context-banner hidden" aria-live="polite">
         <div class="tcc-context-main">
@@ -96,14 +96,14 @@
           <div class="device-select-group">
             <span id="device-select-title" class="device-select-title">Devices</span>
             <p id="device-select-hint" class="device-select-hint">Select one or more devices to plot. Use the checkboxes below to toggle curves.</p>
-            <select id="device-select" multiple class="visually-hidden" aria-labelledby="device-select-title" aria-describedby="device-select-hint"></select>
-            <button id="device-modal-btn" type="button" class="device-modal-btn" aria-haspopup="dialog" aria-controls="device-select">
+            <select id="device-select" multiple hidden aria-hidden="true" tabindex="-1"></select>
+            <button id="device-modal-btn" type="button" class="device-modal-btn" aria-haspopup="dialog">
               Choose Devices
             </button>
             <div id="selected-device-summary" class="selected-device-summary" aria-live="polite"></div>
           </div>
           <button id="plot-btn" type="button">Update Plot</button>
-          <button id="auto-coord-btn" type="button" title="Find minimum time dial settings that achieve selective coordination for the plotted devices">Auto-Coordinate</button>
+          <button id="auto-coord-btn" type="button" title="Requires calculation-ready device evidence and a project short-circuit result">Auto-Coordinate</button>
           <button id="add-annotation-btn" type="button" disabled title="Update the plot before adding annotations.">Add Annotation</button>
           <details class="tcc-action-menu">
             <summary>Export</summary>
@@ -113,7 +113,7 @@
             <button id="export-png-btn" type="button" disabled title="Download TCC chart as high-resolution PNG (2×)">Export PNG</button>
             <button id="export-review-btn" type="button" disabled title="Update the plot before exporting the review package.">Export Review</button>
             <button id="export-cti-btn" type="button" class="hidden" title="Download coordination time interval report as CSV">Export CTI Report</button>
-            <button id="export-relay-settings-btn" type="button" disabled title="Update the plot before exporting relay settings.">Export Relay Settings</button>
+            <button id="export-relay-settings-btn" type="button" disabled title="Update the plot before exporting a draft settings package.">Export Settings Draft</button>
             </div>
           </details>
           <details class="tcc-action-menu">
@@ -156,10 +156,30 @@
             </select>
           </label>
         </div>
+        <section id="tcc-readiness-summary" class="tcc-readiness-summary" data-status="empty" aria-labelledby="tcc-readiness-heading" aria-live="polite">
+          <div class="tcc-readiness-copy">
+            <span class="tcc-readiness-eyebrow">Study readiness</span>
+            <h2 id="tcc-readiness-heading">Choose protective devices</h2>
+            <p id="tcc-readiness-detail">Select the exact devices and configurations that define the coordination path.</p>
+          </div>
+          <dl class="tcc-readiness-metrics" aria-label="Selected device evidence summary">
+            <div><dt>Selected</dt><dd id="tcc-readiness-selected">0</dd></div>
+            <div><dt>Calculation-ready</dt><dd id="tcc-readiness-ready">0</dd></div>
+            <div><dt>Review pending</dt><dd id="tcc-readiness-review">0</dd></div>
+            <div><dt>Screening</dt><dd id="tcc-readiness-screening">0</dd></div>
+          </dl>
+          <button id="tcc-readiness-action" type="button" class="btn secondary-btn">Choose devices</button>
+        </section>
         <div id="coord-status-summary" class="coord-status-summary" role="status" aria-live="polite">Choose devices and update the plot.</div>
         <div class="tcc-visualization">
           <div class="tcc-chart-container">
             <svg id="tcc-chart" width="800" height="600" xmlns="http://www.w3.org/2000/svg"></svg>
+            <div id="tcc-chart-empty-state" class="tcc-chart-empty-state">
+              <span class="tcc-chart-empty-kicker">Plot workspace</span>
+              <h2>Generate the current curve comparison</h2>
+              <p>Update the plot to load the selected curve data, inspect published domains, and enable coordination checks and exports.</p>
+              <button id="tcc-chart-empty-action" type="button" class="btn primary-btn">Update Plot</button>
+            </div>
             <div id="tcc-hover-tooltip" class="tcc-hover-tooltip" aria-hidden="true"></div>
           </div>
           <aside class="tcc-oneline-preview empty" aria-labelledby="oneline-preview-title" aria-live="polite">

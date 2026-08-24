@@ -21,6 +21,10 @@ import { interpolateTime } from '../analysis/tccAutoCoord.mjs';
 export const CTI_HEADERS = [
   'Upstream Device',
   'Downstream Device',
+  'Study Readiness',
+  'Fault Current Source',
+  'Input Fingerprint',
+  'Intended Use',
   'Test Current (A)',
   'Upstream Time (s)',
   'Downstream Time (s)',
@@ -56,7 +60,7 @@ const TEST_FRACTIONS = [1.0, 0.6, 0.25, 0.1, 0.05];
  *   One row object per (device pair × test-current level). Returns [] for
  *   fewer than 2 devices or invalid inputs.
  */
-export function buildCTIRows(deviceEntries, coordResult, faultCurrentA, margin = 0.3) {
+export function buildCTIRows(deviceEntries, coordResult, faultCurrentA, margin = 0.3, { studyContext = {} } = {}) {
   if (
     !Array.isArray(deviceEntries) ||
     deviceEntries.length < 2 ||
@@ -107,6 +111,10 @@ export function buildCTIRows(deviceEntries, coordResult, faultCurrentA, margin =
       rows.push({
         'Upstream Device': upstreamEntry.id,
         'Downstream Device': downstreamEntry.id,
+        'Study Readiness': studyContext.provenance?.heading || '',
+        'Fault Current Source': studyContext.faultCurrentSource || '',
+        'Input Fingerprint': studyContext.provenance?.inputFingerprint || '',
+        'Intended Use': studyContext.provenance?.intendedUse || '',
         'Test Current (A)': testCurrent.toFixed(1),
         'Upstream Time (s)': upTime.toFixed(4),
         'Downstream Time (s)': downTime.toFixed(4),

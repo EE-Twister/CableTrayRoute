@@ -13,6 +13,7 @@
  */
 
 import { scaleCurve } from './tccUtils.js';
+import { evaluateTimeCurrentCurve } from './timeCurrentCurve.mjs';
 
 const MIN_TIME = 1e-4;
 const TIME_DIAL_MIN = 0.05;
@@ -46,36 +47,11 @@ function dialOverrideKey(device) {
  * @returns {number} Interpolated time [s], never below MIN_TIME
  */
 export function interpolateTime(curve, current) {
-  if (!Array.isArray(curve) || !curve.length || !Number.isFinite(current) || current <= 0) {
-    return MIN_TIME;
-  }
-  const first = curve[0];
-  if (!first || first.current >= current) {
-    return Math.max(first?.time ?? MIN_TIME, MIN_TIME);
-  }
-  for (let i = 1; i < curve.length; i += 1) {
-    const prev = curve[i - 1];
-    const next = curve[i];
-    if (!next) continue;
-    if (current <= next.current) {
-      const prevC = Math.max(prev.current, MIN_TIME);
-      const nextC = Math.max(next.current, MIN_TIME);
-      if (Math.abs(nextC - prevC) < 1e-12) {
-        return Math.max(Math.min(prev.time, next.time), MIN_TIME);
-      }
-      const logPrevC = Math.log(prevC);
-      const logNextC = Math.log(nextC);
-      const span = logNextC - logPrevC;
-      const ratio = span === 0 ? 0 : (Math.log(current) - logPrevC) / span;
-      const clampedRatio = Number.isFinite(ratio) ? Math.min(Math.max(ratio, 0), 1) : 0;
-      const logPrevT = Math.log(Math.max(prev.time, MIN_TIME));
-      const logNextT = Math.log(Math.max(next.time, MIN_TIME));
-      const interpolated = logPrevT + clampedRatio * (logNextT - logPrevT);
-      return Math.max(Math.exp(interpolated), MIN_TIME);
-    }
-  }
-  const last = curve[curve.length - 1];
-  return Math.max(last?.time ?? MIN_TIME, MIN_TIME);
+  const evaluation = evaluateTimeCurrentCurve(curve, current, {
+    boundary: 'lower',
+    outOfRange: 'clamp',
+  });
+  return Math.max(evaluation.time ?? MIN_TIME, MIN_TIME);
 }
 
 /**
@@ -111,7 +87,7 @@ export function generateFaultCurrents(start, end, n = LOG_SPACE_POINTS) {
  * @param {object} downstreamScaled - Return value of scaleCurve() for the downstream device
  * @param {number[]} testCurrents - Array of fault current levels to test [A]
  * @param {number} [margin=0.3] - Required time separation [s]
- * @returns {{ coordinated: boolean, violations: Array<{current, upstreamMinTime, downstreamMaxTime, gap}> }}
+ * @returns {{ coordinated: boolean, violations: Array<{current, upstreamMinTime, downstreamMaxTime, gap}>, unevaluated: Array, comparisonCount: number }}
  */
 export function checkCoordination(upstreamScaled, downstreamScaled, testCurrents, margin = DEFAULT_MARGIN) {
   const upMin = upstreamScaled?.minCurve ?? upstreamScaled?.curve ?? [];
@@ -119,14 +95,38 @@ export function checkCoordination(upstreamScaled, downstreamScaled, testCurrents
   const safeMargin = Number.isFinite(margin) ? margin : DEFAULT_MARGIN;
 
   if (!Array.isArray(testCurrents) || !testCurrents.length) {
-    return { coordinated: false, violations: [] };
+    return { coordinated: false, violations: [], unevaluated: [], comparisonCount: 0 };
   }
 
   const violations = [];
+  const unevaluated = [];
+  let comparisonCount = 0;
   for (const I of testCurrents) {
     if (!Number.isFinite(I) || I <= 0) continue;
-    const upTime = interpolateTime(upMin, I);
-    const downTime = interpolateTime(downMax, I);
+    const upstreamEvaluation = evaluateTimeCurrentCurve(upMin, I, {
+      boundary: 'lower',
+      outOfRange: 'reject',
+    });
+    const downstreamEvaluation = evaluateTimeCurrentCurve(downMax, I, {
+      boundary: 'upper',
+      outOfRange: 'reject',
+    });
+    // Below the downstream pickup/curve domain, the downstream device does not
+    // operate and there is no selective-coordination comparison to make.
+    if (downstreamEvaluation.status === 'below-domain') continue;
+    const upTime = upstreamEvaluation.time;
+    const downTime = downstreamEvaluation.time;
+    if (!Number.isFinite(upTime) || !Number.isFinite(downTime)) {
+      unevaluated.push({
+        current: I,
+        upstreamStatus: upstreamEvaluation.status,
+        downstreamStatus: downstreamEvaluation.status,
+        upstreamDomain: upstreamEvaluation.domain,
+        downstreamDomain: downstreamEvaluation.domain,
+      });
+      continue;
+    }
+    comparisonCount += 1;
     // Only check where the downstream device actually trips (above MIN_TIME floor)
     if (downTime <= MIN_TIME * 2) continue;
     if (upTime < downTime + safeMargin) {
@@ -138,7 +138,12 @@ export function checkCoordination(upstreamScaled, downstreamScaled, testCurrents
       });
     }
   }
-  return { coordinated: violations.length === 0, violations };
+  return {
+    coordinated: comparisonCount > 0 && violations.length === 0 && unevaluated.length === 0,
+    violations,
+    unevaluated,
+    comparisonCount,
+  };
 }
 
 /**
@@ -161,7 +166,13 @@ export function findCoordinatingTimeDial(device, currentOverrides, downstreamSca
   const scaledHi = scaleCurve(device, { ...overrides, [dialKey]: TIME_DIAL_MAX });
   const checkHi = checkCoordination(scaledHi, downstreamScaled, testCurrents, margin);
   if (!checkHi.coordinated) {
-    return { found: false, timeDial: TIME_DIAL_MAX, scaledResult: scaledHi, violations: checkHi.violations };
+    return {
+      found: false,
+      timeDial: TIME_DIAL_MAX,
+      scaledResult: scaledHi,
+      violations: checkHi.violations,
+      unevaluated: checkHi.unevaluated,
+    };
   }
 
   // Quick check: is the minimum dial already coordinated?

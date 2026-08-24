@@ -1,0 +1,201 @@
+.tcc-readiness-summary {
+    display: grid;
+    grid-template-columns: minmax(18rem, 1fr) auto auto;
+    align-items: center;
+    gap: 0.85rem 1rem;
+    margin-top: 1rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--border-color, #d1d5db);
+    border-left-width: 4px;
+    border-radius: 8px;
+    background: var(--secondary-color, #f8fafc);
+}
+
+.tcc-readiness-summary[data-status="empty"] {
+    border-left-color: #64748b;
+}
+
+.tcc-readiness-summary[data-status="screening"],
+.tcc-readiness-summary[data-status="review"] {
+    border-color: rgba(217, 119, 6, 0.35);
+    border-left-color: #d97706;
+    background: rgba(217, 119, 6, 0.07);
+}
+
+.tcc-readiness-summary[data-status="ready"] {
+    border-color: rgba(21, 128, 61, 0.35);
+    border-left-color: #15803d;
+    background: rgba(21, 128, 61, 0.07);
+}
+
+.tcc-readiness-copy {
+    min-width: 0;
+}
+
+.tcc-readiness-eyebrow,
+.tcc-chart-empty-kicker {
+    display: block;
+    margin-bottom: 0.2rem;
+    color: var(--text-muted, #64748b);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.tcc-readiness-copy h2,
+.tcc-chart-empty-state h2 {
+    margin: 0;
+    color: var(--text-color, #212529);
+    font-size: 1rem;
+    line-height: 1.25;
+}
+
+.tcc-readiness-copy p,
+.tcc-chart-empty-state p {
+    margin: 0.25rem 0 0;
+    color: var(--text-muted, #64748b);
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+
+.tcc-readiness-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(5.2rem, 1fr));
+    gap: 0.4rem;
+    margin: 0;
+}
+
+.tcc-readiness-metrics > div {
+    min-width: 0;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid color-mix(in srgb, var(--border-color, #d1d5db) 82%, transparent);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--color-surface, #ffffff) 82%, transparent);
+    text-align: center;
+}
+
+.tcc-readiness-metrics dt,
+.tcc-readiness-metrics dd {
+    margin: 0;
+}
+
+.tcc-readiness-metrics dt {
+    color: var(--text-muted, #64748b);
+    font-size: 0.66rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.tcc-readiness-metrics dd {
+    margin-top: 0.12rem;
+    color: var(--text-color, #212529);
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.tcc-readiness-summary > button {
+    min-width: 10rem;
+    margin: 0;
+    white-space: nowrap;
+}
+
+body.dark-mode .tcc-readiness-summary {
+    background: #1f2226;
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+body.dark-mode .tcc-readiness-summary[data-status="screening"],
+body.dark-mode .tcc-readiness-summary[data-status="review"] {
+    border-left-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.12);
+}
+
+body.dark-mode .tcc-readiness-summary[data-status="ready"] {
+    border-left-color: #22c55e;
+    background: rgba(34, 197, 94, 0.12);
+}
+
+body.dark-mode .tcc-readiness-metrics > div {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.14);
+}
+
+.tcc-chart-empty-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding: 2rem;
+    border: 1px dashed color-mix(in srgb, var(--border-color, #d1d5db) 88%, transparent);
+    border-radius: 8px;
+    background:
+        radial-gradient(circle at 50% 42%, rgba(13, 110, 253, 0.08), transparent 38%),
+        var(--secondary-color, #f8fafc);
+    text-align: center;
+}
+
+#tcc-chart:not(:empty) + .tcc-chart-empty-state {
+    display: none;
+}
+
+.tcc-chart-empty-state p {
+    max-width: 32rem;
+}
+
+.tcc-chart-empty-state button {
+    align-self: center;
+    width: auto;
+    min-width: 10rem;
+    margin: 1rem 0 0;
+    padding-inline: 1.25rem;
+}
+
+body.dark-mode .tcc-chart-empty-state {
+    border-color: rgba(255, 255, 255, 0.2);
+    background:
+        radial-gradient(circle at 50% 42%, rgba(59, 130, 246, 0.14), transparent 38%),
+        #171a1f;
+}
+
+@media (max-width: 860px) {
+    .tcc-readiness-summary {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    .tcc-readiness-summary > button {
+        width: 100%;
+    }
+}
+
+@media (max-width: 760px) {
+    .tcc-readiness-summary {
+        order: 2;
+        margin-top: 0;
+        padding: 0.75rem;
+    }
+
+    .tcc-readiness-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .tcc-study-card .tcc-controls {
+        order: 1;
+    }
+
+    .tcc-study-card .coord-status-summary {
+        order: 3;
+    }
+
+    .tcc-study-card .tcc-visualization {
+        order: 4;
+    }
+
+    .tcc-study-card .tcc-supporting-panels {
+        order: 5;
+    }
+}

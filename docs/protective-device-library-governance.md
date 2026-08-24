@@ -8,6 +8,23 @@ The TCC selector's **Filters** group can isolate calculation-ready,
 source-verified, standards-reference, or screening-only library records before
 curves are selected.
 
+The main TCC workspace repeats that evidence boundary in a persistent **Study
+readiness** summary. Counts distinguish calculation-ready, review-pending, and
+screening selections before the plot is generated. Screening or unassessed
+curves remain available for preliminary comparison, but the page explicitly
+excludes them from issued settings and arc-flash clearing-time use.
+
+The same gate controls study actions. **Auto-Coordinate** requires at least two
+calculation-ready protective-device records plus a positive three-phase fault
+current from the active component's Short Circuit study; the TCC workflow does
+not substitute an assumed fault current. **Export Settings Draft** includes only
+selected calculation-ready, settings-bearing devices. Review-package HTML,
+coordination CSV, and settings manifests preserve the readiness boundary,
+fault-current source, exact device identity, curve provenance, intended-use
+statement, and a deterministic fingerprint of the TCC input basis. These files
+remain drafts for qualified human and vendor review, not approval or issued
+settings.
+
   The Library Manager initially loads the compact governed inventory rather than
   every curve and source record. Selecting a device name loads that device's full
   record from its catalog shard and opens the detailed rating and curve summary.
@@ -71,6 +88,28 @@ templates for new research.
 | Standards reference | Uses a published IEC 60255 inverse-time equation family. Verify settings and the associated breaker or recloser before issuing a study. |
 | Screening only | Supports preliminary comparison only. The exact manufacturer curve/configuration must be checked before issued calculations, protection settings, or arc-flash clearing times. |
 
+## Curve evaluation policy
+
+Time-current points are evaluated in log-current/log-time space. The point
+array may retain duplicate-current coordinates and near-vertical segments:
+
+- at an exact duplicate current, the lower boundary selects the shortest time
+  and the upper boundary selects the longest time;
+- an interpolated segment enters the upper end of a vertical segment from the
+  left and leaves its lower end to the right;
+- arc-flash duration uses the upper/total-clearing boundary and does not
+  extrapolate beyond the recorded current domain; and
+- automatic coordination uses the upstream lower/minimum-melt boundary and
+  downstream upper/total-clearing boundary. It reports the comparison as
+  unevaluated, not coordinated, when a sampled operating current is above a
+  required curve domain. Currents below the downstream pickup are not trip
+  comparisons.
+
+The bounded evaluator preserves source geometry but does not make a reduced or
+unreviewed curve calculation-ready. Arc-flash results driven by a record below
+`calculation_ready`, or by a 0.2 s fallback outside the curve domain, carry an
+unresolved required input and are withheld from label eligibility.
+
 ## Promotion gate
 
 A device may declare `libraryStatus: "calculation_ready"` only when it includes:
@@ -105,6 +144,15 @@ ratings, settings, or curves.
 Unknown values must remain null, empty arrays, or empty objects and must be
 listed in `missingForProduction`. Research agents must not infer interrupting
 ratings, withstand ratings, curve bands, settings, or reviewer approval.
+
+Manufacturer tolerance statements that are not symmetric time multipliers must
+use `tolerance.profileSemantics`. Each entry identifies the affected profile,
+the plotted test-point boundary, variation axis and direction, any explicitly
+published percentage, the operational boundary, and the source ID. A missing
+percentage stays null. In particular, a statement such as "all variations are
+minus" must not be converted into an assumed symmetric percentage or a
+`timeLower`/`timeUpper` band. The legacy numeric time multipliers remain
+available only for sources that actually publish or support that representation.
 
 ## Recording reviewed custom curves
 
@@ -144,6 +192,12 @@ source documents and exact configurations are pinned. The IEC 60255 equation
 entries are standards references. The research inventory in
 [`protective-device-library-research.md`](protective-device-library-research.md)
 identifies source-backed candidates; it is not a substitute for promotion.
+
+The S&C SMU-20 technical reconstruction in
+[`protective-device-source-geometry-smu20-2026-08-12.json`](protective-device-source-geometry-smu20-2026-08-12.json)
+is likewise non-canonical. It demonstrates lossless source-point capture and
+boundary-aware evaluation only; it is not a governed promotion record or human
+approval.
 
 ## Project manufacturer-catalog imports
 
