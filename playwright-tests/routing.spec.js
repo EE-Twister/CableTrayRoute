@@ -76,6 +76,16 @@ test.describe('Optimal Route', () => {
     await expect(page.locator('#allow-hand-pulls')).toBeChecked();
     await expect(page.locator('#hand-pull-max-length')).toHaveValue('25');
     await expect(page.locator('#hand-pull-max-tension')).toHaveValue('200');
+    await expect(page.locator('#pull-cable-limit-source')).toBeVisible();
+    await expect(page.locator('#pull-bend-geometry-confirmed')).not.toBeChecked();
+    await expect(page.locator('#pull-bend-geometry-source')).toBeVisible();
+    await expect(page.locator('#pull-equipment-ratings-source')).toBeVisible();
+    await expect(page.locator('#pull-point-access-source')).toBeVisible();
+    await page.locator('#pull-cable-limit-source').fill('Manufacturer pull sheet MPS-101 Rev 2');
+    await page.locator('#pull-bend-geometry-source').fill('Issued route model RM-04');
+    await page.locator('#pull-bend-geometry-confirmed').check();
+    await page.locator('#pull-equipment-ratings-source').fill('Pulling equipment register PER-12');
+    await page.locator('#pull-point-access-source').fill('Site access walkdown SAW-03');
     await page.locator('#pull-max-length').fill('100');
     await page.click('#calculate-route-btn');
     await page.waitForFunction(() => (
@@ -209,10 +219,22 @@ test.describe('Optimal Route', () => {
     await expect(page.locator('.pull-group-separate')).toHaveAttribute('open', '');
     await expect(page.locator('.pull-group-separate-list > div').first()).toContainText('Cable');
     await expect(page.locator('.pull-group-separate-list > div').first().locator('p')).not.toBeEmpty();
-    await expect(page.locator('.pull-check-guidance')).toContainText('Setup locations are already calculated');
+    await expect(page.locator('.pull-check-guidance').filter({ hasText: 'Setup locations are already calculated' })).toBeVisible();
     const cableOnePullPlan = page.locator('#pull-checks-container [data-pull-route="Cable 01"]');
-    await expect(cableOnePullPlan).toContainText('3 setups required');
-    await expect(cableOnePullPlan).toContainText('tugger');
+    await expect(cableOnePullPlan).toContainText('Evidence incomplete');
+    await expect(cableOnePullPlan).toContainText('minimum bend radius');
+    await expect(page.locator('.pull-field-plan .pull-check-guidance')).toContainText('Constructability evidence: incomplete');
+    await expect(page.locator('.pull-field-plan .pull-check-guidance')).toContainText('Signature');
+    const accessRows = page.locator('.pull-access-table [data-pull-access-record]');
+    const accessPointCount = await accessRows.count();
+    expect(accessPointCount).toBeGreaterThanOrEqual(2);
+    await expect(page.locator('.pull-access-records')).toContainText(`0/${accessPointCount} confirmed`);
+    for (let index = 0; index < accessPointCount; index += 1) {
+      await accessRows.nth(index).locator('[data-pull-access-status]').selectOption('confirmed');
+    }
+    await page.locator('[data-save-pull-access="0"]').click();
+    await expect(page.locator('.pull-access-records')).toContainText(`${accessPointCount}/${accessPointCount} confirmed`);
+    await expect(page.locator('.pull-field-plan .pull-check-guidance')).toContainText(`${accessPointCount}/${accessPointCount} points confirmed`);
     await expect(cableOnePullPlan.getByRole('button', { name: /Show 3 setup locations/ })).toBeVisible();
     await page.locator('#pull-setups-toggle').uncheck();
     await page.locator('#labels-toggle').uncheck();

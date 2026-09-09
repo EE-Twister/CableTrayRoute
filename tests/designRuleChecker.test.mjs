@@ -36,6 +36,7 @@ function makeTray(id, fillSqIn, widthIn = 12, depthIn = 4, opts = {}) {
     tray_id: id,
     inside_width: widthIn,
     tray_depth: depthIn,
+    tray_type: 'Ladder',
     current_fill: fillSqIn,
     allowed_cable_group: opts.allowed_cable_group ?? '',
     ...opts,
@@ -53,6 +54,28 @@ function makeCable(name, opts = {}) {
     allowed_cable_group: opts.allowed_cable_group ?? '',
     ground_size: opts.ground_size ?? null,
     ...opts,
+  };
+}
+
+function makeFillCable(name, areaIn2, opts = {}) {
+  return makeCable(name, {
+    conductors: 3,
+    conductor_size: '#2 AWG',
+    cable_area: areaIn2,
+    ...opts,
+  });
+}
+
+function acceptanceFor(input, note = 'Reviewed project exception', extra = {}) {
+  const finding = runDRC(input).findings.find(item => item.ruleId === 'DRC-01');
+  assert.ok(finding, 'Expected DRC-01 finding for acceptance fixture');
+  return {
+    key: finding.acceptedKey,
+    signature: finding.acceptedSignature,
+    ruleId: finding.ruleId,
+    location: finding.location,
+    note,
+    ...extra,
   };
 }
 
@@ -100,41 +123,42 @@ describe('trayFillPercent()', () => {
 // DRC-01 — Tray fill
 // ---------------------------------------------------------------------------
 describe('DRC-01 Tray Fill', () => {
-  it('raises ERROR when fill > 40 %', () => {
-    // 12" × 4" = 48 in²; 40 % = 19.2; use 20 in² → 41.7 %
-    const trays = [makeTray('T1', 20, 12, 4)];
-    const { findings, summary } = runDRC({ trays, cables: [], trayCableMap: {} });
+  it('raises ERROR when selected Article 392 allowance is exceeded', () => {
+    const trays = [makeTray('T1', 14.1, 12, 4)];
+    const assigned = makeFillCable('C1', 14.1);
+    const { findings, summary } = runDRC({ trays, cables: [assigned], trayCableMap: { T1: [assigned] } });
     const drc01 = findings.filter(f => f.ruleId === 'DRC-01');
     assert.ok(drc01.length > 0, 'Expected DRC-01 finding');
     assert.strictEqual(drc01[0].severity, DRC_SEVERITY.ERROR);
+    assert.match(drc01[0].reference, /Column 1/);
     assert.ok(summary.errors >= 1);
   });
 
-  it('raises WARNING when fill is 36–40 %', () => {
-    // 37.5 % = 18 in² of 48 in²
-    const trays = [makeTray('T1', 18, 12, 4)];
-    const { findings } = runDRC({ trays, cables: [], trayCableMap: {} });
+  it('raises WARNING when selected Article 392 allowance is within 10 %', () => {
+    const trays = [makeTray('T1', 13, 12, 4)];
+    const assigned = makeFillCable('C1', 13);
+    const { findings } = runDRC({ trays, cables: [assigned], trayCableMap: { T1: [assigned] } });
     const warns = findings.filter(f => f.ruleId === 'DRC-01' && f.severity === DRC_SEVERITY.WARNING);
     assert.ok(warns.length > 0, 'Expected DRC-01 WARNING for near-limit fill');
   });
 
   it('no finding when fill is within limit', () => {
-    // 30 % = 14.4 in²
-    const trays = [makeTray('T1', 14.4, 12, 4)];
-    const { findings } = runDRC({ trays, cables: [], trayCableMap: {} });
+    const trays = [makeTray('T1', 10, 12, 4)];
+    const assigned = makeFillCable('C1', 10);
+    const { findings } = runDRC({ trays, cables: [assigned], trayCableMap: { T1: [assigned] } });
     const drc01 = findings.filter(f => f.ruleId === 'DRC-01');
     assert.strictEqual(drc01.length, 0);
   });
 
-  it('respects custom fillLimit option', () => {
-    // 45 % normally OK at 40 % limit, but should ERROR at 44 % custom limit
+  it('labels aggregate custom fillLimit checks as project screening', () => {
     const trays = [makeTray('T1', 21.6, 12, 4)]; // 21.6/48 = 45 %
     const { findings } = runDRC(
       { trays, cables: [], trayCableMap: {} },
       { fillLimit: 0.44 }
     );
-    const drc01 = findings.filter(f => f.ruleId === 'DRC-01' && f.severity === DRC_SEVERITY.ERROR);
-    assert.ok(drc01.length > 0, 'Expected ERROR with custom limit 44 %');
+    const drc01 = findings.filter(f => f.ruleId === 'DRC-01' && f.severity === DRC_SEVERITY.WARNING);
+    assert.ok(drc01.length > 0, 'Expected project-screening warning with custom target 44 %');
+    assert.match(drc01[0].reference, /not an Article 392/i);
   });
 });
 
@@ -564,20 +588,22 @@ describe('Summary', () => {
   });
 
   it('passed=false when errors exist', () => {
-    const trays = [makeTray('T1', 30, 12, 4)]; // 62.5 % fill → ERROR
-    const { summary } = runDRC({ trays, cables: [], trayCableMap: {} });
+    const trays = [makeTray('T1', 15, 12, 4)];
+    const assigned = makeFillCable('C1', 15);
+    const { summary } = runDRC({ trays, cables: [assigned], trayCableMap: { T1: [assigned] } });
     assert.strictEqual(summary.passed, false);
     assert.ok(summary.errors > 0);
   });
 
   it('counts all severities correctly', () => {
     // One fill error, one unrouted info
-    const trays = [makeTray('T1', 25, 12, 4)]; // >40 % → error
-    const cables = [makeCable('C_unrouted')];
+    const trays = [makeTray('T1', 15, 12, 4)];
+    const routed = makeFillCable('C_routed', 15);
+    const cables = [routed, makeCable('C_unrouted')];
     const { summary } = runDRC({
       trays,
       cables,
-      trayCableMap: {},
+      trayCableMap: { T1: [routed] },
     }, { skipGrounding: true, skipAmpacity: true });
     assert.ok(summary.errors >= 1, 'Expected at least 1 error');
     assert.ok(summary.info >= 1,   'Expected at least 1 info (unrouted cable)');
@@ -596,18 +622,20 @@ describe('formatDrcReport()', () => {
   });
 
   it('includes FAILED when errors present', () => {
-    const trays = [makeTray('T1', 25, 12, 4)];
-    const result = runDRC({ trays, cables: [], trayCableMap: {} });
+    const trays = [makeTray('T1', 15, 12, 4)];
+    const assigned = makeFillCable('C1', 15);
+    const result = runDRC({ trays, cables: [assigned], trayCableMap: { T1: [assigned] } });
     const report = formatDrcReport(result);
     assert.ok(report.includes('FAILED'), 'Report should include FAILED');
     assert.ok(report.includes('DRC-01'), 'Report should include DRC-01');
   });
 
   it('includes rule references', () => {
-    const trays = [makeTray('T1', 25, 12, 4)];
-    const result = runDRC({ trays, cables: [], trayCableMap: {} });
+    const trays = [makeTray('T1', 15, 12, 4)];
+    const assigned = makeFillCable('C1', 15);
+    const result = runDRC({ trays, cables: [assigned], trayCableMap: { T1: [assigned] } });
     const report = formatDrcReport(result);
-    assert.ok(report.includes('NEC 392.22'), 'Report should cite NEC reference');
+    assert.ok(report.includes('NFPA 70 (NEC) 2023 392.22'), 'Report should cite the edition-pinned NEC reference');
   });
 
   it('includes remediation guidance in formatted report', () => {
@@ -624,8 +652,9 @@ describe('formatDrcReport()', () => {
 // ---------------------------------------------------------------------------
 describe('Remediation guidance', () => {
   it('DRC-01 finding includes non-empty remediation text', () => {
-    const trays = [makeTray('T1', 25, 12, 4)]; // >40% fill → error
-    const { findings } = runDRC({ trays, cables: [], trayCableMap: {} });
+    const trays = [makeTray('T1', 15, 12, 4)];
+    const assigned = makeFillCable('C1', 15);
+    const { findings } = runDRC({ trays, cables: [assigned], trayCableMap: { T1: [assigned] } });
     const drc01 = findings.find(f => f.ruleId === 'DRC-01');
     assert.ok(drc01, 'Expected DRC-01 finding');
     assert.ok(typeof drc01.remediation === 'string' && drc01.remediation.length > 0,
@@ -668,10 +697,11 @@ describe('Remediation guidance', () => {
 // ---------------------------------------------------------------------------
 describe('runDRC — accepted findings', () => {
   it('marks a finding as accepted when its key matches acceptedFindings option', () => {
-    // 12" × 4" = 48 in²; 20 in² → 41.7 % → triggers DRC-01 ERROR
-    const trays = [makeTray('T1', 20, 12, 4)];
-    const result = runDRC({ trays, cables: [], trayCableMap: {} }, {
-      acceptedFindings: [{ key: 'DRC-01:T1', signature: 'DRC-01|T1|error|Tray fill 41.7 % exceeds NEC 392.22(A) limit of 40 %.|Inside width: 12 in, depth: 4 in, fill: 20.00 in².|NEC 392.22(A)|Widen or deepen the tray, add a parallel tray segment, or use the Optimal Route page to reroute cables to adjacent trays with available capacity.', ruleId: 'DRC-01', location: 'T1', note: 'Approved per EE-001' }],
+    const trays = [makeTray('T1', 15, 12, 4)];
+    const assigned = makeFillCable('C1', 15);
+    const input = { trays, cables: [assigned], trayCableMap: { T1: [assigned] } };
+    const result = runDRC(input, {
+      acceptedFindings: [acceptanceFor(input, 'Approved per EE-001')],
     });
     const finding = result.findings.find(f => f.ruleId === 'DRC-01' && f.location === 'T1');
     assert.ok(finding, 'DRC-01 finding should exist');
@@ -680,9 +710,11 @@ describe('runDRC — accepted findings', () => {
   });
 
   it('summary.passed is true when all errors are accepted', () => {
-    const trays = [makeTray('T1', 20, 12, 4)];
-    const result = runDRC({ trays, cables: [], trayCableMap: {} }, {
-      acceptedFindings: [{ key: 'DRC-01:T1', signature: 'DRC-01|T1|error|Tray fill 41.7 % exceeds NEC 392.22(A) limit of 40 %.|Inside width: 12 in, depth: 4 in, fill: 20.00 in².|NEC 392.22(A)|Widen or deepen the tray, add a parallel tray segment, or use the Optimal Route page to reroute cables to adjacent trays with available capacity.', ruleId: 'DRC-01', location: 'T1', note: 'OK' }],
+    const trays = [makeTray('T1', 15, 12, 4)];
+    const assigned = makeFillCable('C1', 15);
+    const input = { trays, cables: [assigned], trayCableMap: { T1: [assigned] } };
+    const result = runDRC(input, {
+      acceptedFindings: [acceptanceFor(input, 'OK')],
     });
     assert.strictEqual(result.summary.errors, 0);
     assert.strictEqual(result.summary.accepted, 1);
@@ -691,11 +723,21 @@ describe('runDRC — accepted findings', () => {
 
   it('summary.accepted counts only accepted findings, unaccepted errors remain', () => {
     const trays = [
-      makeTray('T1', 20, 12, 4), // overfill → DRC-01 ERROR
-      makeTray('T2', 20, 12, 4), // overfill → DRC-01 ERROR
+      makeTray('T1', 15, 12, 4),
+      makeTray('T2', 15, 12, 4),
     ];
-    const result = runDRC({ trays, cables: [], trayCableMap: {} }, {
-      acceptedFindings: [{ key: 'DRC-01:T1', signature: 'DRC-01|T1|error|Tray fill 41.7 % exceeds NEC 392.22(A) limit of 40 %.|Inside width: 12 in, depth: 4 in, fill: 20.00 in².|NEC 392.22(A)|Widen or deepen the tray, add a parallel tray segment, or use the Optimal Route page to reroute cables to adjacent trays with available capacity.', ruleId: 'DRC-01', location: 'T1', note: 'OK' }],
+    const cable1 = makeFillCable('C1', 15);
+    const cable2 = makeFillCable('C2', 15);
+    const input = { trays, cables: [cable1, cable2], trayCableMap: { T1: [cable1], T2: [cable2] } };
+    const firstFinding = runDRC(input).findings.find(item => item.ruleId === 'DRC-01' && item.location === 'T1');
+    const result = runDRC(input, {
+      acceptedFindings: [{
+        key: firstFinding.acceptedKey,
+        signature: firstFinding.acceptedSignature,
+        ruleId: firstFinding.ruleId,
+        location: firstFinding.location,
+        note: 'OK',
+      }],
     });
     assert.strictEqual(result.summary.accepted, 1);
     assert.strictEqual(result.summary.errors, 1);   // T2 still an error
@@ -703,8 +745,9 @@ describe('runDRC — accepted findings', () => {
   });
 
   it('non-matching key does not mark finding as accepted', () => {
-    const trays = [makeTray('T1', 20, 12, 4)];
-    const result = runDRC({ trays, cables: [], trayCableMap: {} }, {
+    const trays = [makeTray('T1', 15, 12, 4)];
+    const assigned = makeFillCable('C1', 15);
+    const result = runDRC({ trays, cables: [assigned], trayCableMap: { T1: [assigned] } }, {
       acceptedFindings: [{ key: 'DRC-01:T9', signature: 'x', ruleId: 'DRC-01', location: 'T9', note: 'Wrong tray' }],
     });
     const finding = result.findings.find(f => f.ruleId === 'DRC-01');
@@ -712,8 +755,9 @@ describe('runDRC — accepted findings', () => {
   });
 
   it('does not accept finding when signature mismatches', () => {
-    const trays = [makeTray('T1', 20, 12, 4)];
-    const result = runDRC({ trays, cables: [], trayCableMap: {} }, {
+    const trays = [makeTray('T1', 15, 12, 4)];
+    const assigned = makeFillCable('C1', 15);
+    const result = runDRC({ trays, cables: [assigned], trayCableMap: { T1: [assigned] } }, {
       acceptedFindings: [{ key: 'DRC-01:T1', signature: 'DRC-01|T1|error|old message', note: 'Stale acceptance' }],
     });
     const finding = result.findings.find(f => f.ruleId === 'DRC-01' && f.location === 'T1');
@@ -757,27 +801,31 @@ describe('traySlotFillPercent()', () => {
 // ---------------------------------------------------------------------------
 describe('DRC-01 Per-Slot Fill', () => {
   it('raises ERROR for an overfilled individual slot in a 2-slot tray', () => {
-    // 12" × 4" = 48 in²; 2 slots → 24 in² per slot; 40 % limit = 9.6 in²
-    // slot 0: 15 in² → 62.5 % (overfilled), slot 1: 0 in²
     const tray = {
       ...makeTray('T_SLOT', 0, 12, 4),
       num_slots: 2,
-      slotFills: [15, 0],
+      slot_groups: '{"0":"power","1":"control"}',
     };
-    const { findings } = runDRC({ trays: [tray], cables: [], trayCableMap: {} });
+    const assigned = makeFillCable('C1', 7.1, { allowed_cable_group: 'power', slot_index: 0 });
+    const { findings } = runDRC({ trays: [tray], cables: [assigned], trayCableMap: { T_SLOT: [assigned] } });
     const drc01 = findings.filter(f => f.ruleId === 'DRC-01' && f.severity === DRC_SEVERITY.ERROR);
     assert.ok(drc01.length > 0, 'Expected DRC-01 ERROR for overfilled slot 0');
     assert.ok(drc01[0].location.includes('T_SLOT'), 'Finding location should reference the tray');
   });
 
   it('no ERROR when only slot 1 is within limit in a 2-slot tray', () => {
-    // slot 0: 5 in² → 20.8 %, slot 1: 5 in² → 20.8 % — both fine
     const tray = {
       ...makeTray('T_SLOT2', 0, 12, 4),
       num_slots: 2,
-      slotFills: [5, 5],
+      slot_groups: '{"0":"power","1":"control"}',
     };
-    const { findings } = runDRC({ trays: [tray], cables: [], trayCableMap: {} });
+    const power = makeFillCable('P1', 5, { allowed_cable_group: 'power', slot_index: 0 });
+    const control = makeFillCable('C1', 5, { cable_type: 'Control', allowed_cable_group: 'control', slot_index: 1 });
+    const { findings } = runDRC({
+      trays: [tray],
+      cables: [power, control],
+      trayCableMap: { T_SLOT2: [power, control] },
+    });
     const drc01 = findings.filter(f => f.ruleId === 'DRC-01' && f.severity === DRC_SEVERITY.ERROR);
     assert.strictEqual(drc01.length, 0);
   });
@@ -837,17 +885,14 @@ describe('DRC-02 Multi-Slot Tray Suppression', () => {
 // ---------------------------------------------------------------------------
 describe('formatDrcReport() — accepted risk section', () => {
   it('includes accepted risk section header and note when findings are accepted', () => {
-    const trays = [makeTray('T1', 20, 12, 4)];
-    const result = runDRC({ trays, cables: [], trayCableMap: {} }, {
-      acceptedFindings: [{
-        key: 'DRC-01:T1',
-        signature: 'DRC-01|T1|error|Tray fill 41.7 % exceeds NEC 392.22(A) limit of 40 %.|Inside width: 12 in, depth: 4 in, fill: 20.00 in².|NEC 392.22(A)|Widen or deepen the tray, add a parallel tray segment, or use the Optimal Route page to reroute cables to adjacent trays with available capacity.',
-        ruleId: 'DRC-01',
-        location: 'T1',
-        note: 'Approved per ENG-042',
+    const trays = [makeTray('T1', 15, 12, 4)];
+    const assigned = makeFillCable('C1', 15);
+    const input = { trays, cables: [assigned], trayCableMap: { T1: [assigned] } };
+    const result = runDRC(input, {
+      acceptedFindings: [acceptanceFor(input, 'Approved per ENG-042', {
         reviewedBy: 'J. Smith, PE',
         acceptedAt: '2026-03-30T00:00:00.000Z',
-      }],
+      })],
     });
     const report = formatDrcReport(result);
     assert.ok(report.includes('Accepted Risk'), 'Report should include accepted risk section header');

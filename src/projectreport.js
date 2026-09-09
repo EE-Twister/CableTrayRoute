@@ -24,6 +24,8 @@ import { renderProjectInputPanel } from './components/projectInputBinding.js';
 import { buildDesignBasisReview } from '../analysis/designBasis.mjs';
 import { buildDeliverableReadinessDiagnostics } from '../analysis/deliverableWorkflow.mjs';
 import { normalizeRouteResultState } from '../analysis/routeResults.mjs';
+import { buildRacewayAssurance } from '../analysis/racewayAssurance.mjs';
+import { buildPullConstructabilityAssurance } from '../analysis/pullConstructability.mjs';
 import { buildWorkflowCoreDiagnostics } from '../analysis/projectWorkflowCore.mjs';
 import { runDRC } from '../analysis/designRuleChecker.mjs';
 import { generateProjectReport } from '../analysis/projectReport.mjs';
@@ -314,6 +316,7 @@ function loadProjectData() {
     designGateApprovals: getDesignGateApprovals(),
     tccSettings: getItem('tccSettings', null),
     routeResults: getItem('latestRouteResults', null),
+    currentInputFingerprint: getProjectInputFingerprint(),
     pullPlans: getItem('pullPlanArtifact', null),
     procurement: getProcurementRegister(),
     costEstimate: getItem('costEstimateArtifact', null),
@@ -409,7 +412,51 @@ function constructionSectionData(projectData) {
     })),
   ];
   const pullRows = sectionRows(projectData.pullPlans);
-  const routeRows = sectionRows(projectData.routeResults);
+  const routeState = normalizeRouteResultState(projectData.routeResults || {}, { cables: projectData.cables });
+  const assurance = buildRacewayAssurance({
+    routeResults: projectData.routeResults || [],
+    cables: projectData.cables,
+    trays: projectData.trays,
+    conduits: projectData.conduits,
+    ductbanks: projectData.ductbanks,
+    currentInputFingerprint: projectData.currentInputFingerprint || '',
+  });
+  const assuranceByCable = new Map(assurance.resultChecks.map(check => [String(check.cable || '').trim().toLowerCase(), check]));
+  const pullConstructability = buildPullConstructabilityAssurance({ routeResults: routeState.batchResults });
+  const pullAssuranceByCable = new Map(pullConstructability.checks.map(check => [String(check.cable || '').trim().toLowerCase(), check]));
+  const routeRows = routeState.batchResults.map(row => {
+    const cable = firstValue(row, ['cable', 'cable_tag', 'tag', 'name']);
+    const check = assuranceByCable.get(String(cable || '').trim().toLowerCase());
+    const pullCheck = pullAssuranceByCable.get(String(cable || '').trim().toLowerCase());
+    return {
+      cable,
+      status: firstValue(row, ['status']),
+      totalLengthFt: firstValue(row, ['total_length', 'totalLength', 'length']),
+      segmentCount: Array.isArray(row.route_segments) ? row.route_segments.length : 0,
+      assurance: check ? (check.ready ? 'Pass' : 'Blocked') : 'Not evaluated',
+      routeSignature: check?.signature || '',
+      internalConduits: check?.conduitAssignments
+        ?.filter(assignment => assignment.status === 'resolved')
+        .map(assignment => assignment.identity)
+        .filter(Boolean)
+        .join(', ') || '',
+      conduitAssignmentBasis: check?.conduitAssignments
+        ?.map(assignment => `${assignment.identity || '(unresolved)'} [${assignment.source}]`)
+        .join('; ') || '',
+      fieldRouteBasis: check?.fieldRouteBasis?.code || 'contained-route',
+      fieldRouteExplanation: check?.fieldRouteBasis?.explanation || 'Saved route uses contained raceway segments only.',
+      assuranceIssues: check?.issues?.map(issue => issue.message).join('; ') || '',
+      pullConstructability: pullCheck?.status || 'Not evaluated',
+      pullConstructabilitySignature: pullCheck?.signature || '',
+      pullPointAccess: pullCheck?.pullPoints
+        ? `${pullCheck.pullPoints.confirmedCount || 0} of ${pullCheck.pullPoints.requiredCount || 0} confirmed`
+        : 'Not evaluated',
+      pullPointAccessRecords: pullCheck?.pullPoints?.records?.map(record => (
+        `${record.label} @ ${Number(record.distanceFt).toFixed(1)} ft: ${record.status}${record.source ? ` [${record.source}]` : ''}${record.notes ? ` — ${record.notes}` : ''}`
+      )).join('; ') || '',
+      pullConstructabilityIssues: pullCheck?.issues?.map(issue => issue.message).join('; ') || '',
+    };
+  });
   return {
     equipment: {
       key: 'equipment',
@@ -444,7 +491,22 @@ function constructionSectionData(projectData) {
       key: 'routing',
       title: 'Routing Summary',
       rows: routeRows,
-      summary: { 'Saved route records': routeRows.length },
+      summary: {
+        'Saved route records': routeRows.length,
+        'Raceway assurance': assurance.status,
+        'Assurance blockers': assurance.blockingIssues.length,
+        'Assurance warnings': assurance.warnings.length,
+        'Route signatures': assurance.summary.routeSignatures,
+        'Field-route bases': assurance.summary.fieldRoutes,
+        'Resolved internal-conduit assignments': assurance.summary.internalConduitAssignments,
+        'Unresolved internal-conduit assignments': assurance.summary.unresolvedConduitAssignments,
+        'Pull constructability assurance': pullConstructability.status,
+        'Pull constructability blockers': pullConstructability.blockingIssues.length,
+        'Pull constructability signatures': pullConstructability.checks.filter(check => check.signature).length,
+        'Pull access points required': pullConstructability.checks.reduce((sum, check) => sum + Number(check.pullPoints?.requiredCount || 0), 0),
+        'Pull access points confirmed': pullConstructability.checks.reduce((sum, check) => sum + Number(check.pullPoints?.confirmedCount || 0), 0),
+        'Route input fingerprint': assurance.inputFingerprint || 'Not recorded',
+      },
     },
     pullPlans: {
       key: 'pullPlans',
@@ -462,7 +524,15 @@ function constructionSectionData(projectData) {
       key: 'costEstimate',
       title: 'Cost Estimate',
       rows: sectionRows(projectData.costEstimate),
-      summary: projectData.costEstimate?.summary || {},
+      summary: {
+        ...(projectData.costEstimate?.summary || {}),
+        'Route cost assurance': projectData.costEstimate?.routeCostAssurance?.status || 'Not generated',
+        'Assurance classification': projectData.costEstimate?.routeCostAssurance?.classification || 'Screening only',
+        'Route cost signature': projectData.costEstimate?.routeCostAssurance?.signature || 'Not recorded',
+        'Route quantity signature': projectData.costEstimate?.routeCostAssurance?.quantityLedger?.signature || 'Not recorded',
+        'Route cost blockers': projectData.costEstimate?.routeCostAssurance?.blockingIssues?.length || 0,
+        'Estimate input fingerprint': projectData.costEstimate?.inputFingerprint || 'Not recorded',
+      },
     },
     fieldExecution: {
       key: 'fieldExecution',
@@ -880,8 +950,8 @@ function loadProjectDataWithPackage() {
   return {
     cables:    Array.isArray(snap.cables)  ? snap.cables  : [],
     trays:     Array.isArray(snap.trays)   ? snap.trays   : [],
-    conduits:  [],
-    ductbanks: [],
+    conduits:  Array.isArray(snap.conduits) ? snap.conduits : [],
+    ductbanks: Array.isArray(snap.ductbanks) ? snap.ductbanks : [],
     equipment: Array.isArray(snap.equipment) ? snap.equipment : getEquipment(),
     loads: Array.isArray(snap.loads) ? snap.loads : getLoads(),
     oneLine: snap.oneLine || getOneLine(),
@@ -891,6 +961,7 @@ function loadProjectDataWithPackage() {
     designGateApprovals: snap.designGateApprovals || getDesignGateApprovals(),
     tccSettings: snap.tccSettings || getItem('tccSettings', null),
     routeResults: snap.latestRouteResults || snap.routeResults || null,
+    currentInputFingerprint: snap.currentInputFingerprint || '',
     pullPlans: snap.pullPlanArtifact || null,
     procurement: Array.isArray(snap.procurementRegister) ? snap.procurementRegister : [],
     costEstimate: snap.costEstimateArtifact || null,
@@ -925,6 +996,7 @@ function currentReportReadinessDiagnostics() {
     tccSettings: projectData.tccSettings,
     enforceDesignBasis: true,
     currentInputFingerprint: activeLifecyclePkg ? '' : getProjectInputFingerprint(),
+    costEstimate: projectData.costEstimate,
   });
 }
 

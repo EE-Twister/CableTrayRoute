@@ -107,6 +107,32 @@ describe('buildLifecyclePackage', () => {
     assert.strictEqual(pkg.projectSnapshot.cables.length, 1);
   });
 
+  it('retains raceway assurance inputs in the immutable snapshot', () => {
+    const routeResults = { inputFingerprint: 'route-basis-1', batchResults: [{ cable: 'C1' }] };
+    const projectData = {
+      conduits: [{ conduit_id: 'C-1' }],
+      ductbanks: [{ tag: 'DB-1' }],
+      routeResults,
+      currentInputFingerprint: 'route-basis-1',
+    };
+    const pkg = buildLifecyclePackage({}, projectData);
+    routeResults.batchResults[0].cable = 'mutated';
+    assert.strictEqual(pkg.projectSnapshot.conduits[0].conduit_id, 'C-1');
+    assert.strictEqual(pkg.projectSnapshot.ductbanks[0].tag, 'DB-1');
+    assert.strictEqual(pkg.projectSnapshot.latestRouteResults.batchResults[0].cable, 'C1');
+    assert.strictEqual(pkg.projectSnapshot.currentInputFingerprint, 'route-basis-1');
+  });
+
+  it('retains procurement and signed cost evidence in the immutable snapshot', () => {
+    const procurementRegister = [{ spec_key: '4-awg', vendor: 'Supplier' }];
+    const costEstimateArtifact = { routeCostAssurance: { signature: 'cost-1234' } };
+    const pkg = buildLifecyclePackage({}, { procurementRegister, costEstimateArtifact });
+    procurementRegister[0].vendor = 'mutated';
+    costEstimateArtifact.routeCostAssurance.signature = 'mutated';
+    assert.strictEqual(pkg.projectSnapshot.procurementRegister[0].vendor, 'Supplier');
+    assert.strictEqual(pkg.projectSnapshot.costEstimateArtifact.routeCostAssurance.signature, 'cost-1234');
+  });
+
   it('summary counts match snapshot contents', () => {
     const projectData = {
       cables: [{ id: 'C1' }, { id: 'C2' }],

@@ -15,6 +15,7 @@ import {
   setOneLine, setCables, setTrays, setConduits, setDuctbanks, setItem,
   getLifecyclePackages, getReportSnapshots, getItem, addLifecyclePackage, deleteLifecyclePackage,
   getFieldObservationQueue, getFieldObservations,
+  getProcurementRegister,
 } from '../dataStore.mjs';
 import { trayFillPercent } from '../analysis/designRuleChecker.mjs';
 import { buildLifecyclePackage, summarizePackage } from '../analysis/lifecyclePackage.mjs';
@@ -817,6 +818,7 @@ function currentDashboardProject() {
     designGateApprovals: getDesignGateApprovals(),
     tccSettings: getItem('tccSettings', null),
     currentInputFingerprint: getProjectInputFingerprint(),
+    costEstimateArtifact: getItem('costEstimateArtifact', null),
     reconcilePending: false
   };
 }
@@ -1453,10 +1455,11 @@ function initReleasePackageForm() {
       }
       return;
     }
-    const designReview = currentDesignBasisReview();
-    if (designReview.deliverableBlockers.length > 0) {
+    const workflow = currentCoreDiagnostics();
+    if (!workflow.readyForDeliverables) {
+      const blocker = workflow.issueBlockers[0] || workflow.designReview.deliverableBlockers[0];
       if (statusEl) {
-        statusEl.textContent = `Release blocked: ${designReview.deliverableBlockers[0].label}. Resolve ${designReview.deliverableBlockers.length} design basis gate(s).`;
+        statusEl.textContent = `Release blocked: ${blocker?.label || 'workflow readiness is incomplete'}. Resolve ${workflow.issueBlockers.length} workflow blocker(s) before issuing the package.`;
       }
       renderDesignBasisReviewPanel();
       return;
@@ -1465,6 +1468,8 @@ function initReleasePackageForm() {
     const projectData = {
       cables:    getCables(),
       trays:     getTrays(),
+      conduits:  getConduits(),
+      ductbanks: getDuctbanks(),
       equipment: getEquipment(),
       studies:   getStudies(),
       approvals: getStudyApprovals(),
@@ -1473,6 +1478,10 @@ function initReleasePackageForm() {
       tccSettings: getItem('tccSettings', null),
       fieldObservations: getFieldObservations(),
       fieldObservationQueue: getFieldObservationQueue(),
+      routeResults: getItem('latestRouteResults', null),
+      procurementRegister: getProcurementRegister(),
+      costEstimateArtifact: getItem('costEstimateArtifact', null),
+      currentInputFingerprint: getProjectInputFingerprint(),
       oneLine:   getOneLine(),
     };
 

@@ -15,6 +15,7 @@
  */
 
 import { tracePullTension } from '../src/pullCalc.js';
+import { resolveRouteResultConduits } from './ductbankConduitAssignment.mjs';
 
 const DEFAULT_PULL_ASSUMPTIONS = Object.freeze({
   coeffFriction: 0.35,
@@ -451,10 +452,18 @@ export function groupCablesIntoPulls(routeResults = [], cableList = []) {
         breakdown: normalizedBreakdown,
         total_length: parseFloat(result.total_length) || 0,
         route_segments: result.route_segments || normalizedBreakdown,
+        pull_checks: [],
       });
     }
 
     const pull = pullMap.get(groupKey);
+    pull.pull_checks.push({
+      cable: result.cable,
+      status: result.pull_check?.constructability?.status || null,
+      signature: result.pull_check?.constructability?.signature || null,
+      pullPoints: result.pull_check?.constructability?.pullPoints || null,
+      issues: result.pull_check?.constructability?.issues || [],
+    });
     pull.cables.push({
       tag: result.cable,
       cable_type: cableType,
@@ -489,6 +498,7 @@ export function groupCablesIntoPulls(routeResults = [], cableList = []) {
       total_length: pull.total_length,
       breakdown: pull.breakdown,
       route_segments: pull.route_segments,
+      pull_checks: pull.pull_checks,
     });
   }
 
@@ -515,6 +525,18 @@ export function buildPullCard(pull, options = {}) {
   const baseURL = options.baseURL || 'https://cabletrayroute.com';
   const assumptions = normalizePullAssumptions(options.assumptions || options);
   const coverageWarnings = [];
+  const pullChecks = Array.isArray(pull.pull_checks) ? pull.pull_checks : [];
+  const constructabilityApplicable = pullChecks.some(check => check.status || check.signature || check.pullPoints);
+  if (constructabilityApplicable) {
+    pullChecks.forEach(check => {
+      if (!check.status) {
+        coverageWarnings.push(`${check.cable}: pull constructability evidence is missing.`);
+      } else if (check.status !== 'pass') {
+        const firstIssue = check.issues?.find(issue => issue.blocking !== false)?.message;
+        coverageWarnings.push(`${check.cable}: pull constructability evidence is blocked${firstIssue ? ` — ${firstIssue}` : '.'}`);
+      }
+    });
+  }
   const missingWeight = pull.cables.filter(cable => !finitePositive(cable.weight));
   const missingDiameter = pull.cables.filter(cable => !finitePositive(cable.diameter));
   pull.cables.forEach(cable => {
@@ -551,6 +573,12 @@ export function buildPullCard(pull, options = {}) {
   const sourceEngineeringSegments = pull.route_segments?.length
     ? pull.route_segments
     : sourceBreakdown;
+  sourceEngineeringSegments
+    .filter(segment => ['missing', 'ambiguous', 'not-found'].includes(segment?.conduit_assignment_status))
+    .forEach(segment => {
+      const parent = segment.ductbankTag || segment.tray_id || segment.raceway_id || '(unknown ductbank)';
+      coverageWarnings.push(`Ductbank ${parent}: internal conduit assignment is ${segment.conduit_assignment_status}; conduit fill and pull constructability are incomplete.`);
+    });
   const forwardBreakdown = sourceBreakdown.map(segment => ({ ...segment }));
   const reverseBreakdown = reverseSegments(sourceBreakdown);
   const forwardSegments = buildEngineeringSegments(sourceEngineeringSegments, assumptions);
@@ -606,6 +634,9 @@ export function buildPullCard(pull, options = {}) {
       elementId = segment.ductbankTag
         ? `${segment.ductbankTag}:${segment.conduit_id}`
         : segment.conduit_id;
+    } else if (segment.ductbankTag || segment.conduit_assignment_status) {
+      elementType = 'Ductbank';
+      elementId = segment.ductbankTag || segment.tray_id || segment.raceway_id || '';
     } else if (segment.tray_id && segment.tray_id !== 'Field Route' && segment.tray_id !== 'N/A') {
       elementType = 'Tray';
       elementId = segment.tray_id;
@@ -696,6 +727,15 @@ export function buildPullCard(pull, options = {}) {
     assumptions,
     coverage_warnings: [...new Set(coverageWarnings)],
     input_coverage_complete: coverageWarnings.length === 0,
+    constructability_evidence: constructabilityApplicable
+      ? pullChecks.map(check => ({
+          cable: check.cable,
+          status: check.status || 'missing',
+          signature: check.signature,
+          pullPoints: check.pullPoints,
+          issues: check.issues,
+        }))
+      : [],
   };
 }
 
@@ -712,7 +752,11 @@ export function buildPullCard(pull, options = {}) {
  * @returns {{ pulls: Array<PullCard>, summary: PullSummary }}
  */
 export function buildPullTable(routeResults = [], cableList = [], options = {}) {
-  const groups = groupCablesIntoPulls(routeResults, cableList);
+  const resolvedRouteResults = resolveRouteResultConduits(routeResults, cableList, {
+    conduits: options.conduits,
+    ductbanks: options.ductbanks,
+  });
+  const groups = groupCablesIntoPulls(resolvedRouteResults, cableList);
   const pulls = groups.map(group => {
     const pullId = stablePullId(group);
     const savedAssumptions = options.assumptionsByPull?.[pullId];
@@ -777,7 +821,12 @@ export function createPullPlanArtifact(pulls = [], metadata = {}) {
           jamCheck: pull.jam_check,
         },
         coverageWarnings: [...(pull.coverage_warnings || [])],
+        constructabilityEvidence: deepClonePullEvidence(pull.constructability_evidence),
       },
     ])),
   };
+}
+
+function deepClonePullEvidence(records = []) {
+  return JSON.parse(JSON.stringify(Array.isArray(records) ? records : []));
 }

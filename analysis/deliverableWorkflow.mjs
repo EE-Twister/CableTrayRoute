@@ -3,6 +3,9 @@ import { buildSpoolSheetVisualModel } from './spoolSheetVisualModel.mjs';
 import { getAvailableSections } from './reportPackage.mjs';
 import { summarizeCableWorkflow } from './scheduleWorkflow.mjs';
 import { buildDesignBasisReview } from './designBasis.mjs';
+import { buildRacewayAssurance } from './racewayAssurance.mjs';
+import { buildPullConstructabilityAssurance } from './pullConstructability.mjs';
+import { assessSavedRouteCostArtifact } from './routeCostAssurance.mjs';
 import {
   normalizeRouteResults,
   routeResultSucceeded,
@@ -204,9 +207,9 @@ function uniqueRoutedCableTags(routeResults = []) {
   return tags;
 }
 
-function buildPullSummary(routeResults, cables) {
+function buildPullSummary(routeResults, cables, conduits, ductbanks) {
   try {
-    return buildPullTable(routeResults.filter(routeResultSucceeded), cables);
+    return buildPullTable(routeResults.filter(routeResultSucceeded), cables, { conduits, ductbanks });
   } catch (error) {
     return {
       pulls: [],
@@ -257,6 +260,7 @@ export function buildDeliverableReadinessDiagnostics({
   tccSettings = null,
   enforceDesignBasis = false,
   currentInputFingerprint = '',
+  costEstimate = null,
 } = {}) {
   const cableRows = meaningfulRecords(cables);
   const trayRows = meaningfulRecords(trays);
@@ -285,7 +289,22 @@ export function buildDeliverableReadinessDiagnostics({
     .map(cableTag)
     .filter(Boolean);
   const missingRouteResultTags = scheduleReadyTags.filter(tag => !routedTags.has(normalizedKey(tag)));
-  const pullSummary = buildPullSummary(routedRouteResults, cableRows);
+  const racewayAssurance = buildRacewayAssurance({
+    routeResults,
+    cables: cableRows,
+    trays: trayRows,
+    conduits: conduitRows,
+    ductbanks: ductbankRows,
+    currentInputFingerprint,
+  });
+  const racewayAssuranceReady = racewayAssurance.blockingIssues.length === 0;
+  const pullSummary = buildPullSummary(routedRouteResults, cableRows, conduitRows, ductbankRows);
+  const pullConstructability = buildPullConstructabilityAssurance({ routeResults: routedRouteResults });
+  const pullConstructabilityReady = !pullConstructability.applicable
+    || pullConstructability.blockingIssues.length === 0;
+  const routeCostAssurance = assessSavedRouteCostArtifact(costEstimate, currentInputFingerprint);
+  const routeCostReady = !routeCostAssurance.applicable
+    || routeCostAssurance.blockingIssues.length === 0;
   const spoolModel = buildSpoolSheetVisualModel(trayRows, cableRows);
   const availableSections = getAvailableSections({
     studies,
@@ -348,6 +367,47 @@ export function buildDeliverableReadinessDiagnostics({
     actions.push(makeAction('Fill / Routing', 'warning', 'Refresh route results', `${missingRouteResultTags.length} schedule-ready cable(s) do not have matching route results.`, 'optimalRoute.html'));
   }
 
+  if (racewayAssurance.blockingIssues.length > 0) {
+    const firstIssue = racewayAssurance.blockingIssues[0];
+    actions.push(makeAction(
+      'Fill / Routing',
+      'critical',
+      'Resolve raceway assurance blockers',
+      `${racewayAssurance.blockingIssues.length} routing or capacity assurance blocker(s) remain. ${firstIssue.message}`,
+      firstIssue.href || 'optimalRoute.html'
+    ));
+  } else if (racewayAssurance.warnings.length > 0) {
+    actions.push(makeAction(
+      'Fill / Routing',
+      'info',
+      'Review raceway assurance warnings',
+      `${racewayAssurance.warnings.length} nonblocking assurance warning(s) remain for qualified review.`,
+      racewayAssurance.warnings[0]?.href || 'optimalRoute.html'
+    ));
+  }
+
+  if (pullConstructability.applicable && pullConstructability.blockingIssues.length > 0) {
+    const firstIssue = pullConstructability.blockingIssues[0];
+    actions.push(makeAction(
+      'Cable Pulls',
+      'critical',
+      'Resolve pull constructability blockers',
+      `${pullConstructability.blockingIssues.length} pull evidence blocker(s) remain. ${firstIssue.message}`,
+      firstIssue.href || 'optimalRoute.html'
+    ));
+  }
+
+  if (routeCostAssurance.applicable && routeCostAssurance.blockingIssues.length > 0) {
+    const firstIssue = routeCostAssurance.blockingIssues[0];
+    actions.push(makeAction(
+      'Cost Estimate',
+      'critical',
+      'Regenerate governed route cost estimate',
+      `${routeCostAssurance.blockingIssues.length} route cost assurance blocker(s) remain. ${firstIssue.message}`,
+      firstIssue.href || 'costestimate.html'
+    ));
+  }
+
   if (trayRows.length === 0) {
     actions.push(makeAction('Spool Sheets', 'info', 'Add tray geometry for spool sheets', 'Spool sheets need tray records from the Raceway Schedule.', 'racewayschedule.html'));
   } else if (!spoolModel.hasCoordinates) {
@@ -386,8 +446,24 @@ export function buildDeliverableReadinessDiagnostics({
       deliverables: reportSnapshotCount + lifecyclePackageCount,
       designBasisReviewGates: designReview ? designReview.openGateCount : 0,
       blockingReviewGates: designReview ? designReview.deliverableBlockers.length : 0,
+      racewayAssuranceStatus: racewayAssurance.status,
+      racewayAssuranceBlockers: racewayAssurance.blockingIssues.length,
+      racewayAssuranceWarnings: racewayAssurance.warnings.length,
+      routeSignatures: racewayAssurance.summary.routeSignatures,
+      fieldRoutes: racewayAssurance.summary.fieldRoutes,
+      pullConstructabilityStatus: pullConstructability.status,
+      pullConstructabilityBlockers: pullConstructability.blockingIssues.length,
+      constructabilitySignatures: pullConstructability.checks.filter(check => check.signature).length,
+      pullAccessPointsRequired: pullConstructability.checks.reduce((sum, check) => sum + Number(check.pullPoints?.requiredCount || 0), 0),
+      pullAccessPointsConfirmed: pullConstructability.checks.reduce((sum, check) => sum + Number(check.pullPoints?.confirmedCount || 0), 0),
+      routeCostAssuranceStatus: routeCostAssurance.status,
+      routeCostAssuranceBlockers: routeCostAssurance.blockingIssues.length,
+      routeCostSignature: routeCostAssurance.signature || '',
     },
     designReview,
+    racewayAssurance,
+    pullConstructability,
+    routeCostAssurance,
     routeResults: routedRouteResults,
     missingRouteResultTags,
     cableSummary,
@@ -398,10 +474,10 @@ export function buildDeliverableReadinessDiagnostics({
     actions,
     nextAction: findNextAction(actions),
     ready: {
-      routeResults: routedRouteResults.length > 0,
-      pullCards: pullSummary.summary.total_pulls > 0,
+      routeResults: routedRouteResults.length > 0 && racewayAssuranceReady,
+      pullCards: pullSummary.summary.total_pulls > 0 && racewayAssuranceReady && pullConstructabilityReady,
       spoolSheets: spoolModel.summary.spoolCount > 0 && spoolModel.hasCoordinates,
-      projectReport: availableSections.size > 4 && (!designReview || designReview.readyForDeliverables),
+      projectReport: availableSections.size > 4 && racewayAssuranceReady && pullConstructabilityReady && routeCostReady && (!designReview || designReview.readyForDeliverables),
       reportSnapshot: reportSnapshotCount > 0,
       releasePackage: lifecyclePackageCount > 0,
     },

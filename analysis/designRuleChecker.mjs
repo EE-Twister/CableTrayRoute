@@ -5,7 +5,7 @@
  * levels: ERROR, WARNING, and INFO.
  *
  * Rules implemented:
- *   DRC-01  NEC 392.22(A)  — Tray fill exceeds 40 % of usable cross-section
+ *   DRC-01  NEC 392.22(A)  — Selected multiconductor tray-fill arrangement
  *   DRC-02  NEC 392.6(H)   — Voltage-class segregation (mixed cable groups)
  *   DRC-03  NEC 310.15     — Cable exceeds rated ampacity (with tray derating)
  *   DRC-04  NEC 250.122    — Power cables have no EGC, or selected EGC is undersized
@@ -32,6 +32,7 @@ import {
   smallConductorMaxOcpd,
   tableAmpacity,
 } from './autoSize.mjs';
+import { evaluateTrayFill, summarizeTrayFillResult } from './trayFill.mjs';
 
 // ---------------------------------------------------------------------------
 // Severity constants
@@ -43,11 +44,10 @@ export const DRC_SEVERITY = {
 };
 
 // ---------------------------------------------------------------------------
-// NEC 392.22(A) fill limit for cable trays
-//   Ladder / ventilated-trough trays: 40 % of (inside_width × tray_depth)
-//   Single-layer power cable trays: 50 % (simplified; DRC uses 40 % default)
+// Aggregate-fill fallback used only when cable-level Article 392 inputs are
+// unavailable. This is a project capacity screen, not an NEC compliance rule.
 // ---------------------------------------------------------------------------
-const NEC_TRAY_FILL_LIMIT = 0.40;
+const DEFAULT_TRAY_CAPACITY_SCREENING_LIMIT = 0.40;
 
 // ---------------------------------------------------------------------------
 // NEC 310.15(B)(3)(a) — Tray derating factors for power cables
@@ -405,78 +405,147 @@ function isPowerCable(cable) {
 // Rule implementations
 // ---------------------------------------------------------------------------
 
+function aggregateTrayFillFinding(tray, pct, limit, location = tray.tray_id, detail = '') {
+  if (pct / 100 <= limit * 0.9) return null;
+  const overTarget = pct / 100 > limit;
+  return {
+    ruleId: 'DRC-01',
+    severity: DRC_SEVERITY.WARNING,
+    location,
+    message: overTarget
+      ? `Aggregate tray fill ${pct.toFixed(1)} % exceeds the ${(limit * 100).toFixed(0)} % project screening target; cable-level Article 392 inputs are required before reporting a selected-rule result.`
+      : `Aggregate tray fill ${pct.toFixed(1)} % is within 10 % of the ${(limit * 100).toFixed(0)} % project screening target; cable-level Article 392 inputs are required before reporting a selected-rule result.`,
+    detail,
+    reference: 'Project tray-capacity screen; not an Article 392 arrangement determination',
+    remediation: 'Load assigned cables with conductor count, conductor size, cable outside diameter, and tray construction so the selected NEC 2023 Article 392 evaluator can run.',
+  };
+}
+
+function article392Finding(tray, result, location = tray.tray_id) {
+  const reference = `NFPA 70 (NEC) 2023 ${result.clause}${result.tableColumn ? `, Table 392.22(A)(1) Column ${result.tableColumn}` : ''}`;
+  if (result.status === 'fail') {
+    return {
+      ruleId: 'DRC-01',
+      severity: DRC_SEVERITY.ERROR,
+      location,
+      message: `Selected Article 392 tray-fill check exceeds the applicable allowance: ${summarizeTrayFillResult(result)}`,
+      detail: `Arrangement: ${result.arrangement}. Inside width: ${result.widthIn} in; construction: ${result.construction}.`,
+      reference,
+      remediation: 'Reduce assigned cable quantity, use a wider applicable tray, separate cable groups into a verified compartment, or reroute cables and rerun the selected Article 392 check.',
+    };
+  }
+  if (result.status === 'pass' && result.utilizationPercent > 90) {
+    return {
+      ruleId: 'DRC-01',
+      severity: DRC_SEVERITY.WARNING,
+      location,
+      message: `Selected Article 392 tray-fill check is within 10 % of its allowance: ${summarizeTrayFillResult(result)}`,
+      detail: `Arrangement: ${result.arrangement}. Inside width: ${result.widthIn} in; construction: ${result.construction}.`,
+      reference,
+      remediation: 'Review future capacity and verify installed cable dimensions before adding cables to this tray section.',
+    };
+  }
+  if (result.status === 'incomplete' || result.status === 'screening') {
+    return {
+      ruleId: 'DRC-01',
+      severity: DRC_SEVERITY.WARNING,
+      location,
+      message: summarizeTrayFillResult(result),
+      detail: `No selected Article 392 pass is reported for arrangement "${result.arrangement}".`,
+      reference,
+      remediation: 'Complete the missing cable/tray inputs or use the governing single-conductor, channel-tray, MV, manufacturer, and AHJ basis applicable to the installation.',
+    };
+  }
+  return null;
+}
+
 /**
- * DRC-01 — Tray fill > NEC limit
- * @param {object[]} trays
- * @param {object}   [options]
- * @param {number}   [options.fillLimit=0.40]  Fractional fill limit (0–1).
- * @returns {DrcFinding[]}
+ * DRC-01 — selected NEC 2023 Article 392 check when cable inputs exist;
+ * otherwise retain only a clearly labeled aggregate project-capacity screen.
  */
-function checkTrayFill(trays, options = {}) {
-  const limit = options.fillLimit ?? NEC_TRAY_FILL_LIMIT;
+function checkTrayFill(trays, trayCableMap, options = {}) {
+  const limit = options.fillLimit ?? DEFAULT_TRAY_CAPACITY_SCREENING_LIMIT;
   const findings = [];
   for (const tray of trays) {
-    // Per-slot DRC-01 when routing system has provided slotFills[]
-    if (Array.isArray(tray.slotFills) && tray.slotFills.length > 1) {
-      const numSlots = tray.slotFills.length;
-      for (let i = 0; i < numSlots; i++) {
-        const pct = traySlotFillPercent(tray, i, tray.slotFills[i]);
-        if (pct === null) continue;
-        const slotLabel = tray.slotGroups?.get?.(i) ?? `slot ${i}`;
-        if (pct / 100 > limit) {
-          findings.push({
-            ruleId: 'DRC-01',
-            severity: DRC_SEVERITY.ERROR,
-            location: `${tray.tray_id} (${slotLabel})`,
-            message:
-              `Slot fill ${pct.toFixed(1)} % exceeds NEC 392.22(A) limit of ${(limit * 100).toFixed(0)} % ` +
-              `in compartment "${slotLabel}" of tray "${tray.tray_id}".`,
-            detail: `Slot ${i} fill: ${tray.slotFills[i].toFixed(2)} in².`,
-            reference: 'NEC 392.22(A)',
-            remediation: 'Reroute cables from this slot to a tray with available capacity, or widen the tray.',
-          });
-        } else if (pct / 100 > limit * 0.9) {
+    const trayId = String(tray.tray_id ?? tray.id ?? tray.tag ?? '').trim();
+    const assignedCables = trayCableMap.get(trayId) ?? [];
+    if (assignedCables.length > 0) {
+      const numSlots = Math.max(1, parseInt(tray.num_slots) || 1);
+      if (numSlots > 1) {
+        const assignments = parseSlotGroupAssignments(tray.slot_groups, tray.slotGroups, numSlots);
+        const slotCables = Array.from({ length: numSlots }, () => []);
+        let unresolved = false;
+        assignedCables.forEach(cable => {
+          let slotIndex = cableSlotIndex(cable);
+          if (slotIndex === null && assignments) {
+            const group = String(cable.allowed_cable_group ?? cable.cable_group ?? '').trim();
+            if (group && assignments.has(group)) slotIndex = assignments.get(group);
+          }
+          if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= numSlots) {
+            unresolved = true;
+          } else {
+            slotCables[slotIndex].push(cable);
+          }
+        });
+        if (unresolved) {
           findings.push({
             ruleId: 'DRC-01',
             severity: DRC_SEVERITY.WARNING,
-            location: `${tray.tray_id} (${slotLabel})`,
-            message:
-              `Slot fill ${pct.toFixed(1)} % is within 10 % of the NEC 392.22(A) limit ` +
-              `in compartment "${slotLabel}" of tray "${tray.tray_id}".`,
-            reference: 'NEC 392.22(A)',
-            remediation: 'Monitor future cable additions to this slot.',
+            location: trayId,
+            message: 'Compartmented tray fill is incomplete because one or more assigned cables do not resolve to a physical compartment.',
+            detail: 'No whole-tray average is substituted for the missing compartment assignment.',
+            reference: 'NFPA 70 (NEC) 2023 392.22(A)',
+            remediation: 'Assign every cable to a tray slot/compartment and rerun the check.',
           });
+          continue;
         }
+        const fullWidth = parseFloat(tray.inside_width ?? tray.width) || 0;
+        for (let index = 0; index < numSlots; index += 1) {
+          if (!slotCables[index].length) continue;
+          const slotTray = { ...tray, inside_width: fullWidth / numSlots, num_slots: 1 };
+          const result = evaluateTrayFill(slotTray, slotCables[index]);
+          const slotLabel = assignments
+            ? [...assignments.entries()].find(([, slot]) => slot === index)?.[0] || `slot ${index + 1}`
+            : `slot ${index + 1}`;
+          const finding = article392Finding(tray, result, `${trayId} (${slotLabel})`);
+          if (finding) findings.push(finding);
+        }
+        continue;
       }
-      continue; // slot-level checks replace the whole-tray check
+
+      const finding = article392Finding(tray, evaluateTrayFill(tray, assignedCables), trayId);
+      if (finding) findings.push(finding);
+      continue;
+    }
+
+    if (Array.isArray(tray.slotFills) && tray.slotFills.length > 1) {
+      const numSlots = tray.slotFills.length;
+      for (let index = 0; index < numSlots; index += 1) {
+        const pct = traySlotFillPercent(tray, index, tray.slotFills[index]);
+        if (pct === null) continue;
+        const slotLabel = tray.slotGroups?.get?.(index) ?? `slot ${index + 1}`;
+        const finding = aggregateTrayFillFinding(
+          tray,
+          pct,
+          limit,
+          `${trayId} (${slotLabel})`,
+          `Slot ${index + 1} aggregate fill: ${tray.slotFills[index].toFixed(2)} in².`
+        );
+        if (finding) findings.push(finding);
+      }
+      continue;
     }
 
     const pct = trayFillPercent(tray);
     if (pct === null) continue;
-    if (pct / 100 > limit) {
-      findings.push({
-        ruleId: 'DRC-01',
-        severity: DRC_SEVERITY.ERROR,
-        location: tray.tray_id,
-        message:
-          `Tray fill ${pct.toFixed(1)} % exceeds NEC 392.22(A) limit of ${(limit * 100).toFixed(0)} %.`,
-        detail: `Inside width: ${tray.inside_width ?? tray.width ?? '?'} in, ` +
-                `depth: ${tray.tray_depth ?? tray.height ?? '?'} in, ` +
-                `fill: ${parseFloat(tray.current_fill).toFixed(2)} in².`,
-        reference: 'NEC 392.22(A)',
-        remediation: 'Widen or deepen the tray, add a parallel tray segment, or use the Optimal Route page to reroute cables to adjacent trays with available capacity.',
-      });
-    } else if (pct / 100 > limit * 0.9) {
-      findings.push({
-        ruleId: 'DRC-01',
-        severity: DRC_SEVERITY.WARNING,
-        location: tray.tray_id,
-        message:
-          `Tray fill ${pct.toFixed(1)} % is within 10 % of the NEC 392.22(A) limit.`,
-        reference: 'NEC 392.22(A)',
-        remediation: 'Monitor future cable additions to this tray. Consider reserving a parallel tray for overflow capacity.',
-      });
-    }
+    const finding = aggregateTrayFillFinding(
+      tray,
+      pct,
+      limit,
+      trayId,
+      `Inside width: ${tray.inside_width ?? tray.width ?? '?'} in, depth: ${tray.tray_depth ?? tray.height ?? '?'} in, aggregate fill: ${parseFloat(tray.current_fill).toFixed(2)} in².`
+    );
+    if (finding) findings.push(finding);
   }
   return findings;
 }
@@ -1167,7 +1236,7 @@ export function runDRC(input, options = {}) {
   }
 
   const findings = [
-    ...checkTrayFill(trays, options),
+    ...checkTrayFill(trays, trayMap, options),
     ...checkSegregation(trays, trayMap),
     ...(options.skipAmpacity ? [] : checkAmpacity(cables, trayMap)),
     ...(options.skipGrounding ? [] : checkGrounding(cables)),

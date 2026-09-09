@@ -48,6 +48,7 @@ import { recordStartupMeasurement, startPerformanceMeasurement } from './src/per
 import { appendHtmlChunks } from './src/components/incrementalDom.js';
 import { bindRouteDetailActions, buildRouteDetailMarkup } from './src/routing/routeDetailView.mjs';
 import { createRouteBreakdown } from './src/routing/routeBreakdown.mjs';
+import { createPullOptionElements, getPullAnalysisInputs, readPullCheckOptions, restorePullCheckOptions } from './src/routing/pullOptionsController.mjs';
 
 const getParallelCount = value => Math.max(1, Number.parseInt(value, 10) || 1);
 
@@ -311,24 +312,7 @@ async function initializeApp() {
         pullChecksDetails: document.getElementById('pull-checks-details'),
         performPullChecks: document.getElementById('perform-pull-checks'),
         pullCheckOptions: document.getElementById('pull-check-options'),
-        pullMaxLength: document.getElementById('pull-max-length'),
-        allowHandPulls: document.getElementById('allow-hand-pulls'),
-        handPullMaxLength: document.getElementById('hand-pull-max-length'),
-        handPullMaxTension: document.getElementById('hand-pull-max-tension'),
-        pullMaxTension: document.getElementById('pull-max-tension'),
-        pullMaxSidewall: document.getElementById('pull-max-sidewall'),
-        pullFriction: document.getElementById('pull-friction'),
-        pullBendRadius: document.getElementById('pull-bend-radius'),
-        pullDirection: document.getElementById('pull-direction'),
-        pullIncomingTension: document.getElementById('pull-incoming-tension'),
-        pullPullerCapacity: document.getElementById('pull-puller-capacity'),
-        pullRopeCapacity: document.getElementById('pull-rope-capacity'),
-        pullGripCapacity: document.getElementById('pull-grip-capacity'),
-        pullAnchorageCapacity: document.getElementById('pull-anchorage-capacity'),
-        pullSheaveCapacity: document.getElementById('pull-sheave-capacity'),
-        pullRollerSpacing: document.getElementById('pull-roller-spacing'),
-        pullGroupSuggestions: document.getElementById('pull-group-suggestions'),
-        pullGroupMaxSize: document.getElementById('pull-group-max-size'),
+        ...createPullOptionElements(document),
         pullSetupsToggle: document.getElementById('pull-setups-toggle'),
         pullSetupLegend: document.getElementById('pull-setup-legend'),
         pullTuggerLegend: document.getElementById('pull-tugger-legend'),
@@ -752,26 +736,7 @@ async function initializeApp() {
         syncManualPath(cable);
     };
 
-    const getPullCheckOptions = () => ({
-        maxPullLengthFt: parseFloat(elements.pullMaxLength?.value) || 500,
-        allowHandPulls: elements.allowHandPulls?.checked !== false,
-        maxHandPullLengthFt: parseFloat(elements.handPullMaxLength?.value) || 25,
-        maxHandPullTensionLbf: parseFloat(elements.handPullMaxTension?.value) || 200,
-        allowableTension: parseFloat(elements.pullMaxTension?.value) || 1000,
-        allowableSidewallPressure: parseFloat(elements.pullMaxSidewall?.value) || 500,
-        coeffFriction: parseFloat(elements.pullFriction?.value) || 0.35,
-        defaultBendRadiusFt: parseFloat(elements.pullBendRadius?.value) || 3,
-        pullDirection: elements.pullDirection?.value || 'auto',
-        incomingTensionLbf: Math.max(0, parseFloat(elements.pullIncomingTension?.value) || 0),
-        pullerCapacityLbf: parseFloat(elements.pullPullerCapacity?.value) || 3000,
-        ropeCapacityLbf: parseFloat(elements.pullRopeCapacity?.value) || 5000,
-        gripCapacityLbf: parseFloat(elements.pullGripCapacity?.value) || 1000,
-        anchorageCapacityLbf: parseFloat(elements.pullAnchorageCapacity?.value) || 3000,
-        sheaveCapacityLbf: parseFloat(elements.pullSheaveCapacity?.value) || 4000,
-        maxRollerSpacingFt: parseFloat(elements.pullRollerSpacing?.value) || 10,
-        suggestPullGroups: elements.pullGroupSuggestions?.checked !== false,
-        maxPullGroupSize: Math.max(2, Math.min(12, parseInt(elements.pullGroupMaxSize?.value, 10) || 4))
-    });
+    const getPullCheckOptions = () => readPullCheckOptions(elements);
 
     const applyPullChecksToResults = (results = []) => {
         const cableMap = new Map(state.cableList.map(cable => [cable.name, cable]));
@@ -780,9 +745,13 @@ async function initializeApp() {
             delete routeResult.pull_check;
             if (!state.pullChecksEnabled || !isRoutedResult(result)) return routeResult;
             const cable = cableMap.get(result.cable) || {};
+            const pullPointAccessRecords = state.pullPointAccessRecordsByCable?.[result.cable] || [];
             return {
                 ...routeResult,
-                pull_check: buildCablePullPlan(result.route_segments || [], cable, getPullCheckOptions())
+                pull_check: buildCablePullPlan(result.route_segments || [], cable, {
+                    ...getPullCheckOptions(),
+                    pullPointAccessRecords
+                })
             };
         });
     };
@@ -829,6 +798,7 @@ async function initializeApp() {
                 pullChecksEnabled: state.pullChecksEnabled,
                 pullSetupsVisible: state.pullSetupsVisible,
                 pullGroupDecisions: state.pullGroupDecisions,
+                pullPointAccessRecordsByCable: state.pullPointAccessRecordsByCable,
                 pullCheckOptions: getPullCheckOptions(),
                 includeDuctbankOutlines: state.includeDuctbankOutlines,
                 sampleDataMode: state.sampleDataMode,
@@ -888,25 +858,13 @@ async function initializeApp() {
                 state.pullGroupDecisions = data.pullGroupDecisions && typeof data.pullGroupDecisions === 'object'
                     ? { ...data.pullGroupDecisions }
                     : {};
+                state.pullPointAccessRecordsByCable = data.pullPointAccessRecordsByCable
+                    && typeof data.pullPointAccessRecordsByCable === 'object'
+                    && !Array.isArray(data.pullPointAccessRecordsByCable)
+                    ? structuredClone(data.pullPointAccessRecordsByCable)
+                    : {};
                 const savedPullOptions = data.pullCheckOptions || {};
-                if (elements.pullMaxLength && savedPullOptions.maxPullLengthFt !== undefined) elements.pullMaxLength.value = savedPullOptions.maxPullLengthFt;
-                if (elements.allowHandPulls && savedPullOptions.allowHandPulls !== undefined) elements.allowHandPulls.checked = savedPullOptions.allowHandPulls !== false;
-                if (elements.handPullMaxLength && savedPullOptions.maxHandPullLengthFt !== undefined) elements.handPullMaxLength.value = savedPullOptions.maxHandPullLengthFt;
-                if (elements.handPullMaxTension && savedPullOptions.maxHandPullTensionLbf !== undefined) elements.handPullMaxTension.value = savedPullOptions.maxHandPullTensionLbf;
-                if (elements.pullMaxTension && savedPullOptions.allowableTension !== undefined) elements.pullMaxTension.value = savedPullOptions.allowableTension;
-                if (elements.pullMaxSidewall && savedPullOptions.allowableSidewallPressure !== undefined) elements.pullMaxSidewall.value = savedPullOptions.allowableSidewallPressure;
-                if (elements.pullFriction && savedPullOptions.coeffFriction !== undefined) elements.pullFriction.value = savedPullOptions.coeffFriction;
-                if (elements.pullBendRadius && savedPullOptions.defaultBendRadiusFt !== undefined) elements.pullBendRadius.value = savedPullOptions.defaultBendRadiusFt;
-                if (elements.pullDirection && savedPullOptions.pullDirection) elements.pullDirection.value = savedPullOptions.pullDirection;
-                if (elements.pullIncomingTension && savedPullOptions.incomingTensionLbf !== undefined) elements.pullIncomingTension.value = savedPullOptions.incomingTensionLbf;
-                if (elements.pullPullerCapacity && savedPullOptions.pullerCapacityLbf !== undefined) elements.pullPullerCapacity.value = savedPullOptions.pullerCapacityLbf;
-                if (elements.pullRopeCapacity && savedPullOptions.ropeCapacityLbf !== undefined) elements.pullRopeCapacity.value = savedPullOptions.ropeCapacityLbf;
-                if (elements.pullGripCapacity && savedPullOptions.gripCapacityLbf !== undefined) elements.pullGripCapacity.value = savedPullOptions.gripCapacityLbf;
-                if (elements.pullAnchorageCapacity && savedPullOptions.anchorageCapacityLbf !== undefined) elements.pullAnchorageCapacity.value = savedPullOptions.anchorageCapacityLbf;
-                if (elements.pullSheaveCapacity && savedPullOptions.sheaveCapacityLbf !== undefined) elements.pullSheaveCapacity.value = savedPullOptions.sheaveCapacityLbf;
-                if (elements.pullRollerSpacing && savedPullOptions.maxRollerSpacingFt !== undefined) elements.pullRollerSpacing.value = savedPullOptions.maxRollerSpacingFt;
-                if (elements.pullGroupSuggestions && savedPullOptions.suggestPullGroups !== undefined) elements.pullGroupSuggestions.checked = savedPullOptions.suggestPullGroups !== false;
-                if (elements.pullGroupMaxSize && savedPullOptions.maxPullGroupSize !== undefined) elements.pullGroupMaxSize.value = savedPullOptions.maxPullGroupSize;
+                restorePullCheckOptions(elements, savedPullOptions);
                 syncPullAnalysisControls();
                 if (elements.routePresetDescription && elements.routePreset) {
                     const preset = ROUTE_PRESETS[elements.routePreset.value] || ROUTE_PRESETS.custom;
@@ -1987,6 +1945,32 @@ const renderPullChecks = results => {
             }
             saveSession();
             document.querySelector('.route-visual-shell')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        },
+        onSaveAccessRecords: (routeIndex, records) => {
+            const route = state.latestRouteData[routeIndex];
+            if (!route?.cable) return;
+            state.pullPointAccessRecordsByCable[route.cable] = records.map(record => ({
+                id: String(record.id || ''),
+                status: ['confirmed', 'blocked'].includes(record.status) ? record.status : 'pending',
+                source: String(record.source || '').trim(),
+                notes: String(record.notes || '').trim(),
+            }));
+            const cable = state.cableList.find(candidate => candidate.name === route.cable) || {};
+            route.pull_check = buildCablePullPlan(route.route_segments || [], cable, {
+                ...getPullCheckOptions(),
+                pullPointAccessRecords: state.pullPointAccessRecordsByCable[route.cable]
+            });
+            state.selectedRouteIndex = routeIndex;
+            renderBatchResults(state.latestRouteData);
+            storeLatestRouteResults(state.latestRouteData, {
+                source: 'optimalRoutePullPointAccess',
+                trayCableMap: state.trayCableMap,
+                finalTrays: state.finalTrays,
+                updatedUtilData: state.updatedUtilData
+            });
+            update3DPlot();
+            updateRouteInspector(routeIndex);
+            saveSession();
         }
     });
     elements.pullChecksDetails.style.display = '';
@@ -2251,6 +2235,7 @@ const renderBatchResults = async (results) => {
         state.updatedUtilData = [];
         state.finalTrays = [];
         state.pullGroupAnalysis = null;
+        state.pullPointAccessRecordsByCable = {};
         state.pullGroupDecisions = {};
         rebuildTrayData();
         renderManualTrayTable();
@@ -2950,7 +2935,10 @@ const renderBatchResults = async (results) => {
                             cable.voltage_drop_pct = vd;
                         }
                         const pullCheck = result.success && state.pullChecksEnabled
-                            ? buildCablePullPlan(result.route_segments || [], cable, getPullCheckOptions())
+                            ? buildCablePullPlan(result.route_segments || [], cable, {
+                                ...getPullCheckOptions(),
+                                pullPointAccessRecords: state.pullPointAccessRecordsByCable[cable.name] || []
+                            })
                             : null;
                         return {
                             cable: cable.name,
@@ -3183,7 +3171,10 @@ const renderBatchResults = async (results) => {
                     tray_segments: res.tray_segments,
                     route_segments: res.route_segments,
                     ...(state.pullChecksEnabled ? {
-                        pull_check: buildCablePullPlan(res.route_segments || [], cable, getPullCheckOptions())
+                        pull_check: buildCablePullPlan(res.route_segments || [], cable, {
+                            ...getPullCheckOptions(),
+                            pullPointAccessRecords: state.pullPointAccessRecordsByCable[cable.name] || []
+                        })
                     } : {}),
                     breakdown: res.route_segments.map((seg, i) => {
                         let tray_id = seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A');
@@ -4210,26 +4201,7 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, ${safeJson(plotCon
             refreshPullAnalysis();
         });
     }
-    [
-        elements.pullMaxLength,
-        elements.handPullMaxLength,
-        elements.handPullMaxTension,
-        elements.pullMaxTension,
-        elements.pullMaxSidewall,
-        elements.pullFriction,
-        elements.pullBendRadius,
-        elements.pullDirection,
-        elements.pullIncomingTension,
-        elements.pullPullerCapacity,
-        elements.pullRopeCapacity,
-        elements.pullGripCapacity,
-        elements.pullAnchorageCapacity,
-        elements.pullSheaveCapacity,
-        elements.pullRollerSpacing,
-        elements.pullGroupSuggestions,
-        elements.pullGroupMaxSize
-    ]
-        .filter(Boolean)
+    getPullAnalysisInputs(elements)
         .forEach(input => input.addEventListener('change', refreshPullAnalysis));
     if (elements.allowHandPulls) {
         elements.allowHandPulls.addEventListener('change', () => {

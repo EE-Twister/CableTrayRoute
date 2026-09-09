@@ -239,6 +239,8 @@ test('dashboard shows the real project workflow order', async ({ page }) => {
     '7. Studies',
     '8. Deliverables'
   ]);
+  await expect(page.locator('#dashboard-next-action-strip')).toContainText('Add cable schedule rows');
+  await page.locator('#dashboard-focus-select').selectOption('full');
   await expect(page.locator('#dashboard-next-action-strip')).toContainText('Add equipment records');
 });
 

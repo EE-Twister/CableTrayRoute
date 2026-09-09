@@ -4,11 +4,12 @@ import { showAlertModal, openModal } from './src/components/modal.js';
 import { createFillGauge } from './src/components/fillGauge.js';
 import { start as startTour } from './tour.js';
 import { getCableAssignedRacewayIds, summarizeCableWorkflow } from './analysis/scheduleWorkflow.mjs';
+import { evaluateTrayFill, summarizeTrayFillResult } from './analysis/trayFill.mjs';
 
 const TRAYFILL_TOUR_STEPS = [
   { selector: '#trayParameters',       message: 'Select the tray you want to analyze: choose width, depth, and tray type. These parameters are used to calculate a selected NEC-informed fill percentage.' },
   { selector: '#addCableBtn',          message: 'Add cables to this tray. The tool will visualize how they pack into the cross-section.' },
-  { selector: '#fill-gauge-container', message: 'The fill gauge shows the current fill percentage. NEC §392.22(A) limits tray fill to 40% for multi-conductor cables. Yellow = near limit, red = over limit.' },
+  { selector: '#fill-gauge-container', message: 'The fill gauge shows geometric packing density. The result panel separately evaluates the selected NEC 2023 Article 392 arrangement when cable construction, size, count, and diameter are complete.' },
   { selector: '#drawBtn',              message: 'Click Draw Tray to render the cross-section visualization with each cable shown to scale.' },
   { selector: '#exportExcelBtn',       message: 'Export the fill analysis to Excel for design documentation or submittal packages.' }
 ];
@@ -369,7 +370,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         const warningThreshold = limit * 0.8;
         const isOverLimit = fillPercent > limit;
         const isNearLimit = fillPercent >= warningThreshold && !isOverLimit;
-        trayFillStatusEl.textContent = isOverLimit ? 'Over limit' : isNearLimit ? 'Near limit' : 'Within limit';
+        trayFillStatusEl.textContent = isOverLimit ? 'High density' : isNearLimit ? 'Density review' : 'Density screen';
         trayFillStatusEl.classList.toggle('is-ok', !isNearLimit && !isOverLimit);
         trayFillStatusEl.classList.toggle('is-warn', isNearLimit);
         trayFillStatusEl.classList.toggle('is-danger', isOverLimit);
@@ -397,7 +398,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           cableTable.parentElement.appendChild(fillSummaryEl);
         }
         const compLabel = compartments.length > 1 ? ' (worst compartment)' : '';
-        fillSummaryEl.textContent = `Total Cable Area: ${totalArea.toFixed(2)} in², Fill: ${worstFill.toFixed(1)}%${compLabel}`;
+        fillSummaryEl.textContent = `Total Cable Area: ${totalArea.toFixed(2)} in², geometric packing density: ${worstFill.toFixed(1)}%${compLabel}`;
         fillSummaryEl.style.color = worstFill > allow ? 'var(--color-error)' : '';
         trayGauge.update(worstFill, allow);
         updateTrayFillStatus(worstFill, allow);
@@ -645,42 +646,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
 
       document.getElementById('trayType').addEventListener('change',updateTotals);
 
-      // ─────────────────────────────────────────────────────────────
-      // (C) NEC-2011 Sizing Helpers (Table 5 allowable area for small) :contentReference[oaicite:1]{index=1}
-      // ─────────────────────────────────────────────────────────────
-      const allowableAreaByWidth = {
-        6:  7.0,
-        9: 10.5,
-        12:14.0,
-        18:21.0,
-        24:28.0,
-        30:35.0,
-        36:42.0
-      };
-      const standardWidths = [6, 9, 12, 18, 24, 30, 36];
-
-      // NFPA 70 Table 392.22(A) "Column 2" for Ladder/ventilated trough (in²),
-      // multiconductor cables 4/0 AWG and smaller. Values are linear at
-      // width × 7/6 (6→7.0 … 30→35.0, 36→42.0).
-      const nfpaLadder = {
-        6:  7.0,
-        9: 10.5,
-        12:14.0,
-        18:21.0,
-        24:28.0,
-        30:35.0,
-        36:42.0
-      };
-      // NFPA 70 Table 392.22(A) "Column 4a" for Solid Bottom (in²)
-      const nfpaSolid = {
-        6:  5.5,
-        9:  8.0,
-        12:11.0,
-        18:16.5,
-        24:22.0,
-        30:27.5,
-        36:33.0
-      };
+      const standardWidths = [2, 4, 6, 8, 9, 12, 16, 18, 20, 24, 30, 36];
 
       function splitLargeSmall(cables) {
         const large = [], small = [];
@@ -706,11 +672,6 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       function sumAreas(arr) {
         return arr.reduce((sum, c) => sum + Math.PI * (c.OD/2)**2 * (c.parallelCount || 1), 0);
       }
-      function getAllowableArea(width, trayType) {
-        const base = allowableAreaByWidth[width] || 0;
-        return (trayType === "solid") ? base * 0.78 : base;
-      }
-
       function sizeRank(sizeStr) {
         if (!sizeStr) return -Infinity;
         const s = sizeStr.trim().toUpperCase();
@@ -720,28 +681,6 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         const m2 = s.match(/#(\d+)\s*AWG/);
         if (m2) return -parseInt(m2[1]);
         return NaN;
-      }
-
-      function singleAllowPercent(rank, trayType) {
-        if (rank >= sizeRank('4/0 AWG')) return 40;
-        return (trayType === 'ladder') ? 50 : 40;
-      }
-      function computeNeededWidth(large, small, trayType) {
-        let widthNeededLarge = 0;
-        if (large.length > 0) {
-          const sumD = sumDiameters(large);
-          widthNeededLarge = (trayType === "solid") ? (sumD / 0.9) : sumD;
-        }
-        const areaNeededSmall = sumAreas(small);
-
-        for (const W of standardWidths) {
-          if (W < widthNeededLarge) continue;
-          const allowA = getAllowableArea(W, trayType);
-          if (small.length === 0 || areaNeededSmall <= allowA) {
-            return W;
-          }
-        }
-        return null;
       }
 
       // ─────────────────────────────────────────────────────────────
@@ -1032,10 +971,22 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           showAlertModal('Validation Error', 'Add at least one cable before drawing the tray.');
           return;
         }
-        const totalArea = sumAreas(cables);
-        const allowFill = trayType === "ladder" ? 50 : 40;
-        const overallFill = (totalArea / (trayW * trayD)) * 100;
-        const overLimit = overallFill > allowFill + 1e-6;
+        const article392Results = compartments
+          .map(compartment => {
+            const compartmentCables = cables.filter(cable => (parseInt(cable.zone) || 1) === compartment.id);
+            if (!compartmentCables.length) return null;
+            return {
+              label: compartment.label || `Compartment ${compartment.id}`,
+              result: evaluateTrayFill({
+                tray_id: `${trayName || 'Tray'}:${compartment.id}`,
+                tray_type: trayType,
+                inside_width: parseFloat(compartment.width) || trayW,
+                tray_depth: parseFloat(compartment.depth) || trayD,
+              }, compartmentCables),
+            };
+          })
+          .filter(Boolean);
+        const overLimit = article392Results.some(entry => entry.result.status === 'fail');
         const cableColor = overLimit ? '#ff6666' : '#66ccff';
         lastColor = cableColor;
 
@@ -1105,32 +1056,18 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         const { large, small } = splitLargeSmall(cables);
         let sumSmallArea = sumAreas(small);
         let sumLargeDiam = sumDiameters(large);
-        const singleCables = cables.filter(c => !c.multi);
 
-        let singleWarning = "";
-        if (singleCables.length > 0) {
-          const areaSingle = sumAreas(singleCables);
-          const largestRank = Math.max(...singleCables.map(c => sizeRank(c.size)));
-          const allowP = singleAllowPercent(largestRank, trayType);
-          const fillP = (areaSingle / (trayW * trayD)) * 100;
-          if (fillP > allowP + 1e-6) {
-            singleWarning = `
-              <p class="nfpaWarn">
-                NFPA 70 392.22(B) WARNING:<br>
-                Single-conductor fill (${fillP.toFixed(0)} %) exceeds ${allowP} % allowable.
-              </p>`;
-          }
-          if (singleCables.some(c => c.count === 1 && sizeRank(c.size) < sizeRank('1/0 AWG'))) {
-            singleWarning += `
-              <p class="nfpaWarn">
-                NFPA 70 392.10(B)(1)(a) WARNING:<br>
-                Single-conductor cables smaller than #1/0 are not permitted in ladder cable trays.
-              </p>`;
-          }
-        }
-
-        // 4) Use the large/small split to compute recommended width
-        let recommendedWidth = computeNeededWidth(large, small, trayType);
+        // A width recommendation is only made when the shared selected-rule
+        // evaluator can produce an exact pass for a single physical compartment.
+        const recommendedWidth = compartments.length === 1
+          ? standardWidths
+              .filter(width => width > trayW)
+              .find(width => evaluateTrayFill({
+                tray_type: trayType,
+                inside_width: width,
+                tray_depth: trayD,
+              }, cables).status === 'pass') || null
+          : null;
 
         // 5) Check if user wants one‐diameter spacing between 4/0+ cables
         const spacingEnabled = document.getElementById("largeSpacing").checked;
@@ -1229,43 +1166,26 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         // 7) Determine if ALL cables are Control/Signal
         const allCS = cables.every(c => c.cableType === "Control" || c.cableType === "Signal");
 
-        // 8) NFPA 70 Table 392.22(A) warning (area vs sumLargeDiam) — only if NOT allCS
-        let nfpaWarning = "";
-        if (!allCS) {
-          const baseAllow = (trayType === "ladder") ? (nfpaLadder[trayW] || 0) : (nfpaSolid[trayW] || 0);
-          const penaltyFactor = (trayType === "ladder") ? 1.2 : 1.0;
-          if (baseAllow > 0) {
-            let nfpaAllowable = baseAllow - (penaltyFactor * sumLargeDiam);
-            if (nfpaAllowable < 0) nfpaAllowable = 0;
-            if (sumSmallArea > nfpaAllowable + 1e-6) {
-              nfpaWarning = `
-                <p class="nfpaWarn">
-                  NFPA 70 Table 392.22(A) WARNING:<br>
-                  Small‐cable area (${sumSmallArea.toFixed(2)} in²) exceeds NFPA allowable
-                  (${nfpaAllowable.toFixed(2)} in²) for a ${trayW}" ${trayType === "ladder" ? "Ladder" : "Solid Bottom"} tray.
-                </p>`;
-            }
-          }
-        }
-
-        // 9) NFPA 70 392.22(A)(2) & (4) warning for Control/Signal‐only
-        let csWarning = "";
-        const csFill = (sumSmallArea / (trayW * trayD)) * 100;
-        if (allCS) {
-          if (trayType === "ladder" && csFill > 50) {
-            csWarning = `
-              <p class="nfpaWarn">
-                NFPA 70 392.22(A)(2) WARNING:<br>
-                All cables are Control/Signal and Fill % (${csFill.toFixed(0)} %) exceeds 50 % for Ladder tray.
-              </p>`;
-          } else if (trayType === "solid" && csFill > 40) {
-            csWarning = `
-              <p class="nfpaWarn">
-                NFPA 70 392.22(A)(4) WARNING:<br>
-                All cables are Control/Signal and Fill % (${csFill.toFixed(0)} %) exceeds 40 % for Solid Bottom tray.
-              </p>`;
-          }
-        }
+        // Packing helpers above support the drawing only. The shared evaluator
+        // is the sole selected Article 392 determination shown to the user.
+        const articleRows = article392Results.map(({ label, result }) => {
+          const status = result.status === 'pass'
+            ? 'Selected-rule pass'
+            : result.status === 'fail'
+              ? 'Selected-rule exceedance'
+              : 'Evidence incomplete';
+          const reference = `NFPA 70 (NEC) 2023 ${result.clause}${result.tableColumn ? `, Table 392.22(A)(1) Column ${result.tableColumn}` : ''}`;
+          return `<li class="${result.status === 'fail' ? 'nfpaWarn' : result.status === 'pass' ? '' : 'warning'}">
+            <strong>${escapeHtml(label)} — ${escapeHtml(status)}:</strong>
+            ${escapeHtml(summarizeTrayFillResult(result))}
+            <br><span class="field-hint">${escapeHtml(reference)} · ${escapeHtml(result.arrangement)}</span>
+          </li>`;
+        }).join('');
+        const nfpaWarning = `<section class="tray-fill-basis" aria-label="Selected Article 392 results">
+          <h3>Selected NEC 2023 Article 392 Evaluation</h3>
+          <p class="field-hint">Geometric packing density is shown separately. Single-conductor, channel-tray, MV, ampacity-spacing, manufacturer, and AHJ-specific requirements do not receive an automatic pass.</p>
+          <ul>${articleRows}</ul>
+        </section>`;
 
         // 10) Summarize metrics + total weight
         const totalWeight = cables.reduce((sum, c) => sum + c.weight, 0);
@@ -1290,30 +1210,30 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           worstHTML += `</ul></section>`;
         }
 
-        // NEC violations panel
-        const necLimit = (allCS || trayType === 'ladder') ? 50 : 40;
-        const violatingZones = allZoneData.filter(zd => zd.pct > necLimit);
+        // Geometric packing-density panel; this is not the Article 392 result.
+        const densityThreshold = (allCS || trayType === 'ladder') ? 50 : 40;
+        const violatingZones = allZoneData.filter(zd => zd.pct > densityThreshold);
         let violationsHTML = '';
         if (violatingZones.length > 0) {
           const items = violatingZones
-            .map(zd => `<li><strong>${zd.label.replace(' Fill %', '')}</strong>: ${zd.pct.toFixed(1)}% (limit ${necLimit}%)</li>`)
+            .map(zd => `<li><strong>${zd.label.replace(' Fill %', '')}</strong>: ${zd.pct.toFixed(1)}% (review threshold ${densityThreshold}%)</li>`)
             .join('');
           violationsHTML = `<div class="fill-violations-panel" role="alert">
-            <strong>&#9888; NEC Fill Violations (${violatingZones.length})</strong>
+            <strong>&#9888; Packing-density review (${violatingZones.length})</strong>
             <ul>${items}</ul>
           </div>`;
         }
 
         // Color legend
         const legendHTML = `<div class="fill-heat-legend" aria-label="Fill color legend">
-          <span class="fhl-item fhl-ok">0\u201340% Safe</span>
-          <span class="fhl-item fhl-warn">40\u201350% Caution</span>
-          <span class="fhl-item fhl-danger">50%+ Violation</span>
+          <span class="fhl-item fhl-ok">0\u201340% packing density</span>
+          <span class="fhl-item fhl-warn">40\u201350% density review</span>
+          <span class="fhl-item fhl-danger">50%+ density review</span>
         </div>`;
 
         let resultsHTML = `${violationsHTML}${worstHTML}
           <p>
-            <strong>Tray Type:</strong> ${trayType === "ladder" ? "Ladder (50 % fill)" : "Solid Bottom (40 % fill)"}<br>
+            <strong>Tray Type:</strong> ${trayType === "ladder" ? "Ladder / ventilated family" : "Solid Bottom"}<br>
             <strong>Compartments:</strong> ${compartments.length}
           </p>
           <p>
@@ -1323,8 +1243,6 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           ${zoneHTML}
           <p><strong>Total Cable Weight:</strong> ${totalWeight.toFixed(2)} lbs/ft</p>
           ${nfpaWarning}
-          ${csWarning}
-          ${singleWarning}
           ${groupWarning}
           ${voltageWarning}
           ${legendHTML}

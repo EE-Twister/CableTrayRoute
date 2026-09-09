@@ -1,17 +1,9 @@
+import { buildPullConstructabilityMarkup, getPullGuidance, getPullStatusDetails } from './pullEvidenceView.mjs';
+import { bindPullAccessActions, buildPullAccessMarkup } from './pullAccessView.mjs';
+
 const formatCheck = (actual, allowable, unit) => Number.isFinite(actual) && Number.isFinite(allowable)
     ? `${Number(actual).toFixed(1)} / ${Number(allowable).toFixed(0)} ${unit}`
     : 'Inputs required';
-
-const getStatusDetails = (check, sectionCount = 0) => {
-    if (!check) return { label: 'Not calculated', className: 'inputs' };
-    if (check.status === 'pass') return { label: '1 setup · within limits', className: 'pass' };
-    if (check.status === 'setups-required') {
-        const count = Math.max(2, sectionCount || 0);
-        return { label: `${count} setups required`, className: 'setup' };
-    }
-    if (check.status === 'review-required') return { label: 'Review required', className: 'review' };
-    return { label: 'Inputs missing', className: 'inputs' };
-};
 
 export const buildPullGroupAnalysisMarkup = (analysis, options = {}) => {
     const {
@@ -82,8 +74,9 @@ export const buildPullReviewMarkup = (results, options = {}) => {
     } = options;
     const checks = results.map(result => result.pull_check).filter(Boolean);
     const setupCount = checks.filter(check => check.status === 'setups-required').length;
-    const reviewCount = checks.filter(check => ['review-required', 'inputs-required'].includes(check.status)).length;
-    let html = `<div class="pull-check-summary"><strong>${checks.length} cable pull plans</strong><span>${setupCount} require multiple setups</span><span>${reviewCount} require input or equipment review</span><span>Auto direction compares both ends · weakest equipment rating governs</span></div>`;
+    const reviewCount = checks.filter(check => ['review-required', 'inputs-required'].includes(check.status) || check.constructability?.status === 'blocked').length;
+    const evidenceReadyCount = checks.filter(check => check.constructability?.status === 'pass').length;
+    let html = `<div class="pull-check-summary"><strong>${checks.length} cable pull plans</strong><span>${setupCount} require multiple setups</span><span>${reviewCount} require input, equipment, or evidence review</span><span>${evidenceReadyCount} constructability evidence package${evidenceReadyCount === 1 ? '' : 's'} ready for qualified review</span></div>`;
     if (groupAnalysis) {
         html += buildPullGroupAnalysisMarkup(groupAnalysis, {
             decisions,
@@ -97,13 +90,9 @@ export const buildPullReviewMarkup = (results, options = {}) => {
     results.forEach((result, routeIndex) => {
         const check = result.pull_check;
         const sections = Array.isArray(check?.sections) ? check.sections : [];
-        const status = getStatusDetails(check, sections.length);
+        const status = getPullStatusDetails(check, sections.length);
         const equipment = check?.equipment || {};
-        const guidance = check?.status === 'inputs-required'
-            ? `Missing: ${(check.missingInputs || []).join(', ')}`
-            : check
-                ? `${equipment.counts?.reels || 0} reel · ${equipment.counts?.tuggers || 0} tugger · ${equipment.counts?.handPulls || 0} hand pull · ${equipment.counts?.sheaves || 0} sheave · ${equipment.counts?.rollers || 0} rollers`
-                : 'Run routing with pull planning enabled';
+        const guidance = getPullGuidance(check, equipment);
         const canShowSetups = check && check.status !== 'inputs-required';
         const setupLabel = sections.length === 1 ? 'Show setup location' : `Show ${sections.length} setup locations`;
         const canvasAction = canShowSetups
@@ -113,7 +102,10 @@ export const buildPullReviewMarkup = (results, options = {}) => {
     });
     html += '</tbody></table></div>';
 
-    const selectedRoute = results[selectedRouteIndex] || results.find(result => result.pull_check);
+    const resolvedSelectedRouteIndex = Number.isInteger(selectedRouteIndex) && results[selectedRouteIndex]?.pull_check
+        ? selectedRouteIndex
+        : results.findIndex(result => result.pull_check);
+    const selectedRoute = results[resolvedSelectedRouteIndex];
     const selected = selectedRoute?.pull_check;
     if (selected && selected.status !== 'inputs-required') {
         const equipment = selected.equipment || {};
@@ -128,6 +120,8 @@ export const buildPullReviewMarkup = (results, options = {}) => {
             ? ` ${handPullCount} short section${handPullCount === 1 ? '' : 's'} meet both hand-pull limits: ≤ ${Number(selected.assumptions?.maxHandPullLengthFt || 25).toFixed(0)} ft and ≤ ${Number(selected.assumptions?.maxHandPullTensionLbf || 200).toFixed(0)} lbf.`
             : '';
         html += `<section class="pull-field-plan" aria-label="Selected cable field pull plan"><div class="pull-field-plan-heading"><div><span>Selected cable field plan</span><h4>${escapeHtml(selectedRoute.cable)} · ${escapeHtml(selected.directionLabel)}</h4><p>${escapeHtml(directionReason + handPullReason)}</p></div><span class="pull-direction-badge">${escapeHtml(selected.direction === 'reverse' ? 'Reverse pull selected' : 'Forward pull selected')}</span></div>`;
+        html += buildPullConstructabilityMarkup(selected.constructability, escapeHtml);
+        html += buildPullAccessMarkup({ constructability: selected.constructability, routeIndex: resolvedSelectedRouteIndex, formatDistance, escapeHtml, escapeAttr });
         html += `<div class="pull-equipment-kpis"><span><i class="legend-reel"></i><strong>${equipment.counts?.reels || 0}</strong>Reels</span><span><i class="legend-tugger"></i><strong>${equipment.counts?.tuggers || 0}</strong>Tuggers</span><span><i class="legend-hand-pull"></i><strong>${handPullCount}</strong>Hand pulls</span><span><i class="legend-sheave"></i><strong>${equipment.counts?.sheaves || 0}</strong>Sheaves</span><span><i class="legend-roller"></i><strong>${equipment.counts?.rollers || 0}</strong>Tray rollers</span><span><strong>${escapeHtml(weakest?.label || '—')}</strong>Weakest link · ${escapeHtml(weakest ? `${weakest.value.toFixed(0)} lbf` : '—')}</span></div>`;
         html += '<div class="table-scroll"><table class="sticky-table pull-section-table"><thead><tr><th>Section</th><th>Reel / payoff</th><th>Receiving method / end</th><th>Length</th><th>Maximum tension</th><th>Sheaves</th><th>Tray rollers</th></tr></thead><tbody>';
         selected.sections.forEach(section => {
@@ -186,4 +180,5 @@ export const bindPullReviewActions = (container, callbacks = {}) => {
     container.querySelectorAll('.pull-check-view-setups').forEach(button => {
         button.addEventListener('click', () => callbacks.onShowSetups?.(Number(button.dataset.pullRouteIndex)));
     });
+    bindPullAccessActions(container, callbacks.onSaveAccessRecords);
 };

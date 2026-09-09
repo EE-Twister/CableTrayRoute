@@ -794,6 +794,39 @@ body.dark-mode .large-facility-sample-btn {
 .pull-field-plan-heading p { margin: 0.28rem 0 0; color: #64748b; font-size: 0.68rem; }
 .pull-direction-badge { flex: 0 0 auto; padding: 0.28rem 0.52rem; border-radius: 999px; background: #dbeafe; color: #1d4ed8 !important; font-size: 0.6rem !important; letter-spacing: 0 !important; text-transform: none !important; }
 
+.pull-access-records {
+  margin: 0.75rem;
+  overflow: hidden;
+  border: 1px solid #bfdbfe;
+  border-radius: 9px;
+  background: #f8fafc;
+}
+
+.pull-access-heading,
+.pull-access-actions {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.75rem;
+}
+
+.pull-access-heading { border-bottom: 1px solid #dbeafe; }
+.pull-access-heading strong { color: #1e3a8a; font-size: 0.72rem; }
+.pull-access-heading p,
+.pull-access-actions p { margin: 0.14rem 0 0; color: #64748b; font-size: 0.62rem; }
+.pull-access-heading > span { flex: 0 0 auto; color: #1d4ed8; font-size: 0.66rem; font-weight: 800; }
+.pull-access-table { min-width: 940px; }
+.pull-access-table td { vertical-align: top; }
+.pull-access-table td strong,
+.pull-access-table td small { display: block; }
+.pull-access-table td small { margin-top: 0.15rem; color: #64748b; font-size: 0.58rem; }
+.pull-access-table select,
+.pull-access-table input { min-width: 8.5rem; margin: 0; font-size: 0.66rem; }
+.pull-access-table input { width: 100%; min-width: 13rem; }
+.pull-access-actions { border-top: 1px solid #dbeafe; }
+.pull-access-actions button { flex: 0 0 auto; margin: 0; background: #2563eb; font-size: 0.66rem; font-weight: 800; }
+
 .pull-equipment-kpis {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));

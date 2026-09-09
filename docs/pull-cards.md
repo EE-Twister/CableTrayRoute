@@ -26,6 +26,8 @@ Missing values are not silently replaced with zero:
 
 The Pull Summary reports how many pull groups still require input.
 
+Ductbank route segments use the shared scope-qualified `ductbank:conduit` identity. An explicit Cable Schedule conduit assignment can complete a parent-only ductbank route when that conduit exists in the named ductbank. If multiple internal conduits remain possible, the Pull Card retains the ductbank step, reports the unresolved assignment, and marks input coverage incomplete instead of selecting a conduit.
+
 ## Per-Pull Engineering Inputs
 
 Open a pull and use **Pull Engineering Inputs** to edit the following values for
@@ -46,6 +48,8 @@ lower maximum screening tension. The detail view and XLSX export retain both
 direction results, the selected direction, engineering assumptions, limits,
 statuses, jam result, and input warnings.
 
+When Optimal Route has calculated Pull Constructability Assurance, Pull Cards also show a read-only table of each cable's reel, intermediate, and receiving access records. Status, station, coordinates, evidence source, access note, and constructability signature are retained. Blocked or incomplete constructability evidence is included in the input warnings. Edit these records in Optimal Route; Pull Cards deliberately does not create or approve field evidence.
+
 Jam-ratio screening is intentionally limited to three physical cables whose
 outside diameters are within 10% of one another. Ratios from 2.8 through 3.2 are
 flagged for detailed engineering review. Other bundle configurations are marked
@@ -63,6 +67,7 @@ pull-table re-sorting and renumbering. The artifact includes:
 - Tension, sidewall-pressure, and jam results
 - Pass/fail/not-evaluated statuses
 - Input-coverage warnings
+- Per-cable constructability signatures and pull-point access records, when available
 
 Because it is project-backed, the artifact participates in the project's normal
 scenario, undo/redo, import, and export behavior. Pull Cards does not write

@@ -70,8 +70,8 @@ const reportSnapshots = projectInput('settings.reportSnapshots', 'setting', fals
 const lifecyclePackages = projectInput('settings.lifecyclePackages', 'setting', false, 'Release package records and lifecycle package history.');
 const deliverableArtifacts = projectInput('settings.deliverableArtifacts', 'setting', false, 'Source-fingerprinted deliverable records with revision, status, and transmittal metadata.');
 const fieldExecutionRecords = projectInput('settings.fieldExecutionRecords', 'setting', false, 'Shared cable and raceway installation, punch, and as-built records.');
-const procurementRegister = projectInput('settings.procurementRegister', 'setting', false, 'Saved procurement line items, vendor controls, milestones, and receiving status.');
-const costEstimateArtifact = projectInput('settings.costEstimateArtifact', 'setting', false, 'Latest persisted estimate summary, basis, and line-item rows.');
+const procurementRegister = projectInput('settings.procurementRegister', 'setting', false, 'Saved procurement line items, vendor controls, milestones, receiving status, and route-quantity evidence references.');
+const costEstimateArtifact = projectInput('settings.costEstimateArtifact', 'setting', false, 'Latest persisted estimate summary, basis, route-scoped quantity ledger, assurance signatures, blockers, and line-item rows.');
 const pullPlanArtifact = projectInput('settings.pullPlanArtifact', 'setting', false, 'Saved pull engineering assumptions, direction comparison, limits, jam screening, and input warnings.');
 const scenarios = projectInput('settings.scenarios', 'setting', false, 'Scenario registry and active scenario selection.');
 const oneLineReconcilePending = projectInput('settings.oneLineScheduleReconcilePending', 'setting', false, 'Legacy compatibility flag; automatic shared-data synchronization keeps this false.');
@@ -114,6 +114,8 @@ export const PAGE_CONTRACTS_BY_HREF = {
       approvals,
       reportSnapshots,
       lifecyclePackages,
+      procurementRegister,
+      costEstimateArtifact,
       tccSettings,
       oneLineReconcilePending,
       projectInput('settings.activeSampleWorkflow', 'setting', false, 'Active sample context used to suppress redundant sample-loading guidance.'),
@@ -515,7 +517,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
     standaloneInputs: ['Manual cable/raceway imports, route constraints, geometry settings, and optimization options.'],
     projectInputs: [...racewayInputs, routeSession],
     outputs: [
-      output('settings.latestRouteResults', 'setting', 'Latest route result batch with path choices, lengths, warnings, and failed routes.', ['pullcards.html', 'spoolsheets.html', 'projectreport.html']),
+      output('settings.latestRouteResults', 'setting', 'Latest route result batch with path choices, lengths, warnings, failed routes, and optional signed pull-constructability evidence.', ['pullcards.html', 'spoolsheets.html', 'projectreport.html']),
       output('cableSchedule', 'schedule', 'Cable assignment updates written after route edits.', ['cableschedule.html']),
       output('settings.ctrSession', 'setting', 'Optimal Route working session values.', ['optimalRoute.html']),
       output('settings.trayFillData', 'setting', 'Tray fill handoff data opened from route results.', ['cabletrayfill.html']),
@@ -523,7 +525,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
       output('settings.ductbankRouteData', 'setting', 'Ductbank route handoff data opened from route results.', ['ductbankroute.html']),
       exportOnly('Route result CSV, summaries, and segment exports.', ['pullcards.html', 'projectreport.html'])
     ],
-    readiness: ready('Ready when routing-ready cables and routeable raceways with geometry are available.', ['No routing-ready cables, no raceways, invalid raceway references, or missing geometry.']),
+    readiness: ready('Ready when routing-ready cables and routeable raceways with geometry are available; opted-in pull plans require complete constructability evidence for issue.', ['No routing-ready cables, no raceways, invalid raceway references, missing geometry, or incomplete opted-in pull evidence.']),
     downstream: ['pullcards.html', 'spoolsheets.html', 'projectreport.html']
   }),
   'pullcards.html': contract({
@@ -541,7 +543,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'procurementschedule.html': contract({
     workflowStep: 'deliverables',
     standaloneInputs: ['Cable cut imports, reel sizes, tolerance settings, and procurement options.'],
-    projectInputs: [cables, latestRouteResults, procurementRegister, designBasis],
+    projectInputs: [cables, trays, conduits, ductbanks, latestRouteResults, procurementRegister, designBasis],
     outputs: [
       output('settings.procurementRegister', 'setting', 'Saved commercial cable specification lines with vendor, quote, schedule, PO, delivery, and receiving controls.', ['costestimate.html', 'projectreport.html', 'submittal.html']),
       output('settings.deliverableArtifacts', 'setting', 'Source-fingerprinted current procurement schedule record.', ['projectreport.html', 'submittal.html']),
@@ -552,14 +554,14 @@ export const PAGE_CONTRACTS_BY_HREF = {
   }),
   'costestimate.html': contract({
     workflowStep: 'deliverables',
-    standaloneInputs: ['Manual quantities, labor rates, regional wage basis, escalation indexes, custom price book imports, and estimate assumptions.'],
+    standaloneInputs: ['Manual quantities, electrical/civil labor rates, mixed-unit productivity, regional wage basis, escalation indexes, custom price book imports, and estimate assumptions.'],
     projectInputs: [cables, trays, conduits, ductbanks, studies, routeResultsStudy, latestRouteResults, costEstimateArtifact, projectInput('settings.customPricing', 'setting', false, 'Saved custom pricing book used to override default estimator unit prices.'), projectInput('settings.costEstimateBasis', 'setting', false, 'Saved regional labor and material/labor escalation basis.'), designBasis],
     outputs: [
-      output('settings.customPricing', 'setting', 'Custom pricing book and estimator overrides.', ['costestimate.html']),
+      output('settings.customPricing', 'setting', 'Custom electrical, support, fitting, and civil assembly pricing/productivity book.', ['costestimate.html']),
       output('settings.costEstimateBasis', 'setting', 'Regional wage and index escalation basis with source metadata.', ['costestimate.html', 'projectreport.html']),
-      output('settings.costEstimateArtifact', 'setting', 'Latest estimate summary, cost basis, and line-item rows persisted for report and submittal packages.', ['projectreport.html', 'submittal.html']),
+      output('settings.costEstimateArtifact', 'setting', 'Latest estimate summary, governed pricing basis, signed route quantity and cost assurance, blockers, and line-item rows persisted for report and lifecycle packages.', ['projectreport.html', 'submittal.html']),
       output('settings.deliverableArtifacts', 'setting', 'Source-fingerprinted cost estimate artifact record.', ['projectreport.html', 'submittal.html']),
-      exportOnly('Cost estimate tables and bid-support exports.', ['projectreport.html'])
+      exportOnly('Conceptual cost-estimate tables and qualified commercial-review exports.', ['projectreport.html'])
     ],
     readiness: ready('Ready when quantities and pricing assumptions are available.', ['No quantities, missing unit pricing, or invalid labor assumptions.']),
     downstream: ['projectreport.html']

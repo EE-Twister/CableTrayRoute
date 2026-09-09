@@ -6,6 +6,9 @@ import {
   estimateCableCosts,
   estimateTrayCosts,
   estimateConduitCosts,
+  estimateTraySupportCosts,
+  estimateDuctbankCosts,
+  ductbankConstructionPriceKey,
   summarizeCosts,
   DEFAULT_PRICES,
   DEFAULT_ESTIMATE_BASIS,
@@ -58,6 +61,12 @@ describe('DEFAULT_PRICES', () => {
 describe('source-aware estimate basis', () => {
   it('calculates escalation as current index divided by base index', () => {
     assert.strictEqual(calculateEscalationFactor(100, 125), 1.25);
+  });
+
+  it('does not invent civil or tray-support prices', () => {
+    assert.strictEqual(DEFAULT_PRICES.traySupport.default, 0);
+    assert.deepStrictEqual(DEFAULT_PRICES.construction, {});
+    assert.deepStrictEqual(DEFAULT_PRICES.laborUnitHours, {});
   });
 
   it('keeps invalid index pairs neutral', () => {
@@ -128,6 +137,17 @@ describe('estimateCableCosts', () => {
     assert.strictEqual(items[1].quantity, 150);
   });
 
+  it('applies physical-run multiplicity while retaining conductor footage evidence', () => {
+    const items = estimateCableCosts([
+      { cable_tag: 'C-PAR', conductor_size: '4 AWG', conductors: 3, parallel_sets: 2 },
+    ], [{ cable: 'C-PAR', total_length: 50 }]);
+    assert.strictEqual(items[0].routeLengthFt, 50);
+    assert.strictEqual(items[0].runCount, 2);
+    assert.strictEqual(items[0].quantity, 100);
+    assert.strictEqual(items[0].extendedQuantity, 300);
+    assert.strictEqual(items[0].priceKey, '4 AWG');
+  });
+
   it('computes non-zero costs for known sizes', () => {
     const items = estimateCableCosts(cables, routes);
     assert.ok(items[0].materialCost > 0);
@@ -174,6 +194,8 @@ describe('estimateCableCosts', () => {
     const unknownRoute = [{ cable: 'X-1', total_length: '100' }];
     const items = estimateCableCosts(unknownCable, unknownRoute);
     assert.strictEqual(items[0].unitPrice, DEFAULT_PRICES.cable['default']);
+    assert.strictEqual(items[0].usedDefaultPrice, true);
+    assert.strictEqual(items[0].priceKey, 'default');
   });
 
   it('returns empty array for empty input', () => {
@@ -207,6 +229,90 @@ describe('estimateTrayCosts', () => {
     const withFittings = items[1].materialCost;
     const withoutFittings = estimateTrayCosts([{ ...trays[1], fitting_count: '0' }])[0].materialCost;
     assert.ok(withFittings > withoutFittings);
+  });
+
+  it('adds fitting labor only when governed fitting productivity is supplied', () => {
+    const item = estimateTrayCosts([trays[1]], {
+      labor: { trayInstall: 100 },
+      laborProductivity: { trayInstallFtPerHr: 25, trayFittingInstallEaPerHr: 2 },
+    })[0];
+    assert.strictEqual(item.routeLaborHrs, 2);
+    assert.strictEqual(item.fittingLaborHrs, 2);
+    assert.strictEqual(item.laborHrs, 4);
+    assert.strictEqual(item.laborCost, 400);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('tray support and ductbank assembly costs', () => {
+  it('uses route-ledger tray support counts and catalog-keyed pricing', () => {
+    const item = estimateTraySupportCosts([{
+      tray_id: 'T-S1',
+      inside_width: '12',
+      support_quantity: 11,
+      support_catalog_number: 'SUP-12-A',
+    }], {
+      traySupport: { 'SUP-12-A': 25 },
+      labor: { trayInstall: 100 },
+      laborProductivity: { traySupportInstallEaPerHr: 2 },
+    })[0];
+    assert.strictEqual(item.priceBasis, 'catalog-number');
+    assert.strictEqual(item.materialCost, 275);
+    assert.strictEqual(item.laborHrs, 5.5);
+    assert.strictEqual(item.totalCost, 825);
+  });
+
+  it('prices mixed-unit ductbank BOM rows without inventing missing rates', () => {
+    const ductbank = {
+      tag: 'DB-1',
+      coverDepth: 36,
+      concrete_encasement: true,
+      rightPad: 3,
+      conduits: [
+        { type: 'PVC Sch 40', trade_size: '2', x: 0, y: 0 },
+        { type: 'PVC Sch 40', trade_size: '2', x: 4, y: 0 },
+      ],
+    };
+    const quantityRows = [{ type: 'ductbank', id: 'DB-1', quantity: 100 }];
+    const unpriced = estimateDuctbankCosts([ductbank], quantityRows);
+    assert.strictEqual(unpriced.assemblies[0].ready, true);
+    assert(unpriced.lineItems.length > 5);
+    assert(unpriced.lineItems.every(item => item.unitPrice === 0 && item.laborHrs === 0));
+
+    const construction = {};
+    const laborUnitHours = {};
+    unpriced.lineItems.forEach(item => {
+      construction[item.priceKey] = 2;
+      laborUnitHours[item.laborHoursKey] = 0.5;
+    });
+    const priced = estimateDuctbankCosts([ductbank], quantityRows, {
+      construction,
+      laborUnitHours,
+      labor: { civilInstall: 100 },
+    });
+    const conduit = priced.lineItems.find(item => item.description.startsWith('PVC Sch 40 conduit'));
+    assert.strictEqual(conduit.priceKey, 'ductbank.raceway.pvc-sch-40-conduit.2-in-trade-size');
+    assert.strictEqual(conduit.quantity, 210);
+    assert.strictEqual(conduit.materialCost, 420);
+    assert.strictEqual(conduit.laborHrs, 105);
+    assert.strictEqual(conduit.laborCost, 10500);
+  });
+
+  it('marks ductbank construction evidence incomplete when cover depth is absent', () => {
+    const result = estimateDuctbankCosts([{
+      tag: 'DB-NO-DEPTH',
+      conduits: [{ conduit_type: 'PVC Sch 40', trade_size: '2', x: 0, y: 0 }],
+    }], [{ type: 'ductbank', id: 'DB-NO-DEPTH', quantity: 50 }]);
+    assert.strictEqual(result.assemblies[0].ready, false);
+    assert(result.assemblies[0].blockingReasons.some(reason => reason.includes('cover/depth')));
+  });
+
+  it('creates deterministic construction keys from BOM identity', () => {
+    assert.strictEqual(ductbankConstructionPriceKey({
+      category: 'Civil',
+      item: 'Concrete encasement',
+      specification: '12 in W × 8 in H',
+    }), 'ductbank.civil.concrete-encasement.12-in-w-8-in-h');
   });
 });
 
@@ -354,6 +460,28 @@ cable,default,2.00,$/ft,Local Supplier,2026-01-01
   });
 });
 
+describe('parsePricingCSV — construction scope', () => {
+  const csv = `category,key,unit_price,unit,source,date
+tray_support,12,28,$/ea,Qualified takeoff,2026-08-25
+construction,ductbank.civil.trench-excavation,18,$/CY,Qualified takeoff,2026-08-25
+labor_unit_hours,ductbank.civil.trench-excavation,0.25,hr/CY,Qualified takeoff,2026-08-25
+labor,civilInstall,110,$/hr,Qualified takeoff,2026-08-25
+productivity,traySupportInstallEaPerHr,2,EA/hr,Qualified takeoff,2026-08-25
+productivity,trayFittingInstallEaPerHr,4,EA/hr,Qualified takeoff,2026-08-25
+`;
+  const { prices, meta } = parsePricingCSV(csv);
+
+  it('parses support, construction, civil labor, and mixed-unit labor evidence', () => {
+    assert.strictEqual(prices.traySupport['12'], 28);
+    assert.strictEqual(prices.construction['ductbank.civil.trench-excavation'], 18);
+    assert.strictEqual(prices.laborUnitHours['ductbank.civil.trench-excavation'], 0.25);
+    assert.strictEqual(prices.labor.civilInstall, 110);
+    assert.strictEqual(prices.laborProductivity.traySupportInstallEaPerHr, 2);
+    assert.strictEqual(prices.laborProductivity.trayFittingInstallEaPerHr, 4);
+    assert.strictEqual(meta.rowCount, 6);
+  });
+});
+
 // ---------------------------------------------------------------------------
 describe('parsePricingCSV — malformed input', () => {
   it('skips rows with non-numeric unit_price', () => {
@@ -434,6 +562,20 @@ describe('exportPricingCSV — roundtrip', () => {
     const { prices } = parsePricingCSV(csv);
     assert.strictEqual(prices.labor.cableInstall, 82);
     assert.strictEqual(prices.labor.trayInstall, 97);
+  });
+
+  it('roundtrips construction and mixed-unit labor maps', () => {
+    const original = {
+      traySupport: { 12: 25 },
+      construction: { 'ductbank.civil.trench-excavation': 18 },
+      laborUnitHours: { 'ductbank.civil.trench-excavation': 0.25 },
+      labor: { civilInstall: 110 },
+    };
+    const { prices } = parsePricingCSV(exportPricingCSV(original, {}));
+    assert.strictEqual(prices.traySupport['12'], 25);
+    assert.strictEqual(prices.construction['ductbank.civil.trench-excavation'], 18);
+    assert.strictEqual(prices.laborUnitHours['ductbank.civil.trench-excavation'], 0.25);
+    assert.strictEqual(prices.labor.civilInstall, 110);
   });
 
   it('CSV includes meta source and date in header comment', () => {

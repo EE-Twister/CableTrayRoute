@@ -2,6 +2,8 @@ import {
   estimateCableCosts,
   estimateTrayCosts,
   estimateConduitCosts,
+  estimateTraySupportCosts,
+  estimateDuctbankCosts,
   summarizeCosts,
   DEFAULT_PRICES,
   DEFAULT_ESTIMATE_BASIS,
@@ -14,6 +16,8 @@ import {
 import {
   getCables,
   getConduits,
+  getDuctbanks,
+  getItem,
   getProjectInputFingerprint,
   getStudies,
   getTrays,
@@ -24,6 +28,8 @@ import {
 } from './dataStore.mjs';
 import { showAlertModal } from './src/components/modal.js';
 import { normalizeDeliverableArtifact } from './analysis/deliverableArtifacts.mjs';
+import { normalizeRouteResults } from './analysis/routeResults.mjs';
+import { buildRouteCostAssurance, buildRouteQuantityLedger } from './analysis/routeCostAssurance.mjs';
 
 const CUSTOM_PRICING_KEY = 'customPricing';
 const COST_ESTIMATE_BASIS_KEY = 'costEstimateBasis';
@@ -39,6 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let customPrices = null;          // null = use DEFAULT_PRICES
   let customPricingMeta = { source: '', date: '', rowCount: 0 };
   let lastEstimateBasis = buildEstimateBasis();
+  let lastRouteCostAssurance = null;
+  let lastDuctbankAssemblies = [];
 
   // Restore persisted custom pricing from project settings.
   try {
@@ -173,17 +181,23 @@ document.addEventListener('DOMContentLoaded', () => {
           cable:             { ...DEFAULT_PRICES.cable,   ...(customPrices.cable   || {}) },
           tray:              { ...DEFAULT_PRICES.tray,    ...(customPrices.tray    || {}) },
           conduit:           { ...DEFAULT_PRICES.conduit, ...(customPrices.conduit || {}) },
+          traySupport:       { ...DEFAULT_PRICES.traySupport, ...(customPrices.traySupport || {}) },
+          construction:      { ...DEFAULT_PRICES.construction, ...(customPrices.construction || {}) },
           fitting:           customPrices.fitting ?? DEFAULT_PRICES.fitting,
           labor:             { ...DEFAULT_PRICES.labor,            ...(customPrices.labor            || {}) },
           laborProductivity: { ...DEFAULT_PRICES.laborProductivity, ...(customPrices.laborProductivity || {}) },
+          laborUnitHours:    { ...DEFAULT_PRICES.laborUnitHours, ...(customPrices.laborUnitHours || {}) },
         }
       : {
           cable:             { ...DEFAULT_PRICES.cable   },
           tray:              { ...DEFAULT_PRICES.tray    },
           conduit:           { ...DEFAULT_PRICES.conduit },
+          traySupport:       { ...DEFAULT_PRICES.traySupport },
+          construction:      { ...DEFAULT_PRICES.construction },
           fitting:           DEFAULT_PRICES.fitting,
           labor:             { ...DEFAULT_PRICES.labor   },
           laborProductivity: { ...DEFAULT_PRICES.laborProductivity },
+          laborUnitHours:    { ...DEFAULT_PRICES.laborUnitHours },
         };
 
     const estimateBasis = buildEstimateBasis(readEstimateBasis());
@@ -291,16 +305,51 @@ document.addEventListener('DOMContentLoaded', () => {
     const cables = getCables();
     const trays  = getTrays();
     const conduits = getConduits();
+    const ductbanks = getDuctbanks();
     const studies  = getStudies();
-    const routeResults = Array.isArray(studies.routeResults) ? studies.routeResults : [];
+    const latestRouteResults = normalizeRouteResults(getItem('latestRouteResults', null));
+    const routeResults = latestRouteResults.length
+      ? latestRouteResults
+      : normalizeRouteResults(studies.routeResults || []);
 
     const prices = buildMergedPrices();
+    const quantityLedger = buildRouteQuantityLedger({ routeResults, cables, trays, conduits, ductbanks });
+    const cableIds = new Set(quantityLedger.rows.filter(row => row.type === 'cable').map(row => row.id.toLowerCase()));
+    const trayQuantities = new Map(quantityLedger.rows.filter(row => row.type === 'tray').map(row => [row.id.toLowerCase(), row.quantity]));
+    const conduitQuantities = new Map(quantityLedger.rows.filter(row => row.type === 'conduit').map(row => [row.id.toLowerCase(), row.quantity]));
+    const ductbankConduits = ductbanks.flatMap(ductbank => Array.isArray(ductbank.conduits) ? ductbank.conduits : []);
+    const allConduits = [...conduits, ...ductbankConduits];
+    const routeScoped = quantityLedger.status === 'pass' && quantityLedger.summary.routes > 0;
+    const scopedCables = routeScoped
+      ? cables.filter(cable => cableIds.has(String(cable.cable_tag || cable.tag || cable.name || cable.id || '').toLowerCase()))
+      : cables;
+    const scopedTrays = routeScoped
+      ? trays.filter(tray => trayQuantities.has(String(tray.tray_id || tray.id || tray.tag || '').toLowerCase()))
+        .map(tray => {
+          const trayId = String(tray.tray_id || tray.id || tray.tag || '').toLowerCase();
+          const ledgerRow = quantityLedger.rows.find(row => row.type === 'tray' && row.id.toLowerCase() === trayId);
+          return {
+            ...tray,
+            length_ft: trayQuantities.get(trayId),
+            support_quantity: ledgerRow?.supportQuantity || 0,
+          };
+        })
+      : trays;
+    const scopedConduits = routeScoped
+      ? allConduits.filter(conduit => conduitQuantities.has(String(conduit.conduit_id || conduit.id || conduit.tag || '').toLowerCase()))
+        .map(conduit => ({ ...conduit, length_ft: conduitQuantities.get(String(conduit.conduit_id || conduit.id || conduit.tag || '').toLowerCase()) }))
+      : conduits;
 
-    const cableItems   = estimateCableCosts(cables, routeResults, prices);
-    const trayItems    = estimateTrayCosts(trays, prices);
-    const conduitItems = estimateConduitCosts(conduits, prices);
+    const cableItems   = estimateCableCosts(scopedCables, routeResults, prices);
+    const trayItems    = estimateTrayCosts(scopedTrays, prices);
+    const conduitItems = estimateConduitCosts(scopedConduits, prices);
+    const supportItems = routeScoped ? estimateTraySupportCosts(scopedTrays, prices) : [];
+    const ductbankEstimate = routeScoped
+      ? estimateDuctbankCosts(ductbanks, quantityLedger.rows, prices)
+      : { lineItems: [], assemblies: [] };
+    lastDuctbankAssemblies = ductbankEstimate.assemblies;
 
-    lastLineItems = [...cableItems, ...trayItems, ...conduitItems];
+    lastLineItems = [...cableItems, ...trayItems, ...conduitItems, ...supportItems, ...ductbankEstimate.lineItems];
 
     if (!lastLineItems.length) {
       document.getElementById('results').innerHTML =
@@ -314,8 +363,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const totalWithContingency = summary.grandTotal + contingencyAmt;
 
     const generatedAt = new Date().toISOString();
+    const inputFingerprint = getProjectInputFingerprint();
+    lastRouteCostAssurance = buildRouteCostAssurance({
+      routeResults,
+      cables,
+      trays,
+      conduits,
+      ductbanks,
+      lineItems: lastLineItems,
+      estimateBasis: lastEstimateBasis,
+      pricingMeta: customPricingMeta,
+      governedPrices: customPrices,
+      ductbankAssemblies: lastDuctbankAssemblies,
+      contingencyPct,
+      inputFingerprint,
+    });
     const savedEstimate = {
       generatedAt,
+      inputFingerprint,
+      pricingMeta: customPricingMeta,
       basis: lastEstimateBasis,
       summary: {
         material: summary.grandMaterial,
@@ -326,6 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
         total: totalWithContingency,
       },
       rows: lastLineItems,
+      routeCostAssurance: lastRouteCostAssurance,
     };
     setItem('costEstimateArtifact', savedEstimate);
     upsertDeliverableArtifact(normalizeDeliverableArtifact({
@@ -335,10 +402,16 @@ document.addEventListener('DOMContentLoaded', () => {
       revision: lastEstimateBasis.estimateDate || lastEstimateBasis.baseDate || '0',
       status: 'draft',
       generatedAt,
-      sourceFingerprint: getProjectInputFingerprint(),
+      sourceFingerprint: inputFingerprint,
       sourcePage: 'costestimate.html',
       includedSections: ['costEstimate'],
-      summary: savedEstimate.summary,
+      summary: {
+        ...savedEstimate.summary,
+        routeCostStatus: lastRouteCostAssurance.status,
+        routeCostSignature: lastRouteCostAssurance.signature,
+        routeQuantitySignature: lastRouteCostAssurance.quantityLedger.signature,
+        routeCostBlockers: lastRouteCostAssurance.blockingIssues.length,
+      },
     }));
 
     renderResults(summary, lastLineItems, contingencyPct, contingencyAmt, totalWithContingency, lastEstimateBasis);
@@ -367,6 +440,34 @@ document.addEventListener('DOMContentLoaded', () => {
     return 'Prices based on built-in 2024 USD conceptual allowances. Replace them with a licensed cost source or supplier quote for issued estimates.';
   }
 
+  function routeCostAssuranceMarkup(assurance) {
+    if (!assurance) return '';
+    const ledger = assurance.quantityLedger;
+    const status = assurance.status === 'pass' ? 'Ready for qualified commercial review' : 'Evidence incomplete';
+    const issueRows = [...assurance.blockingIssues, ...assurance.warnings].map(item =>
+      `<li><strong>${esc(item.code)}</strong> — ${esc(item.message)}</li>`
+    ).join('');
+    const ledgerRows = ledger.rows.map(row => `
+      <tr><td>${esc(row.category)}</td><td>${esc(row.id)}</td><td>${Number(row.quantity || 0).toFixed(1)}</td><td>${esc(row.unit)}</td><td>${esc(row.basis)}</td></tr>`
+    ).join('');
+    return `
+      <section class="field-group" aria-label="Route quantity and cost assurance" style="margin-bottom:1.5rem">
+        <h3>Route Quantity &amp; Cost Assurance</h3>
+        <p class="${assurance.status === 'pass' ? 'result-ok' : 'result-warn'}"><strong>${status}</strong> — ${esc(assurance.classification)}</p>
+        <p class="field-hint">Cost signature <code>${esc(assurance.signature)}</code>; quantity signature <code>${esc(ledger.signature)}</code>. This evidence is conceptual and is not a bid or issued estimate.</p>
+        <table class="result-table" aria-label="Route quantity summary"><tbody>
+          <tr><td>Cable-run footage</td><td>${ledger.summary.cableRunFt.toFixed(1)} ft</td></tr>
+          <tr><td>Conductor footage</td><td>${ledger.summary.conductorFt.toFixed(1)} ft</td></tr>
+          <tr><td>Unique used tray / conduit / ductbank</td><td>${ledger.summary.uniqueTrayFt.toFixed(1)} / ${ledger.summary.uniqueConduitFt.toFixed(1)} / ${ledger.summary.uniqueDuctbankFt.toFixed(1)} ft</td></tr>
+          <tr><td>Tray supports / route bends / pull setups</td><td>${ledger.summary.traySupports} / ${ledger.summary.routeBends} / ${ledger.summary.pullSetups}</td></tr>
+        </tbody></table>
+        ${issueRows ? `<ul class="field-hint">${issueRows}</ul>` : '<p class="field-hint">All governed quantity, price, labor, and extension checks passed.</p>'}
+        <details><summary>Route quantity ledger (${ledger.rows.length} rows)</summary>
+          <table class="result-table" aria-label="Route quantity ledger"><thead><tr><th>Category</th><th>ID</th><th>Quantity</th><th>Unit</th><th>Basis</th></tr></thead><tbody>${ledgerRows}</tbody></table>
+        </details>
+      </section>`;
+  }
+
   function renderResults(summary, lineItems, contingencyPct, contingencyAmt, totalWithContingency, basis) {
     const catRows = Object.entries(summary.categories).map(([cat, s]) => `
       <tr>
@@ -385,7 +486,9 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${esc(item.catalogNumber || '')}</td>
         <td>${item.approvedPart ? 'Approved' : 'Unreviewed'}</td>
         <td>${(item.quantity || 0).toFixed(0)} ${esc(item.unit)}</td>
+        <td><code>${esc(item.priceKey || '')}</code></td>
         <td>${fmt(item.unitPrice)}</td>
+        <td>${esc(item.laborHoursKey || (item.productivityEaPerHr ? `${item.productivityEaPerHr} EA/hr` : item.productivityFtPerHr ? `${item.productivityFtPerHr} ft/hr` : ''))}</td>
         <td>${fmt(item.materialCost)}</td>
         <td>${fmt(item.laborCost)}</td>
         <td><strong>${fmt(item.totalCost)}</strong></td>
@@ -393,6 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('results').innerHTML = `
       <h2>Cost Summary</h2>
+      ${routeCostAssuranceMarkup(lastRouteCostAssurance)}
       <section class="field-group" aria-label="Estimate basis summary" style="margin-bottom:1.5rem">
         <h3>Estimate Basis</h3>
         <table class="result-table" aria-label="Estimate escalation basis">
@@ -451,7 +555,9 @@ document.addEventListener('DOMContentLoaded', () => {
               <th scope="col">Catalog No.</th>
               <th scope="col">Approval</th>
               <th scope="col">Quantity</th>
+              <th scope="col">Price Key</th>
               <th scope="col">Unit Price</th>
+              <th scope="col">Labor Basis</th>
               <th scope="col">Material</th>
               <th scope="col">Labor</th>
               <th scope="col">Total</th>
@@ -536,20 +642,54 @@ document.addEventListener('DOMContentLoaded', () => {
     ]);
 
     const detailData = [
-      ['Category', 'ID', 'Description', 'Manufacturer', 'Catalog No.', 'Approval', 'Quantity', 'Unit', 'Unit Price ($)', 'Material ($)', 'Labor ($)', 'Total ($)'],
+      ['Category', 'ID', 'Description', 'Manufacturer', 'Catalog No.', 'Approval', 'Quantity', 'Unit', 'Price Key', 'Unit Price ($)', 'Labor Basis', 'Labor Hours', 'Material ($)', 'Labor ($)', 'Total ($)'],
       ...lastLineItems.map(i => [
         i.category, i.id, i.description,
         i.manufacturer || '',
         i.catalogNumber || '',
         i.approvedPart ? 'Approved' : 'Unreviewed',
-        (i.quantity || 0).toFixed(0), i.unit,
+        (i.quantity || 0).toFixed(3), i.unit,
+        i.priceKey || '',
         (i.unitPrice || 0).toFixed(2),
+        i.laborHoursKey || (i.productivityEaPerHr ? `${i.productivityEaPerHr} EA/hr` : i.productivityFtPerHr ? `${i.productivityFtPerHr} ft/hr` : ''),
+        (i.laborHrs || 0).toFixed(3),
         (i.materialCost || 0).toFixed(0),
         (i.laborCost || 0).toFixed(0),
         (i.totalCost || 0).toFixed(0),
       ]),
     ];
     addSheet('Line Items', detailData);
+
+    if (lastRouteCostAssurance) {
+      const assurance = lastRouteCostAssurance;
+      addSheet('Route Quantity', [
+        ['Route Quantity Ledger', `Signature: ${assurance.quantityLedger.signature}`],
+        ['Category', 'ID', 'Quantity', 'Unit', 'Basis'],
+        ...assurance.quantityLedger.rows.map(row => [row.category, row.id, row.quantity, row.unit, row.basis]),
+      ]);
+      addSheet('Cost Assurance', [
+        ['Classification', assurance.classification],
+        ['Status', assurance.status],
+        ['Cost signature', assurance.signature],
+        ['Quantity signature', assurance.quantityLedger.signature],
+        ['Input fingerprint', assurance.inputFingerprint],
+        [],
+        ['Code', 'Severity', 'Blocking', 'Message'],
+        ...[...assurance.issues, ...assurance.warnings].map(item => [item.code, item.severity, item.blocking ? 'Yes' : 'No', item.message]),
+      ]);
+      if (lastDuctbankAssemblies.length) {
+        addSheet('Ductbank Assemblies', [
+          ['Ductbank', 'BOM ready', 'Route quantity (ft)', 'Category', 'Item', 'Specification', 'Quantity', 'Unit', 'Quantity basis', 'Blocking reason'],
+          ...lastDuctbankAssemblies.flatMap(assembly => {
+            const reasons = (assembly.blockingReasons || []).join(' ');
+            const rows = assembly.bom?.rows || [];
+            return rows.length
+              ? rows.map(row => [assembly.ductbankId, assembly.ready ? 'Yes' : 'No', assembly.routeQuantityFt, row.category, row.item, row.specification, row.quantity, row.unit, row.basis, reasons])
+              : [[assembly.ductbankId, assembly.ready ? 'Yes' : 'No', assembly.routeQuantityFt, '', '', '', '', '', '', reasons]];
+          }),
+        ]);
+      }
+    }
 
     XLSX.writeFile(wb, 'cost_estimate.xlsx');
   }

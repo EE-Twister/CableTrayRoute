@@ -43,6 +43,85 @@ async function readWorkbookRows(filePath) {
 }
 
 test.describe('next features integration: cost estimator scenarios and exports', () => {
+  test('route-scoped assurance deduplicates shared raceways and exposes allowance blockers', async ({ page }) => {
+    await setupCEPage(page);
+    await applyCostEstimatorFixture(page, {
+      cableSchedule: [
+        { cable_tag: 'RQ-1', conductor_size: '4 AWG', conductors: 3, length_ft: 80 },
+        { cable_tag: 'RQ-2', conductor_size: '4 AWG', conductors: 4, length_ft: 80 },
+      ],
+      traySchedule: [
+        { tray_id: 'RQ-T1', tray_type: 'Ladder', inside_width: '12', length_ft: 80 },
+        { tray_id: 'UNUSED-T2', tray_type: 'Ladder', inside_width: '12', length_ft: 500 },
+      ],
+      conduitSchedule: [],
+      studyResults: {
+        routeResults: ['RQ-1', 'RQ-2'].map(cable => ({
+          cable,
+          status: 'Routed',
+          total_length: 80,
+          route_segments: [{ type: 'straight', tray_id: 'RQ-T1', length: 80, start: [0, 0, 0], end: [80, 0, 0] }],
+        })),
+      },
+    });
+
+    await runCEEstimate(page);
+    const assurance = page.locator('[aria-label="Route quantity and cost assurance"]');
+    await expect(assurance).toContainText('Evidence incomplete');
+    await expect(assurance).toContainText('Screening only');
+    await expect(assurance).toContainText('160.0 ft');
+    await expect(assurance).toContainText('560.0 ft');
+    await expect(assurance).toContainText('80.0 / 0.0 / 0.0 ft');
+    await expect(assurance).toContainText('ROUTE-COST-PRICE-BOOK-MISSING');
+    await expect(page.locator('[aria-label="Line item cost detail"]')).toContainText('RQ-T1');
+    await expect(page.locator('[aria-label="Line item cost detail"]')).toContainText('Tray Support');
+    await expect(page.locator('[aria-label="Line item cost detail"]')).not.toContainText('UNUSED-T2');
+  });
+
+  test('ductbank routes produce BOM-derived civil assembly cost lines and fail safe without governed rates', async ({ page }) => {
+    await setupCEPage(page);
+    await applyCostEstimatorFixture(page, {
+      cableSchedule: [{ cable_tag: 'DB-CABLE', conductor_size: '4 AWG', conductors: 3 }],
+      traySchedule: [],
+      conduitSchedule: [],
+      studyResults: {
+        routeResults: [{
+          cable: 'DB-CABLE',
+          status: 'Routed',
+          total_length: 100,
+          route_segments: [{ type: 'ductbank', ductbankTag: 'DB-1', tray_id: 'DB-1', length: 100, start: [0, 0, 0], end: [100, 0, 0] }],
+        }],
+      },
+    });
+    await page.evaluate(() => {
+      localStorage.setItem('base:ductbankSchedule', JSON.stringify([{
+        tag: 'DB-1',
+        length_ft: 100,
+        depth_in: 36,
+        concrete_encasement: true,
+        conduits: [
+          { conduit_id: 'DB-C1', conduit_type: 'PVC Sch 40', trade_size: '2', x: 0, y: 0 },
+          { conduit_id: 'DB-C2', conduit_type: 'PVC Sch 40', trade_size: '2', x: 4, y: 0 },
+        ],
+      }]));
+    });
+
+    await runCEEstimate(page);
+    const detail = page.locator('[aria-label="Line item cost detail"]');
+    const assurance = page.locator('[aria-label="Route quantity and cost assurance"]');
+    await expect(detail).toContainText('Ductbank');
+    await expect(detail).toContainText('Trench excavation');
+    await expect(detail).toContainText('Concrete encasement');
+    await expect(assurance).toContainText('ROUTE-COST-UNIT-PRICE-MISSING');
+    await expect(assurance).not.toContainText('ROUTE-COST-DUCTBANK-SCOPE-UNPRICED');
+
+    const download = await runCEXlsxExport(page);
+    const savedPath = await assertExportDownload(download, 'cost_estimate.xlsx');
+    const workbookRows = await readWorkbookRows(savedPath);
+    expect(workbookRows['Ductbank Assemblies']).toBeTruthy();
+    expect(workbookRows['Ductbank Assemblies'].flat().join(' ')).toContain('Trench excavation');
+  });
+
   test('acceptance CE-01 [cost estimator] [AT-CE-01]: baseline fixture renders deterministic rounded totals', async ({ page }) => {
     await setupCEPage(page);
     await expect(page.getByRole('heading', { level: 1, name: 'Project Cost Estimator' })).toBeVisible();

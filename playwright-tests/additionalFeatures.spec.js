@@ -427,6 +427,43 @@ test.describe('Pull Cards', () => {
     await expect(page.locator('#pull-iso-status')).toContainText('Coordinate data missing');
     await expect(page.locator('#pull-iso-canvas')).toContainText('Coordinate data missing');
   });
+
+  test('resolves a parent-only ductbank route to the scheduled internal conduit', async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.setItem('base:cableSchedule', JSON.stringify([{
+        name: 'DB-CABLE',
+        cable_type: 'Power',
+        conduit_id: 'C-2',
+        diameter: 1,
+        weight: 1,
+        allowable_tension_lbf: 5000,
+        max_sidewall_pressure: 1000
+      }]));
+      localStorage.setItem('base:ductbankSchedule', JSON.stringify([{
+        tag: 'DB-1',
+        conduits: [
+          { conduit_id: 'C-1', type: 'PVC Sch 40', trade_size: '2' },
+          { conduit_id: 'C-2', type: 'PVC Sch 40', trade_size: '2' }
+        ]
+      }]));
+      sessionStorage.setItem('base:routeCache', JSON.stringify({
+        batchResults: [{
+          cable: 'DB-CABLE',
+          status: 'Routed',
+          total_length: 100,
+          breakdown: [{ type: 'ductbank', ductbankTag: 'DB-1', tray_id: 'DB-1', length: 100, start: [0, 0, 0], end: [100, 0, 0] }],
+          route_segments: [{ type: 'ductbank', ductbankTag: 'DB-1', tray_id: 'DB-1', length: 100, start: [0, 0, 0], end: [100, 0, 0] }]
+        }]
+      }));
+    });
+    await page.goto(staticSite.url('pullcards.html?e2e=1'));
+    await page.waitForLoadState('networkidle');
+    await dismissOnboarding(page);
+    await page.click('#loadFromProjectBtn');
+    await page.locator('.view-pull-btn').click();
+    await expect(page.locator('#pullCardContent')).toContainText('DB-1:C-2');
+    await expect(page.locator('#pullCardContent')).not.toContainText('internal conduit assignment is missing');
+  });
 });
 
 // -------------------------------------------------------------------------
@@ -741,6 +778,59 @@ test.describe('Spool Sheets', () => {
     await expect(page.locator('#spoolVisualCanvas svg')).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(2);
+  });
+});
+
+// -------------------------------------------------------------------------
+// Procurement route quantity basis
+// -------------------------------------------------------------------------
+test.describe('Procurement route quantity basis', () => {
+  let staticSite;
+
+  test.beforeAll(async () => {
+    staticSite = await startStaticServer();
+  });
+
+  test.afterAll(async () => {
+    await staticSite.close();
+  });
+
+  test('shows the deduplicated route ledger used for commercial handoff', async ({ page }) => {
+    await resetStaticStorage(page, staticSite);
+    await page.evaluate(() => {
+      const cables = ['PR-1', 'PR-2'].map(cable_tag => ({
+        cable_tag,
+        cable_type: 'Power',
+        conductor_size: '4 AWG',
+        conductors: 3,
+        material: 'Copper',
+        cable_rating: 600,
+        insulation_type: 'XHHW-2',
+        insulation_rating: 90,
+      }));
+      localStorage.setItem('base:cableSchedule', JSON.stringify(cables));
+      localStorage.setItem('base:traySchedule', JSON.stringify([
+        { tray_id: 'PR-T1', inside_width: 12, length_ft: 80 },
+      ]));
+      sessionStorage.setItem('base:routeCache', JSON.stringify({
+        batchResults: ['PR-1', 'PR-2'].map(cable => ({
+          cable,
+          status: 'Routed',
+          total_length: 80,
+          route_segments: [{ type: 'straight', tray_id: 'PR-T1', length: 80, start: [0, 0, 0], end: [80, 0, 0] }],
+        })),
+      }));
+    });
+    await page.goto(staticSite.url('procurementschedule.html?e2e=1'));
+    await page.waitForLoadState('networkidle');
+    await dismissOnboarding(page);
+
+    await page.click('#generateBtn');
+    await expect(page.locator('#routeQuantitySection')).toBeVisible();
+    await expect(page.locator('#routeQuantityStatus')).toContainText('160.0 cable-ft');
+    await expect(page.locator('#routeQuantityStatus')).toContainText('80.0 unique tray-ft');
+    await expect(page.locator('#routeQuantityStatus')).toContainText(/signature [0-9a-f]{8}/);
+    await expect(page.locator('#routeQuantityTable tbody tr')).toHaveCount(3);
   });
 });
 

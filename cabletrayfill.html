@@ -10,7 +10,7 @@
   <!-- Open Graph / Social sharing -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="Cable Tray Fill — CableTrayRoute">
-  <meta property="og:description" content="Visualize cable cross-sections and verify tray fill percentages against NEC limits.">
+  <meta property="og:description" content="Visualize cable cross-sections and evaluate selected NEC 2023 Article 392 tray-fill arrangements.">
   <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
   <meta property="og:site_name" content="CableTrayRoute">
   <meta property="og:url" content="cabletrayfill.html">
@@ -72,14 +72,14 @@
         </header>
         <details class="method-panel">
           <summary>Method &amp; Assumptions</summary>
-          <p>Fill percentage is computed as F = 100 × Σ A_cable / A_tray.</p>
+          <p>The packing-density display uses F = 100 × Σ A_cable / A_tray. The selected Article 392 result is calculated separately from cable count, conductor size, outside diameter/area, tray construction, width, depth where required, and cable arrangement.</p>
           <p>Variables:</p>
           <ul>
             <li>A_cable – cross-sectional area of each cable</li>
             <li>A_tray – usable inside area of the tray</li>
           </ul>
           <p>Citations: <a href="docs/standards.html">NEC 392</a></p>
-          <p>Applicability: valid for uniform cable loading with fill below 50%.</p>
+          <p>Applicability: the selected-rule evaluator covers NEC 2023 392.22(A)(1)–(4) multiconductor arrangements at 2000 V or less. It withholds a pass for incomplete or out-of-scope arrangements; qualified review remains required.</p>
           <p>See also: <a href="docs/load_calculation_formulas.html">Load Calculation Formulas</a>, <a href="docs/cable_fill_rules.html">Cable Fill Rules</a>, <a href="docs/routing_assumptions.html">Routing Assumptions</a>.</p>
         </details>
 
@@ -87,7 +87,7 @@
           <div class="page-visual-copy">
             <p class="page-visual-kicker">Workspace Preview</p>
             <h2>Tray Capacity View</h2>
-            <p>Review tray dimensions, compartment assignments, and NEC fill status with a cross-section diagram.</p>
+            <p>Review tray dimensions, compartment assignments, geometric packing, and selected Article 392 evidence with a cross-section diagram.</p>
           </div>
           <img src="icons/graphics/fill-visual.svg" alt="Illustration for tray capacity view" loading="lazy" decoding="async">
         </section>
@@ -123,8 +123,8 @@
       <div class="tray-param">
         <label for="trayType">Tray Type:</label>
         <select id="trayType">
-          <option value="ladder">Ladder (50 % fill)</option>
-          <option value="solid">Solid Bottom (40 % fill)</option>
+          <option value="ladder">Ladder / Ventilated / Wire Mesh</option>
+          <option value="solid">Solid Bottom</option>
         </select>
       </div>
       <div class="tray-param">
@@ -137,7 +137,7 @@
 
   <!-- COMPARTMENT CONFIGURATION -->
   <fieldset id="compartmentConfig" class="card tray-fill-card">
-    <legend><strong>Compartment Configuration</strong> <button class="helpBtn" data-help="Define up to 5 tray compartments (e.g. divided by separator strips). Each compartment has its own width, depth, and NEC fill limit. Assign cables to compartments using the Compartment column in the cable table." data-doc="docs/tutorial.html#trayfill">?</button></legend>
+    <legend><strong>Compartment Configuration</strong> <button class="helpBtn" data-help="Define up to 5 physical tray compartments. Each compartment is evaluated from its own width, depth, cable arrangement, and complete cable inputs; a whole-tray average is not substituted." data-doc="docs/tutorial.html#trayfill">?</button></legend>
     <div id="compartmentRows"></div>
     <button id="addCompartmentBtn" type="button">+ Add Compartment</button>
     <p id="compartmentWidthWarning" class="warning" hidden></p>
@@ -283,7 +283,7 @@
       </div>
       <aside class="tray-fill-gauge-card" aria-label="Tray fill gauge summary" aria-live="polite">
         <div class="tray-fill-gauge-meta">
-          <span class="tray-fill-gauge-title">Tray Fill Gauge</span>
+          <span class="tray-fill-gauge-title">Packing Density Gauge</span>
           <span id="trayFillStatus" class="tray-fill-status is-ok">Ready</span>
         </div>
         <div class="tray-fill-gauge-content">
@@ -294,7 +294,7 @@
               <dd id="trayFillValue">0.0%</dd>
             </div>
             <div>
-              <dt>Limit</dt>
+              <dt>Review threshold</dt>
               <dd id="trayFillLimit">50%</dd>
             </div>
           </dl>

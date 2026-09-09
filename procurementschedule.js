@@ -8,15 +8,19 @@ import {
 } from './analysis/cableProcurement.mjs';
 import {
   getCables,
+  getConduits,
+  getDuctbanks,
   getProjectInputFingerprint,
   getProcurementRegister,
   getItem,
+  getTrays,
   setProcurementRegister,
   upsertDeliverableArtifact
 } from './dataStore.mjs';
 import { normalizeDeliverableArtifact } from './analysis/deliverableArtifacts.mjs';
 import { normalizeRouteResults } from './analysis/deliverableWorkflow.mjs';
 import { listAppSettingKeys, readAppSetting } from './projectStorage.js';
+import { buildRouteQuantityLedger } from './analysis/routeCostAssurance.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -35,6 +39,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const coverageSection = document.getElementById('coverageSection');
   const coverageStatus = document.getElementById('coverageStatus');
   const coverageWarnings = document.getElementById('coverageWarnings');
+  const routeQuantitySection = document.getElementById('routeQuantitySection');
+  const routeQuantityStatus = document.getElementById('routeQuantityStatus');
+  const routeQuantityTbody = document.querySelector('#routeQuantityTable tbody');
   const registerSection = document.getElementById('registerSection');
   const registerTbody = document.querySelector('#registerTable tbody');
   const inactiveRegisterMsg = document.getElementById('inactiveRegisterMsg');
@@ -124,6 +131,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     coverageWarnings.hidden = warnings.length === 0;
     coverageSection.hidden = false;
+  }
+
+  function renderRouteQuantityLedger(ledger) {
+    routeQuantityStatus.textContent = `${ledger.status === 'pass' ? 'Reconciled' : 'Evidence incomplete'} · `
+      + `signature ${ledger.signature} · ${ledger.summary.cableRunFt.toFixed(1)} cable-ft · `
+      + `${ledger.summary.uniqueTrayFt.toFixed(1)} unique tray-ft · ${ledger.summary.uniqueConduitFt.toFixed(1)} unique conduit-ft.`;
+    routeQuantityStatus.className = ledger.status === 'pass' ? 'status-pass' : 'status-warn';
+    routeQuantityTbody.innerHTML = ledger.rows.map(row => `<tr>
+      <td>${esc(row.category)}</td><td>${esc(row.id)}</td><td>${esc(Number(row.quantity || 0).toFixed(1))}</td>
+      <td>${esc(row.unit)}</td><td>${esc(row.basis)}</td>
+    </tr>`).join('');
+    routeQuantitySection.hidden = false;
   }
 
   function specLabel(record) {
@@ -272,6 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
     summarySection.hidden = true;
     lineItemsSection.hidden = true;
     coverageSection.hidden = true;
+    routeQuantitySection.hidden = true;
     exportCsvBtn.disabled = true;
     lastReport = null;
 
@@ -286,6 +306,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const report = calculateProcurement(routeResults, getCables(), {
       tolerancePct,
       reelSizes: getSelectedReelSizes()
+    });
+    const routeQuantityLedger = buildRouteQuantityLedger({
+      routeResults,
+      cables: getCables(),
+      trays: getTrays(),
+      conduits: getConduits(),
+      ductbanks: getDuctbanks(),
     });
 
     if (!report.lineItems.length) {
@@ -312,10 +339,14 @@ document.addEventListener('DOMContentLoaded', () => {
         orderedFt: report.summary.total_ordered_ft,
         wasteFt: report.summary.total_waste_ft,
         procurementReady: report.coverage.procurement_ready,
+        routeQuantityStatus: routeQuantityLedger.status,
+        routeQuantitySignature: routeQuantityLedger.signature,
+        routeQuantityBlockers: routeQuantityLedger.blockingIssues.length,
       },
     }));
     renderSummary(report.summary);
     renderCoverage(report);
+    renderRouteQuantityLedger(routeQuantityLedger);
     renderLineItems(report.lineItems);
     renderRegister();
     exportCsvBtn.disabled = false;

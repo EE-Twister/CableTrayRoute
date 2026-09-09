@@ -15,14 +15,14 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - Routes without source files: 0
 - Routes with undocumented reads: 0
 - Routes with undocumented writes: 0
-- Routes with declared inputs not statically read: 47
+- Routes with declared inputs not statically read: 46
 - Routes with explicitly indirect project inputs: 54
 - Routes with declared outputs not statically written: 0
 - Direct browser storage hits: 2
 - Unclassified direct browser storage hits: 0
 - Direct browser storage classifications: session-handoff=2
 - Actionable failures: 0
-- Warnings: 87
+- Warnings: 85
 
 ## Findings
 
@@ -30,7 +30,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Planning
-- Source files: `ampacity.mjs`, `analysis/autoSize.mjs`, `analysis/cableThermalEnvironment.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designCoach.mjs`, `analysis/designRuleChecker.mjs`, `analysis/equipmentEvaluation.mjs`, `analysis/equipmentWorkflow.mjs`, `analysis/fieldObservations.mjs`, `analysis/iec60287.mjs`, `analysis/lifecyclePackage.mjs`, `analysis/loadWorkflow.mjs`, `analysis/projectWorkflowCore.mjs`, `analysis/pullCards.mjs`, `analysis/reportPackage.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/voltageDropStudy.mjs`, `analysis/workflowAutomation.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/protectiveDevices/calculationCatalog.mjs`, `src/protectiveDevices/catalogLoader.mjs`, `src/pullCalc.js`, `src/voltageDrop.js`, `src/workflowDashboard.js`, `utils/componentLabels.js`, `validation/rules.js`
+- Source files: `ampacity.mjs`, `analysis/autoSize.mjs`, `analysis/cableThermalEnvironment.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designCoach.mjs`, `analysis/designRuleChecker.mjs`, `analysis/ductbankConduitAssignment.mjs`, `analysis/equipmentEvaluation.mjs`, `analysis/equipmentWorkflow.mjs`, `analysis/fieldObservations.mjs`, `analysis/iec60287.mjs`, `analysis/lifecyclePackage.mjs`, `analysis/loadWorkflow.mjs`, `analysis/projectWorkflowCore.mjs`, `analysis/pullCards.mjs`, `analysis/pullConstructability.mjs`, `analysis/racewayAssurance.mjs`, `analysis/reportPackage.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/trayFill.mjs`, `analysis/voltageDropStudy.mjs`, `analysis/workflowAutomation.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/protectiveDevices/calculationCatalog.mjs`, `src/protectiveDevices/catalogLoader.mjs`, `src/pullCalc.js`, `src/voltageDrop.js`, `src/workflowDashboard.js`, `utils/componentLabels.js`, `validation/rules.js`
 
 **Undocumented Reads**
 - None
@@ -52,81 +52,89 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - src/workflowDashboard.js:1466 getCables()
-  - src/workflowDashboard.js:158 getCables()
-  - src/workflowDashboard.js:171 getCables()
-  - src/workflowDashboard.js:192 getCables()
-  - src/workflowDashboard.js:676 getCables()
+  - src/workflowDashboard.js:1469 getCables()
+  - src/workflowDashboard.js:159 getCables()
+  - src/workflowDashboard.js:172 getCables()
+  - src/workflowDashboard.js:193 getCables()
+  - src/workflowDashboard.js:677 getCables()
   - ... 2 more
 - `conduitSchedule`
-  - src/workflowDashboard.js:194 getConduits()
-  - src/workflowDashboard.js:680 getConduits()
-  - src/workflowDashboard.js:806 getConduits()
-  - src/workflowDashboard.js:839 getConduits()
+  - src/workflowDashboard.js:1471 getConduits()
+  - src/workflowDashboard.js:195 getConduits()
+  - src/workflowDashboard.js:681 getConduits()
+  - src/workflowDashboard.js:807 getConduits()
+  - src/workflowDashboard.js:841 getConduits()
 - `ductbankSchedule`
-  - src/workflowDashboard.js:195 getDuctbanks()
-  - src/workflowDashboard.js:681 getDuctbanks()
-  - src/workflowDashboard.js:807 getDuctbanks()
-  - src/workflowDashboard.js:840 getDuctbanks()
+  - src/workflowDashboard.js:1472 getDuctbanks()
+  - src/workflowDashboard.js:196 getDuctbanks()
+  - src/workflowDashboard.js:682 getDuctbanks()
+  - src/workflowDashboard.js:808 getDuctbanks()
+  - src/workflowDashboard.js:842 getDuctbanks()
 - `equipment`
-  - src/workflowDashboard.js:1468 getEquipment()
-  - src/workflowDashboard.js:190 getEquipment()
-  - src/workflowDashboard.js:674 getEquipment()
-  - src/workflowDashboard.js:801 getEquipment()
-  - src/workflowDashboard.js:834 getEquipment()
+  - src/workflowDashboard.js:1473 getEquipment()
+  - src/workflowDashboard.js:191 getEquipment()
+  - src/workflowDashboard.js:675 getEquipment()
+  - src/workflowDashboard.js:802 getEquipment()
+  - src/workflowDashboard.js:836 getEquipment()
   - ... 1 more
 - `loadList`
-  - src/workflowDashboard.js:675 getLoads()
-  - src/workflowDashboard.js:802 getLoads()
-  - src/workflowDashboard.js:835 getLoads()
-  - src/workflowDashboard.js:861 getLoads()
+  - src/workflowDashboard.js:676 getLoads()
+  - src/workflowDashboard.js:803 getLoads()
+  - src/workflowDashboard.js:837 getLoads()
+  - src/workflowDashboard.js:863 getLoads()
 - `oneLineDiagram`
-  - src/workflowDashboard.js:1476 getOneLine()
-  - src/workflowDashboard.js:170 getOneLine()
-  - src/workflowDashboard.js:191 getOneLine()
-  - src/workflowDashboard.js:36 getOneLine()
-  - src/workflowDashboard.js:678 getOneLine()
+  - src/workflowDashboard.js:1485 getOneLine()
+  - src/workflowDashboard.js:171 getOneLine()
+  - src/workflowDashboard.js:192 getOneLine()
+  - src/workflowDashboard.js:37 getOneLine()
+  - src/workflowDashboard.js:679 getOneLine()
   - ... 2 more
 - `settings.activeSampleWorkflow`
-  - src/workflowDashboard.js:1202 getItem(activeSampleWorkflow)
-  - src/workflowDashboard.js:874 getItem(activeSampleWorkflow)
+  - src/workflowDashboard.js:1204 getItem(activeSampleWorkflow)
+  - src/workflowDashboard.js:876 getItem(activeSampleWorkflow)
+- `settings.costEstimateArtifact`
+  - src/workflowDashboard.js:1483 getItem(costEstimateArtifact)
+  - src/workflowDashboard.js:821 getItem(costEstimateArtifact)
 - `settings.designBasis`
-  - src/workflowDashboard.js:1471 getDesignBasis()
-  - src/workflowDashboard.js:183 getDesignBasis()
-  - src/workflowDashboard.js:188 getDesignBasis()
-  - src/workflowDashboard.js:419 getDesignBasis()
-  - src/workflowDashboard.js:816 getDesignBasis()
+  - src/workflowDashboard.js:1476 getDesignBasis()
+  - src/workflowDashboard.js:184 getDesignBasis()
+  - src/workflowDashboard.js:189 getDesignBasis()
+  - src/workflowDashboard.js:420 getDesignBasis()
+  - src/workflowDashboard.js:817 getDesignBasis()
   - ... 1 more
 - `settings.designGateApprovals`
-  - src/workflowDashboard.js:1472 getDesignGateApprovals()
-  - src/workflowDashboard.js:189 getDesignGateApprovals()
-  - src/workflowDashboard.js:817 getDesignGateApprovals()
-  - src/workflowDashboard.js:913 getDesignGateApprovals()
+  - src/workflowDashboard.js:1477 getDesignGateApprovals()
+  - src/workflowDashboard.js:190 getDesignGateApprovals()
+  - src/workflowDashboard.js:818 getDesignGateApprovals()
+  - src/workflowDashboard.js:915 getDesignGateApprovals()
 - `settings.latestRouteResults`
-  - src/workflowDashboard.js:198 getItem(latestRouteResults)
-  - src/workflowDashboard.js:799 getItem(latestRouteResults)
-  - src/workflowDashboard.js:841 getItem(latestRouteResults)
+  - src/workflowDashboard.js:1481 getItem(latestRouteResults)
+  - src/workflowDashboard.js:199 getItem(latestRouteResults)
+  - src/workflowDashboard.js:800 getItem(latestRouteResults)
+  - src/workflowDashboard.js:843 getItem(latestRouteResults)
 - `settings.lifecyclePackages`
-  - src/workflowDashboard.js:1375 getLifecyclePackages()
-  - src/workflowDashboard.js:813 getLifecyclePackages()
+  - src/workflowDashboard.js:1377 getLifecyclePackages()
+  - src/workflowDashboard.js:814 getLifecyclePackages()
+- `settings.procurementRegister`
+  - src/workflowDashboard.js:1482 getProcurementRegister()
 - `settings.reportSnapshots`
-  - src/workflowDashboard.js:810 getReportSnapshots()
+  - src/workflowDashboard.js:811 getReportSnapshots()
 - `settings.studyApprovals`
-  - src/workflowDashboard.js:1470 getStudyApprovals()
-  - src/workflowDashboard.js:197 getStudyApprovals()
-  - src/workflowDashboard.js:809 getStudyApprovals()
+  - src/workflowDashboard.js:1475 getStudyApprovals()
+  - src/workflowDashboard.js:198 getStudyApprovals()
+  - src/workflowDashboard.js:810 getStudyApprovals()
 - `settings.tccSettings`
-  - src/workflowDashboard.js:1473 getItem(tccSettings)
-  - src/workflowDashboard.js:199 getItem(tccSettings)
-  - src/workflowDashboard.js:818 getItem(tccSettings)
+  - src/workflowDashboard.js:1478 getItem(tccSettings)
+  - src/workflowDashboard.js:200 getItem(tccSettings)
+  - src/workflowDashboard.js:819 getItem(tccSettings)
 - `settings.workflowDashboardFocus`
-  - src/workflowDashboard.js:71 getItem(workflowDashboardFocus)
+  - src/workflowDashboard.js:72 getItem(workflowDashboardFocus)
 - `studyResults`
-  - src/workflowDashboard.js:1326 getStudies()
-  - src/workflowDashboard.js:1469 getStudies()
-  - src/workflowDashboard.js:151 getStudies()
-  - src/workflowDashboard.js:160 getStudies()
-  - src/workflowDashboard.js:171 getStudies()
+  - src/workflowDashboard.js:1328 getStudies()
+  - src/workflowDashboard.js:1474 getStudies()
+  - src/workflowDashboard.js:152 getStudies()
+  - src/workflowDashboard.js:161 getStudies()
+  - src/workflowDashboard.js:172 getStudies()
   - ... 2 more
 - `studyResults.arcFlash`
   - analysis/designCoach.mjs:479 studies.arcFlash
@@ -150,39 +158,39 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - analysis/designCoach.mjs:480 studies.shortCircuit
   - analysis/equipmentEvaluation.mjs:235 studies?.shortCircuit
 - `traySchedule`
-  - src/workflowDashboard.js:144 getTrays()
-  - src/workflowDashboard.js:1467 getTrays()
-  - src/workflowDashboard.js:159 getTrays()
-  - src/workflowDashboard.js:193 getTrays()
-  - src/workflowDashboard.js:679 getTrays()
+  - src/workflowDashboard.js:145 getTrays()
+  - src/workflowDashboard.js:1470 getTrays()
+  - src/workflowDashboard.js:160 getTrays()
+  - src/workflowDashboard.js:194 getTrays()
+  - src/workflowDashboard.js:680 getTrays()
   - ... 2 more
 
 **Detected Writes**
 - `cableSchedule`
-  - src/workflowDashboard.js:894 setCables()
+  - src/workflowDashboard.js:896 setCables()
 - `conduitSchedule`
-  - src/workflowDashboard.js:896 setConduits()
+  - src/workflowDashboard.js:898 setConduits()
 - `ductbankSchedule`
-  - src/workflowDashboard.js:897 setDuctbanks()
+  - src/workflowDashboard.js:899 setDuctbanks()
 - `oneLineDiagram`
-  - src/workflowDashboard.js:893 setOneLine()
+  - src/workflowDashboard.js:895 setOneLine()
 - `settings.designBasis`
-  - src/workflowDashboard.js:434 setDesignBasis()
+  - src/workflowDashboard.js:435 setDesignBasis()
 - `settings.designGateApprovals`
-  - src/workflowDashboard.js:977 setDesignGateApprovals()
+  - src/workflowDashboard.js:979 setDesignGateApprovals()
 - `settings.latestRouteResults`
-  - src/workflowDashboard.js:898 setItem(latestRouteResults)
+  - src/workflowDashboard.js:900 setItem(latestRouteResults)
 - `settings.lifecyclePackages`
-  - src/workflowDashboard.js:1424 deleteLifecyclePackage()
-  - src/workflowDashboard.js:1482 addLifecyclePackage()
+  - src/workflowDashboard.js:1426 deleteLifecyclePackage()
+  - src/workflowDashboard.js:1491 addLifecyclePackage()
 - `settings.oneLineScheduleReconcilePending`
-  - src/workflowDashboard.js:899 setItem(oneLineScheduleReconcilePending)
+  - src/workflowDashboard.js:901 setItem(oneLineScheduleReconcilePending)
 - `settings.workflowDashboardFocus`
-  - src/workflowDashboard.js:1502 setItem(workflowDashboardFocus)
+  - src/workflowDashboard.js:1511 setItem(workflowDashboardFocus)
 - `studyResults.duty`
   - validation/rules.js:666 studies.duty
 - `traySchedule`
-  - src/workflowDashboard.js:895 setTrays()
+  - src/workflowDashboard.js:897 setTrays()
 
 ### Scenario Comparison (`scenarios.html`)
 
@@ -629,7 +637,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Cable
-- Source files: `exportPanelSchedule.js`, `panelschedule.js`, `src/components/projectDeletionReview.js`, `src/panel-schedule/breakerLayoutModel.js`, `src/panel-schedule/panelModel.js`, `src/panel-schedule/phaseLoadModel.js`, `src/panel-schedule/phaseModel.js`, `src/panelSchedule.js`, `src/projectManagerEntry.js`
+- Source files: `exportPanelSchedule.js`, `panelschedule.js`, `src/components/projectDeletionReview.js`, `src/panel-schedule/breakerLayoutModel.js`, `src/panel-schedule/panelModel.js`, `src/panel-schedule/phaseLoadModel.js`, `src/panel-schedule/phaseModel.js`, `src/panel-schedule/totalsModel.js`, `src/panelSchedule.js`, `src/projectManagerEntry.js`
 
 **Undocumented Reads**
 - None
@@ -651,44 +659,44 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - src/panelSchedule.js:2565 getCables()
-  - src/panelSchedule.js:508 getCables()
+  - src/panelSchedule.js:2462 getCables()
+  - src/panelSchedule.js:405 getCables()
 - `equipment`
-  - src/panelSchedule.js:2464 getEquipment()
-  - src/panelSchedule.js:2522 getEquipment()
+  - src/panelSchedule.js:2361 getEquipment()
+  - src/panelSchedule.js:2419 getEquipment()
 - `loadList`
-  - exportPanelSchedule.js:205 getLoads()
-  - src/panelSchedule.js:2081 getLoads()
-  - src/panelSchedule.js:2142 getLoads()
-  - src/panelSchedule.js:2354 getLoads()
-  - src/panelSchedule.js:2639 getLoads()
+  - exportPanelSchedule.js:46 getLoads()
+  - src/panelSchedule.js:1978 getLoads()
+  - src/panelSchedule.js:2039 getLoads()
+  - src/panelSchedule.js:2251 getLoads()
+  - src/panelSchedule.js:2536 getLoads()
   - ... 4 more
 - `panelSchedule`
-  - exportPanelSchedule.js:203 getPanels()
-  - src/panelSchedule.js:1779 getPanels()
-  - src/panelSchedule.js:2640 getPanels()
-  - src/panelSchedule.js:266 getPanels()
-  - src/panelSchedule.js:2716 getPanels()
+  - exportPanelSchedule.js:44 getPanels()
+  - src/panelSchedule.js:1676 getPanels()
+  - src/panelSchedule.js:2537 getPanels()
+  - src/panelSchedule.js:2613 getPanels()
+  - src/panelSchedule.js:267 getPanels()
   - ... 2 more
 
 **Detected Writes**
 - `cableSchedule`
-  - src/panelSchedule.js:2570 setCables()
+  - src/panelSchedule.js:2467 setCables()
 - `equipment`
-  - src/panelSchedule.js:2504 setEquipment()
-  - src/panelSchedule.js:2517 addEquipment()
+  - src/panelSchedule.js:2401 setEquipment()
+  - src/panelSchedule.js:2414 addEquipment()
 - `loadList`
-  - src/panelSchedule.js:2371 setLoads()
-  - src/panelSchedule.js:2659 setLoads()
-  - src/panelSchedule.js:347 setLoads()
-  - src/panelSchedule.js:549 setLoads()
-  - src/panelSchedule.js:89 setLoads()
+  - src/panelSchedule.js:2268 setLoads()
+  - src/panelSchedule.js:2556 setLoads()
+  - src/panelSchedule.js:348 setLoads()
+  - src/panelSchedule.js:446 setLoads()
+  - src/panelSchedule.js:90 setLoads()
 - `panelSchedule`
-  - src/panelSchedule.js:115 setPanels()
-  - src/panelSchedule.js:165 setPanels()
-  - src/panelSchedule.js:1844 setPanels()
-  - src/panelSchedule.js:2679 setPanels()
-  - src/panelSchedule.js:345 setPanels()
+  - src/panelSchedule.js:116 setPanels()
+  - src/panelSchedule.js:166 setPanels()
+  - src/panelSchedule.js:1741 setPanels()
+  - src/panelSchedule.js:2576 setPanels()
+  - src/panelSchedule.js:346 setPanels()
   - ... 1 more
 
 ### Raceway Schedule (`racewayschedule.html`)
@@ -830,7 +838,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Raceway
-- Source files: `analysis/scheduleWorkflow.mjs`, `cabletrayfill.js`, `src/cabletrayfill.js`, `src/components/fillGauge.js`, `src/projectManagerEntry.js`, `tableUtils.mjs`, `tour.js`
+- Source files: `analysis/conduitFill.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/trayFill.mjs`, `cabletrayfill.js`, `src/cabletrayfill.js`, `src/components/fillGauge.js`, `src/projectManagerEntry.js`, `tableUtils.mjs`, `tour.js`
 
 **Undocumented Reads**
 - None
@@ -853,11 +861,11 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `settings.trayFillData`
-  - cabletrayfill.js:2169 getItem(trayFillData)
+  - cabletrayfill.js:2087 getItem(trayFillData)
 
 **Detected Writes**
 - `settings.trayFillData`
-  - cabletrayfill.js:2177 removeItem(trayFillData)
+  - cabletrayfill.js:2095 removeItem(trayFillData)
 
 ### Conduit Fill (`conduitfill.html`)
 
@@ -1038,7 +1046,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Raceway
-- Source files: `analysis/catalogImport.mjs`, `analysis/manufacturerCatalog.mjs`, `analysis/pullCards.mjs`, `analysis/routingCatalog.mjs`, `analysis/supportSpan.mjs`, `analysis/trayHardware.mjs`, `src/catalogBrowser.js`, `src/projectManagerEntry.js`, `src/pullCalc.js`, `src/trayhardwarebom.js`
+- Source files: `analysis/catalogImport.mjs`, `analysis/ductbankConduitAssignment.mjs`, `analysis/manufacturerCatalog.mjs`, `analysis/pullCards.mjs`, `analysis/routingCatalog.mjs`, `analysis/supportSpan.mjs`, `analysis/trayHardware.mjs`, `src/catalogBrowser.js`, `src/projectManagerEntry.js`, `src/pullCalc.js`, `src/trayhardwarebom.js`
 
 **Undocumented Reads**
 - None
@@ -1105,7 +1113,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Validation
-- Source files: `analysis/autoSize.mjs`, `analysis/conduitFill.mjs`, `analysis/designRuleChecker.mjs`, `analysis/routeResults.mjs`, `designrulechecker.js`, `src/crossProbe.js`, `src/designrulechecker.js`
+- Source files: `analysis/autoSize.mjs`, `analysis/conduitFill.mjs`, `analysis/designRuleChecker.mjs`, `analysis/routeResults.mjs`, `analysis/trayFill.mjs`, `designrulechecker.js`, `src/crossProbe.js`, `src/designrulechecker.js`
 
 **Undocumented Reads**
 - None
@@ -1153,7 +1161,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Validation
-- Source files: `ampacity.mjs`, `analysis/autoSize.mjs`, `analysis/cableThermalEnvironment.mjs`, `analysis/conduitFill.mjs`, `analysis/designCoach.mjs`, `analysis/designRuleChecker.mjs`, `analysis/equipmentEvaluation.mjs`, `analysis/iec60287.mjs`, `analysis/voltageDropStudy.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `src/crossProbe.js`, `src/designCoach.js`, `src/necTable9.mjs`, `src/voltageDrop.js`
+- Source files: `ampacity.mjs`, `analysis/autoSize.mjs`, `analysis/cableThermalEnvironment.mjs`, `analysis/conduitFill.mjs`, `analysis/designCoach.mjs`, `analysis/designRuleChecker.mjs`, `analysis/equipmentEvaluation.mjs`, `analysis/iec60287.mjs`, `analysis/trayFill.mjs`, `analysis/voltageDropStudy.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `src/crossProbe.js`, `src/designCoach.js`, `src/necTable9.mjs`, `src/voltageDrop.js`
 
 **Undocumented Reads**
 - None
@@ -1214,7 +1222,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Deliverables
-- Source files: `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/pullCards.mjs`, `analysis/reportPackage.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `spoolsheets.js`, `src/projectManagerEntry.js`, `src/pullCalc.js`, `src/spoolsheets.js`
+- Source files: `analysis/conduitFill.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/ductbankConduitAssignment.mjs`, `analysis/pullCards.mjs`, `analysis/pullConstructability.mjs`, `analysis/racewayAssurance.mjs`, `analysis/reportPackage.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/trayFill.mjs`, `spoolsheets.js`, `src/projectManagerEntry.js`, `src/pullCalc.js`, `src/spoolsheets.js`
 
 **Undocumented Reads**
 - None
@@ -1391,7 +1399,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Optimization
-- Source files: `ampacity.mjs`, `analysis/cablePullGroups.mjs`, `analysis/cablePullPlan.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/largeFacilityRoutingSample.mjs`, `analysis/pullCards.mjs`, `analysis/racewayReviewTarget.mjs`, `analysis/reportPackage.mjs`, `analysis/routeResults.mjs`, `analysis/routeScreeningSummary.mjs`, `analysis/routeStorageCompaction.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `app.mjs`, `bimExport.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `e2e-helpers.js`, `exporters/simpleDxf.js`, `optimalRoute.js`, `resultsExport.mjs`, `src/components/incrementalDom.js`, `src/ductbankProjectAdapter.mjs`, `src/exporters/gltf2.mjs`, `src/fetchUtils.mjs`, `src/htmlSafety.mjs`, `src/necTable9.mjs`, `src/optimalRoute.js`, `src/performance/performanceMetrics.js`, `src/projectManagerEntry.js`, `src/pullCalc.js`, `src/routing/cableRoutingSystem.mjs`, `src/routing/manualEntryView.mjs`, `src/routing/plotlyRouteScene.mjs`, `src/routing/projectHash.mjs`, `src/routing/pullReviewView.mjs`, `src/routing/racewayGeometry.mjs`, `src/routing/racewaySizingModel.mjs`, `src/routing/routeBreakdown.mjs`, `src/routing/routeDetailView.mjs`, `src/routing/routeReviewModel.mjs`, `src/routing/routeReviewView.mjs`, `src/routing/routeVisualizationModel.mjs`, `src/routing/routingProjectAdapter.mjs`, `src/routing/routingReadinessModel.mjs`, `src/routing/routingSamples.mjs`, `src/routing/routingState.mjs`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/safeEvents.mjs`
+- Source files: `ampacity.mjs`, `analysis/cablePullGroups.mjs`, `analysis/cablePullPlan.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/ductbankConduitAssignment.mjs`, `analysis/largeFacilityRoutingSample.mjs`, `analysis/pullCards.mjs`, `analysis/pullConstructability.mjs`, `analysis/racewayAssurance.mjs`, `analysis/racewayReviewTarget.mjs`, `analysis/reportPackage.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `analysis/routeScreeningSummary.mjs`, `analysis/routeStorageCompaction.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/trayFill.mjs`, `app.mjs`, `bimExport.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `e2e-helpers.js`, `exporters/simpleDxf.js`, `optimalRoute.js`, `resultsExport.mjs`, `src/components/incrementalDom.js`, `src/ductbankProjectAdapter.mjs`, `src/exporters/gltf2.mjs`, `src/fetchUtils.mjs`, `src/htmlSafety.mjs`, `src/necTable9.mjs`, `src/optimalRoute.js`, `src/performance/performanceMetrics.js`, `src/projectManagerEntry.js`, `src/pullCalc.js`, `src/routing/cableRoutingSystem.mjs`, `src/routing/manualEntryView.mjs`, `src/routing/plotlyRouteScene.mjs`, `src/routing/projectHash.mjs`, `src/routing/pullAccessView.mjs`, `src/routing/pullEvidenceView.mjs`, `src/routing/pullOptionsController.mjs`, `src/routing/pullReviewView.mjs`, `src/routing/racewayGeometry.mjs`, `src/routing/racewaySizingModel.mjs`, `src/routing/routeBreakdown.mjs`, `src/routing/routeDetailView.mjs`, `src/routing/routeReviewModel.mjs`, `src/routing/routeReviewView.mjs`, `src/routing/routeVisualizationModel.mjs`, `src/routing/routingProjectAdapter.mjs`, `src/routing/routingReadinessModel.mjs`, `src/routing/routingSamples.mjs`, `src/routing/routingState.mjs`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/safeEvents.mjs`
 
 **Undocumented Reads**
 - None
@@ -1413,41 +1421,41 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - app.mjs:949 getCables()
+  - app.mjs:907 getCables()
 - `conduitSchedule`
-  - app.mjs:953 getConduits()
+  - app.mjs:911 getConduits()
 - `ductbankSchedule`
-  - app.mjs:952 getDuctbanks()
+  - app.mjs:910 getDuctbanks()
 - `settings.ctrSession`
-  - app.mjs:487 getItem(ctrSession)
-  - app.mjs:850 getItem(ctrSession)
+  - app.mjs:471 getItem(ctrSession)
+  - app.mjs:820 getItem(ctrSession)
 - `settings.latestRouteResults`
-  - app.mjs:1123 getItem(latestRouteResults)
+  - app.mjs:1081 getItem(latestRouteResults)
 - `traySchedule`
-  - app.mjs:948 getTrays()
+  - app.mjs:906 getTrays()
 
 **Detected Writes**
 - `cableSchedule`
-  - app.mjs:2975 setCables()
+  - app.mjs:2963 setCables()
 - `settings.conduitFillData`
-  - app.mjs:1470 setItem(conduitFillData)
-  - app.mjs:1504 setItem(conduitFillData)
+  - app.mjs:1428 setItem(conduitFillData)
+  - app.mjs:1462 setItem(conduitFillData)
 - `settings.ctrSession`
-  - app.mjs:496 setItem(ctrSession)
-  - app.mjs:839 setItem(ctrSession)
+  - app.mjs:480 setItem(ctrSession)
+  - app.mjs:809 setItem(ctrSession)
 - `settings.ductbankRouteData`
-  - app.mjs:1488 setItem(ductbankRouteData)
+  - app.mjs:1446 setItem(ductbankRouteData)
 - `settings.latestRouteResults`
-  - app.mjs:261 setItem(latestRouteResults)
+  - app.mjs:262 setItem(latestRouteResults)
 - `settings.trayFillData`
-  - app.mjs:1445 setItem(trayFillData)
-  - app.mjs:2595 setItem(trayFillData)
+  - app.mjs:1403 setItem(trayFillData)
+  - app.mjs:2580 setItem(trayFillData)
 
 ### Pull Cards (`pullcards.html`)
 
 - Section: Workflow
 - Group: Deliverables
-- Source files: `analysis/deliverableArtifacts.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/pullCardRouteImport.mjs`, `analysis/pullCardVisualModel.mjs`, `analysis/pullCards.mjs`, `analysis/reportPackage.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `pullcards.js`, `src/projectManagerEntry.js`, `src/pullCalc.js`, `src/pullcards.js`, `src/utils/isometricSvg.js`
+- Source files: `analysis/conduitFill.mjs`, `analysis/deliverableArtifacts.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/ductbankConduitAssignment.mjs`, `analysis/pullCardRouteImport.mjs`, `analysis/pullCardVisualModel.mjs`, `analysis/pullCards.mjs`, `analysis/pullConstructability.mjs`, `analysis/racewayAssurance.mjs`, `analysis/reportPackage.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/trayFill.mjs`, `pullcards.js`, `src/projectManagerEntry.js`, `src/pullCalc.js`, `src/pullcards.js`, `src/utils/isometricSvg.js`
 
 **Undocumented Reads**
 - None
@@ -1465,46 +1473,48 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - None
 
 **Direct Browser Storage**
-- pullcards.js:299 sessionStorage.getItem(<dynamic>) - session-handoff: Temporary route-result handoff; persisted route results use settings.latestRouteResults.
+- pullcards.js:301 sessionStorage.getItem(<dynamic>) - session-handoff: Temporary route-result handoff; persisted route results use settings.latestRouteResults.
 
 **Detected Reads**
 - `cableSchedule`
-  - pullcards.js:314 getCables()
-  - pullcards.js:360 getCables()
-  - pullcards.js:410 getCables()
+  - pullcards.js:316 getCables()
+  - pullcards.js:362 getCables()
+  - pullcards.js:412 getCables()
   - pullcards.js:83 getCables()
   - pullcards.js:98 getCables()
 - `conduitSchedule`
-  - pullcards.js:316 getConduits()
-  - pullcards.js:362 getConduits()
+  - pullcards.js:145 getConduits()
+  - pullcards.js:318 getConduits()
+  - pullcards.js:364 getConduits()
 - `ductbankSchedule`
-  - pullcards.js:317 getDuctbanks()
-  - pullcards.js:363 getDuctbanks()
+  - pullcards.js:146 getDuctbanks()
+  - pullcards.js:319 getDuctbanks()
+  - pullcards.js:365 getDuctbanks()
 - `settings.latestRouteResults`
-  - pullcards.js:319 getItem(latestRouteResults)
+  - pullcards.js:321 getItem(latestRouteResults)
 - `settings.lifecyclePackages`
-  - pullcards.js:367 getLifecyclePackages()
+  - pullcards.js:369 getLifecyclePackages()
 - `settings.pullPlanArtifact`
   - pullcards.js:122 getItem(pullPlanArtifact)
 - `settings.reportSnapshots`
-  - pullcards.js:366 getReportSnapshots()
+  - pullcards.js:368 getReportSnapshots()
 - `studyResults`
-  - pullcards.js:364 getStudies()
+  - pullcards.js:366 getStudies()
 - `traySchedule`
-  - pullcards.js:315 getTrays()
-  - pullcards.js:361 getTrays()
+  - pullcards.js:317 getTrays()
+  - pullcards.js:363 getTrays()
 
 **Detected Writes**
 - `settings.deliverableArtifacts`
-  - pullcards.js:237 upsertDeliverableArtifact()
+  - pullcards.js:239 upsertDeliverableArtifact()
 - `settings.pullPlanArtifact`
-  - pullcards.js:236 setItem(pullPlanArtifact)
+  - pullcards.js:238 setItem(pullPlanArtifact)
 
 ### Procurement Schedule (`procurementschedule.html`)
 
 - Section: Workflow
 - Group: Deliverables
-- Source files: `analysis/cableProcurement.mjs`, `analysis/deliverableArtifacts.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/pullCards.mjs`, `analysis/reportPackage.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `procurementschedule.js`, `src/procurementschedule.js`, `src/projectManagerEntry.js`, `src/pullCalc.js`
+- Source files: `analysis/cableProcurement.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableArtifacts.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/ductbankConduitAssignment.mjs`, `analysis/pullCards.mjs`, `analysis/pullConstructability.mjs`, `analysis/racewayAssurance.mjs`, `analysis/reportPackage.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/trayFill.mjs`, `procurementschedule.js`, `src/procurementschedule.js`, `src/projectManagerEntry.js`, `src/pullCalc.js`
 
 **Undocumented Reads**
 - None
@@ -1526,24 +1536,31 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - procurementschedule.js:286 getCables()
+  - procurementschedule.js:306 getCables()
+  - procurementschedule.js:312 getCables()
+- `conduitSchedule`
+  - procurementschedule.js:314 getConduits()
+- `ductbankSchedule`
+  - procurementschedule.js:315 getDuctbanks()
 - `settings.latestRouteResults`
-  - procurementschedule.js:64 getItem(latestRouteResults)
+  - procurementschedule.js:71 getItem(latestRouteResults)
 - `settings.procurementRegister`
-  - procurementschedule.js:43 getProcurementRegister()
+  - procurementschedule.js:50 getProcurementRegister()
+- `traySchedule`
+  - procurementschedule.js:313 getTrays()
 
 **Detected Writes**
 - `settings.deliverableArtifacts`
-  - procurementschedule.js:299 upsertDeliverableArtifact()
+  - procurementschedule.js:326 upsertDeliverableArtifact()
 - `settings.procurementRegister`
-  - procurementschedule.js:267 setProcurementRegister()
-  - procurementschedule.js:298 setProcurementRegister()
+  - procurementschedule.js:286 setProcurementRegister()
+  - procurementschedule.js:325 setProcurementRegister()
 
 ### Cost Estimate (`costestimate.html`)
 
 - Section: Workflow
 - Group: Deliverables
-- Source files: `analysis/costEstimate.mjs`, `analysis/deliverableArtifacts.mjs`, `analysis/manufacturerCatalog.mjs`, `costestimate.js`, `src/costestimate.js`, `src/projectManagerEntry.js`
+- Source files: `analysis/costEstimate.mjs`, `analysis/deliverableArtifacts.mjs`, `analysis/ductbankBom.mjs`, `analysis/manufacturerCatalog.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `costestimate.js`, `src/costestimate.js`, `src/projectManagerEntry.js`
 
 **Undocumented Reads**
 - None
@@ -1552,8 +1569,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - None
 
 **Declared Inputs Not Statically Read**
-- `ductbankSchedule` - No static read/write evidence was detected for this declared input.
-- `settings.latestRouteResults` - No static read/write evidence was detected for this declared input.
+- None
 
 **Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
@@ -1566,33 +1582,37 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - costestimate.js:291 getCables()
+  - costestimate.js:305 getCables()
 - `conduitSchedule`
-  - costestimate.js:293 getConduits()
+  - costestimate.js:307 getConduits()
+- `ductbankSchedule`
+  - costestimate.js:308 getDuctbanks()
 - `settings.costEstimateBasis`
-  - costestimate.js:53 migrateLegacyItem(..., costEstimateBasis)
+  - costestimate.js:61 migrateLegacyItem(..., costEstimateBasis)
 - `settings.customPricing`
-  - costestimate.js:45 migrateLegacyItem(..., customPricing)
+  - costestimate.js:53 migrateLegacyItem(..., customPricing)
+- `settings.latestRouteResults`
+  - costestimate.js:310 getItem(latestRouteResults)
 - `studyResults`
-  - costestimate.js:294 getStudies()
+  - costestimate.js:309 getStudies()
 - `studyResults.routeResults`
-  - costestimate.js:295 studies.routeResults
+  - costestimate.js:313 studies.routeResults
 - `traySchedule`
-  - costestimate.js:292 getTrays()
+  - costestimate.js:306 getTrays()
 
 **Detected Writes**
 - `settings.costEstimateArtifact`
-  - costestimate.js:330 setItem(costEstimateArtifact)
+  - costestimate.js:397 setItem(costEstimateArtifact)
 - `settings.costEstimateBasis`
-  - costestimate.js:194 setItem(costEstimateBasis)
-  - costestimate.js:277 setItem(costEstimateBasis)
-  - costestimate.js:53 migrateLegacyItem(..., costEstimateBasis)
+  - costestimate.js:208 setItem(costEstimateBasis)
+  - costestimate.js:291 setItem(costEstimateBasis)
+  - costestimate.js:61 migrateLegacyItem(..., costEstimateBasis)
 - `settings.customPricing`
-  - costestimate.js:133 setItem(customPricing)
-  - costestimate.js:45 migrateLegacyItem(..., customPricing)
-  - costestimate.js:95 removeItem(customPricing)
+  - costestimate.js:103 removeItem(customPricing)
+  - costestimate.js:141 setItem(customPricing)
+  - costestimate.js:53 migrateLegacyItem(..., customPricing)
 - `settings.deliverableArtifacts`
-  - costestimate.js:331 upsertDeliverableArtifact()
+  - costestimate.js:398 upsertDeliverableArtifact()
 
 ### Submittal Package (`submittal.html`)
 
@@ -1669,7 +1689,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Deliverables
-- Source files: `analysis/autoSize.mjs`, `analysis/clashDetect.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableArtifacts.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designRuleChecker.mjs`, `analysis/equipmentWorkflow.mjs`, `analysis/fieldObservations.mjs`, `analysis/heatTraceReport.mjs`, `analysis/heatTraceSizing.mjs`, `analysis/loadWorkflow.mjs`, `analysis/projectReport.mjs`, `analysis/projectWorkflowCore.mjs`, `analysis/pullCards.mjs`, `analysis/reportPackage.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `src/components/projectInputBinding.js`, `src/projectManagerEntry.js`, `src/projectreport.js`, `src/pullCalc.js`, `utils/componentLabels.js`, `validation/rules.js`
+- Source files: `analysis/autoSize.mjs`, `analysis/clashDetect.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableArtifacts.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designRuleChecker.mjs`, `analysis/ductbankConduitAssignment.mjs`, `analysis/equipmentWorkflow.mjs`, `analysis/fieldObservations.mjs`, `analysis/heatTraceReport.mjs`, `analysis/heatTraceSizing.mjs`, `analysis/loadWorkflow.mjs`, `analysis/projectReport.mjs`, `analysis/projectWorkflowCore.mjs`, `analysis/pullCards.mjs`, `analysis/pullConstructability.mjs`, `analysis/racewayAssurance.mjs`, `analysis/reportPackage.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/trayFill.mjs`, `src/components/projectInputBinding.js`, `src/projectManagerEntry.js`, `src/projectreport.js`, `src/pullCalc.js`, `utils/componentLabels.js`, `validation/rules.js`
 
 **Undocumented Reads**
 - None
@@ -1691,67 +1711,67 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - src/projectreport.js:284 getCables()
-  - src/projectreport.js:288 getCables()
+  - src/projectreport.js:286 getCables()
+  - src/projectreport.js:290 getCables()
 - `conduitSchedule`
-  - src/projectreport.js:290 getConduits()
+  - src/projectreport.js:292 getConduits()
 - `ductbankSchedule`
-  - src/projectreport.js:307 getDuctbanks()
+  - src/projectreport.js:309 getDuctbanks()
 - `equipment`
-  - src/projectreport.js:308 getEquipment()
-  - src/projectreport.js:885 getEquipment()
+  - src/projectreport.js:310 getEquipment()
+  - src/projectreport.js:955 getEquipment()
 - `loadList`
-  - src/projectreport.js:309 getLoads()
-  - src/projectreport.js:886 getLoads()
+  - src/projectreport.js:311 getLoads()
+  - src/projectreport.js:956 getLoads()
 - `oneLineDiagram`
-  - src/projectreport.js:310 getOneLine()
-  - src/projectreport.js:887 getOneLine()
+  - src/projectreport.js:312 getOneLine()
+  - src/projectreport.js:957 getOneLine()
 - `settings.costEstimateArtifact`
-  - src/projectreport.js:319 getItem(costEstimateArtifact)
+  - src/projectreport.js:322 getItem(costEstimateArtifact)
 - `settings.deliverableArtifacts`
-  - src/projectreport.js:323 getDeliverableArtifacts()
+  - src/projectreport.js:326 getDeliverableArtifacts()
 - `settings.designBasis`
-  - src/projectreport.js:313 getDesignBasis()
-  - src/projectreport.js:890 getDesignBasis()
+  - src/projectreport.js:315 getDesignBasis()
+  - src/projectreport.js:960 getDesignBasis()
 - `settings.designGateApprovals`
-  - src/projectreport.js:314 getDesignGateApprovals()
-  - src/projectreport.js:891 getDesignGateApprovals()
+  - src/projectreport.js:316 getDesignGateApprovals()
+  - src/projectreport.js:961 getDesignGateApprovals()
 - `settings.fieldExecutionRecords`
-  - src/projectreport.js:320 getFieldExecutionRecords()
+  - src/projectreport.js:323 getFieldExecutionRecords()
 - `settings.latestRouteResults`
-  - src/projectreport.js:284 getItem(latestRouteResults)
-  - src/projectreport.js:316 getItem(latestRouteResults)
-  - src/projectreport.js:920 getItem(latestRouteResults)
-  - src/projectreport.js:945 getItem(latestRouteResults)
-  - src/projectreport.js:959 getItem(latestRouteResults)
+  - src/projectreport.js:1017 getItem(latestRouteResults)
+  - src/projectreport.js:1031 getItem(latestRouteResults)
+  - src/projectreport.js:286 getItem(latestRouteResults)
+  - src/projectreport.js:318 getItem(latestRouteResults)
+  - src/projectreport.js:991 getItem(latestRouteResults)
 - `settings.lifecyclePackages`
-  - src/projectreport.js:1116 getLifecyclePackages()
-  - src/projectreport.js:1130 getLifecyclePackages()
-  - src/projectreport.js:849 getLifecyclePackages()
-  - src/projectreport.js:922 getLifecyclePackages()
-  - src/projectreport.js:956 getLifecyclePackages()
+  - src/projectreport.js:1028 getLifecyclePackages()
+  - src/projectreport.js:1188 getLifecyclePackages()
+  - src/projectreport.js:1202 getLifecyclePackages()
+  - src/projectreport.js:919 getLifecyclePackages()
+  - src/projectreport.js:993 getLifecyclePackages()
 - `settings.oneLineScheduleReconcilePending`
-  - src/projectreport.js:962 getItem(oneLineScheduleReconcilePending)
+  - src/projectreport.js:1034 getItem(oneLineScheduleReconcilePending)
 - `settings.procurementRegister`
-  - src/projectreport.js:318 getProcurementRegister()
+  - src/projectreport.js:321 getProcurementRegister()
 - `settings.projectMeta`
-  - src/projectreport.js:153 getProjectMeta()
-  - src/projectreport.js:174 getProjectMeta()
-  - src/projectreport.js:203 getProjectMeta()
+  - src/projectreport.js:155 getProjectMeta()
+  - src/projectreport.js:176 getProjectMeta()
+  - src/projectreport.js:205 getProjectMeta()
 - `settings.pullPlanArtifact`
-  - src/projectreport.js:317 getItem(pullPlanArtifact)
+  - src/projectreport.js:320 getItem(pullPlanArtifact)
 - `settings.reportSnapshots`
-  - src/projectreport.js:757 getReportSnapshots()
-  - src/projectreport.js:792 getReportSnapshots()
-  - src/projectreport.js:921 getReportSnapshots()
-  - src/projectreport.js:955 getReportSnapshots()
+  - src/projectreport.js:1027 getReportSnapshots()
+  - src/projectreport.js:827 getReportSnapshots()
+  - src/projectreport.js:862 getReportSnapshots()
+  - src/projectreport.js:992 getReportSnapshots()
 - `settings.studyApprovals`
-  - src/projectreport.js:312 getStudyApprovals()
+  - src/projectreport.js:314 getStudyApprovals()
 - `settings.tccSettings`
-  - src/projectreport.js:315 getItem(tccSettings)
-  - src/projectreport.js:892 getItem(tccSettings)
+  - src/projectreport.js:317 getItem(tccSettings)
+  - src/projectreport.js:962 getItem(tccSettings)
 - `studyResults`
-  - src/projectreport.js:311 getStudies()
+  - src/projectreport.js:313 getStudies()
 - `studyResults.arcFlash`
   - analysis/projectReport.mjs:449 studies.arcFlash
 - `studyResults.bessHazard`
@@ -1795,16 +1815,16 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `studyResults.voltageStability`
   - analysis/projectReport.mjs:756 studies.voltageStability
 - `traySchedule`
-  - src/projectreport.js:289 getTrays()
+  - src/projectreport.js:291 getTrays()
 
 **Detected Writes**
 - `settings.deliverableArtifacts`
-  - src/projectreport.js:1217 upsertDeliverableArtifact()
+  - src/projectreport.js:1289 upsertDeliverableArtifact()
 - `settings.projectMeta`
-  - src/projectreport.js:205 setProjectMeta()
+  - src/projectreport.js:207 setProjectMeta()
 - `settings.reportSnapshots`
-  - src/projectreport.js:1216 setReportSnapshot()
-  - src/projectreport.js:785 deleteReportSnapshot()
+  - src/projectreport.js:1288 setReportSnapshot()
+  - src/projectreport.js:855 deleteReportSnapshot()
 - `studyResults.duty`
   - validation/rules.js:666 studies.duty
 

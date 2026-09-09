@@ -2,6 +2,7 @@ import assert from 'assert';
 import { runLoadFlow } from '../analysis/loadFlow.js';
 import { runShortCircuit } from '../analysis/shortCircuit.mjs';
 import { evaluateConduitFill } from '../analysis/conduitFill.mjs';
+import { evaluateTrayFill } from '../analysis/trayFill.mjs';
 
 function describe(name, fn) { console.log(name); fn(); }
 function it(name, fn) {
@@ -82,5 +83,27 @@ describe('independently derived engineering evidence benchmarks', () => {
     assert.strictEqual(three.fillLimit, 0.40);
     assert.ok(Math.abs(one.fillPercent - expectedOneCableFill) < 1e-10);
     assert.ok(Math.abs(one.fillPercent - 41.336745) < 0.0001);
+  });
+
+  it('applies the NEC 2023 Article 392 mixed-cable diameter penalty at its boundary', () => {
+    const tray = { tray_type: 'Ladder', inside_width: 12, tray_depth: 6 };
+    const large = {
+      tag: 'LARGE', cable_type: 'Power', conductors: 3,
+      conductor_size: '4/0 AWG', cable_area: Math.PI,
+    };
+    const atBoundary = evaluateTrayFill(tray, [
+      large,
+      { tag: 'SMALL', cable_type: 'Power', conductors: 3, conductor_size: '#2 AWG', cable_area: 11.6 },
+    ]);
+    const aboveBoundary = evaluateTrayFill(tray, [
+      large,
+      { tag: 'SMALL', cable_type: 'Power', conductors: 3, conductor_size: '#2 AWG', cable_area: 11.601 },
+    ]);
+
+    assert.equal(atBoundary.allowable.baseTableAreaIn2, 14);
+    assert.ok(Math.abs(atBoundary.allowable.diameterPenaltyIn2 - 2.4) < 1e-10);
+    assert.ok(Math.abs(atBoundary.allowable.smallCableAreaIn2 - 11.6) < 1e-10);
+    assert.equal(atBoundary.status, 'pass');
+    assert.equal(aboveBoundary.status, 'fail');
   });
 });

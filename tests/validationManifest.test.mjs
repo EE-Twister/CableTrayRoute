@@ -208,6 +208,7 @@ describe('benchmark sample project files — structure', () => {
     'benchmark-ieee80-ground-grid.json',
     'benchmark-heat-trace-screening.json',
     'benchmark-ductbank-thermal.json',
+    'benchmark-nec2023-tray-fill.json',
   ];
 
   it('samples/ directory exists', () => {

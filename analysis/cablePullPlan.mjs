@@ -1,4 +1,5 @@
 import { tracePullTension } from '../src/pullCalc.js';
+import { buildPullConstructabilityEvidence } from './pullConstructability.mjs';
 
 const EPSILON = 1e-6;
 
@@ -495,7 +496,7 @@ export function buildCablePullPlan(routeSegments = [], cable = {}, options = {})
   if (!forwardPieces.length) missingInputs.push('Route geometry');
 
   if (missingInputs.length) {
-    return {
+    const incompletePlan = {
       enabled: true,
       status: 'inputs-required',
       missingInputs,
@@ -513,6 +514,13 @@ export function buildCablePullPlan(routeSegments = [], cable = {}, options = {})
         maxPullLengthFt: settings.maxPullLengthFt
       }
     };
+    incompletePlan.constructability = buildPullConstructabilityEvidence({
+      routeSegments,
+      cable,
+      pullPlan: incompletePlan,
+      options: { ...options, ...settings },
+    });
+    return incompletePlan;
   }
 
   const forward = buildDirectionalPlan(forwardPieces, properties, settings, 'forward');
@@ -531,7 +539,7 @@ export function buildCablePullPlan(routeSegments = [], cable = {}, options = {})
     ? (cable?.start_tag || cable?.from || 'Start')
     : (cable?.end_tag || cable?.to || 'End');
 
-  return {
+  const plan = {
     enabled: true,
     status: selected.status,
     missingInputs: [],
@@ -580,9 +588,24 @@ export function buildCablePullPlan(routeSegments = [], cable = {}, options = {})
       maxHandPullLengthFt: settings.maxHandPullLengthFt,
       maxHandPullTensionLbf: settings.maxHandPullTensionLbf,
       sheaveCapacityLbf: settings.sheaveCapacityLbf,
-      inferredBends: true
+      inferredBends: true,
+      bendGeometryConfirmed: options.bendGeometryConfirmed === true,
+      bendGeometrySource: String(options.bendGeometrySource || '').trim() || null,
+      pullPointAccessSource: String(options.pullPointAccessSource || '').trim() || null,
+      pullPointAccessRecordCount: Array.isArray(options.pullPointAccessRecords)
+        ? options.pullPointAccessRecords.length
+        : 0,
+      cableLimitSource: String(options.cableLimitSource || '').trim() || null,
+      equipmentRatingsSource: String(options.equipmentRatingsSource || '').trim() || null
     }
   };
+  plan.constructability = buildPullConstructabilityEvidence({
+    routeSegments,
+    cable,
+    pullPlan: plan,
+    options: { ...options, ...settings },
+  });
+  return plan;
 }
 
 export { analysisSegments };

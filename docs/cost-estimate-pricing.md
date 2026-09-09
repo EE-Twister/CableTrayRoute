@@ -2,7 +2,9 @@
 
 ## Overview
 
-The Project Cost Estimator uses unit prices to calculate material and labor costs for cables, trays, conduit, and fittings. Its built-in 2024 USD values are conceptual allowances, not a licensed cost-book extract. Import supplier, internal, or licensed cost data for issued estimates.
+The Project Cost Estimator uses unit prices to calculate material and labor costs for cables, trays, conduit, tray fittings/supports, and BOM-derived ductbank construction. Its built-in 2024 USD electrical values are conceptual allowances, not a licensed cost-book extract. Support and civil assemblies intentionally have no positive built-in prices. Import supplier, subcontractor, internal, or licensed cost data to complete governed-price checks. Output remains **Screening only** and is not a bid or issued estimate.
+
+When successful route results exist, the estimator uses the signed, route-scoped quantity basis described in [Route Quantity and Cost Assurance](route-quantity-cost-assurance.md). Routed cable quantities retain physical-run multiplicity, while shared installed trays, conduits, and ductbanks are counted once by schedule identity. Tray supports use the signed ledger count. Ductbank cost lines reuse the Ductbank Route BOM.
 
 For detailed estimates — such as those submitted to a client or used for contractor bid comparison — you can import a **custom pricing book** from a CSV file. Typical sources include:
 
@@ -37,7 +39,7 @@ labor escalation factor = current ECI index / base ECI index
 combined labor factor = regional labor factor × labor escalation factor
 ```
 
-Material prices (cable, tray, conduit, and fittings) receive the material
+Material prices (cable, tray, conduit, fittings, supports, and ductbank construction) receive the material
 factor. Contractor labor rates receive the combined labor factor. Productivity
 rates are not changed.
 
@@ -89,7 +91,7 @@ Click **Reset to Built-in Defaults** to clear all custom pricing and return to t
 
 | Column | Required | Description |
 |--------|----------|-------------|
-| `category` | Yes | One of: `cable`, `tray`, `conduit`, `fitting`, `labor`, `productivity` |
+| `category` | Yes | One of: `cable`, `tray`, `conduit`, `fitting`, `tray_support`, `construction`, `labor_unit_hours`, `labor`, `productivity` |
 | `key` | Conditional | Size or rate key (see table below). Leave empty for `fitting`. |
 | `unit_price` | Yes | Numeric unit price. Must be a non-negative finite number. |
 | `unit` | No | Display label (e.g. `$/ft`, `$/hr`). Not used in calculations. |
@@ -104,14 +106,19 @@ Click **Reset to Built-in Defaults** to clear all custom pricing and return to t
 | `tray` | Nominal width in inches: `6`, `9`, `12`, `18`, `24`, `30`, `36`, `default` |
 | `conduit` | Trade size in inches: `0.5`, `0.75`, `1`, `1.25`, `1.5`, `2`, `2.5`, `3`, `3.5`, `4`, `default` |
 | `fitting` | *(leave key empty)* — sets the unit price per tray fitting |
-| `labor` | `cableInstall`, `trayInstall`, `conduitInstall` |
-| `productivity` | `cablePullFtPerHr`, `trayInstallFtPerHr`, `conduitInstallFtPerHr` |
+| `tray_support` | Tray width, manufacturer catalog number, or `default`; value is material dollars per support assembly |
+| `construction` | Deterministic ductbank BOM key shown in the estimate line-item detail/export; value is material dollars per displayed BOM unit |
+| `labor_unit_hours` | Same ductbank BOM key as `construction`; value is labor-hours per displayed BOM unit |
+| `labor` | `cableInstall`, `trayInstall`, `conduitInstall`, `civilInstall` |
+| `productivity` | `cablePullFtPerHr`, `trayInstallFtPerHr`, `conduitInstallFtPerHr`, `traySupportInstallEaPerHr`, `trayFittingInstallEaPerHr` |
 
-> **Tip:** Include a `default` key for `cable`, `tray`, and `conduit` to cover any sizes not explicitly listed. Rows with unrecognized keys or non-numeric prices are skipped with a warning.
+For cable, tray, conduit, and support rows, an exact manufacturer catalog-number key is preferred when the schedule identifies a catalog part. Attribute keys such as conductor size, tray width, or conduit trade size remain available for screening price books. If a selected catalog part is priced only by a generic attribute, exact-product price assurance blocks.
+
+For ductbanks, an exact key includes category, item, and specification. A shorter `ductbank.<category>.<item>` key may intentionally cover multiple specifications; `default` is also accepted but should be used only when the source truly supports a uniform rate. Every generated construction line needs both a material price and labor-hours-per-unit entry.
 
 ### Priority Rules
 
-When both a CSV value and a manual UI override exist for the same field, the **manual UI field takes precedence**. This applies to the three labor-rate inputs and the fitting price input. All other values come exclusively from the CSV (or default if no CSV is loaded).
+When both a CSV value and a manual UI override exist for the same field, the **manual UI field takes precedence**. This applies to the three electrical labor-rate inputs and the fitting price input. Civil crew rates, support/fitting productivity, construction prices, and labor-hours-per-unit come from the CSV.
 
 ### Comments
 
@@ -170,13 +177,21 @@ conduit,3.5,8.30,$/ft,Distributor ABC,2026-04-11
 conduit,4,10.50,$/ft,Distributor ABC,2026-04-11
 conduit,default,3.50,$/ft,Distributor ABC,2026-04-11
 fitting,,42.00,$,Distributor ABC,2026-04-11
+tray_support,12,28.00,$/ea,Distributor ABC,2026-04-11
 labor,cableInstall,80.00,$/hr,IBEW Local 2026,2026-04-11
 labor,trayInstall,95.00,$/hr,IBEW Local 2026,2026-04-11
 labor,conduitInstall,90.00,$/hr,IBEW Local 2026,2026-04-11
+labor,civilInstall,110.00,$/hr,Civil Subcontractor 2026,2026-04-11
 productivity,cablePullFtPerHr,140,ft/hr,IBEW Local 2026,2026-04-11
 productivity,trayInstallFtPerHr,28,ft/hr,IBEW Local 2026,2026-04-11
 productivity,conduitInstallFtPerHr,22,ft/hr,IBEW Local 2026,2026-04-11
+productivity,traySupportInstallEaPerHr,2,ea/hr,IBEW Local 2026,2026-04-11
+productivity,trayFittingInstallEaPerHr,4,ea/hr,IBEW Local 2026,2026-04-11
+construction,ductbank.civil.trench-excavation,18.00,$/CY,Civil Subcontractor 2026,2026-04-11
+labor_unit_hours,ductbank.civil.trench-excavation,0.25,hr/CY,Civil Subcontractor 2026,2026-04-11
 ```
+
+The construction rows above are illustrative. Exported line items show the exact keys required by the current ductbank BOM; populate every generated key before expecting assurance to pass.
 
 ---
 
@@ -184,7 +199,8 @@ productivity,conduitInstallFtPerHr,22,ft/hr,IBEW Local 2026,2026-04-11
 
 Each successful estimate is saved as `settings.costEstimateArtifact`. The
 record includes the source-stamped estimate basis, category summary,
-contingency, grand total, and line-item rows. A source-fingerprinted entry is
+contingency, grand total, line-item rows, input fingerprint, route quantity ledger,
+blocking issues, and deterministic quantity/cost signatures. A source-fingerprinted entry is
 also added to the deliverable register so Project Report and Submittal packages
 can include the current estimate without relying on a downloaded workbook.
 
@@ -206,7 +222,8 @@ basis and applied material/labor factors. A dedicated **Estimate Basis** sheet
 records dates, region, wages, index values, series IDs, calculated factors, and
 public source URLs. The **Line Items** sheet also carries manufacturer, catalog
 number, and approval status fields when schedule rows include governed catalog
-metadata.
+metadata. **Route Quantity** and **Cost Assurance** sheets retain the signed ledger and assurance findings.
+When routed ductbanks are present, **Ductbank Assemblies** retains BOM readiness, quantities, units, bases, and blocking reasons.
 
 
 ---
@@ -217,7 +234,7 @@ This section summarizes the behavior expected by integration checks and user wor
 
 ### Input assumptions
 
-- At least one schedule category (cable, tray, or conduit) is present in project data before generating a meaningful estimate.
+- At least one schedule category (cable, tray, conduit, or routed ductbank) is present in project data before generating a meaningful estimate.
 - Contingency is a numeric percent, typically in the `0` to `100` UI range.
 - Pricing source is either built-in defaults or imported CSV values, with manual labor/fitting overrides taking precedence when entered.
 

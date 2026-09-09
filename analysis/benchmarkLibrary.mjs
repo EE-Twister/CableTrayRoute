@@ -42,8 +42,44 @@ import {
   initialRotorAngle,
 } from './transientStability.mjs';
 import { DEFAULT_FLEET, runOptimalPowerFlow } from './optimalPowerFlow.mjs';
+import { evaluateTrayFill, table39222AllowableArea } from './trayFill.mjs';
 
 export const BENCHMARKS = [
+  {
+    id: 'TRAY-NEC-001',
+    fixtureId: 'nec2023-tray-fill-mixed-boundary',
+    label: 'NEC 2023 Article 392 — 12 in ladder mixed-cable boundary',
+    studyType: 'Cable Tray Fill',
+    standardRef: 'NFPA 70 (NEC) 2023 392.22(A)(1), Table 392.22(A)(1)',
+    sourceUrl: 'https://docinfofiles.nfpa.org/files/AboutTheCodes/70/70_A2022_NEC_P08_FD_PIReport_rev_1008.pdf',
+    description:
+      'For a 12 in ladder tray, Column 1 is 14.0 in². One 2.0 in diameter 4/0-or-larger multiconductor cable applies a 1.2 × Sd penalty, leaving 11.6 in² for smaller cables. The exact boundary passes and 0.001 in² above it fails.',
+    run() {
+      const tray = { tray_type: 'Ladder', inside_width: 12, tray_depth: 6 };
+      const largeArea = Math.PI;
+      const atBoundary = evaluateTrayFill(tray, [
+        { tag: 'LARGE', cable_type: 'Power', conductors: 3, conductor_size: '4/0 AWG', cable_area: largeArea },
+        { tag: 'SMALL', cable_type: 'Power', conductors: 3, conductor_size: '#2 AWG', cable_area: 11.6 },
+      ]);
+      const aboveBoundary = evaluateTrayFill(tray, [
+        { tag: 'LARGE', cable_type: 'Power', conductors: 3, conductor_size: '4/0 AWG', cable_area: largeArea },
+        { tag: 'SMALL', cable_type: 'Power', conductors: 3, conductor_size: '#2 AWG', cable_area: 11.601 },
+      ]);
+      return {
+        ladderColumn1In2: table39222AllowableArea(12, 'ladder'),
+        mixedSmallAllowanceIn2: atBoundary.allowable.smallCableAreaIn2,
+        boundaryPass: atBoundary.status === 'pass',
+        aboveBoundaryFails: aboveBoundary.status === 'fail',
+      };
+    },
+    checks: [
+      { key: 'ladderColumn1In2', description: '12 in ladder Column 1 area (in²)', expectedVal: 14, tolerance: 0 },
+      { key: 'mixedSmallAllowanceIn2', description: '14 - 1.2 × 2.0 in mixed allowance (in²)', expectedVal: 11.6, tolerance: 1e-9 },
+      { key: 'boundaryPass', description: 'Exact boundary is accepted', expectedVal: true, type: 'boolean' },
+      { key: 'aboveBoundaryFails', description: '0.001 in² above boundary is rejected', expectedVal: true, type: 'boolean' },
+    ],
+  },
+
   // -------------------------------------------------------------------------
   // EMF Analysis — Biot-Savart / ICNIRP
   // -------------------------------------------------------------------------

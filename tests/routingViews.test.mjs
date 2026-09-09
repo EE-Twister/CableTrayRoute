@@ -68,9 +68,31 @@ describe('pull-review view', () => {
                 cable: 'C-1',
                 pull_check: {
                     status: 'setups-required',
+                    direction: 'forward',
                     directionLabel: 'From → To',
-                    sections: [{ index: 1 }, { index: 2 }],
-                    equipment: { counts: { reels: 2, tuggers: 2 } }
+                    sections: [
+                        { index: 1, startDistance: 0, endDistance: 50, length: 50, maxTension: 120 },
+                        { index: 2, startDistance: 50, endDistance: 100, length: 50, maxTension: 130 }
+                    ],
+                    equipment: { counts: { reels: 2, tuggers: 2 } },
+                    constructability: {
+                        status: 'blocked',
+                        signature: 'AB12CD34',
+                        sources: {
+                            cableLimits: 'Manufacturer pull sheet MPS-101 Rev 2',
+                            equipmentRatings: 'Pulling equipment register PER-12'
+                        },
+                        pullPoints: {
+                            requiredCount: 3,
+                            confirmedCount: 1,
+                            records: [
+                                { id: 'point-1', type: 'reel', label: 'Reel / pull start', point: [0, 0, 0], distanceFt: 0, status: 'confirmed', source: 'Site access walkdown SAW-03', notes: 'Pad clear' },
+                                { id: 'point-2', type: 'intermediate', label: 'Intermediate setup 1', point: [50, 0, 0], distanceFt: 50, status: 'pending', source: '', notes: '' },
+                                { id: 'point-3', type: 'receiving', label: 'Receiving / pull end', point: [100, 0, 0], distanceFt: 100, status: 'blocked', source: 'Site access walkdown SAW-03', notes: 'Scaffold conflict' }
+                            ]
+                        },
+                        issues: [{ message: 'Cable minimum bend radius is missing.' }]
+                    }
                 }
             },
             {
@@ -83,17 +105,25 @@ describe('pull-review view', () => {
             }
         ];
         const review = buildPullReviewMarkup(results, {
-            selectedRouteIndex: 1,
+            selectedRouteIndex: 0,
             formatDistance: value => `${value} ft`,
             escapeHtml,
             escapeAttr
         });
 
         assert.equal(review.setupCount, 1);
-        assert.equal(review.reviewCount, 1);
+        assert.equal(review.reviewCount, 2);
         assert.match(review.html, /2 cable pull plans/);
-        assert.match(review.html, /2 setups required/);
+        assert.match(review.html, /Show 2 setup locations/);
         assert.match(review.html, /Missing: weight/);
+        assert.match(review.html, /Evidence incomplete/);
+        assert.match(review.html, /Constructability evidence: incomplete/);
+        assert.match(review.html, /Signature AB12CD34/);
+        assert.match(review.html, /1\/3 points confirmed/);
+        assert.match(review.html, /Per-point access evidence/);
+        assert.match(review.html, /Intermediate setup 1/);
+        assert.match(review.html, /data-save-pull-access="0"/);
+        assert.match(review.html, /Cable minimum bend radius is missing/);
         assert.match(review.html, /data-pull-route-index="0"/);
     });
 

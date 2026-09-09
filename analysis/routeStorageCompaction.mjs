@@ -12,7 +12,10 @@ const compactRouteSegment = segment => ({
     ...(text(segment?.tray_id) ? { tray_id: text(segment.tray_id) } : {}),
     ...(text(segment?.conduit_id) ? { conduit_id: text(segment.conduit_id) } : {}),
     ...(text(segment?.ductbankTag || segment?.ductbank_tag) ? { ductbankTag: text(segment.ductbankTag || segment.ductbank_tag) } : {}),
-    ...(Number.isFinite(Number(segment?.radius)) ? { radius: Number(segment.radius) } : {})
+    ...(Number.isFinite(Number(segment?.radius)) ? { radius: Number(segment.radius) } : {}),
+    ...(text(segment?.bend_radius_source || segment?.bendRadiusSource) ? { bend_radius_source: text(segment.bend_radius_source || segment.bendRadiusSource) } : {}),
+    ...(text(segment?.pull_point_id || segment?.pullPointId) ? { pull_point_id: text(segment.pull_point_id || segment.pullPointId) } : {}),
+    ...(segment?.pull_point_accessible === true || segment?.pullPointAccessible === true ? { pull_point_accessible: true } : {})
 });
 
 const compactExclusions = records => {

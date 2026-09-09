@@ -93,12 +93,18 @@ export function summarizePackage(projectData = {}) {
  *   projectSnapshot: {
  *     cables: any[],
  *     trays: any[],
+ *     conduits: any[],
+ *     ductbanks: any[],
  *     equipment: any[],
  *     studies: object,
  *     approvals: object,
  *     designBasis: object|null,
  *     designGateApprovals: object,
  *     oneLine: object,
+ *     latestRouteResults: object|any[],
+ *     procurementRegister: any[],
+ *     costEstimateArtifact: object|null,
+ *     currentInputFingerprint: string,
  *     oneLineComponentCount: number,
  *   },
  *   summary: {
@@ -122,6 +128,8 @@ export function summarizePackage(projectData = {}) {
  * @param {{
  *   cables?: any[],
  *   trays?: any[],
+ *   conduits?: any[],
+ *   ductbanks?: any[],
  *   equipment?: any[],
  *   studies?: object,
  *   approvals?: object,
@@ -131,6 +139,10 @@ export function summarizePackage(projectData = {}) {
  *   fieldObservations?: any[],
  *   fieldObservationQueue?: string[],
  *   oneLine?: object,
+ *   routeResults?: object|any[],
+ *   procurementRegister?: any[],
+ *   costEstimateArtifact?: object|null,
+ *   currentInputFingerprint?: string,
  * }} projectData
  * @returns {LifecyclePackage}
  */
@@ -139,6 +151,8 @@ export function buildLifecyclePackage(config = {}, projectData = {}) {
 
   const cables    = deepClone(Array.isArray(projectData.cables) ? projectData.cables : []);
   const trays     = deepClone(Array.isArray(projectData.trays)  ? projectData.trays  : []);
+  const conduits  = deepClone(Array.isArray(projectData.conduits) ? projectData.conduits : []);
+  const ductbanks = deepClone(Array.isArray(projectData.ductbanks) ? projectData.ductbanks : []);
   const equipment = deepClone(Array.isArray(projectData.equipment) ? projectData.equipment : []);
   const studies   = deepClone(projectData.studies   || {});
   const approvals = deepClone(projectData.approvals || {});
@@ -148,6 +162,10 @@ export function buildLifecyclePackage(config = {}, projectData = {}) {
   const fieldObservations = deepClone(Array.isArray(projectData.fieldObservations) ? projectData.fieldObservations : []);
   const fieldObservationQueue = deepClone(Array.isArray(projectData.fieldObservationQueue) ? projectData.fieldObservationQueue : []);
   const oneLine   = deepClone(projectData.oneLine || {});
+  const latestRouteResults = deepClone(projectData.routeResults || projectData.latestRouteResults || []);
+  const procurementRegister = deepClone(Array.isArray(projectData.procurementRegister) ? projectData.procurementRegister : []);
+  const costEstimateArtifact = deepClone(projectData.costEstimateArtifact || projectData.costEstimate || null);
+  const currentInputFingerprint = String(projectData.currentInputFingerprint || '');
   const components = oneLineComponents(oneLine);
 
   const summary = {
@@ -167,6 +185,8 @@ export function buildLifecyclePackage(config = {}, projectData = {}) {
     projectSnapshot: {
       cables,
       trays,
+      conduits,
+      ductbanks,
       equipment,
       studies,
       approvals,
@@ -175,6 +195,10 @@ export function buildLifecyclePackage(config = {}, projectData = {}) {
       tccSettings,
       fieldObservations,
       fieldObservationQueue,
+      latestRouteResults,
+      procurementRegister,
+      costEstimateArtifact,
+      currentInputFingerprint,
       oneLine,
       oneLineComponentCount: components.length
     },

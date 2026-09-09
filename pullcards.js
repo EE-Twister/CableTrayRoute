@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function readSavedPullArtifact() {
     const saved = getItem(PULL_PLAN_KEY, null);
-    return saved && saved.schemaVersion === 1 && saved.pulls && typeof saved.pulls === 'object'
+    return saved && [1, 2].includes(saved.schemaVersion) && saved.pulls && typeof saved.pulls === 'object'
       ? saved
       : null;
   }
@@ -142,6 +142,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const { pulls, summary } = buildPullTable(currentRouteResults, currentCableList, {
       baseURL: fieldViewBaseURL(),
       assumptionsByPull,
+      conduits: getConduits(),
+      ductbanks: getDuctbanks(),
     });
     currentPulls = pulls;
     selectedPullNumber = pulls[0]?.pull_number ?? null;
@@ -532,6 +534,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const jamRatio = pull.jam_check?.ratio === null || pull.jam_check?.ratio === undefined
       ? 'Not calculated'
       : pull.jam_check.ratio;
+    const accessRecords = (pull.constructability_evidence || []).flatMap(evidence => (
+      (evidence.pullPoints?.records || []).map(record => ({ ...record, cable: evidence.cable, signature: evidence.signature }))
+    ));
+    const accessRows = accessRecords.map(record => `<tr>
+      <td>${esc(record.cable)}</td>
+      <td>${esc(record.label)}</td>
+      <td>${formatEngineeringValue(record.distanceFt)} ft</td>
+      <td>${esc(formatPoint(record.point))}</td>
+      <td>${esc(record.status)}</td>
+      <td>${esc(record.source || 'Source missing')}</td>
+      <td>${esc(record.notes || '')}</td>
+      <td>${esc(record.signature || '')}</td>
+    </tr>`).join('');
 
     pullCardContent.innerHTML = `
       <div class="pull-card-visual iso-detail-panel">
@@ -597,6 +612,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         ${coverageWarnings ? `<div class="pull-coverage-warning" role="status"><strong>Inputs requiring review</strong><ul>${coverageWarnings}</ul></div>` : '<p class="pull-coverage-complete">Engineering input coverage is complete.</p>'}
       </section>
+      ${accessRows ? `<section class="pull-engineering-panel" aria-label="Pull-point access evidence"><div class="pull-engineering-header"><div><h3>Pull-Point Access Evidence</h3><p class="field-hint">Read-only evidence carried from the calculated Optimal Route pull plan.</p></div></div><div class="table-scroll"><table class="result-table"><thead><tr><th>Cable</th><th>Point</th><th>Station</th><th>Coordinates</th><th>Status</th><th>Source</th><th>Note</th><th>Signature</th></tr></thead><tbody>${accessRows}</tbody></table></div></section>` : ''}
       <div class="pull-card-grid">
         <div class="pull-card-info">
           <table class="result-table" aria-label="Pull card summary">
@@ -827,6 +843,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }));
     const wsEngineering = XLSX.utils.json_to_sheet(engineeringRows);
     XLSX.utils.book_append_sheet(wb, wsEngineering, 'Engineering Inputs');
+
+    const accessEvidenceRows = currentPulls.flatMap(p => (p.constructability_evidence || []).flatMap(evidence => (
+      (evidence.pullPoints?.records || []).map(record => ({
+        'Pull #': p.pull_number,
+        'Cable Tag': evidence.cable,
+        'Point': record.label,
+        'Type': record.type,
+        'Station (ft)': record.distanceFt,
+        'Coordinates (ft)': formatPoint(record.point),
+        'Status': record.status,
+        'Evidence Source': record.source || '',
+        'Access Note': record.notes || '',
+        'Constructability Signature': evidence.signature || '',
+      }))
+    )));
+    if (accessEvidenceRows.length) {
+      const wsAccess = XLSX.utils.json_to_sheet(accessEvidenceRows);
+      XLSX.utils.book_append_sheet(wb, wsAccess, 'Access Evidence');
+    }
 
     XLSX.writeFile(wb, 'pull_cards.xlsx');
   });

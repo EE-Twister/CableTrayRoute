@@ -4,6 +4,7 @@ import {
   normalizeRouteResults,
   routedCableNamesFromResults
 } from '../analysis/deliverableWorkflow.mjs';
+import { buildCablePullPlan } from '../analysis/cablePullPlan.mjs';
 
 const cables = [
   {
@@ -11,24 +12,38 @@ const cables = [
     from: 'SWBD-101',
     to: 'MCC-101',
     conductor_size: '3-500 kcmil CU',
+    conductors: 3,
     length: 120,
     route_preference: 'TR-101',
     raceway_ids: ['TR-101'],
     cable_type: 'Power',
     diameter: 1.2,
     weight: 3.1,
+    start_x: 0,
+    start_y: 0,
+    start_z: 10,
+    end_x: 40,
+    end_y: 0,
+    end_z: 10,
   },
   {
     tag: 'CBL-102',
     from: 'MCC-101',
     to: 'PMP-101',
     conductor_size: '3-#4 CU',
+    conductors: 3,
     length: 80,
     route_preference: 'TR-102',
     raceway_ids: ['TR-102'],
     cable_type: 'Power',
     diameter: 0.55,
     weight: 1.1,
+    start_x: 40,
+    start_y: 0,
+    start_z: 10,
+    end_x: 70,
+    end_y: 10,
+    end_z: 10,
   },
 ];
 
@@ -43,6 +58,7 @@ const trays = [
     end_z: 10,
     inside_width: 24,
     tray_depth: 6,
+    tray_type: 'Ladder',
   },
   {
     tray_id: 'TR-102',
@@ -54,6 +70,7 @@ const trays = [
     end_z: 10,
     inside_width: 18,
     tray_depth: 4,
+    tray_type: 'Ladder',
   },
 ];
 
@@ -62,7 +79,7 @@ const routeResults = {
     {
       cable: 'CBL-101',
       status: 'Routed',
-      total_length: 120,
+      total_length: 40,
       breakdown: [
         { tray_id: 'TR-101', length: 40, start: [0, 0, 10], end: [40, 0, 10] },
       ],
@@ -108,6 +125,8 @@ const staleFingerprint = buildDeliverableReadinessDiagnostics({
 
 assert.equal(staleFingerprint.health.routeResults, 0);
 assert.deepEqual(staleFingerprint.missingRouteResultTags, ['CBL-101', 'CBL-102']);
+assert.equal(staleFingerprint.racewayAssurance.status, 'blocked');
+assert(staleFingerprint.racewayAssurance.blockingIssues.some(issue => issue.code === 'ROUTE-RESULTS-STALE'));
 
 
 const partial = buildDeliverableReadinessDiagnostics({
@@ -127,6 +146,33 @@ assert.equal(partial.ready.pullCards, true);
 assert.equal(partial.ready.spoolSheets, true);
 assert.equal(partial.ready.reportSnapshot, false);
 
+const pullPlanBlocked = buildCablePullPlan(
+  routeResults.batchResults[0].route_segments,
+  { ...cables[0], max_tension: 10000, max_sidewall_pressure: 10000 },
+  { maxPullLengthFt: 500 }
+);
+const pullEvidenceBlocked = buildDeliverableReadinessDiagnostics({
+  cables,
+  trays,
+  routeResults: {
+    batchResults: [{ ...routeResults.batchResults[0], pull_check: pullPlanBlocked }],
+  },
+});
+assert.equal(pullEvidenceBlocked.pullConstructability.status, 'blocked');
+assert.equal(pullEvidenceBlocked.ready.pullCards, false);
+assert(pullEvidenceBlocked.actions.some(action => action.label === 'Resolve pull constructability blockers'));
+
+const legacyCostBlocked = buildDeliverableReadinessDiagnostics({
+  cables,
+  trays,
+  routeResults,
+  costEstimate: { summary: { total: 1000 } },
+  currentInputFingerprint: 'current-inputs',
+});
+assert.equal(legacyCostBlocked.routeCostAssurance.status, 'blocked');
+assert.equal(legacyCostBlocked.ready.projectReport, false);
+assert(legacyCostBlocked.actions.some(action => action.label === 'Regenerate governed route cost estimate'));
+
 const complete = buildDeliverableReadinessDiagnostics({
   cables,
   trays,
@@ -135,12 +181,12 @@ const complete = buildDeliverableReadinessDiagnostics({
     {
       cable: 'CBL-102',
       status: 'Routed',
-      total_length: 80,
+      total_length: Math.hypot(30, 10),
       breakdown: [
-        { tray_id: 'TR-102', length: 32, start: [40, 0, 10], end: [70, 10, 10] },
+        { tray_id: 'TR-102', length: Math.hypot(30, 10), start: [40, 0, 10], end: [70, 10, 10] },
       ],
       route_segments: [
-        { type: 'straight', tray_id: 'TR-102', length: 32, start: [40, 0, 10], end: [70, 10, 10] },
+        { type: 'straight', tray_id: 'TR-102', length: Math.hypot(30, 10), start: [40, 0, 10], end: [70, 10, 10] },
       ],
     },
   ],
@@ -153,6 +199,9 @@ assert.equal(complete.health.routeCoverage, 100);
 assert.equal(complete.health.reportSnapshots, 1);
 assert.equal(complete.health.lifecyclePackages, 1);
 assert.equal(complete.ready.releasePackage, true);
+assert.equal(complete.ready.routeResults, true);
+assert.equal(complete.racewayAssurance.status, 'pass');
+assert.equal(complete.health.routeSignatures, 2);
 assert.equal(complete.nextAction.href, 'projectreport.html');
 assert.equal(complete.actions.filter(action => action.severity === 'warning').length, 0);
 

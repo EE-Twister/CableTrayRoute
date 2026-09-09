@@ -84,19 +84,25 @@
 
       <details class="method-panel">
         <summary>Method &amp; Pricing Basis</summary>
-        <p>Material costs are estimated from unit prices ($/ft for cable, tray, conduit)
-        multiplied by quantities from the project schedules. Cable lengths come from routing
-        results if available, otherwise from the cable schedule.</p>
-        <p>Labor costs use built-in conceptual productivity allowances:</p>
+        <p>When successful route results are available, material costs use a signed route-scoped
+        quantity ledger: cable length includes physical-run multiplicity, while shared installed
+        trays and conduits are counted once by schedule identity. Without routes, schedule quantities
+        remain available as a conceptual fallback.</p>
+        <p>Labor costs use built-in conceptual productivity allowances for linear electrical work:</p>
         <ul>
           <li>Cable pull: 150 ft/hr → $75/hr = $0.50/ft installed</li>
           <li>Tray installation: 30 ft/hr → $90/hr = $3.00/ft installed</li>
           <li>Conduit installation: 25 ft/hr → $85/hr = $3.40/ft installed</li>
         </ul>
+        <p>Route-ledger tray support counts are priced as separate assemblies. Tray fitting labor
+        requires imported fitting productivity. Routed ductbanks reuse the Ductbank Route BOM for
+        conduit, accessories, structures, fittings, excavation, bedding, concrete, and backfill;
+        every mixed-unit BOM line requires imported material price and labor-hours-per-unit evidence.</p>
         <p>Default unit prices are built-in 2024 USD conceptual allowances, not a licensed cost-book extract.
-        Import a current supplier, internal, or licensed cost source for issued estimates.</p>
+        Import a current supplier, internal, or licensed cost source to complete the governed-price
+        checks. Output remains classified <strong>Screening only</strong> and is not a bid or issued estimate.</p>
         <p>This estimate does not include: engineering fees, permits, switchgear, transformers,
-        or conduit fittings beyond a default unit cost per fitting.</p>
+        taxes, freight, contractor markup, dewatering, rock excavation, or unmodeled field conditions.</p>
       </details>
 
       <section class="field-group" aria-labelledby="estimate-basis-title">

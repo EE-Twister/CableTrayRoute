@@ -137,6 +137,19 @@
         <ul id="coverageWarnings"></ul>
       </section>
 
+      <section id="routeQuantitySection" hidden aria-labelledby="routeQuantityTitle">
+        <h2 id="routeQuantityTitle">Route Quantity Basis</h2>
+        <p id="routeQuantityStatus" role="status"></p>
+        <p class="field-hint">Installed raceways are counted once by schedule identity even when multiple cables share them. Cable footage retains physical-run multiplicity.</p>
+        <details>
+          <summary>Quantity ledger</summary>
+          <table id="routeQuantityTable" class="result-table" aria-label="Procurement route quantity ledger">
+            <thead><tr><th scope="col">Category</th><th scope="col">ID</th><th scope="col">Quantity</th><th scope="col">Unit</th><th scope="col">Basis</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </details>
+      </section>
+
       <!-- Summary -->
       <section id="summarySection" hidden aria-label="Procurement summary">
         <h2>Summary</h2>

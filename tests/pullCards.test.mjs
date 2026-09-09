@@ -529,6 +529,36 @@ describe('construction pull engineering', () => {
     assert.strictEqual(saved.results.allowableTensionLbf, 5000);
     assert.strictEqual(saved.assumptions.allowableSidewallPressureLbfFt, 1500);
   });
+
+  it('carries per-point constructability evidence into pull cards and saved artifacts', () => {
+    const result = {
+      ...routeResults[0],
+      pull_check: {
+        constructability: {
+          status: 'blocked',
+          signature: 'access123',
+          pullPoints: {
+            requiredCount: 2,
+            confirmedCount: 1,
+            records: [
+              { id: 'point-1', label: 'Reel / pull start', status: 'confirmed', source: 'Walkdown WD-1' },
+              { id: 'point-2', label: 'Receiving / pull end', status: 'blocked', source: 'Walkdown WD-1', notes: 'Laydown conflict' },
+            ],
+          },
+          issues: [{ code: 'PULL-POINT-ACCESS-BLOCKED', blocking: true, message: 'Receiving point is blocked.' }],
+        },
+      },
+    };
+    const { pulls } = buildPullTable([result], cableList);
+    assert.strictEqual(pulls[0].constructability_evidence[0].pullPoints.records.length, 2);
+    assert.strictEqual(pulls[0].input_coverage_complete, false);
+    assert.match(pulls[0].coverage_warnings.join(' '), /constructability evidence is blocked/i);
+
+    const artifact = createPullPlanArtifact(pulls);
+    const saved = artifact.pulls[pulls[0].pull_plan_id];
+    assert.strictEqual(saved.constructabilityEvidence[0].signature, 'access123');
+    assert.strictEqual(saved.constructabilityEvidence[0].pullPoints.records[1].notes, 'Laydown conflict');
+  });
 });
 
 // Sync tests for cableQRPayload
@@ -646,5 +676,53 @@ describe('edge cases', () => {
     assert.strictEqual(summary.total_pulls, 1);
     assert.strictEqual(summary.single_cable_pulls, 1);
     assert.strictEqual(summary.multi_cable_pulls, 0);
+  });
+
+  it('carries a resolved ductbank internal conduit into the pull-card route', () => {
+    const results = [{
+      cable: 'DB-CABLE',
+      status: '✓ Routed',
+      total_length: 100,
+      breakdown: [{ type: 'ductbank', ductbankTag: 'DB-1', tray_id: 'DB-1', length: 100, start: [0, 0, 0], end: [100, 0, 0] }],
+      route_segments: [{ type: 'ductbank', ductbankTag: 'DB-1', tray_id: 'DB-1', length: 100, start: [0, 0, 0], end: [100, 0, 0] }],
+    }];
+    const cables = [{
+      name: 'DB-CABLE',
+      cable_type: 'Power',
+      conduit_id: 'C-2',
+      diameter: 1,
+      weight: 1,
+      allowable_tension_lbf: 5000,
+      max_sidewall_pressure: 1000,
+    }];
+    const { pulls } = buildPullTable(results, cables, {
+      ductbanks: [{ tag: 'DB-1', conduits: [
+        { conduit_id: 'C-1', type: 'PVC Sch 40', trade_size: '2' },
+        { conduit_id: 'C-2', type: 'PVC Sch 40', trade_size: '2' },
+      ] }],
+    });
+    assert.strictEqual(pulls[0].route_steps[0].type, 'Conduit');
+    assert.strictEqual(pulls[0].route_steps[0].id, 'DB-1:C-2');
+    assert.equal(pulls[0].coverage_warnings.some(message => /internal conduit assignment/i.test(message)), false);
+  });
+
+  it('marks an unresolved ductbank assignment as incomplete pull-card evidence', () => {
+    const results = [{
+      cable: 'DB-CABLE',
+      status: '✓ Routed',
+      total_length: 100,
+      breakdown: [{ type: 'ductbank', ductbankTag: 'DB-1', tray_id: 'DB-1', length: 100, start: [0, 0, 0], end: [100, 0, 0] }],
+      route_segments: [{ type: 'ductbank', ductbankTag: 'DB-1', tray_id: 'DB-1', length: 100, start: [0, 0, 0], end: [100, 0, 0] }],
+    }];
+    const cables = [{ name: 'DB-CABLE', cable_type: 'Power', diameter: 1, weight: 1 }];
+    const { pulls } = buildPullTable(results, cables, {
+      ductbanks: [{ tag: 'DB-1', conduits: [
+        { conduit_id: 'C-1', type: 'PVC Sch 40', trade_size: '2' },
+        { conduit_id: 'C-2', type: 'PVC Sch 40', trade_size: '2' },
+      ] }],
+    });
+    assert.strictEqual(pulls[0].route_steps[0].type, 'Ductbank');
+    assert.strictEqual(pulls[0].input_coverage_complete, false);
+    assert.equal(pulls[0].coverage_warnings.some(message => /internal conduit assignment is missing/i.test(message)), true);
   });
 });

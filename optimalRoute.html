@@ -175,11 +175,21 @@
                         <label for="pull-max-sidewall">Default allowable sidewall pressure (lbf/ft)</label>
                         <input type="number" id="pull-max-sidewall" value="500" min="1" step="25">
 
+                        <label for="pull-cable-limit-source">Cable pulling-limit source</label>
+                        <input type="text" id="pull-cable-limit-source" placeholder="Manufacturer, document, revision/page">
+
                         <label for="pull-friction">Coefficient of friction</label>
                         <input type="number" id="pull-friction" value="0.35" min="0.05" max="1" step="0.05">
 
                         <label for="pull-bend-radius">Default bend radius (ft)</label>
                         <input type="number" id="pull-bend-radius" value="3" min="0.25" step="0.25">
+
+                        <label class="pull-group-suggestion-toggle" for="pull-bend-geometry-confirmed">
+                            <input type="checkbox" id="pull-bend-geometry-confirmed">
+                            <span><strong>Confirm entered radius for unmodeled bends</strong><small>The default becomes issue-gate evidence only when checked and supported below.</small></span>
+                        </label>
+                        <label for="pull-bend-geometry-source">Bend geometry basis</label>
+                        <input type="text" id="pull-bend-geometry-source" placeholder="Fitting schedule, model revision, or field layout">
 
                         <label for="pull-incoming-tension">Reel payoff tension (lbf)</label>
                         <input type="number" id="pull-incoming-tension" value="0" min="0" step="25">
@@ -200,8 +210,14 @@
                         <label for="pull-sheave-capacity">Sheave support rating (lbf)</label>
                         <input type="number" id="pull-sheave-capacity" value="4000" min="1" step="100">
 
+                        <label for="pull-equipment-ratings-source">Field-equipment rating source</label>
+                        <input type="text" id="pull-equipment-ratings-source" placeholder="Puller/rope/grip/sheave data and revision">
+
                         <label for="pull-roller-spacing">Max tray roller spacing (ft)</label>
                         <input type="number" id="pull-roller-spacing" value="10" min="1" step="1">
+                        <label for="pull-point-access-source">Default pull-point evidence source</label>
+                        <input type="text" id="pull-point-access-source" placeholder="Site plan, vault/manhole schedule, or field walkdown">
+                        <p class="field-hint">After calculation, confirm access separately for every reel, intermediate, and receiving point in the selected cable field plan.</p>
                         <p class="field-hint">Zero reel payoff tension uses a 25 × cable-weight estimate. The cable, puller, rope, grip, and anchorage are checked as a weakest-link system.</p>
                     </div>
                  </div>

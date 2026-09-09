@@ -75,7 +75,7 @@ assert(diagnostics.health.spoolSheets > 0);
 assert.equal(diagnostics.blockers.filter(item => item.severity === 'critical').length, 1);
 assert.equal(diagnostics.blockers.filter(item => item.severity === 'warning').length, 1);
 assert.equal(diagnostics.designRules.errors, 2);
-assert.equal(diagnostics.designRules.warnings, 8);
+assert.equal(diagnostics.designRules.warnings, 10);
 assert.equal(diagnostics.cableDeliverables.ready, 14);
 assert.equal(diagnostics.readyForDeliverables, false);
 assert.equal(diagnostics.workflowSteps.length, 8);

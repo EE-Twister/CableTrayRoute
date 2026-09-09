@@ -1,170 +1,11 @@
 import * as dataStore from './dataStore.mjs';
 import { showAlertModal } from './src/components/modal.js';
 
-const DEFAULT_PANEL_CIRCUIT_COUNT = 42;
-const MAX_PANEL_CIRCUITS = 512;
-
-function parsePositiveInt(value) {
-  if (value == null) return null;
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
-function getPanelCircuitCount(panel) {
-  const explicit = parsePositiveInt(panel?.circuitCount || panel?.circuit_count);
-  if (explicit) return Math.min(explicit, MAX_PANEL_CIRCUITS);
-  if (Array.isArray(panel?.breakers) && panel.breakers.length > 0) return Math.min(panel.breakers.length, MAX_PANEL_CIRCUITS);
-  return DEFAULT_PANEL_CIRCUIT_COUNT;
-}
-
-function getPanelSystem(panel) {
-  const raw = (panel?.powerType || panel?.systemType || panel?.type || '').toString().toLowerCase();
-  return raw === 'dc' ? 'dc' : 'ac';
-}
-
-const DC_PHASE_LABELS = ['+', '−'];
-const SINGLE_PHASE_LABELS = ['A', 'B'];
-const THREE_PHASE_LABELS = ['A', 'B', 'C'];
-const FALLBACK_DC_SEQUENCE = ['+', '−'];
-
-function resolveDcSequence(sequence) {
-  if (Array.isArray(sequence) && sequence.length >= 2) {
-    return sequence;
-  }
-  return FALLBACK_DC_SEQUENCE;
-}
-
-function getDcPolarityForCircuit(circuit, sequence = DC_PHASE_LABELS) {
-  const slot = Number.parseInt(circuit, 10);
-  if (!Number.isFinite(slot) || slot < 1) return '';
-  const normalized = resolveDcSequence(sequence);
-  const positive = normalized[0] ?? FALLBACK_DC_SEQUENCE[0];
-  const negative = normalized[1] ?? FALLBACK_DC_SEQUENCE[1];
-  const rowIndex = Math.floor((slot - 1) / 2);
-  const label = rowIndex % 2 === 0 ? positive : negative;
-  return label == null ? '' : String(label);
-}
-
-function computeBreakerSpan(startCircuit, poleCount, circuitCount) {
-  const start = Number.parseInt(startCircuit, 10);
-  const poles = Number.parseInt(poleCount, 10);
-  if (!Number.isFinite(start) || start < 1) return [];
-  if (!Number.isFinite(poles) || poles <= 0) return [];
-  const limit = Number.isFinite(circuitCount) && circuitCount > 0 ? circuitCount : null;
-  const step = poles > 1 ? 2 : 1;
-  const span = [];
-  for (let position = 0; position < poles; position++) {
-    const circuit = start + position * step;
-    if (limit && circuit > limit) {
-      return [];
-    }
-    span.push(circuit);
-  }
-  return span;
-}
-
-function getBreakerBlock(panel, circuit) {
-  if (!panel || !Array.isArray(panel.breakerLayout)) return null;
-  if (!Number.isFinite(circuit) || circuit < 1) return null;
-  return panel.breakerLayout[circuit - 1] || null;
-}
-
-function getLayoutPoleCount(panel, startCircuit) {
-  const block = getBreakerBlock(panel, startCircuit);
-  if (!block || block.position !== 0) return null;
-  const size = Number(block.size);
-  return Number.isFinite(size) && size > 0 ? size : null;
-}
-
-function getBlockCircuits(panel, block, circuitCount) {
-  if (!block) return [];
-  const size = Number(block.size);
-  const start = Number(block.start);
-  if (!Number.isFinite(size) || !Number.isFinite(start) || size <= 0 || start < 1) return [];
-  const limit = Number.isFinite(circuitCount) && circuitCount > 0 ? circuitCount : getPanelCircuitCount(panel);
-  return computeBreakerSpan(start, size, limit);
-}
-
-function getPanelPhaseSequence(panel) {
-  const system = getPanelSystem(panel);
-  if (system === 'dc') return resolveDcSequence(DC_PHASE_LABELS);
-  const phases = parseInt(panel?.phases, 10);
-  if (Number.isFinite(phases)) {
-    if (phases <= 1) return SINGLE_PHASE_LABELS;
-    if (phases === 2) return SINGLE_PHASE_LABELS;
-    if (phases >= 3) return THREE_PHASE_LABELS;
-  }
-  return THREE_PHASE_LABELS;
-}
-
-function getPhaseLabel(panel, circuit) {
-  const sequence = getPanelPhaseSequence(panel);
-  if (!sequence.length) return '';
-  const index = Number(circuit);
-  if (!Number.isFinite(index) || index < 1) return '';
-  const system = getPanelSystem(panel);
-  if (system === 'dc') {
-    return getDcPolarityForCircuit(index, sequence);
-  }
-  if (sequence.length === 3 && system === 'ac') {
-    const rowIndex = Math.floor((index - 1) / 2);
-    return sequence[rowIndex % sequence.length];
-  }
-  return sequence[(index - 1) % sequence.length];
-}
-
-function getLoadPoleCount(load, panel) {
-  if (!load) return 1;
-  const system = getPanelSystem(panel);
-  const candidates = [
-    load.breakerPoles,
-    load.poles,
-    load.poleCount,
-    load.phaseCount,
-    load.phases
-  ];
-  for (const candidate of candidates) {
-    const parsed = parsePositiveInt(candidate);
-    if (!parsed) continue;
-    if (system === 'dc') return Math.min(parsed, 2);
-    if (system === 'ac') {
-      if (parsed >= 3) return 3;
-      if (parsed === 2) return 2;
-      return 1;
-    }
-    return parsed;
-  }
-  return 1;
-}
-
-function getLoadBreakerSpan(load, panel, circuitCount) {
-  let start = parsePositiveInt(load?.breaker);
-  if (!start) return [];
-  const limit = Number.isFinite(circuitCount) && circuitCount > 0
-    ? circuitCount
-    : getPanelCircuitCount(panel);
-
-  if (panel) {
-    const blockAtSlot = getBreakerBlock(panel, start);
-    if (blockAtSlot && Number.isFinite(Number(blockAtSlot.start)) && Number(blockAtSlot.start) !== start) {
-      start = Number(blockAtSlot.start);
-    }
-    const startBlock = getBreakerBlock(panel, start);
-    if (startBlock && startBlock.position === 0) {
-      const blockSpan = getBlockCircuits(panel, startBlock, limit);
-      if (blockSpan.length) {
-        return blockSpan;
-      }
-    }
-    const layoutPoles = getLayoutPoleCount(panel, start);
-    if (Number.isFinite(layoutPoles) && layoutPoles > 0) {
-      return computeBreakerSpan(start, layoutPoles, limit);
-    }
-  }
-
-  const poles = Math.max(1, getLoadPoleCount(load, panel));
-  return computeBreakerSpan(start, poles, limit);
-}
+import { getPanelCircuitCount, getPanelSystem, parsePositiveInt } from './src/panel-schedule/phaseModel.js';
+import { getBreakerBlock, getLoadBreakerSpan, getLoadPoleCount } from './src/panel-schedule/breakerLayoutModel.js';
+import { getPhaseLabel, getPhaseLoadKey, getDetailPhaseLoad, getPhasePowerValue } from './src/panel-schedule/phaseLoadModel.js';
+import { findPanelByIdentifier } from './src/panel-schedule/panelModel.js';
+import { calculatePanelTotalsFromData } from './src/panel-schedule/totalsModel.js';
 
 function getLoadLabel(load) {
   const tag = load?.ref || load?.id || load?.tag;
@@ -201,7 +42,7 @@ export function exportPanelSchedule(panelId) {
     return;
   }
   const panels = dataStore.getPanels();
-  const panel = panels.find(p => p.id === panelId || p.panel_id === panelId) || {};
+  const panel = findPanelByIdentifier(panels, panelId) || {};
   const loads = dataStore.getLoads().filter(l => l.panelId === panelId);
 
   const circuitCount = getPanelCircuitCount(panel);
@@ -218,7 +59,8 @@ export function exportPanelSchedule(panelId) {
   data.push(['Short-Circuit Rating (A)', panel.shortCircuitRating || panel.shortCircuitCurrentRating || '']);
   data.push(['Circuit Count', circuitCount]);
   data.push([]);
-  data.push(['Circuit', 'Phase', 'Description', 'Poles', 'Demand (kVA)', '', 'Circuit', 'Phase', 'Description', 'Poles', 'Demand (kVA)']);
+  const headers = ['Circuit', 'Phase', 'Description', 'Poles', 'Demand (kVA)', 'Rating (A)', 'Device Type', 'Cable', systemType === 'dc' ? 'Phase Load (W)' : 'Phase Load (VA)'];
+  data.push([...headers, '', ...headers]);
 
   const assignments = new Map();
   loads.forEach(load => {
@@ -267,7 +109,22 @@ export function exportPanelSchedule(panelId) {
         description = `Tied to Circuit ${startRef}${label ? ` — ${label}` : ''}`;
       }
     }
+    const block = getBreakerBlock(panel, circuit);
+    const start = Number(block?.start) || info?.startCircuit || circuit;
+    const detail = panel.breakerDetails?.[String(start)] || {};
+    const customLabel = typeof detail.customLoad === 'string' ? detail.customLoad.trim() : '';
+    if (customLabel) {
+      description = circuit === start ? customLabel : `Tied to Circuit ${start} � ${customLabel}`;
+    }
+    if (block && circuit === start) poles = String(block.size);
+    const customPower = getDetailPhaseLoad(detail, getPhaseLoadKey(phase, block));
+    const loadPower = info ? getPhasePowerValue(info.load, systemType) : null;
+    const phasePower = customPower ?? (loadPower == null ? '' : loadPower / info.spanLength);
     rows.push({
+      rating: circuit === start ? (detail.rating ?? '') : '',
+      deviceType: circuit === start && (block || info) ? (detail.deviceType || panel.branchDeviceType || 'breaker') : '',
+      cable: circuit === start ? (detail.cableTag || detail.cable || detail.cableId || '') : '',
+      phasePower,
       circuit,
       phase,
       description,
@@ -285,26 +142,24 @@ export function exportPanelSchedule(panelId) {
       left.description ?? '',
       left.poles ?? '',
       left.demand ?? '',
+      left.rating ?? '',
+      left.deviceType ?? '',
+      left.cable ?? '',
+      left.phasePower ?? '',
       '',
       right.circuit ?? '',
       right.phase ?? '',
       right.description ?? '',
       right.poles ?? '',
-      right.demand ?? ''
+      right.demand ?? '',
+      right.rating ?? '',
+      right.deviceType ?? '',
+      right.cable ?? '',
+      right.phasePower ?? ''
     ]);
   }
 
-  const totals = loads.reduce((acc, load) => {
-    const connectedKva = Number.parseFloat(load.kva) || 0;
-    const connectedKw = Number.parseFloat(load.kw) || 0;
-    const demandKva = Number.parseFloat(load.demandKva) || connectedKva;
-    const demandKw = Number.parseFloat(load.demandKw) || connectedKw;
-    acc.connectedKva += connectedKva;
-    acc.connectedKw += connectedKw;
-    acc.demandKva += demandKva;
-    acc.demandKw += demandKw;
-    return acc;
-  }, { connectedKva: 0, connectedKw: 0, demandKva: 0, demandKw: 0 });
+  const totals = calculatePanelTotalsFromData(panel, loads);
 
   data.push([]);
   data.push(['Connected Load (kVA)', totals.connectedKva.toFixed(2), '', '', '', '', 'Demand Load (kVA)', totals.demandKva.toFixed(2)]);

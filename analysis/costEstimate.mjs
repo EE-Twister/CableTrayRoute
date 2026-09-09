@@ -8,6 +8,7 @@
  */
 
 import { buildBomCatalogFields } from './manufacturerCatalog.mjs';
+import { buildDuctbankBOM } from './ductbankBom.mjs';
 
 export const COST_SOURCE_URLS = Object.freeze({
   oewsElectricians: 'https://www.bls.gov/ooh/construction-and-extraction/electricians.htm',
@@ -104,11 +105,17 @@ export function applyEstimateBasis(prices = DEFAULT_PRICES, basisInput = {}) {
     cable: scalePriceMap(prices.cable || DEFAULT_PRICES.cable, basis.materialFactor),
     tray: scalePriceMap(prices.tray || DEFAULT_PRICES.tray, basis.materialFactor),
     conduit: scalePriceMap(prices.conduit || DEFAULT_PRICES.conduit, basis.materialFactor),
+    traySupport: scalePriceMap(prices.traySupport || DEFAULT_PRICES.traySupport, basis.materialFactor),
+    construction: scalePriceMap(prices.construction || DEFAULT_PRICES.construction, basis.materialFactor),
     fitting: Number(prices.fitting ?? DEFAULT_PRICES.fitting) * basis.materialFactor,
     labor: scalePriceMap(prices.labor || DEFAULT_PRICES.labor, basis.combinedLaborFactor),
     laborProductivity: {
       ...DEFAULT_PRICES.laborProductivity,
       ...(prices.laborProductivity || {}),
+    },
+    laborUnitHours: {
+      ...DEFAULT_PRICES.laborUnitHours,
+      ...(prices.laborUnitHours || {}),
     },
   };
 }
@@ -170,11 +177,18 @@ export const DEFAULT_PRICES = {
   // Fittings: unit cost ($) — per tray fitting (elbow, tee, reducer etc.)
   fitting: 35.00,
 
+  // No built-in values are asserted for support or civil assemblies. These
+  // maps are populated by a governed pricing CSV and intentionally price at 0
+  // until that evidence is supplied.
+  traySupport: { default: 0 },
+  construction: {},
+
   // Labor rates ($/hr)
   labor: {
     cableInstall:  75.00,  // per hour to pull cable
     trayInstall:   90.00,  // per hour to install cable tray
     conduitInstall: 85.00, // per hour to install conduit
+    civilInstall: 0,       // governed civil crew rate required
   },
 
   // Labor productivity (units per hour)
@@ -182,22 +196,36 @@ export const DEFAULT_PRICES = {
     cablePullFtPerHr:    150, // ft of cable pulled per labor-hour
     trayInstallFtPerHr:   30, // ft of tray installed per labor-hour
     conduitInstallFtPerHr: 25, // ft of conduit installed per labor-hour
+    traySupportInstallEaPerHr: 0,
+    trayFittingInstallEaPerHr: 0,
   },
+
+  // Mixed-unit ductbank BOM labor basis: labor-hours per BOM unit, keyed with
+  // the same deterministic construction key as the material price.
+  laborUnitHours: {},
 };
 
 /**
  * Look up a price from a pricing map, falling back to 'default'.
  * @param {Object} priceMap
  * @param {string|number} key
- * @returns {number}
+ * @returns {{unitPrice: number, priceKey: string, usedDefaultPrice: boolean}}
  */
-function lookupPrice(priceMap, key) {
+export function lookupPriceEvidence(priceMap, key) {
   const k = String(key ?? '').trim();
-  if (priceMap[k] !== undefined) return priceMap[k];
+  if (priceMap[k] !== undefined) return { unitPrice: priceMap[k], priceKey: k, usedDefaultPrice: false };
   // Try numeric key (e.g. trade size '1.0' vs '1')
   const numKey = String(parseFloat(k));
-  if (priceMap[numKey] !== undefined) return priceMap[numKey];
-  return priceMap['default'] ?? 0;
+  if (priceMap[numKey] !== undefined) return { unitPrice: priceMap[numKey], priceKey: numKey, usedDefaultPrice: false };
+  return { unitPrice: priceMap['default'] ?? 0, priceKey: 'default', usedDefaultPrice: true };
+}
+
+function lookupCatalogOrAttributePriceEvidence(priceMap, record, attributeKey) {
+  const catalog = buildBomCatalogFields(record).catalogNumber;
+  if (catalog && priceMap[catalog] !== undefined) {
+    return { ...lookupPriceEvidence(priceMap, catalog), priceBasis: 'catalog-number' };
+  }
+  return { ...lookupPriceEvidence(priceMap, attributeKey), priceBasis: 'schedule-attribute' };
 }
 
 /**
@@ -221,12 +249,18 @@ export function estimateCableCosts(cables = [], routeResults = [], prices = {}) 
   });
 
   return cables.map(c => {
-    const tag = c.cable_tag || c.tag || '';
+    const tag = c.cable_tag || c.tag || c.name || c.id || '';
     const size = c.conductor_size || c.size || '';
     const conductors = Math.max(1, parseInt(c.conductors, 10) || 1);
-    const lengthFt = lengthMap[tag] || parseFloat(c.length_ft || c.route_length || 0) || 0;
+    const routeLengthFt = lengthMap[tag] || parseFloat(c.length_ft || c.route_length || 0) || 0;
+    const runCount = Math.max(1, parseInt(
+      c.parallel_sets || c.parallelSets || c.parallel_runs || c.parallelRuns || c.quantity || c.qty || 1,
+      10
+    ) || 1);
+    const lengthFt = routeLengthFt * runCount;
 
-    const unitPrice = lookupPrice(cablePrices, size);
+    const priceEvidence = lookupCatalogOrAttributePriceEvidence(cablePrices, c, size);
+    const unitPrice = priceEvidence.unitPrice;
     const materialCost = unitPrice * conductors * lengthFt;
     const laborHrs = lengthFt / (productivity.cablePullFtPerHr || 150);
     const laborCost = laborHrs * (labor.cableInstall || 75);
@@ -238,9 +272,19 @@ export function estimateCableCosts(cables = [], routeResults = [], prices = {}) 
       ...buildBomCatalogFields(c),
       quantity: lengthFt,
       unit: 'ft',
+      routeLengthFt,
+      runCount,
+      conductorCount: conductors,
+      extendedQuantity: conductors * lengthFt,
+      extendedUnit: 'conductor-ft',
+      priceKey: priceEvidence.priceKey,
+      priceBasis: priceEvidence.priceBasis,
+      usedDefaultPrice: priceEvidence.usedDefaultPrice,
       unitPrice,
       materialCost,
       laborHrs,
+      laborRate: labor.cableInstall || 75,
+      productivityFtPerHr: productivity.cablePullFtPerHr || 150,
       laborCost,
       totalCost: materialCost + laborCost,
     };
@@ -266,9 +310,13 @@ export function estimateTrayCosts(trays = [], prices = {}) {
     const lengthFt = parseFloat(t.length_ft || 0) || 0;
     const fittingCount = parseInt(t.fitting_count || 0, 10) || 0;
 
-    const unitPrice = lookupPrice(trayPrices, width);
+    const priceEvidence = lookupCatalogOrAttributePriceEvidence(trayPrices, t, width);
+    const unitPrice = priceEvidence.unitPrice;
     const materialCost = unitPrice * lengthFt + fittingCount * fittingPrice;
-    const laborHrs = lengthFt / (productivity.trayInstallFtPerHr || 30);
+    const routeLaborHrs = lengthFt / (productivity.trayInstallFtPerHr || 30);
+    const fittingProductivityEaPerHr = Number(productivity.trayFittingInstallEaPerHr) || 0;
+    const fittingLaborHrs = fittingProductivityEaPerHr > 0 ? fittingCount / fittingProductivityEaPerHr : 0;
+    const laborHrs = routeLaborHrs + fittingLaborHrs;
     const laborCost = laborHrs * (labor.trayInstall || 90);
 
     return {
@@ -278,9 +326,19 @@ export function estimateTrayCosts(trays = [], prices = {}) {
       ...buildBomCatalogFields(t),
       quantity: lengthFt,
       unit: 'ft',
+      fittingCount,
+      fittingUnitPrice: fittingPrice,
+      priceKey: priceEvidence.priceKey,
+      priceBasis: priceEvidence.priceBasis,
+      usedDefaultPrice: priceEvidence.usedDefaultPrice,
       unitPrice,
       materialCost,
       laborHrs,
+      laborRate: labor.trayInstall || 90,
+      productivityFtPerHr: productivity.trayInstallFtPerHr || 30,
+      fittingProductivityEaPerHr,
+      routeLaborHrs,
+      fittingLaborHrs,
       laborCost,
       totalCost: materialCost + laborCost,
     };
@@ -304,7 +362,8 @@ export function estimateConduitCosts(conduits = [], prices = {}) {
     const tradeSize = String(c.trade_size || c.diameter || '').trim();
     const lengthFt = parseFloat(c.length_ft || 0) || 0;
 
-    const unitPrice = lookupPrice(conduitPrices, tradeSize);
+    const priceEvidence = lookupCatalogOrAttributePriceEvidence(conduitPrices, c, tradeSize);
+    const unitPrice = priceEvidence.unitPrice;
     const materialCost = unitPrice * lengthFt;
     const laborHrs = lengthFt / (productivity.conduitInstallFtPerHr || 25);
     const laborCost = laborHrs * (labor.conduitInstall || 85);
@@ -316,13 +375,190 @@ export function estimateConduitCosts(conduits = [], prices = {}) {
       ...buildBomCatalogFields(c),
       quantity: lengthFt,
       unit: 'ft',
+      priceKey: priceEvidence.priceKey,
+      priceBasis: priceEvidence.priceBasis,
+      usedDefaultPrice: priceEvidence.usedDefaultPrice,
       unitPrice,
       materialCost,
       laborHrs,
+      laborRate: labor.conduitInstall || 85,
+      productivityFtPerHr: productivity.conduitInstallFtPerHr || 25,
       laborCost,
       totalCost: materialCost + laborCost,
     };
   });
+}
+
+/** Estimate tray support material and labor from governed route-ledger counts. */
+export function estimateTraySupportCosts(trays = [], prices = {}) {
+  const supportPrices = { ...DEFAULT_PRICES.traySupport, ...(prices.traySupport || {}) };
+  const labor = { ...DEFAULT_PRICES.labor, ...(prices.labor || {}) };
+  const productivity = { ...DEFAULT_PRICES.laborProductivity, ...(prices.laborProductivity || {}) };
+
+  return trays.flatMap(tray => {
+    const quantity = Math.max(0, Number(tray.support_quantity ?? tray.supportQuantity) || 0);
+    if (!quantity) return [];
+    const id = tray.tray_id || tray.id || tray.tag || '';
+    const width = String(tray.inside_width || tray.width || '').trim();
+    const supportRecord = {
+      manufacturer: tray.support_manufacturer ?? tray.supportManufacturer,
+      catalog_number: tray.support_catalog_number ?? tray.supportCatalogNumber,
+      approved_part: tray.support_approved_part ?? tray.supportApprovedPart,
+      approval_status: tray.support_approval_status ?? tray.supportApprovalStatus,
+      catalog_source: tray.support_catalog_source ?? tray.supportCatalogSource,
+      catalog_last_verified: tray.support_catalog_last_verified ?? tray.supportCatalogLastVerified,
+    };
+    const priceEvidence = lookupCatalogOrAttributePriceEvidence(supportPrices, supportRecord, width);
+    const unitPrice = Number(priceEvidence.unitPrice) || 0;
+    const productivityEaPerHr = Number(productivity.traySupportInstallEaPerHr) || 0;
+    const laborHrs = productivityEaPerHr > 0 ? quantity / productivityEaPerHr : 0;
+    const laborRate = Number(labor.trayInstall) || 0;
+    const materialCost = quantity * unitPrice;
+    const laborCost = laborHrs * laborRate;
+    return [{
+      category: 'Tray Support',
+      id,
+      description: `${width || 'Unspecified'} in tray support assembly`,
+      ...buildBomCatalogFields(supportRecord),
+      quantity,
+      unit: 'EA',
+      priceKey: priceEvidence.priceKey,
+      priceBasis: priceEvidence.priceBasis,
+      usedDefaultPrice: priceEvidence.usedDefaultPrice,
+      unitPrice,
+      materialCost,
+      laborHrs,
+      laborRate,
+      productivityEaPerHr,
+      laborCost,
+      totalCost: materialCost + laborCost,
+    }];
+  });
+}
+
+function slug(value) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'unspecified';
+}
+
+/** Deterministic pricing key for one mixed-unit ductbank BOM row. */
+export function ductbankConstructionPriceKey(row = {}) {
+  return `ductbank.${slug(row.category)}.${slug(row.item)}.${slug(row.specification)}`;
+}
+
+function ductbankId(record = {}) {
+  return String(record.tag || record.ductbank_tag || record.ductbankTag || record.id || '').trim();
+}
+
+function truthySelection(value) {
+  if (typeof value === 'boolean') return value;
+  return ['yes', 'true', '1', 'concrete', 'encased'].includes(String(value ?? '').trim().toLowerCase());
+}
+
+function lookupConstructionEvidence(map, exactKey, genericKey) {
+  if (map[exactKey] !== undefined) return lookupPriceEvidence(map, exactKey);
+  if (map[genericKey] !== undefined) return lookupPriceEvidence(map, genericKey);
+  if (map.default !== undefined) return lookupPriceEvidence(map, 'default');
+  return { unitPrice: 0, priceKey: exactKey, usedDefaultPrice: false };
+}
+
+/**
+ * Price the existing ductbank BOM with governed material rates and
+ * labor-hours-per-unit. No civil price or productivity is invented.
+ */
+export function estimateDuctbankCosts(ductbanks = [], quantityRows = [], prices = {}) {
+  const constructionPrices = { ...DEFAULT_PRICES.construction, ...(prices.construction || {}) };
+  const laborUnitHours = { ...DEFAULT_PRICES.laborUnitHours, ...(prices.laborUnitHours || {}) };
+  const labor = { ...DEFAULT_PRICES.labor, ...(prices.labor || {}) };
+  const quantityMap = new Map((Array.isArray(quantityRows) ? quantityRows : [])
+    .filter(row => row.type === 'ductbank')
+    .map(row => [String(row.id || '').trim().toLowerCase(), Number(row.quantity) || 0]));
+  const lineItems = [];
+  const assemblies = [];
+
+  (Array.isArray(ductbanks) ? ductbanks : []).forEach(record => {
+    const id = ductbankId(record);
+    const routeQuantityFt = quantityMap.get(id.toLowerCase());
+    if (!(routeQuantityFt > 0)) return;
+    const depthIn = Number(
+      record.depth_in
+      ?? record.depthIn
+      ?? record.cover_depth_in
+      ?? record.coverDepthIn
+      ?? record.coverDepth
+    ) || 0;
+    const conduits = (Array.isArray(record.conduits) ? record.conduits : []).map(conduit => ({
+      ...conduit,
+      conduit_type: conduit.conduit_type || conduit.type,
+      x: conduit.x ?? conduit.offset_x,
+      y: conduit.y ?? conduit.offset_y,
+    }));
+    const bom = buildDuctbankBOM({
+      tag: id,
+      lengthFt: routeQuantityFt,
+      depthIn,
+      concreteEncasement: truthySelection(record.concrete_encasement ?? record.concreteEncasement ?? record.encasement),
+      conduits,
+      routeProfile: record.routeProfile || record.route_profile || null,
+      layout: record.layout || record.bom_layout || {
+        topPad: record.topPad ?? record.top_pad,
+        bottomPad: record.bottomPad ?? record.bottom_pad,
+        leftPad: record.leftPad ?? record.left_pad,
+        rightPad: record.rightPad ?? record.right_pad,
+      },
+      assumptions: record.bomAssumptions || record.bom_assumptions || {},
+      optionalMaterials: record.bomOptionalMaterials || record.bom_optional_materials || {},
+    });
+    const blockingReasons = [];
+    if (!bom.ready) blockingReasons.push('Ductbank BOM is not ready.');
+    if (!(depthIn > 0) && !bom.routeProfileApplied) blockingReasons.push('Positive cover/depth input is missing.');
+    bom.warnings.forEach(warning => blockingReasons.push(warning));
+    assemblies.push({
+      ductbankId: id,
+      routeQuantityFt,
+      ready: bom.ready && blockingReasons.length === 0,
+      blockingReasons,
+      bom,
+    });
+
+    bom.rows.filter(row => Number(row.quantity) > 0).forEach((row, index) => {
+      const exactKey = ductbankConstructionPriceKey(row);
+      const genericKey = `ductbank.${slug(row.category)}.${slug(row.item)}`;
+      const priceEvidence = lookupConstructionEvidence(constructionPrices, exactKey, genericKey);
+      const hoursEvidence = lookupConstructionEvidence(laborUnitHours, exactKey, genericKey);
+      const quantity = Number(row.quantity) || 0;
+      const unitPrice = Number(priceEvidence.unitPrice) || 0;
+      const laborHoursPerUnit = Number(hoursEvidence.unitPrice) || 0;
+      const laborHrs = quantity * laborHoursPerUnit;
+      const laborRate = Number(labor.civilInstall) || 0;
+      const materialCost = quantity * unitPrice;
+      const laborCost = laborHrs * laborRate;
+      lineItems.push({
+        category: 'Ductbank',
+        id: `${id}:${index + 1}`,
+        ductbankId: id,
+        description: `${row.item}${row.specification ? ` — ${row.specification}` : ''}`,
+        quantity,
+        unit: row.unit,
+        basis: row.basis,
+        priceKey: priceEvidence.priceKey,
+        laborHoursKey: hoursEvidence.priceKey,
+        usedDefaultPrice: priceEvidence.usedDefaultPrice,
+        unitPrice,
+        materialCost,
+        laborHrs,
+        laborHoursPerUnit,
+        laborRate,
+        laborCost,
+        totalCost: materialCost + laborCost,
+      });
+    });
+  });
+
+  return { lineItems, assemblies };
 }
 
 /**
@@ -365,8 +601,11 @@ export function summarizeCosts(lineItems = []) {
  *   tray         – key = nominal width in inches (e.g. "12", "default")
  *   conduit      – key = trade size in inches (e.g. "1", "0.5", "default")
  *   fitting      – key is ignored; sets the scalar fitting unit price
- *   labor        – key ∈ { cableInstall, trayInstall, conduitInstall }
- *   productivity – key ∈ { cablePullFtPerHr, trayInstallFtPerHr, conduitInstallFtPerHr }
+ *   tray_support – key = tray width or "default"
+ *   construction – key = deterministic ductbank BOM material key
+ *   labor_unit_hours – key = matching ductbank BOM key, value = labor-hours/unit
+ *   labor        – key ∈ { cableInstall, trayInstall, conduitInstall, civilInstall }
+ *   productivity – also supports traySupportInstallEaPerHr and trayFittingInstallEaPerHr
  *
  * @param {string} csvText  Raw CSV text
  * @returns {{ prices: Object, meta: { source: string, date: string, rowCount: number, warnings: string[] } }}
@@ -415,9 +654,25 @@ export function parsePricingCSV(csvText) {
   let date = '';
   let rowCount = 0;
 
-  const VALID_LABOR_KEYS = new Set(['cableInstall', 'trayInstall', 'conduitInstall']);
-  const VALID_PRODUCTIVITY_KEYS = new Set(['cablePullFtPerHr', 'trayInstallFtPerHr', 'conduitInstallFtPerHr']);
-  const VALID_CATEGORIES = new Set(['cable', 'tray', 'conduit', 'fitting', 'labor', 'productivity']);
+  const VALID_LABOR_KEYS = new Set(['cableInstall', 'trayInstall', 'conduitInstall', 'civilInstall']);
+  const VALID_PRODUCTIVITY_KEYS = new Set([
+    'cablePullFtPerHr',
+    'trayInstallFtPerHr',
+    'conduitInstallFtPerHr',
+    'traySupportInstallEaPerHr',
+    'trayFittingInstallEaPerHr',
+  ]);
+  const VALID_CATEGORIES = new Set([
+    'cable',
+    'tray',
+    'conduit',
+    'fitting',
+    'tray_support',
+    'construction',
+    'labor_unit_hours',
+    'labor',
+    'productivity',
+  ]);
 
   const lines = csvText.split(/\r?\n/);
   let headerParsed = false;
@@ -488,6 +743,18 @@ export function parsePricingCSV(csvText) {
     } else if (category === 'fitting') {
       prices.fitting = unitPrice;
       rowCount++;
+    } else if (category === 'tray_support') {
+      if (!prices.traySupport) prices.traySupport = {};
+      prices.traySupport[key || 'default'] = unitPrice;
+      rowCount++;
+    } else if (category === 'construction') {
+      if (!prices.construction) prices.construction = {};
+      prices.construction[key || 'default'] = unitPrice;
+      rowCount++;
+    } else if (category === 'labor_unit_hours') {
+      if (!prices.laborUnitHours) prices.laborUnitHours = {};
+      prices.laborUnitHours[key || 'default'] = unitPrice;
+      rowCount++;
     } else if (category === 'labor') {
       if (!VALID_LABOR_KEYS.has(key)) {
         warnings.push(`Line ${lineNum + 1}: unknown labor key "${key}" — skipped`);
@@ -540,6 +807,8 @@ export function exportPricingCSV(prices = {}, meta = {}) {
   addRows('cable',   prices.cable,   '$/ft');
   addRows('tray',    prices.tray,    '$/ft');
   addRows('conduit', prices.conduit, '$/ft');
+  addRows('tray_support', prices.traySupport, '$/ea');
+  addRows('construction', prices.construction, '$/BOM unit');
 
   if (Number.isFinite(prices.fitting)) {
     rows.push(['fitting', '', prices.fitting, '$', source, date].map(encodeCSVCell).join(','));
@@ -547,6 +816,7 @@ export function exportPricingCSV(prices = {}, meta = {}) {
 
   addRows('labor',        prices.labor,            '$/hr');
   addRows('productivity', prices.laborProductivity, 'units/hr');
+  addRows('labor_unit_hours', prices.laborUnitHours, 'labor-hr/BOM unit');
 
   return rows.join('\n') + '\n';
 }

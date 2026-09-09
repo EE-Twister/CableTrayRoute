@@ -26,7 +26,7 @@ export function createRoutingState() {
     pullChecksEnabled: false,
     pullSetupsVisible: true,
     pullGroupAnalysis: null,
-    pullGroupDecisions: {},
+    pullGroupDecisions: {}, pullPointAccessRecordsByCable: {},
     expandedPullGroupIds: new Set(),
     routeViewer: null,
     routeViewerLoad: null,

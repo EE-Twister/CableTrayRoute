@@ -19,6 +19,7 @@
     "ieee3002-load-flow-radial": { "evidenceClass": "independent_analytical", "sourceAccess": "public_primary_context_only", "evidenceStrength": "moderate", "implementationModules": ["analysis/loadFlow.js"], "executableBenchmarkId": "LFLOW-001" },
     "ansi-short-circuit-thevenin": { "evidenceClass": "independent_analytical", "sourceAccess": "public_primary_context_only", "evidenceStrength": "moderate", "implementationModules": ["analysis/shortCircuit.mjs"], "executableBenchmarkId": "ANSI-SC-001" },
     "nec2023-conduit-fill-count": { "evidenceClass": "independent_analytical", "sourceAccess": "paywalled_primary", "evidenceStrength": "moderate", "implementationModules": ["analysis/conduitFill.mjs"], "executableBenchmarkId": null },
+    "nec2023-tray-fill-mixed-boundary": { "evidenceClass": "independent_analytical", "sourceAccess": "public_primary", "evidenceStrength": "moderate", "implementationModules": ["analysis/trayFill.mjs"], "executableBenchmarkId": "TRAY-NEC-001" },
     "iec60909-short-circuit": { "evidenceClass": "independent_analytical", "sourceAccess": "paywalled_primary", "evidenceStrength": "moderate", "implementationModules": ["analysis/iec60909.mjs"], "executableBenchmarkId": "IEC60909-001" },
     "iec60287-cable-rating": { "evidenceClass": "screening_fixture", "sourceAccess": "source_record_incomplete", "evidenceStrength": "limited", "implementationModules": ["analysis/iec60287.mjs"], "executableBenchmarkId": "IEC60287-001" },
     "ieee80-ground-grid": { "evidenceClass": "published_worked_example", "sourceAccess": "paywalled_primary", "evidenceStrength": "moderate", "implementationModules": ["analysis/groundGrid.mjs"], "executableBenchmarkId": null },
@@ -147,6 +148,30 @@
         "oneCableFillPercent": { "value": 41.3367, "tolerance": 0.0001 }
       },
       "reference": "NEC 2023 Chapter 9, Table 1; application raceway tables are edition-pinned to NEC 2023"
+    },
+    {
+      "id": "nec2023-tray-fill-mixed-boundary",
+      "title": "NEC 2023 Article 392 — 12 in Ladder Tray Mixed-Cable Boundary",
+      "studyPage": "cabletrayfill.html",
+      "standard": "NFPA 70 (NEC) 2023",
+      "clause": "392.22(A)(1)(c), Table 392.22(A)(1) Columns 1 and 2",
+      "description": "A 12 in ladder tray has a 14.0 in² Column 1 allowance. One 2.0 in diameter 4/0-or-larger multiconductor cable applies the stated 1.2 × Sd mixed-cable penalty, leaving 11.6 in² for smaller multiconductor cables. The fixture checks the exact boundary and 0.001 in² above it.",
+      "inputs": {
+        "trayConstruction": "ladder",
+        "insideWidthIn": 12,
+        "largeCableDiameterIn": 2,
+        "smallCableAreaAtBoundaryIn2": 11.6,
+        "smallCableAreaAboveBoundaryIn2": 11.601
+      },
+      "expectedOutputs": {
+        "ladderColumn1AreaIn2": { "value": 14, "tolerance": 0 },
+        "mixedSmallCableAllowanceIn2": { "value": 11.6, "tolerance": 0.000000001 },
+        "boundaryPass": { "value": true, "tolerance": 0 },
+        "aboveBoundaryFails": { "value": true, "tolerance": 0 }
+      },
+      "reference": "NFPA 70 (NEC) 2023 development record for 392.22(A)(1) and Table 392.22(A)(1); independent boundary arithmetic",
+      "sourceUrl": "https://docinfofiles.nfpa.org/files/AboutTheCodes/70/70_A2022_NEC_P08_FD_PIReport_rev_1008.pdf",
+      "sampleFile": "samples/benchmark-nec2023-tray-fill.json"
     },
     {
       "id": "iec60909-short-circuit",

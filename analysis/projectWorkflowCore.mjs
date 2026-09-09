@@ -619,7 +619,8 @@ export function buildWorkflowCoreDiagnostics(project = {}) {
     routeResults: project.routeResults || project.latestRouteResults || [],
     reportSnapshots: project.reportSnapshots || {},
     lifecyclePackages: project.deliverables || [],
-    currentInputFingerprint: project.currentInputFingerprint || ''
+    currentInputFingerprint: project.currentInputFingerprint || '',
+    costEstimate: project.costEstimate || project.costEstimateArtifact || null
   });
   const reconcilePending = Boolean(project.reconcilePending);
   const blockers = [];
@@ -709,6 +710,16 @@ export function buildWorkflowCoreDiagnostics(project = {}) {
   } else if (deliverableDiagnostics.missingRouteResultTags.length > 0) {
     blockers.push(makeBlocker('Fill / Routing', 'warning', 'Refresh route results', `${deliverableDiagnostics.missingRouteResultTags.length} schedule-ready cables do not have matching route results.`, 'optimalRoute.html'));
   }
+  if (deliverableDiagnostics.racewayAssurance.blockingIssues.length > 0) {
+    const firstIssue = deliverableDiagnostics.racewayAssurance.blockingIssues[0];
+    blockers.push(makeBlocker(
+      'Fill / Routing',
+      'warning',
+      'Resolve raceway assurance blockers',
+      `${deliverableDiagnostics.racewayAssurance.blockingIssues.length} routing or capacity assurance blocker(s) remain. ${firstIssue.message}`,
+      firstIssue.href || 'optimalRoute.html'
+    ));
+  }
 
   if (studies === 0) {
     blockers.push(makeBlocker('Studies', 'info', 'Run workflow studies', 'No saved study results are available yet.', 'demandschedule.html'));
@@ -760,7 +771,8 @@ export function buildWorkflowCoreDiagnostics(project = {}) {
       complete: cableReadiness.routingReady > 0
         && cableReadiness.missingCoordinates === 0
         && deliverableDiagnostics.health.routeResults >= cableReadiness.routingReady
-        && deliverableDiagnostics.missingRouteResultTags.length === 0,
+        && deliverableDiagnostics.missingRouteResultTags.length === 0
+        && deliverableDiagnostics.racewayAssurance.blockingIssues.length === 0,
       label: `${deliverableDiagnostics.health.routeResults} route result(s)`,
       hint: blockers.find(item => item.step === 'Fill / Routing')?.detail || null
     },
@@ -789,6 +801,13 @@ export function buildWorkflowCoreDiagnostics(project = {}) {
       routingReady: cableReadiness.routingReady,
       raceways,
       routeResults: deliverableDiagnostics.health.routeResults,
+      racewayAssuranceStatus: deliverableDiagnostics.racewayAssurance.status,
+      racewayAssuranceBlockers: deliverableDiagnostics.racewayAssurance.blockingIssues.length,
+      routeSignatures: deliverableDiagnostics.racewayAssurance.summary.routeSignatures,
+      fieldRoutes: deliverableDiagnostics.racewayAssurance.summary.fieldRoutes,
+      pullConstructabilityStatus: deliverableDiagnostics.pullConstructability.status,
+      pullConstructabilityBlockers: deliverableDiagnostics.pullConstructability.blockingIssues.length,
+      constructabilitySignatures: deliverableDiagnostics.pullConstructability.checks.filter(check => check.signature).length,
       pullGroups: deliverableDiagnostics.health.pullGroups,
       spoolSheets: deliverableDiagnostics.health.spoolCount,
       reportSnapshots: deliverableDiagnostics.health.reportSnapshots,
