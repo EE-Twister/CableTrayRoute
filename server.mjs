@@ -1,5 +1,5 @@
 import express from 'express';
-import zlib from 'zlib';
+import compression from 'compression';
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
@@ -115,6 +115,10 @@ class ProjectStore {
   constructor(dataDir) {
     this.dataDir = dataDir;
     this.cache = new Map();
+    // A project save is a read/validate/merge/write transaction. Serialize
+    // transactions per project so concurrent tabs cannot all validate the
+    // same base version and then overwrite one another.
+    this.saveQueues = new Map();
   }
 
   #evictIfNeeded() {
@@ -179,7 +183,23 @@ class ProjectStore {
     };
   }
 
-  async save(username, project, requestBody) {
+  async save(username, project, requestBody, options = {}) {
+    const cacheKey = this.#cacheKey(username, project);
+    const previous = this.saveQueues.get(cacheKey) || Promise.resolve();
+    const transaction = previous
+      .catch(() => {})
+      .then(() => this.#saveUnlocked(username, project, requestBody, options));
+    this.saveQueues.set(cacheKey, transaction);
+    try {
+      return await transaction;
+    } finally {
+      if (this.saveQueues.get(cacheKey) === transaction) {
+        this.saveQueues.delete(cacheKey);
+      }
+    }
+  }
+
+  async #saveUnlocked(username, project, requestBody, { requireBaseVersion = false } = {}) {
     const input = normalizeSaveRequest(requestBody);
     const metrics = { loadMs: 0, mergeMs: 0, serializeMs: 0, writeMs: 0, skippedWrite: false };
     let current = { version: null, data: {} };
@@ -199,10 +219,22 @@ class ProjectStore {
       metrics.loadMs = formatDurationMs(loadStartedAt, loadDoneAt);
     }
 
+    if (requireBaseVersion && current.version && !input.baseVersion) {
+      const conflict = new Error('version-required');
+      conflict.code = 'VERSION_REQUIRED';
+      conflict.currentVersion = current.version;
+      throw conflict;
+    }
     if (input.baseVersion && current.version && input.baseVersion !== current.version) {
       const conflict = new Error('version-conflict');
       conflict.code = 'VERSION_CONFLICT';
       conflict.currentVersion = current.version;
+      throw conflict;
+    }
+    if (input.baseVersion && !current.version) {
+      const conflict = new Error('version-conflict');
+      conflict.code = 'VERSION_CONFLICT';
+      conflict.currentVersion = null;
       throw conflict;
     }
 
@@ -220,7 +252,7 @@ class ProjectStore {
     const cacheKey = this.#cacheKey(username, project);
     const cached = this.cache.get(cacheKey);
     const currentJson = cached?.json ?? JSON.stringify(current.data ?? {});
-    if (currentJson === compactJson) {
+    if (current.version && currentJson === compactJson) {
       metrics.skippedWrite = true;
       return { version: current.version ?? null, data: nextData, metrics };
     }
@@ -228,7 +260,9 @@ class ProjectStore {
     const userDir = this.#projectDir(username, project);
     await fs.mkdir(userDir, { recursive: true });
     const writeStartedAt = process.hrtime.bigint();
-    const version = Date.now().toString();
+    // Date.now() alone can collide when rapid writes are serialized in the
+    // same millisecond. The current version is a monotonic lower bound.
+    const version = Math.max(Date.now(), Number(current.version) + 1 || 0).toString();
     await fs.writeFile(path.join(userDir, `${version}.json`), prettyJson);
     const writeDoneAt = process.hrtime.bigint();
     metrics.writeMs = formatDurationMs(writeStartedAt, writeDoneAt);
@@ -243,6 +277,7 @@ class CloudLibraryStore {
   constructor(dataDir) {
     this.dataDir = dataDir;
     this.cache = new Map();
+    this.saveQueues = new Map();
   }
 
   #evictIfNeeded() {
@@ -300,6 +335,19 @@ class CloudLibraryStore {
   }
 
   async save(username, requestBody) {
+    const previous = this.saveQueues.get(username) || Promise.resolve();
+    const transaction = previous
+      .catch(() => {})
+      .then(() => this.#saveUnlocked(username, requestBody));
+    this.saveQueues.set(username, transaction);
+    try {
+      return await transaction;
+    } finally {
+      if (this.saveQueues.get(username) === transaction) this.saveQueues.delete(username);
+    }
+  }
+
+  async #saveUnlocked(username, requestBody) {
     const input = normalizeSaveRequest(requestBody);
     const metrics = { loadMs: 0, mergeMs: 0, serializeMs: 0, writeMs: 0, skippedWrite: false };
     let current = { version: null, data: {} };
@@ -347,7 +395,7 @@ class CloudLibraryStore {
     const libDir = this.#libraryDir(username);
     await fs.mkdir(libDir, { recursive: true });
     const writeStartedAt = process.hrtime.bigint();
-    const version = Date.now().toString();
+    const version = Math.max(Date.now(), Number(current.version) + 1 || 0).toString();
     await fs.writeFile(path.join(libDir, `${version}.json`), prettyJson);
     const writeDoneAt = process.hrtime.bigint();
     metrics.writeMs = formatDurationMs(writeStartedAt, writeDoneAt);
@@ -1092,48 +1140,13 @@ export async function createApp(options = {}) {
   });
 
   app.use(express.json({ limit: '1mb' }));
-  app.use((req, res, next) => {
-    const acceptEncoding = req.headers['accept-encoding'] || '';
-    const allowCompression =
-      !req.headers['x-no-compression'] &&
-      typeof acceptEncoding === 'string' &&
-      /\bgzip\b/i.test(acceptEncoding);
-
-    if (!allowCompression) {
-      next();
-      return;
+  app.use(compression({
+    filter(req, res) {
+      if (req.headers['x-no-compression'] || req.headers.range
+        || res.statusCode === 206 || res.getHeader('Content-Range')) return false;
+      return compression.filter(req, res);
     }
-
-    const originalSend = res.send.bind(res);
-    res.send = body => {
-      const contentType = String(res.getHeader('Content-Type') || '').toLowerCase();
-      const compressibleType =
-        contentType.includes('text/') ||
-        contentType.includes('json') ||
-        contentType.includes('javascript') ||
-        contentType.includes('xml') ||
-        contentType.includes('svg');
-
-      if (!compressibleType || res.getHeader('Content-Encoding')) {
-        return originalSend(body);
-      }
-
-      const source = Buffer.isBuffer(body)
-        ? body
-        : Buffer.from(typeof body === 'string' ? body : JSON.stringify(body ?? ''));
-      if (source.length < 1024) {
-        return originalSend(body);
-      }
-
-      const compressed = zlib.gzipSync(source, { level: 6 });
-      res.setHeader('Content-Encoding', 'gzip');
-      res.setHeader('Vary', 'Accept-Encoding');
-      res.setHeader('Content-Length', String(compressed.length));
-      return originalSend(compressed);
-    };
-
-    next();
-  });
+  }));
   app.use((req, res, next) => {
     if (!dataDirWithinStaticRoot) {
       next();
@@ -1718,7 +1731,7 @@ export async function createApp(options = {}) {
       }
       const persistStartedAt = process.hrtime.bigint();
       try {
-        const saved = await projectStore.save(username, project, req.body);
+        const saved = await projectStore.save(username, project, req.body, { requireBaseVersion: true });
         const persistMs = formatDurationMs(persistStartedAt);
         appendServerTiming(res, 'project.persist', persistMs);
         appendServerTiming(res, 'project.load', saved.metrics.loadMs);
@@ -1744,6 +1757,10 @@ export async function createApp(options = {}) {
       } catch (err) {
         if (err.code === 'VERSION_CONFLICT') {
           res.status(409).json({ error: 'Version conflict', currentVersion: err.currentVersion });
+          return;
+        }
+        if (err.code === 'VERSION_REQUIRED') {
+          res.status(409).json({ error: 'Base version required for project update', currentVersion: err.currentVersion });
           return;
         }
         throw err;
@@ -2045,7 +2062,19 @@ When answering queries:
       const data = await loadProjectData(req, res);
       if (!data) return;
       const { runVoltageDropStudy } = await import('./analysis/voltageDropStudy.mjs');
-      const result = await withAnalysisStore(data, () => runVoltageDropStudy());
+      const cables = Array.isArray(data.cables)
+        ? data.cables
+        : Array.isArray(data.cableSchedule) ? data.cableSchedule : [];
+      // Canonical project exports persist study results under settings. Keep
+      // legacy shapes as a compatibility fallback for older saved projects.
+      const loadFlow = data.settings?.studyResults?.loadFlow
+        || data.studies?.loadFlow
+        || data.studyResults?.loadFlow
+        || null;
+      const result = runVoltageDropStudy(cables, {
+        loads: Array.isArray(data.loads) ? data.loads : [],
+        loadFlow,
+      });
       res.json({ voltageDrop: result });
     })
   );

@@ -482,6 +482,31 @@ test('sample gallery lists the full project workflow sample', async ({ page }) =
   await expect(page.locator('[data-sample-id="commercial-office-fitout"]')).toHaveClass(/sample-card--selected/);
 });
 
+test('guided sample import populates the ordinary workspace before navigation', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('ctr-review-sample-test-reset') === '1') return;
+    localStorage.clear();
+    sessionStorage.clear();
+    sessionStorage.setItem('ctr-review-sample-test-reset', '1');
+  });
+  await page.goto(server.url('samplegallery.html'), { waitUntil: 'domcontentloaded' });
+  const sampleCard = page.locator('[data-sample-id="project-workflow-core"]');
+  const freshCopy = sampleCard.getByRole('button', { name: /Create a fresh copy/i });
+  if (await freshCopy.isVisible()) {
+    await freshCopy.click();
+  } else {
+    await sampleCard.getByRole('button', { name: /Start guided Project Workflow Core/i }).click();
+  }
+
+  await expect(page.getByRole('dialog', { name: 'Create New Project' })).toHaveCount(0);
+  await expect(page.locator('#checklist-panel')).toContainText('Guided Workflow: Project Workflow Core');
+  const cableStep = page.locator('#checklist-steps .checklist-step__link').filter({ hasText: /cableschedule/i }).first();
+  const cableHref = await cableStep.getAttribute('href');
+  await page.goto(new URL(cableHref, page.url()).toString(), { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#routing-readiness-panel [data-metric="total"]')).toHaveText('14');
+  await expect(page.locator('#cableScheduleTable tbody tr')).toHaveCount(14);
+});
+
 test('one-line saves shared records automatically and opens the data-link review', async ({ page }) => {
   const diagram = {
     activeSheet: 0,

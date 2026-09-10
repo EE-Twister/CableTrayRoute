@@ -24,6 +24,18 @@ The page reports:
 - Current/voltage input source
 - The next modeled conductor size that meets the remaining path allowance, when one is available
 
+The installed cable's voltage drop is calculated from its selected size, phase
+representation, power factor, parallel run count, and impedance override. A
+different conductor size may be suggested by sizing; its modeled drop is shown
+as a recommendation and does not replace the installed cable result. Table 9
+and the DC fallback accept AWG/kcmil conductor tokens only. Metric or malformed
+descriptions remain unevaluated until a sourced metric impedance is provided.
+Each result records its impedance basis: NEC Chapter 9 Table 9 AC resistance
+and reactance, a temperature-corrected DC resistance fallback, or an explicit
+resistance override with reactance assumed zero. An override therefore remains
+the governing value when the selected conductor size changes; clear it before
+expecting a conductor change to alter the drop.
+
 The 3% branch/feeder and 5% combined values are design recommendations used for screening; they are not presented as mandatory NEC pass/fail limits.
 
 ## Controlled writeback

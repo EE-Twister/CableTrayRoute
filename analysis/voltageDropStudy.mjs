@@ -7,7 +7,8 @@
  */
 
 import { NEC_AMPACITY_TABLE } from './autoSize.mjs';
-import { calculateVoltageDrop } from '../src/voltageDrop.js';
+import { calculateVoltageDrop, describeVoltageDropBasis } from '../src/voltageDrop.js';
+import { normalizeCablePhases } from '../utils/cablePhases.js';
 
 export const NEC_LIMITS = {
   feeder: 3,
@@ -96,7 +97,8 @@ export function resolveCableStudyInputs(cables = [], loads = [], loadFlowResult 
       cable.voltage,
       cable.voltageV,
     );
-    const phases = finiteNumber(cable.phases, cable.num_phases, load?.phases, 3);
+    const phaseLabels = normalizeCablePhases(cable?.phases ?? cable?.num_phases);
+    const phases = phaseLabels.length || finiteNumber(load?.phases, 3);
     const flowVoltage = finiteNumber(flowBus?.voltageV, Number(flowBus?.baseKV) * 1000);
     const loadVoltage = finiteNumber(load?.voltage, load?.voltageV, load?.nominal_voltage);
     const voltage = explicitVoltage || flowVoltage || loadVoltage;
@@ -158,7 +160,8 @@ function statusForDrop(dropPct, limit, evaluated) {
 
 export function evaluateCable(cable, lengthFt) {
   const len = finiteNumber(lengthFt ?? cable?.length ?? cable?.route_length);
-  const phase = finiteNumber(cable?.phases, cable?.num_phases, 3);
+  const phaseLabels = normalizeCablePhases(cable?.phases ?? cable?.num_phases ?? cable);
+  const phase = phaseLabels.length || 3;
   const currentA = finiteNumber(cable?.est_load, cable?.current, cable?.load_current);
   const voltageV = finiteNumber(cable?.operating_voltage, cable?.cable_rating, cable?.voltage);
   const conductorSize = cable?.conductor_size || '';
@@ -166,12 +169,14 @@ export function evaluateCable(cable, lengthFt) {
     ...cable,
     est_load: currentA,
     operating_voltage: voltageV,
+    parallel_count: cable?.parallel_count ?? cable?.parallel_runs ?? cable?.parallel ?? 1,
   };
   const calculated = calculateVoltageDrop(normalizedCable, len, phase);
   const dropPct = Number.isFinite(calculated) ? calculated : 0;
   const circuitType = classifyCircuit(cable);
   const limit = NEC_LIMITS[circuitType];
-  const evaluated = len > 0 && currentA > 0 && voltageV > 0 && Boolean(conductorSize) && dropPct > 0;
+  const evaluated = len > 0 && currentA > 0 && voltageV > 0 && Boolean(conductorSize)
+    && Number.isFinite(calculated) && calculated >= 0;
   const tag = cable?.cable_tag || cable?.tag || cable?.id || '';
   const from = cable?.from_location || cable?.origin || cable?.from_tag || cable?.from || '';
   const to = cable?.to_location || cable?.destination || cable?.to_tag || cable?.to || '';
@@ -185,6 +190,9 @@ export function evaluateCable(cable, lengthFt) {
     toKey: normalizedIdentifier(to),
     conductorSize,
     material: cable?.conductor_material || 'CU',
+    phases: phase,
+    phaseLabels,
+    parallelCount: normalizedCable.parallel_count,
     lengthFt: len,
     currentA,
     voltageV,
@@ -199,8 +207,7 @@ export function evaluateCable(cable, lengthFt) {
       current: currentA > 0 ? 'Cable Schedule' : 'missing',
       voltage: voltageV > 0 ? 'Cable Schedule' : 'missing',
     },
-    basis: 'NEC 2023 voltage-drop informational-note recommendation '
-      + '(AC R+X from NEC Ch. 9 Table 9, load power factor applied)',
+    basis: `NEC 2023 voltage-drop informational-note recommendation; ${describeVoltageDropBasis(normalizedCable)}`,
   };
 }
 

@@ -58,7 +58,19 @@ export function sizeConductor(load = {}, params = {}) {
   const current = parseFloat(load.current) || 0;
   const voltage = parseFloat(load.voltage) || 0;
   const phases = parseInt(load.phases, 10) || 3;
-  const required = current * 1.25;
+  const parallelRaw = params.parallel_count ?? params.parallel_runs ?? load.parallel_count;
+  const parallelCount = parallelRaw == null || parallelRaw === '' ? 1 : Number(parallelRaw);
+  if (!Number.isInteger(parallelCount) || parallelCount < 1) {
+    return {
+      size: null,
+      ampacity: null,
+      voltageDrop: null,
+      codeRef: (params.code || 'NEC').toUpperCase(),
+      report: null,
+      violation: 'Parallel conductor count must be a positive integer'
+    };
+  }
+  const required = (current * 1.25) / parallelCount;
   const code = (params.code || 'NEC').toUpperCase();
   const ambient = params.ambient ?? 30;
   const conductors = params.conductors ?? load.conductors ?? 1;
@@ -69,7 +81,15 @@ export function sizeConductor(load = {}, params = {}) {
     const tf = temperatureFactor(code, ambient, params.insulation_rating || 90);
     const af = adjustmentFactor(code, conductors);
     const available = base * tf * af;
-    report = { baseAmpacity: base, tempFactor: tf, adjustFactor: af, available, codeRef: code };
+    report = {
+      baseAmpacity: base,
+      tempFactor: tf,
+      adjustFactor: af,
+      available,
+      requiredPerRun: required,
+      parallelCount,
+      codeRef: code
+    };
     if (available < required) continue;
     const cable = {
       conductor_size: sz,
@@ -78,7 +98,11 @@ export function sizeConductor(load = {}, params = {}) {
       est_load: current,
       operating_voltage: voltage,
       cable_rating: voltage,
-      voltage_rating: voltage
+      voltage_rating: voltage,
+      power_factor: params.power_factor ?? params.powerFactor ?? load.power_factor,
+      parallel_count: params.parallel_count ?? params.parallel_runs ?? load.parallel_count,
+      impedance_per_1000ft: params.impedance_per_1000ft ?? load.impedance_per_1000ft,
+      conduit_material: params.conduit_material ?? load.conduit_material
     };
     const vd = calculateVoltageDrop(cable, params.length || 0, phases);
     if (params.maxVoltageDrop && vd > params.maxVoltageDrop) {
@@ -110,19 +134,35 @@ export { calculateVoltageDrop };
 
 export function summarizeCable(cable, params = {}) {
   const normalizedPhases = normalizeCablePhases(cable);
+  const phaseCount = normalizedPhases.length || parseInt(cable.phases, 10) || 3;
   const load = {
     current: cable.est_load,
     voltage: cable.operating_voltage,
-    phases: normalizedPhases.length || parseInt(cable.phases, 10) || 3,
-    conductors: cable.conductors
+    phases: phaseCount,
+    conductors: cable.conductors,
+    power_factor: cable.power_factor,
+    parallel_count: cable.parallel_count ?? cable.parallel_runs ?? cable.parallel,
+    impedance_per_1000ft: cable.impedance_per_1000ft ?? cable.impedance,
+    conduit_material: cable.conduit_material ?? cable.raceway_material ?? cable.conduit_type
   };
   const res = sizeConductor(load, {
     ...params,
     material: cable.conductor_material,
     insulation_rating: cable.insulation_rating,
     length: cable.length,
-    conductors: cable.conductors
+    conductors: cable.conductors,
+    phases: phaseCount,
+    power_factor: cable.power_factor,
+    parallel_count: cable.parallel_count ?? cable.parallel_runs ?? cable.parallel,
+    impedance_per_1000ft: cable.impedance_per_1000ft ?? cable.impedance,
+    conduit_material: cable.conduit_material ?? cable.raceway_material ?? cable.conduit_type
   });
+  const selectedVoltageDrop = calculateVoltageDrop({
+    ...cable,
+    operating_voltage: cable.operating_voltage,
+    phases: phaseCount,
+    parallel_count: cable.parallel_count ?? cable.parallel_runs ?? cable.parallel,
+  }, cable.length || 0, phaseCount);
   return {
     tag: cable.tag,
     selectedSize: cable.conductor_size,
@@ -132,7 +172,11 @@ export function summarizeCable(cable, params = {}) {
     tempFactor: res.report?.tempFactor,
     adjustFactor: res.report?.adjustFactor,
     availableAmpacity: res.report?.available,
-    voltageDrop: res.voltageDrop,
+    // Keep installed-cable performance separate from the sizing candidate.
+    voltageDrop: Number.isFinite(selectedVoltageDrop) ? selectedVoltageDrop : null,
+    selectedVoltageDrop: Number.isFinite(selectedVoltageDrop) ? selectedVoltageDrop : null,
+    recommendedVoltageDrop: Number.isFinite(res.voltageDrop) ? res.voltageDrop : null,
+    recommendation: res.size ? { size: res.size, voltageDrop: res.voltageDrop } : null,
     violation: res.violation
   };
 }

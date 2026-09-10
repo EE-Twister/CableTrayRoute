@@ -186,6 +186,14 @@ async function authScenario() {
     });
 
     await check('allows project writes with CSRF header', async () => {
+      const currentRes = await fetch(`${baseUrl}/projects/test`, {
+        headers: {
+          Authorization: `Bearer ${session.token}`
+        }
+      });
+      assert.strictEqual(currentRes.status, 200);
+      const current = await currentRes.json();
+      assert(current.version, 'project GET returns current revision');
       const res = await fetch(`${baseUrl}/projects/test`, {
         method: 'POST',
         headers: {
@@ -193,7 +201,7 @@ async function authScenario() {
           Authorization: `Bearer ${session.token}`,
           'X-CSRF-Token': session.csrfToken
         },
-        body: JSON.stringify({ value: 2 })
+        body: JSON.stringify({ data: { value: 2 }, baseVersion: current.version })
       });
       assert.strictEqual(res.status, 200);
       const payload = await res.json();
@@ -271,7 +279,7 @@ async function authScenario() {
           Authorization: `Bearer ${session.token}`,
           'X-CSRF-Token': session.csrfToken
         },
-        body: JSON.stringify({ patch: {} })
+        body: JSON.stringify({ baseVersion: patchedVersion, patch: {} })
       });
       assert.strictEqual(res.status, 200);
       const payload = await res.json();

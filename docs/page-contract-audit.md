@@ -30,7 +30,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Planning
-- Source files: `ampacity.mjs`, `analysis/autoSize.mjs`, `analysis/cableThermalEnvironment.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designCoach.mjs`, `analysis/designRuleChecker.mjs`, `analysis/ductbankConduitAssignment.mjs`, `analysis/equipmentEvaluation.mjs`, `analysis/equipmentWorkflow.mjs`, `analysis/fieldObservations.mjs`, `analysis/iec60287.mjs`, `analysis/lifecyclePackage.mjs`, `analysis/loadWorkflow.mjs`, `analysis/projectWorkflowCore.mjs`, `analysis/pullCards.mjs`, `analysis/pullConstructability.mjs`, `analysis/racewayAssurance.mjs`, `analysis/reportPackage.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/trayFill.mjs`, `analysis/voltageDropStudy.mjs`, `analysis/workflowAutomation.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/protectiveDevices/calculationCatalog.mjs`, `src/protectiveDevices/catalogLoader.mjs`, `src/pullCalc.js`, `src/voltageDrop.js`, `src/workflowDashboard.js`, `utils/componentLabels.js`, `validation/rules.js`
+- Source files: `ampacity.mjs`, `analysis/autoSize.mjs`, `analysis/cableThermalEnvironment.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designCoach.mjs`, `analysis/designRuleChecker.mjs`, `analysis/ductbankConduitAssignment.mjs`, `analysis/equipmentEvaluation.mjs`, `analysis/equipmentWorkflow.mjs`, `analysis/fieldObservations.mjs`, `analysis/iec60287.mjs`, `analysis/lifecyclePackage.mjs`, `analysis/loadWorkflow.mjs`, `analysis/projectWorkflowCore.mjs`, `analysis/pullCards.mjs`, `analysis/pullConstructability.mjs`, `analysis/racewayAssurance.mjs`, `analysis/reportPackage.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/trayFill.mjs`, `analysis/voltageDropStudy.mjs`, `analysis/workflowAutomation.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/protectiveDevices/calculationCatalog.mjs`, `src/protectiveDevices/catalogLoader.mjs`, `src/pullCalc.js`, `src/voltageDrop.js`, `src/workflowDashboard.js`, `utils/cablePhases.js`, `utils/componentLabels.js`, `validation/rules.js`
 
 **Undocumented Reads**
 - None
@@ -560,7 +560,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Cable
-- Source files: `ampacity.mjs`, `analysis/cableLibrary.mjs`, `analysis/scheduleWorkflow.mjs`, `cableschedule.js`, `codes/iecTables.js`, `codes/necTables.js`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `sizing.js`, `src/cable-schedule/io.js`, `src/cable-schedule/optionModel.js`, `src/cable-schedule/printReport.js`, `src/cable-schedule/scheduleConfig.js`, `src/cable-schedule/tagModel.js`, `src/cable-schedule/templateModel.js`, `src/cableschedule.js`, `src/components/projectDeletionReview.js`, `src/crossProbe.js`, `src/lifecycle/pageBootstrap.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/projectManagerEntry.js`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/cablePhases.js`
+- Source files: `ampacity.mjs`, `analysis/cableLibrary.mjs`, `analysis/scheduleWorkflow.mjs`, `cableschedule.js`, `codes/iecTables.js`, `codes/necTables.js`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `sizing.js`, `src/cable-schedule/io.js`, `src/cable-schedule/optionModel.js`, `src/cable-schedule/printReport.js`, `src/cable-schedule/scheduleConfig.js`, `src/cable-schedule/sizingHighlight.js`, `src/cable-schedule/tagModel.js`, `src/cable-schedule/templateModel.js`, `src/cableschedule.js`, `src/components/projectDeletionReview.js`, `src/crossProbe.js`, `src/lifecycle/pageBootstrap.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/projectManagerEntry.js`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/cablePhases.js`
 
 **Undocumented Reads**
 - None
@@ -582,7 +582,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - cableschedule.js:1848 getCables()
+  - cableschedule.js:1873 getCables()
 - `conduitSchedule`
   - cableschedule.js:110 getConduits()
 - `ductbankSchedule`
@@ -599,38 +599,38 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - cableschedule.js:120 getPanels()
   - cableschedule.js:135 getPanels()
 - `settings.cableChangeLog`
-  - cableschedule.js:412 getCableChangeLog()
-  - cableschedule.js:413 getItem(settings.cableChangeLog)
+  - cableschedule.js:426 getCableChangeLog()
+  - cableschedule.js:427 getItem(settings.cableChangeLog)
 - `settings.cableTagSettings`
-  - cableschedule.js:376 getCableTagSettings()
-  - cableschedule.js:377 getItem(settings.cableTagSettings)
+  - cableschedule.js:390 getCableTagSettings()
+  - cableschedule.js:391 getItem(settings.cableTagSettings)
 - `settings.cableTemplates`
-  - cableschedule.js:1143 getCableTemplates()
-  - cableschedule.js:1424 getCableTemplates()
-  - cableschedule.js:367 getCableTemplates()
+  - cableschedule.js:1168 getCableTemplates()
+  - cableschedule.js:1449 getCableTemplates()
+  - cableschedule.js:383 getCableTemplates()
 - `settings.trayHardwareCatalogCustomProducts`
-  - cableschedule.js:1179 getTrayHardwareCatalogCustomProducts()
+  - cableschedule.js:1204 getTrayHardwareCatalogCustomProducts()
 - `traySchedule`
   - cableschedule.js:109 getTrays()
 
 **Detected Writes**
 - `cableSchedule`
-  - cableschedule.js:2215 setCables()
-  - cableschedule.js:2227 setCables()
-  - cableschedule.js:2241 setCables()
-  - cableschedule.js:2264 setCables()
+  - cableschedule.js:2213 setCables()
+  - cableschedule.js:2225 setCables()
+  - cableschedule.js:2239 setCables()
+  - cableschedule.js:2262 setCables()
 - `settings.cableChangeLog`
-  - cableschedule.js:419 setCableChangeLog()
-  - cableschedule.js:421 setItem(settings.cableChangeLog)
+  - cableschedule.js:433 setCableChangeLog()
+  - cableschedule.js:435 setItem(settings.cableChangeLog)
 - `settings.cableTagSettings`
-  - cableschedule.js:383 setCableTagSettings()
-  - cableschedule.js:385 setItem(settings.cableTagSettings)
+  - cableschedule.js:397 setCableTagSettings()
+  - cableschedule.js:399 setItem(settings.cableTagSettings)
 - `settings.cableTemplates`
-  - cableschedule.js:1153 setCableTemplates()
-  - cableschedule.js:1172 setCableTemplates()
-  - cableschedule.js:1206 setCableTemplates()
-  - cableschedule.js:1381 setCableTemplates()
-  - cableschedule.js:1707 setCableTemplates()
+  - cableschedule.js:1178 setCableTemplates()
+  - cableschedule.js:1197 setCableTemplates()
+  - cableschedule.js:1231 setCableTemplates()
+  - cableschedule.js:1406 setCableTemplates()
+  - cableschedule.js:1732 setCableTemplates()
   - ... 5 more
 
 ### Panel Schedule (`panelschedule.html`)
@@ -1161,7 +1161,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Validation
-- Source files: `ampacity.mjs`, `analysis/autoSize.mjs`, `analysis/cableThermalEnvironment.mjs`, `analysis/conduitFill.mjs`, `analysis/designCoach.mjs`, `analysis/designRuleChecker.mjs`, `analysis/equipmentEvaluation.mjs`, `analysis/iec60287.mjs`, `analysis/trayFill.mjs`, `analysis/voltageDropStudy.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `src/crossProbe.js`, `src/designCoach.js`, `src/necTable9.mjs`, `src/voltageDrop.js`
+- Source files: `ampacity.mjs`, `analysis/autoSize.mjs`, `analysis/cableThermalEnvironment.mjs`, `analysis/conduitFill.mjs`, `analysis/designCoach.mjs`, `analysis/designRuleChecker.mjs`, `analysis/equipmentEvaluation.mjs`, `analysis/iec60287.mjs`, `analysis/trayFill.mjs`, `analysis/voltageDropStudy.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `src/crossProbe.js`, `src/designCoach.js`, `src/necTable9.mjs`, `src/voltageDrop.js`, `utils/cablePhases.js`
 
 **Undocumented Reads**
 - None
@@ -1399,7 +1399,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Optimization
-- Source files: `ampacity.mjs`, `analysis/cablePullGroups.mjs`, `analysis/cablePullPlan.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/ductbankConduitAssignment.mjs`, `analysis/largeFacilityRoutingSample.mjs`, `analysis/pullCards.mjs`, `analysis/pullConstructability.mjs`, `analysis/racewayAssurance.mjs`, `analysis/racewayReviewTarget.mjs`, `analysis/reportPackage.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `analysis/routeScreeningSummary.mjs`, `analysis/routeStorageCompaction.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/trayFill.mjs`, `app.mjs`, `bimExport.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `e2e-helpers.js`, `exporters/simpleDxf.js`, `optimalRoute.js`, `resultsExport.mjs`, `src/components/incrementalDom.js`, `src/ductbankProjectAdapter.mjs`, `src/exporters/gltf2.mjs`, `src/fetchUtils.mjs`, `src/htmlSafety.mjs`, `src/necTable9.mjs`, `src/optimalRoute.js`, `src/performance/performanceMetrics.js`, `src/projectManagerEntry.js`, `src/pullCalc.js`, `src/routing/cableRoutingSystem.mjs`, `src/routing/manualEntryView.mjs`, `src/routing/plotlyRouteScene.mjs`, `src/routing/projectHash.mjs`, `src/routing/pullAccessView.mjs`, `src/routing/pullEvidenceView.mjs`, `src/routing/pullOptionsController.mjs`, `src/routing/pullReviewView.mjs`, `src/routing/racewayGeometry.mjs`, `src/routing/racewaySizingModel.mjs`, `src/routing/routeBreakdown.mjs`, `src/routing/routeDetailView.mjs`, `src/routing/routeReviewModel.mjs`, `src/routing/routeReviewView.mjs`, `src/routing/routeVisualizationModel.mjs`, `src/routing/routingProjectAdapter.mjs`, `src/routing/routingReadinessModel.mjs`, `src/routing/routingSamples.mjs`, `src/routing/routingState.mjs`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/safeEvents.mjs`
+- Source files: `ampacity.mjs`, `analysis/cablePullGroups.mjs`, `analysis/cablePullPlan.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/ductbankConduitAssignment.mjs`, `analysis/largeFacilityRoutingSample.mjs`, `analysis/pullCards.mjs`, `analysis/pullConstructability.mjs`, `analysis/racewayAssurance.mjs`, `analysis/racewayReviewTarget.mjs`, `analysis/reportPackage.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `analysis/routeScreeningSummary.mjs`, `analysis/routeStorageCompaction.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/trayFill.mjs`, `app.mjs`, `bimExport.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `e2e-helpers.js`, `exporters/simpleDxf.js`, `optimalRoute.js`, `resultsExport.mjs`, `src/components/incrementalDom.js`, `src/ductbankProjectAdapter.mjs`, `src/exporters/gltf2.mjs`, `src/fetchUtils.mjs`, `src/htmlSafety.mjs`, `src/necTable9.mjs`, `src/optimalRoute.js`, `src/performance/performanceMetrics.js`, `src/projectManagerEntry.js`, `src/pullCalc.js`, `src/routing/cableRoutingSystem.mjs`, `src/routing/manualEntryView.mjs`, `src/routing/plotlyRouteScene.mjs`, `src/routing/projectHash.mjs`, `src/routing/pullAccessView.mjs`, `src/routing/pullEvidenceView.mjs`, `src/routing/pullOptionsController.mjs`, `src/routing/pullReviewView.mjs`, `src/routing/racewayGeometry.mjs`, `src/routing/racewaySizingModel.mjs`, `src/routing/routeBreakdown.mjs`, `src/routing/routeDetailView.mjs`, `src/routing/routeReviewModel.mjs`, `src/routing/routeReviewView.mjs`, `src/routing/routeVisualizationModel.mjs`, `src/routing/routingProjectAdapter.mjs`, `src/routing/routingReadinessModel.mjs`, `src/routing/routingSamples.mjs`, `src/routing/routingState.mjs`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/cablePhases.js`, `utils/safeEvents.mjs`
 
 **Undocumented Reads**
 - None
@@ -3507,7 +3507,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Studies
 - Group: Cable
-- Source files: `ampacity.mjs`, `analysis/autoSize.mjs`, `analysis/studyResultReadiness.mjs`, `analysis/voltageDropStudy.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `reports/reporting.mjs`, `src/necTable9.mjs`, `src/projectManagerEntry.js`, `src/voltageDrop.js`, `src/voltagedropstudy.js`, `voltagedropstudy.js`
+- Source files: `ampacity.mjs`, `analysis/autoSize.mjs`, `analysis/studyResultReadiness.mjs`, `analysis/voltageDropStudy.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `reports/reporting.mjs`, `src/necTable9.mjs`, `src/projectManagerEntry.js`, `src/voltageDrop.js`, `src/voltagedropstudy.js`, `utils/cablePhases.js`, `voltagedropstudy.js`
 
 **Undocumented Reads**
 - None

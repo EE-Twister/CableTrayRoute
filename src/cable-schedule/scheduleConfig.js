@@ -23,7 +23,7 @@ export const BASIC_ENTRY_KEYS = new Set([
   "tag", "service_description", "from_tag", "to_tag", "raceway_ids", "panel_id", "circuit_number",
   "cable_type", "conductors", "conductor_size", "conductor_material", "ground_size", "ground_material",
   "install_method", "insulation_type", "insulation_rating", "parallel_count", "operating_voltage", "est_load",
-  "ocpd_rating", "terminal_temp_rating", "length", "notes"
+  "ocpd_rating", "terminal_temp_rating", "power_factor", "length", "notes"
 ]);
 
 export const DEFAULT_PRESET = "entry";
@@ -128,7 +128,6 @@ export const STARTER_CABLE_TYPES = [
   }
 ];
 
-
 export function createCableScheduleColumns({ getEquipmentOptions, getRacewayOptions, getPanelOptions }) {
   const columns = [
     { key: "tag", label: "Tag", type: "text", group: "Identification", tooltip: "Unique identifier for the cable", sticky: "left", placeholder: "CBL-001" },
@@ -166,13 +165,14 @@ export function createCableScheduleColumns({ getEquipmentOptions, getRacewayOpti
     { key: "parallel_count", label: "Parallel Runs", type: "number", group: "Cable Construction", min: 1, step: 1, tooltip: "Number of identical cables run in parallel for this circuit (e.g. 3 × 240 kcmil in parallel). Tray fill and ampacity are multiplied by this count." },
     { key: "operating_voltage", label: "Operating Voltage (V)", type: "number", group: "Electrical Entry", tooltip: "Nominal operating voltage" },
     { key: "est_load", label: "Est Load (A)", type: "number", group: "Electrical Entry", tooltip: "Estimated operating current" },
+    { key: "power_factor", label: "Power Factor", type: "number", group: "Electrical Entry", min: 0.01, max: 1, step: 0.01, tooltip: "Load power factor used for AC voltage drop; defaults to 0.90 when blank" },
     { key: "ocpd_rating", label: "OCPD Rating (A)", type: "number", group: "Electrical Entry", tooltip: "Overcurrent protective device rating used for NEC 240.4/250.122 screening" },
     { key: "terminal_temp_rating", label: "Terminal Temp (C)", type: "select", options: TERMINAL_TEMP_RATINGS, group: "Electrical Entry", tooltip: "Equipment terminal temperature rating for NEC 110.14(C); blank lets DRC infer 60C through 100A and 75C above 100A" },
     { key: "duty_cycle", label: "Duty Cycle (%)", type: "number", group: "Electrical Entry", tooltip: "Duty cycle percentage" },
     { key: "length", label: "Length (ft)", type: "number", group: "Electrical Entry", tooltip: "Length of cable run" },
     { key: "load_flow_current", label: "Load Flow Current (A)", type: "text", group: "Calculations", tooltip: "Current captured from the latest load flow study" },
     { key: "calc_ampacity", label: "Calc Ampacity (A)", type: "number", group: "Calculations", tooltip: "Ampacity after code factors" },
-    { key: "impedance", label: "Impedance (Ω)", type: "number", group: "Calculations", tooltip: "Circuit impedance used for voltage drop checks" },
+    { key: "impedance", label: "Resistance Override (Ω/1000 ft)", type: "number", group: "Calculations", tooltip: "Optional conductor resistance per 1000 ft override used for voltage drop; the screening calculation assumes reactance is zero. Leave blank to use the conductor and raceway model." },
     { key: "code_reference", label: "Code Ref", type: "text", group: "Calculations", tooltip: "Code table used" },
     { key: "voltage_drop_pct", label: "Estimated Voltage Drop (%)", type: "number", group: "Calculations", tooltip: "Estimated voltage drop percent" },
     { key: "sizing_warning", label: "Sizing Warning", type: "text", group: "Calculations", tooltip: "Non-compliance details" },
@@ -196,7 +196,7 @@ export function createCableSchedulePresets(columns) {
   return {
     groupNames,
     presets: {
-      entry: { label: "Basic Entry", groups: groupNames, keys: ["tag", "from_tag", "to_tag", "raceway_ids", "cable_type", "conductors", "conductor_size", "ground_size", "ocpd_rating", "length"] },
+      entry: { label: "Basic Entry", groups: groupNames, keys: ["tag", "from_tag", "to_tag", "raceway_ids", "cable_type", "conductors", "conductor_size", "ground_size", "ocpd_rating", "power_factor", "length"] },
       full: { label: "Full Detail", groups: groupNames },
       routing: { label: "Routing Focus", groups: ["Identification", "Terminations", "Routing Details", "Notes"] },
       electrical: { label: "Electrical Focus", groups: ["Identification", "Cable Construction", "Electrical Entry", "Calculations", "Notes"] },

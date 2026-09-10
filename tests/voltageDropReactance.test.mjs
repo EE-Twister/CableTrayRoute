@@ -73,11 +73,11 @@ test('size normalization handles AWG, kcmil and #-prefixed strings', () => {
   assert.equal(table9Impedance('#12 AWG', 'CU', 'PVC').R > 0, true);
 });
 
-test('unknown size falls back gracefully (no reactance, finite result)', () => {
+test('unknown conductor descriptions remain unevaluated', () => {
   const cable = {
     est_load: '10', operating_voltage: '480',
     conductor_size: 'unobtanium', conductor_material: 'CU', power_factor: '0.9',
   };
   const pct = calculateVoltageDrop(cable, 100, 3);
-  assert.ok(Number.isFinite(pct) && pct >= 0);
+  assert.equal(pct, null);
 });

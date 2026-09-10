@@ -53,9 +53,21 @@ const OHMS_PER_1000FT_TO_PER_M = 1 / 304.8; // 1000 ft = 304.8 m
 /** Reduce a size string ("#4/0 AWG", "250 kcmil", "12") to a canonical token. */
 export function normalizeSizeToken(size) {
   if (!size) return '';
-  let s = size.toString().trim().replace(/^#/, '');
-  const m = s.match(/(\d+\/0|\d+)/); // matches "4/0", "250", "12"
-  return m ? m[1] : '';
+  const s = size.toString().trim().replace(/^#/, '');
+  // Table 9 below is an AWG/kcmil table. Never silently turn a metric
+  // description such as "10 mm2" into the unrelated AWG 10 row.
+  if (isMetricConductorSize(s)) return '';
+  const awg = s.match(/^(\d{1,2}|\d\/0)\s*awg$/i);
+  if (awg) return awg[1];
+  const kcmil = s.match(/^(\d{3,4})\s*(?:kcmil|mcm)$/i);
+  if (kcmil) return kcmil[1];
+  if (/^(?:\d{1,2}|\d\/0|\d{3,4})$/.test(s)) return s;
+  return '';
+}
+
+/** Return true when a conductor description uses a metric cross-sectional area. */
+export function isMetricConductorSize(size) {
+  return /\d+(?:\.\d+)?\s*mm\s*(?:\^\s*2|2|²)/i.test(String(size || ''));
 }
 
 function isAluminum(material) {
@@ -64,6 +76,8 @@ function isAluminum(material) {
 
 function isMagneticConduit(conduit) {
   // Steel / iron / rigid metal / IMC / EMT are magnetic; PVC / aluminum / fiberglass are not.
+  if (/non[- ]?magnetic/i.test(conduit || '')) return false;
+  if (/alumin(?:um|ium)/i.test(conduit || '')) return false;
   return /steel|iron|rigid|rmc|imc|emt|grc|magnetic/i.test(conduit || '');
 }
 
@@ -90,4 +104,4 @@ export function table9Impedance(size, material, conduit) {
   return { R: R1000 * OHMS_PER_1000FT_TO_PER_M, X: X1000 * OHMS_PER_1000FT_TO_PER_M };
 }
 
-export default { table9Impedance, normalizeSizeToken };
+export default { table9Impedance, normalizeSizeToken, isMetricConductorSize };

@@ -1,8 +1,6 @@
 import { bootstrapPage } from './src/lifecycle/pageBootstrap.js';
 import './site.js';
 import * as dataStore from './dataStore.mjs';
-import { sizeConductor } from './sizing.js';
-import ampacity from './ampacity.mjs';
 import { createTable, STORAGE_KEYS } from './tableUtils.mjs';
 import { openModal, showAlertModal } from './src/components/modal.js';
 import { confirmProjectEntityDeletion } from './src/components/projectDeletionReview.js';
@@ -14,6 +12,8 @@ import {
   summarizeCableWorkflow
 } from './analysis/scheduleWorkflow.mjs';
 import { openOneLineProbe } from './src/crossProbe.js';
+import { calculateVoltageDrop as calculateSharedVoltageDrop } from './src/voltageDrop.js';
+import { normalizeCablePhases } from './utils/cablePhases.js';
 import {
   READINESS_VOCABULARY,
   getContractReadinessCopy
@@ -26,6 +26,7 @@ import {
   writeAoaWorkbook
 } from './src/cable-schedule/io.js';
 import { renderCablePrintReport as renderCablePrintReportTo } from './src/cable-schedule/printReport.js';
+import { applyCableSizingHighlight } from './src/cable-schedule/sizingHighlight.js';
 import { collectPanelOptions, collectRacewayOptions } from './src/cable-schedule/optionModel.js';
 import {
   MAX_TEMPLATE_IMPORT_COUNT,
@@ -66,7 +67,6 @@ import {
   normalizeCableTypical,
   summarizeCableLibrary
 } from './analysis/cableLibrary.mjs';
-const { sizeToArea } = ampacity;
 const CABLE_READINESS_COPY = getContractReadinessCopy('cableschedule.html');
 
 const CABLE_TOUR_STEPS = [
@@ -315,18 +315,7 @@ async function initCableSchedule() {
     });
   };
 
-  const calculateVoltageDrop = (length, current, impedance, operatingVoltage) => {
-    const len = Number(length);
-    const cur = Number(current);
-    const imp = Number(impedance);
-    const voltage = Number(operatingVoltage);
-    if (!Number.isFinite(len) || !Number.isFinite(cur) || !Number.isFinite(imp) || !Number.isFinite(voltage)) return null;
-    if (len <= 0 || cur <= 0 || imp <= 0 || voltage <= 0) return null;
-    const dropVolts = len * cur * imp;
-    return (dropVolts / voltage) * 100;
-  };
-  window.calculateVoltageDrop = calculateVoltageDrop;
-
+  window.calculateVoltageDrop = calculateSharedVoltageDrop;
   const attachVoltageDropAutomation = () => {
     const lengthField = editorFieldMap.get('length');
     const currentField = editorFieldMap.get('est_load');
@@ -338,7 +327,21 @@ async function initCableSchedule() {
     voltageField.setAttribute('aria-readonly', 'true');
     voltageField.tabIndex = -1;
     const updateVoltageDropField = () => {
-      const result = calculateVoltageDrop(lengthField.value, currentField.value, impedanceField.value, operatingVoltageField.value);
+      activeRowData = { ...(activeRowData || {}), ...getEditorFieldValues() };
+      const phaseLabels = normalizeCablePhases(activeRowData);
+      const phaseValue = phaseLabels.length ? phaseLabels : 3;
+      // The visible editor value is authoritative after opening. An empty
+      // value deliberately clears a previously stored canonical override.
+      const impedanceOverride = impedanceField.value;
+      const result = calculateSharedVoltageDrop({
+        ...activeRowData,
+        length: lengthField.value,
+        est_load: currentField.value,
+        impedance: impedanceOverride,
+        impedance_per_1000ft: impedanceOverride,
+        operating_voltage: operatingVoltageField.value,
+        phases: phaseValue,
+      }, lengthField.value, phaseValue);
       if (result === null) {
         voltageField.value = '';
       } else {
@@ -348,13 +351,26 @@ async function initCableSchedule() {
         activeRowData.voltage_drop_pct = voltageField.value;
       }
     };
-    [lengthField, currentField, impedanceField, operatingVoltageField].forEach(field => {
+    [
+      lengthField,
+      currentField,
+      impedanceField,
+      operatingVoltageField,
+      editorFieldMap.get('conductor_size'),
+      editorFieldMap.get('conductor_material'),
+      editorFieldMap.get('insulation_rating'),
+      editorFieldMap.get('conduit_material'),
+      editorFieldMap.get('raceway_material'),
+      editorFieldMap.get('phases'),
+      editorFieldMap.get('num_phases'),
+      editorFieldMap.get('power_factor'),
+      editorFieldMap.get('parallel_count')
+    ].filter(Boolean).forEach(field => {
       field.addEventListener('input', updateVoltageDropField);
       field.addEventListener('change', updateVoltageDropField);
     });
     updateVoltageDropField();
   };
-
   const setupEditorFieldEnhancements = () => {
     resetModalValidationState();
     attachCableModalValidation();
@@ -369,8 +385,6 @@ async function initCableSchedule() {
     dataStore.setCableTemplates(initialTemplates);
   }
   let cachedCableTemplates = initialTemplates;
-
-
   let tagSettings = normalizeTagSettings(
     typeof dataStore.getCableTagSettings === 'function'
       ? dataStore.getCableTagSettings()
@@ -933,7 +947,18 @@ async function initCableSchedule() {
     if (!editorModal || !editorForm || !editorBody) return;
     activeRow = tr || null;
     activeTable = tableInstance;
-    activeRowData = rowData || {};
+    const renderedRow = rowData || {};
+    const rowIndex = tr?.parentElement ? Array.from(tr.parentElement.rows).indexOf(tr) : -1;
+    const storedRow = tableData?.find(entry => entry?.tag && entry.tag === renderedRow.tag)
+      || (rowIndex >= 0 ? tableData?.[rowIndex] : null)
+      || {};
+    activeRowData = { ...storedRow, ...renderedRow };
+    if (!activeRowData.impedance && activeRowData.impedance_per_1000ft != null) {
+      activeRowData.impedance = activeRowData.impedance_per_1000ft;
+    }
+    if (!activeRowData.parallel_count && activeRowData.parallel_runs != null) {
+      activeRowData.parallel_count = activeRowData.parallel_runs;
+    }
     activeEditorMode = options.mode || 'edit';
     activeEditorColumnFilter = options.columnKeys instanceof Set ? options.columnKeys : null;
     editorFieldMap = new Map();
@@ -1849,55 +1874,8 @@ async function initCableSchedule() {
   const DEFAULT_VD_LIMIT = 3;
   const getVoltageDropLimit = () => DEFAULT_VD_LIMIT;
 
-  function applySizingHighlight(){
-    const limit = getVoltageDropLimit();
-    Array.from(table.tbody.querySelectorAll('tr')).forEach(tr => {
-      const sizeSel = tr.querySelector('[name="conductor_size"]');
-      const matSel = tr.querySelector('[name="conductor_material"]');
-      const insSel = tr.querySelector('[name="insulation_rating"]');
-      const loadIn = tr.querySelector('[name="est_load"]');
-      const voltIn = tr.querySelector('[name="operating_voltage"]');
-      const lenIn = tr.querySelector('[name="length"]');
-      const condIn = tr.querySelector('[name="conductors"]');
-      const ambIn = tr.querySelector('[name="ambient_temp"]');
-      const ampIn = tr.querySelector('[name="calc_ampacity"]');
-      const vdIn = tr.querySelector('[name="voltage_drop_pct"]');
-      const warnIn = tr.querySelector('[name="sizing_warning"]');
-      const codeRefIn = tr.querySelector('[name="code_reference"]');
-      if (!sizeSel || !loadIn) return;
-      const rawVoltage = parseFloat(voltIn?.value);
-      const rawConductors = parseInt(condIn?.value);
-      const rawAmbient = parseFloat(ambIn?.value);
-      const rawInsulation = parseFloat(insSel?.value);
-      const load = {
-        current: Math.max(0, parseFloat(loadIn.value) || 0),
-        voltage: (Number.isFinite(rawVoltage) && rawVoltage > 0) ? rawVoltage : 0,
-        phases: 3,
-        conductors: (Number.isFinite(rawConductors) && rawConductors >= 1) ? rawConductors : 1
-      };
-      const params = {
-        material: matSel?.value || 'cu',
-        insulation_rating: (Number.isFinite(rawInsulation) && rawInsulation > 0) ? rawInsulation : 90,
-        length: Math.max(0, parseFloat(lenIn?.value) || 0),
-        conductors: (Number.isFinite(rawConductors) && rawConductors >= 1) ? rawConductors : 1,
-        ambient: (Number.isFinite(rawAmbient) && rawAmbient > -273) ? rawAmbient : 30,
-        maxVoltageDrop: limit
-      };
-      const res = sizeConductor(load, params);
-      if (ampIn) ampIn.value = res.ampacity ? res.ampacity.toFixed(2) : '';
-      if (vdIn) {
-        vdIn.value = res.voltageDrop ? res.voltageDrop.toFixed(2) : '';
-        if (Number.isFinite(limit) && res.voltageDrop > limit) {
-          vdIn.classList.add('voltage-exceed');
-        } else {
-          vdIn.classList.remove('voltage-exceed');
-        }
-      }
-      if (codeRefIn) codeRefIn.value = res.codeRef || '';
-      const sizeViolation = res.violation || (res.size && sizeSel.value && sizeToArea(sizeSel.value) < sizeToArea(res.size));
-      if (warnIn) warnIn.value = sizeViolation ? (res.violation || `Requires ${res.size}`) : '';
-      sizeSel.classList.toggle('sizing-violation', !!sizeViolation);
-    });
+  function applySizingHighlight() {
+    applyCableSizingHighlight({ tbody: table.tbody, table, tableData, limit: getVoltageDropLimit() });
   }
 
   function applyReviewStatusHighlight(){
@@ -2210,7 +2188,27 @@ async function initCableSchedule() {
       validateAllRows();
       updateBatchTypicalControls();
 
-      const data = table.getData();
+      const visibleData = table.getData();
+      const data = visibleData.map((row, index) => {
+        const storedRow = tableData?.find(entry => entry?.tag && entry.tag === row.tag)
+          || tableData?.[index]
+          || {};
+        const next = { ...storedRow, ...row };
+        if (row.impedance !== undefined) {
+          if (row.impedance === '' || row.impedance == null) delete next.impedance_per_1000ft;
+          else next.impedance_per_1000ft = row.impedance;
+        }
+        if (row.parallel_count !== undefined) {
+          if (row.parallel_count === '' || row.parallel_count == null) {
+            delete next.parallel_runs;
+            delete next.parallel;
+          } else {
+            next.parallel_runs = row.parallel_count;
+            next.parallel = row.parallel_count;
+          }
+        }
+        return next;
+      });
       suppressCablesUpdate = true;
       dataStore.setCables(data); // auto-persist edits after recalculating derived fields
       suppressCablesUpdate = false;

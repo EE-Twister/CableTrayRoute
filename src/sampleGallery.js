@@ -1,8 +1,36 @@
 import './workflowStatus.js';
 import '../site.js';
 import { repairMojibake } from './textEncoding.js';
-import { getItem, getProjectInputFingerprint, getStudies, importProject, loadProject, saveProject, setItem, setStudies } from '../dataStore.mjs';
-import { getProjectState, getProjectStorageDiagnostics, listSavedProjects, readAppSetting, setConduitCache, setProjectState, writeAppSetting } from '../projectStorage.js';
+import {
+  getCables,
+  getConduits,
+  getDuctbanks,
+  getEquipment,
+  getItem,
+  getLoads,
+  getMccLineups,
+  getOneLine,
+  getPanels,
+  getProjectInputFingerprint,
+  getStudies,
+  getTrays,
+  importProject,
+  loadProject,
+  saveProject,
+  setItem,
+  setStudies
+} from '../dataStore.mjs';
+import {
+  captureProjectTransactionSnapshot,
+  getProjectState,
+  getProjectStorageDiagnostics,
+  listSavedProjects,
+  readAppSetting,
+  restoreProjectTransactionSnapshot,
+  setConduitCache,
+  setProjectState,
+  writeAppSetting
+} from '../projectStorage.js';
 import {
   SAMPLE_REGISTRY,
   getSampleById,
@@ -254,18 +282,35 @@ async function openSample(sample, { forceNew = false } = {}) {
   const existingCopies = getSampleProjectCopies(sample.title, listSavedProjects());
   if (!forceNew && existingCopies.length > 0) {
     const projectId = existingCopies[0];
-    if (!loadProject(projectId)) {
-      showToast(`Could not open saved project "${projectId}".`, 'error');
-      return;
+    const previousTransaction = captureProjectTransactionSnapshot();
+    const previousProjectId = window.currentProjectId || '';
+    const previousHash = location.hash;
+    const restoreExistingSampleContext = () => {
+      restoreProjectTransactionSnapshot(previousTransaction);
+      window.currentProjectId = previousProjectId;
+      try {
+        history.replaceState(null, '', `${location.pathname}${location.search}${previousHash}`);
+      } catch (restoreError) {
+        console.warn('Could not restore the previous sample URL.', restoreError);
+      }
+    };
+    try {
+      setProjectState({ ...getProjectState(), name: projectId });
+      window.currentProjectId = projectId;
+      if (!loadProject(projectId)) throw new Error(`Could not open saved project "${projectId}".`);
+      setProjectState({ ...getProjectState(), name: projectId });
+      activateSampleWorkflow(sample, projectId);
+      await globalThis.updateProjectDisplay?.({ name: projectId });
+      activeSampleId = sample.id;
+      showChecklist(sample);
+      globalThis.applyProjectHash?.();
+      renderGrid();
+      showToast(`Reopened "${projectId}". Choose Create Fresh Copy when you want a separate project.`, 'success');
+    } catch (error) {
+      restoreExistingSampleContext();
+      console.error(`Could not reopen the ${sample.title} sample project.`, error);
+      showToast(`Could not reopen "${sample.title}".`, 'error');
     }
-    setProjectState({ ...getProjectState(), name: projectId });
-    activateSampleWorkflow(sample, projectId);
-    await globalThis.updateProjectDisplay?.({ name: projectId });
-    activeSampleId = sample.id;
-    showChecklist(sample);
-    globalThis.applyProjectHash?.();
-    renderGrid();
-    showToast(`Reopened "${projectId}". Choose Create Fresh Copy when you want a separate project.`, 'success');
     return;
   }
 
@@ -287,16 +332,68 @@ async function openSample(sample, { forceNew = false } = {}) {
     return;
   }
 
+  const projectId = getSampleProjectCopyName(sample.title, listSavedProjects());
+  const previousTransaction = captureProjectTransactionSnapshot();
+  const previousProjectId = window.currentProjectId || '';
+  const previousHash = location.hash;
+  const restoreSampleContext = () => {
+    restoreProjectTransactionSnapshot(previousTransaction);
+    window.currentProjectId = previousProjectId;
+    try {
+      history.replaceState(null, '', `${location.pathname}${location.search}${previousHash}`);
+    } catch (restoreError) {
+      console.warn('Could not restore the previous sample URL.', restoreError);
+    }
+  };
   try {
     const payload = sampleProjectToImportPayload(migrated);
+    // Establish the destination identity before writing named project keys.
+    // dataStore intentionally blocks those writes in an unnamed production
+    // workspace; importing first used to create a partial, empty sample.
+    setProjectState({ ...getProjectState(), name: projectId });
+    window.currentProjectId = projectId;
     const imported = importProject(payload);
     if (!imported) {
+      restoreSampleContext();
       showToast('Sample import was cancelled or could not be applied.', 'error');
       return;
     }
+    const expectedCollections = {
+      equipment: payload.equipment,
+      panels: payload.panels,
+      loads: payload.loads,
+      cables: payload.cables,
+      mccLineups: payload.mccLineups,
+      trays: payload.trays,
+      conduits: payload.conduits,
+      ductbanks: payload.ductbanks,
+    };
+    const actualCollections = {
+      equipment: getEquipment(),
+      panels: getPanels(),
+      loads: getLoads(),
+      cables: getCables(),
+      mccLineups: getMccLineups(),
+      trays: getTrays(),
+      conduits: getConduits(),
+      ductbanks: getDuctbanks(),
+    };
+    const incomplete = Object.entries(expectedCollections).find(([key, expected]) => {
+      const actual = Array.isArray(actualCollections[key]) ? actualCollections[key].length : 0;
+      return actual !== (Array.isArray(expected) ? expected.length : 0);
+    });
+    if (incomplete) {
+      const [key, expected] = incomplete;
+      const actual = Array.isArray(actualCollections[key]) ? actualCollections[key].length : 0;
+      throw new Error(`Sample import was incomplete for ${key} (${actual}/${expected.length}).`);
+    }
+    const expectedSheets = Array.isArray(payload.oneLine)
+      ? payload.oneLine.length : payload.oneLine?.sheets?.length || 0;
+    const actualSheets = getOneLine()?.sheets?.length || 0;
+    if (actualSheets !== expectedSheets) {
+      throw new Error(`Sample import was incomplete for one-line sheets (${actualSheets}/${expectedSheets}).`);
+    }
     setConduitCache({ ductbanks: payload.ductbanks, conduits: payload.conduits });
-    const projectId = getSampleProjectCopyName(sample.title, listSavedProjects());
-    setProjectState({ ...getProjectState(), name: projectId });
     const routeState = getItem('latestRouteResults', null);
     if (Array.isArray(routeState?.batchResults) && routeState.batchResults.length > 0) {
       setItem('latestRouteResults', {
@@ -325,6 +422,13 @@ async function openSample(sample, { forceNew = false } = {}) {
     }
     await globalThis.updateProjectDisplay?.({ name: projectId });
   } catch (error) {
+    // Import and sample-copy creation are one user action. Restore the prior
+    // project snapshot if validation or persistence fails part way through.
+    try {
+      restoreSampleContext();
+    } catch (restoreError) {
+      console.error('Could not restore the previous project after sample failure.', restoreError);
+    }
     console.error(`Could not load the ${sample.title} sample project.`, error);
     const detail = error instanceof Error && error.message
       ? ` ${error.message}`

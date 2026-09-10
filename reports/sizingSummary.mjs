@@ -5,7 +5,10 @@ import * as dataStore from '../dataStore.mjs';
 export function exportSizingSummary(code = 'NEC') {
   const cables = dataStore.getCables();
   const rows = cables.map(c => summarizeCable(c, { code }));
-  const headers = ['tag','selectedSize','requiredSize','availableAmpacity','voltageDrop','code','violation'];
+  const headers = [
+    'tag', 'selectedSize', 'requiredSize', 'availableAmpacity',
+    'selectedVoltageDrop', 'recommendedVoltageDrop', 'code', 'violation'
+  ];
   downloadCSV(headers, rows, 'sizing-summary.csv');
 }
 

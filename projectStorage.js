@@ -558,6 +558,10 @@ function writeSessionStorage(key, value) {
   updateStorageScanLengths();
 }
 
+function readSessionStorage(key) {
+  return safeGet(getSessionStorage(), key);
+}
+
 function writeRawStorage(key, value, options = {}) {
   const skipLocalStorage = Boolean(options && options.skipLocalStorage);
   if (value === null || value === undefined) {
@@ -1570,6 +1574,29 @@ function loadLegacyProject() {
   };
 }
 
+// Session-only values are used for per-tab coordination metadata. They survive
+// reloads in the same browser tab without allowing another tab to adopt a
+// newer shared local snapshot accidentally.
+export function readProjectSessionValue(key, fallback = null) {
+  if (!key) return fallback;
+  return safeParse(readSessionStorage(key), fallback);
+}
+
+export function writeProjectSessionValue(key, value) {
+  if (!key) return;
+  try {
+    writeSessionStorage(key, JSON.stringify(value));
+  } catch (error) {
+    console.warn('session value save failed', error);
+  }
+}
+
+export function removeProjectSessionValue(key) {
+  if (!key) return;
+  const session = getSessionStorage();
+  try { session?.removeItem(key); } catch {}
+}
+
 function loadExistingProject() {
   const storage = getStorage();
   if (!storage) {
@@ -1986,6 +2013,121 @@ export function getProjectStorageDiagnostics() {
   };
 }
 
+/** Capture all local/session project state for an atomic multi-key workflow. */
+export function captureProjectTransactionSnapshot() {
+  primeRawStorageCache(true);
+  const isWorkflowKey = key => key === PROJECT_KEY
+    || key === SCENARIOS_KEY
+    || key === CURRENT_SCENARIO_KEY
+    || key === SAVED_PROJECTS_KEY
+    || key === CONDUIT_CACHE_KEY
+    || key === 'activeSampleWorkflow'
+    || scenarioListCache.some(scenario => key.startsWith(`${scenario}:`));
+  const keys = new Set([...memoryStorage.keys()].filter(isWorkflowKey));
+  const sources = { local: new Set(), session: new Set() };
+  for (const [kind, storage] of Object.entries({ local: getStorage(), session: getSessionStorage() })) {
+    if (!storage) continue;
+    try {
+      for (let index = 0; index < storage.length; index += 1) {
+        const key = storage.key(index);
+        if (key) {
+          if (isWorkflowKey(key)) {
+            keys.add(key);
+            sources[kind].add(key);
+          }
+        }
+      }
+    } catch {}
+  }
+  const raw = {};
+  keys.forEach(key => {
+    raw[key] = {
+      value: memoryStorage.has(key) ? memoryStorage.get(key) : readRawStorage(key),
+      local: sources.local.has(key),
+      session: sources.session.has(key),
+    };
+  });
+  return {
+    raw,
+    project: cloneProject(),
+    scenarioList: [...scenarioListCache],
+    currentScenarioName,
+    conduitCacheState: conduitCacheState ? cloneSavedProjectValue(conduitCacheState) : null,
+    savedProjectsCache: cloneSavedProjectValue(savedProjectsCache),
+    savedProjectsLoaded,
+    savedProjectsError,
+    migratedSavedProjects: [...migratedSavedProjects],
+    undoStack: cloneSavedProjectValue(undoStack),
+    redoStack: cloneSavedProjectValue(redoStack),
+    undoHistoryBytes,
+    redoHistoryBytes,
+    undoCoalesceState: undoCoalesceState ? cloneSavedProjectValue(undoCoalesceState) : null,
+  };
+}
+
+/** Restore a snapshot captured by captureProjectTransactionSnapshot(). */
+export function restoreProjectTransactionSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') return false;
+  const isWorkflowKey = key => key === PROJECT_KEY
+    || key === SCENARIOS_KEY
+    || key === CURRENT_SCENARIO_KEY
+    || key === SAVED_PROJECTS_KEY
+    || key === CONDUIT_CACHE_KEY
+    || key === 'activeSampleWorkflow'
+    || scenarioListCache.some(scenario => key.startsWith(`${scenario}:`));
+  const currentKeys = new Set([...memoryStorage.keys()].filter(isWorkflowKey));
+  for (const storage of [getStorage(), getSessionStorage()]) {
+    if (!storage) continue;
+    try {
+      for (let index = storage.length - 1; index >= 0; index -= 1) {
+        const key = storage.key(index);
+        if (key && isWorkflowKey(key)) currentKeys.add(key);
+      }
+    } catch {}
+  }
+  const raw = snapshot.raw && typeof snapshot.raw === 'object' ? snapshot.raw : {};
+  currentKeys.forEach(key => {
+    try { getStorage()?.removeItem(key); } catch {}
+    try { getSessionStorage()?.removeItem(key); } catch {}
+  });
+  currentKeys.forEach(key => {
+    memoryStorage.delete(key);
+    missingStorageKeys.delete(key);
+  });
+  Object.entries(raw).forEach(([key, entry]) => {
+    if (!entry || entry.value === null || entry.value === undefined) return;
+    memoryStorage.set(key, entry.value);
+    try {
+      if (entry.local) getStorage()?.setItem(key, entry.value);
+      if (entry.session) getSessionStorage()?.setItem(key, entry.value);
+    } catch (error) {
+      console.warn('project transaction restore failed', key, error);
+    }
+  });
+  project = migrateProject(snapshot.project || {});
+  scenarioListCache = ensureScenarioList(snapshot.scenarioList);
+  currentScenarioName = sanitizeScenarioName(snapshot.currentScenarioName) || scenarioListCache[0] || 'base';
+  conduitCacheState = snapshot.conduitCacheState ? cloneSavedProjectValue(snapshot.conduitCacheState) : null;
+  savedProjectsCache = cloneSavedProjectValue(snapshot.savedProjectsCache || {});
+  savedProjectsLoaded = Boolean(snapshot.savedProjectsLoaded);
+  savedProjectsError = snapshot.savedProjectsError || null;
+  migratedSavedProjects.clear();
+  (snapshot.migratedSavedProjects || []).forEach(name => migratedSavedProjects.add(name));
+  undoStack.length = 0;
+  undoStack.push(...(snapshot.undoStack || []));
+  redoStack.length = 0;
+  redoStack.push(...(snapshot.redoStack || []));
+  undoHistoryBytes = Number(snapshot.undoHistoryBytes) || 0;
+  redoHistoryBytes = Number(snapshot.redoHistoryBytes) || 0;
+  undoCoalesceState = snapshot.undoCoalesceState ? cloneSavedProjectValue(snapshot.undoCoalesceState) : null;
+  projectMutationBatch = null;
+  derivedStorageCache.clear();
+  mutationCounters.clear();
+  updateStorageScanLengths();
+  notifyChange();
+  return true;
+}
+
 export function onProjectChange(handler) {
   if (typeof handler !== 'function') return () => {};
   listeners.add(handler);
@@ -2016,6 +2158,8 @@ const api = {
   canUndo,
   canRedo,
   getProjectStorageDiagnostics,
+  captureProjectTransactionSnapshot,
+  restoreProjectTransactionSnapshot,
   onProjectChange,
   getScenarioListState,
   setScenarioListState,
@@ -2034,6 +2178,9 @@ const api = {
   removeSavedProject,
   wasSavedProjectMigrated,
   getSessionPreferences,
+  readProjectSessionValue,
+  writeProjectSessionValue,
+  removeProjectSessionValue,
   setSessionPreferences,
   updateSessionPreferences,
   getThemePreference,

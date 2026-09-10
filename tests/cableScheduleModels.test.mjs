@@ -119,12 +119,13 @@ test("creates the cable table schema with injected option providers", () => {
   });
   const byKey = new Map(scheduleColumns.map(column => [column.key, column]));
 
-  assert.equal(scheduleColumns.length, 54);
+  assert.equal(scheduleColumns.length, 55);
   assert.deepEqual(byKey.get("from_tag").datalist(), equipment);
   assert.deepEqual(byKey.get("raceway_ids").options(), raceways);
   assert.deepEqual(byKey.get("panel_id").datalist(), panels);
   assert.equal(byKey.get("length").step, "any");
   assert.equal(byKey.get("length").validate, "numeric");
+  assert.equal(byKey.get("power_factor").max, 1);
   assert.equal(byKey.get("tag").sticky, "left");
   assert.deepEqual(CABLE_TYPES, ["Power", "Control", "Signal", "Data", "Fiber"]);
   assert.ok(CONDUCTOR_SIZES.includes("1000 kcmil"));
@@ -139,7 +140,7 @@ test("keeps entry presets and starter cable catalog data outside the page contro
   const { groupNames, presets } = createCableSchedulePresets(scheduleColumns);
 
   assert.ok(groupNames.includes("Cable Construction"));
-  assert.deepEqual(presets.entry.keys, ["tag", "from_tag", "to_tag", "raceway_ids", "cable_type", "conductors", "conductor_size", "ground_size", "ocpd_rating", "length"]);
+  assert.deepEqual(presets.entry.keys, ["tag", "from_tag", "to_tag", "raceway_ids", "cable_type", "conductors", "conductor_size", "ground_size", "ocpd_rating", "power_factor", "length"]);
   assert.equal(BASIC_ENTRY_KEYS.has("terminal_temp_rating"), true);
   assert.equal(STARTER_CABLE_TYPES.length, 6);
   assert.equal(STARTER_CABLE_TYPES[0].catalog_evidence_status, "source_verified");

@@ -146,7 +146,12 @@ curl -s -X POST \
 
 ### POST /api/v1/projects/:project/studies/voltage-drop
 
-Runs a voltage drop study on the project's one-line diagram data.
+Runs a voltage drop study on the project's saved Cable Schedule, Load List, and
+Load Flow data. Canonical exports store saved Load Flow results under
+`settings.studyResults.loadFlow`; older `studies.loadFlow` and
+`studyResults.loadFlow` shapes remain accepted for migration compatibility.
+The endpoint evaluates the supplied project data directly and does not depend
+on process-global browser storage.
 
 **Request body:** `{}` (no parameters required)
 

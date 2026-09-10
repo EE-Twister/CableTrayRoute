@@ -10,7 +10,10 @@ import {
   getSavedProjectsError,
   writeSavedProject,
   readSavedProject,
-  removeSavedProject
+  removeSavedProject,
+  readProjectSessionValue,
+  writeProjectSessionValue,
+  removeProjectSessionValue
 } from '../projectStorage.js';
 import { openModal, showAlertModal, ensureFieldAssistiveText } from './components/modal.js';
 import { resolveActiveProjectName } from './projectContext.js';
@@ -26,6 +29,47 @@ import {
   supabaseRefreshSession,
   supabaseSaveProject
 } from './supabaseBackend.js';
+
+// Server revisions live beside the local snapshot they describe. Keeping the
+// account with the token prevents a token from one signed-in user being reused
+// after an account switch or by a different local project snapshot.
+const SERVER_SYNC_METADATA_KEY = '__serverSync';
+const SERVER_REVISION_SESSION_PREFIX = 'ctrServerRevision:';
+
+function authAccountKey(auth) {
+  return String(auth?.userId || auth?.user || auth?.email || '').trim();
+}
+
+function serverRevisionSessionKey(name, auth) {
+  const account = authAccountKey(auth);
+  return `${SERVER_REVISION_SESSION_PREFIX}${encodeURIComponent(account)}:${encodeURIComponent(name)}`;
+}
+
+function readServerRevision(name, auth) {
+  const account = authAccountKey(auth);
+  if (!account) return '';
+  const sync = readProjectSessionValue(serverRevisionSessionKey(name, auth), null);
+  return sync?.account === account && sync?.project === name && typeof sync.version === 'string'
+    ? sync.version : '';
+}
+
+function persistServerRevision(name, auth, version) {
+  const account = authAccountKey(auth);
+  if (!account || typeof version !== 'string' || !version) {
+    removeProjectSessionValue(serverRevisionSessionKey(name, auth));
+    return;
+  }
+  writeProjectSessionValue(serverRevisionSessionKey(name, auth), {
+    account,
+    project: name,
+    version
+  });
+  const record = readSavedProject(name);
+  if (!record) return;
+  writeSavedProject(name, {
+    [SERVER_SYNC_METADATA_KEY]: { account, version }
+  });
+}
 
 function listProjects() {
   return listSavedProjectsStorage();
@@ -462,7 +506,7 @@ function renameProject(name) {
   return trimmed;
 }
 
-async function serverSaveProject(name) {
+async function serverSaveProject(name, { baseVersion = '' } = {}) {
   const auth = getAuthContext();
   if (!auth) {
     return { attempted: false, ok: false };
@@ -471,16 +515,33 @@ async function serverSaveProject(name) {
     await supabaseSaveProject(auth, name, exportProject());
     return { attempted: true, ok: true };
   }
+  const payload = {
+    data: exportProject(),
+    baseVersion: baseVersion || undefined,
+  };
   const res = await fetch(`/projects/${encodeURIComponent(name)}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-CSRF-Token': auth.csrfToken
     },
-    body: JSON.stringify(exportProject())
+    body: JSON.stringify(payload)
   });
   if (res.status === 401 || res.status === 403) clearAuthContext();
-  return { attempted: true, ok: res.ok };
+  if (res.status === 409) {
+    const conflict = await res.json().catch(() => ({}));
+    return {
+      attempted: true,
+      ok: false,
+      conflict: true,
+      currentVersion: conflict.currentVersion || null,
+    };
+  }
+  if (res.ok) {
+    const result = await res.json().catch(() => ({}));
+    if (result.version) persistServerRevision(name, auth, result.version);
+  }
+  return { attempted: true, ok: res.ok, conflict: false };
 }
 
 async function serverLoadProject(name) {
@@ -489,7 +550,14 @@ async function serverLoadProject(name) {
   if (isSupabaseAuthContext(auth)) {
     const data = await supabaseLoadProject(auth, name);
     if (!data) return false;
-    return importProject(data);
+    applyProjectStateName(name);
+    if (typeof window !== 'undefined') window.currentProjectId = name;
+    const imported = importProject(data);
+    if (imported) {
+      dsSaveProject(name);
+      persistServerRevision(name, auth, '');
+    }
+    return imported;
   }
   const res = await fetch(`/projects/${encodeURIComponent(name)}`, {
     headers: {
@@ -501,8 +569,19 @@ async function serverLoadProject(name) {
     return false;
   }
   if (!res.ok) return false;
-  const { data } = await res.json();
-  return importProject(data);
+  const payload = await res.json();
+  const { data, version } = payload;
+  applyProjectStateName(name);
+  if (typeof window !== 'undefined') window.currentProjectId = name;
+  const imported = importProject(data);
+  if (!imported) return false;
+  // The local snapshot and its revision are committed together so a reload
+  // or navigation retains the optimistic-concurrency base.
+  dsSaveProject(name);
+  if (version) {
+    persistServerRevision(name, auth, version);
+  }
+  return true;
 }
 
 async function saveProject(options = {}) {
@@ -538,17 +617,19 @@ async function saveProject(options = {}) {
   setProjectHash(name);
   applyProjectStateName(name);
   // Save locally and attempt server sync if logged in
+  const auth = getAuthContext();
+  const baseVersion = readServerRevision(name, auth);
   dsSaveProject(name);
   const storageError = getSavedProjectsError();
   let serverResult = { attempted: false, ok: false };
   let serverError = null;
   try {
-    serverResult = await serverSaveProject(name);
+    serverResult = await serverSaveProject(name, { baseVersion });
   } catch (e) {
     console.error(e);
     serverError = e;
   }
-  const { attempted, ok } = serverResult;
+  const { attempted, ok, conflict } = serverResult;
   if (storageError) {
     const baseMessage = storageError.message || 'Saved projects could not be updated. Clear saved data in Settings and try again.';
     let detail;
@@ -563,6 +644,12 @@ async function saveProject(options = {}) {
     return;
   }
   let message;
+  if (conflict) {
+    message = `Project "${name}" was saved locally, but the server has newer changes. Reload the server copy before trying to sync this local version.`;
+    dispatchProjectSyncStatus({ label: 'Conflict', state: 'error', detail: message });
+    await showAlertModal('Server Save Conflict', message);
+    return;
+  }
   if (serverError || (attempted && !ok)) {
     message = `Project "${name}" saved locally. Server sync failed.`;
     dispatchProjectSyncStatus({ label: 'Sync failed', state: 'error', detail: message });
@@ -590,6 +677,7 @@ async function loadProject() {
   let loaded = false;
   try { loaded = await serverLoadProject(name); } catch (e) { console.error(e); }
   if (!loaded) {
+    persistServerRevision(name, getAuthContext(), '');
     const stored = dsLoadProject(name);
     const postLoadError = getSavedProjectsError();
     if (postLoadError) {
@@ -613,7 +701,10 @@ async function openProjectByName(name) {
   setProjectHash(trimmed);
   let loaded = false;
   try { loaded = await serverLoadProject(trimmed); } catch (e) { console.error(e); }
-  if (!loaded) loaded = dsLoadProject(trimmed);
+  if (!loaded) {
+    persistServerRevision(trimmed, getAuthContext(), '');
+    loaded = dsLoadProject(trimmed);
+  }
   if (!loaded) {
     await showAlertModal('Project Not Found', `Project "${trimmed}" could not be loaded from your saved projects.`);
     return false;
@@ -638,6 +729,9 @@ async function deleteProject(name) {
     return false;
   }
   const auth = getAuthContext();
+  // The local snapshot is already gone, so its per-account revision token is
+  // no longer valid regardless of whether the cloud delete is available.
+  persistServerRevision(trimmed, auth, '');
   if (isSupabaseAuthContext(auth)) {
     try {
       await supabaseDeleteProject(auth, trimmed);

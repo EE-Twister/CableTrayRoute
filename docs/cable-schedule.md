@@ -11,6 +11,13 @@ The Cable Schedule page is optimized for fast entry first, with deeper routing a
 - Cable construction now includes **EGC Size** and **EGC Material**, and electrical entry includes **OCPD Rating (A)** plus **Terminal Temp (C)** for selected NEC 110.14(C), 240.4, and 250.122 screening in the Design Rule Checker.
 - Advanced routing coordinates, manufacturer details, and calculated fields remain available through **View Preset**.
 
+## Voltage Drop Inputs
+
+- Enter **Power Factor** when the cable feeds an AC load; blank values use the shared 0.90 screening default.
+- **Resistance Override (Ω/1000 ft)** is an optional conductor-resistance override. The screening calculation assumes reactance is zero when this value is supplied. Leave it blank to use the conductor-size, material, and raceway model from the shared voltage-drop engine.
+- **Parallel Runs** reduces the calculated drop by the entered positive integer when identical runs share current equally. Confirm that the runs have equal length, conductor size, and impedance before relying on that screening result.
+- The Cable Schedule editor, Voltage Drop study, reports, and API use the same calculation model. Results remain screening estimates and require an engineering review before design decisions.
+
 ## Cable Typicals
 
 - Use **Cable Library** to manage reusable cable constructions.
@@ -61,3 +68,4 @@ The Cable Schedule page is optimized for fast entry first, with deeper routing a
 
 - Each row includes a read-only **Last Modified** field.
 - **Change Log** shows recent local actions such as quick adds, imports, batch edits, typical application, sample loading, and saves.
+- Server saves use the version seen when the project was loaded. If another session saves first, the page keeps the local edits and reports a conflict so you can reload the newer server copy before retrying.
