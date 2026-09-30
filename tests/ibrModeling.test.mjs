@@ -207,6 +207,14 @@ describe('ibrFaultContribution()', () => {
     assert.strictEqual(r.tripped, true);
   });
 
+  it('the fault contribution is current-limited: pu and amperes do not depend on pre-fault voltage', () => {
+    const lo = ibrFaultContribution({ sRated_kVA: 200, vLL_kV: 0.48, limitFactor: 1.2, vBus_pu: 0.5 });
+    const hi = ibrFaultContribution({ sRated_kVA: 200, vLL_kV: 0.48, limitFactor: 1.2, vBus_pu: 1.0 });
+    assert.strictEqual(lo.Ifault_pu, 1.2);
+    assert.strictEqual(lo.Ifault_A, hi.Ifault_A);
+    approx(lo.Ifault_A, 1.2 * lo.Irated_A, 1e-9, 'Ifault_A = 1.2 x Irated: ');
+  });
+
   it('Ifault_pu = limitFactor at nominal voltage (1.0 pu)', () => {
     const r = ibrFaultContribution({ sRated_kVA: 200, vLL_kV: 0.48, limitFactor: 1.2, vBus_pu: 1.0 });
     approx(r.Ifault_pu, 1.2, 0.001, 'Ifault_pu at 1.0 pu: ');

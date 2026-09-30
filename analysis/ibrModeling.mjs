@@ -230,7 +230,7 @@ export function ibrPQCapability({
  * @param {object} p
  * @param {number} p.sRated_kVA          — inverter apparent power rating (kVA)
  * @param {number} p.vLL_kV              — line-to-line bus voltage (kV)
- * @param {number} [p.vBus_pu=1.0]       — pre-fault bus voltage (pu); scales rated current
+ * @param {number} [p.vBus_pu=1.0]       — pre-fault bus voltage (pu); informational, the current is limited
  * @param {number} [p.limitFactor=1.1]   — Ipeak/Irated ratio (IEEE 1547 §6.4: 1.05–1.2 pu)
  * @param {boolean} [p.rideThrough=true] — false = inverter trips; true = contributes fault I
  * @returns {{ Irated_A, Ifault_A, Ifault_pu, tripped }}
@@ -257,9 +257,10 @@ export function ibrFaultContribution({
     return { Irated_A, Ifault_A: 0, Ifault_pu: 0, tripped: true };
   }
 
-  // Fault current = limitFactor × rated current (voltage-independent: inverter current-limited)
+  // Fault current = limitFactor × rated current. An inverter is current-limited, so
+  // the contribution does not depend on the pre-fault voltage; pu and amperes agree.
   const Ifault_A = lf * Irated_A;
-  const Ifault_pu = lf * Math.max(0, Math.min(1, vpu));
+  const Ifault_pu = lf;
 
   return { Irated_A, Ifault_A, Ifault_pu, tripped: false };
 }
