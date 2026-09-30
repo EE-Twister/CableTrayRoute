@@ -154,6 +154,27 @@ export function tolerableStep(Cs, rhoS, tf, bw) {
 }
 
 /**
+ * Effective buried lengths for the mesh and step voltage equations
+ * (IEEE 80-2013 Eq. 91 and Eq. 93).
+ *
+ *   Lm = LC + [1.55 + 1.22 × Lr / √(Lx² + Ly²)] × LR     (rods on the grid)
+ *   Ls = 0.75 × LC + 0.85 × LR
+ *
+ * Without rods Lm = LC, but Ls is still only 0.75 × LC: the step voltage is
+ * evaluated outside the grid perimeter where the conductors are less effective.
+ *
+ * @param {number} LC  Horizontal grid conductor length (m)
+ * @param {number} LR  Total rod length (m)
+ * @param {number} Lr  Length of each rod (m)
+ * @param {number} diagonal  √(Lx² + Ly²) of the grid (m)
+ * @returns {{Lm: number, Ls: number}}
+ */
+export function effectiveVoltageLengths(LC, LR, Lr, diagonal) {
+  const rodFactor = LR > 0 ? 1.55 + 1.22 * (Lr / diagonal) : 0;
+  return { Lm: LC + rodFactor * LR, Ls: 0.75 * LC + 0.85 * LR };
+}
+
+/**
  * Complete ground grid analysis per IEEE 80-2013.
  *
  * @param {object} params
@@ -208,8 +229,8 @@ export function analyzeGroundGrid(params) {
   const Dy = gridLy / (nx - 1);  // spacing between conductors running in y-direction
   const D = Math.sqrt(Dx * Dy);  // geometric mean spacing
 
-  // Effective n
-  const n = effectiveN(effectiveLength, Lp, A);
+  // Effective n (Eq. 85 uses the horizontal grid conductor length LC only)
+  const n = effectiveN(conductorLength, Lp, A);
 
   // Km and Ks
   const Km = meshFactor(D, h, d, n, hasRods);
@@ -220,10 +241,8 @@ export function analyzeGroundGrid(params) {
   if (!Number.isFinite(Ks) || Ks < 0) throw new Error('Computed step factor is invalid for the selected geometry');
   if (!Number.isFinite(Ki) || Ki < 0) throw new Error('Computed irregularity factor is invalid for the selected geometry');
 
-  // Lm and Ls — effective lengths for voltage calculations (IEEE 80-2013 §16.5)
-  // For grids without ground rods: Lm = Ls = L
-  const Lm = effectiveLength;
-  const Ls = effectiveLength;
+  // Lm and Ls — effective lengths for voltage calculations (IEEE 80-2013 Eq. 91, 93)
+  const { Lm, Ls } = effectiveVoltageLengths(conductorLength, totalRodLength, rodLength, Math.hypot(gridLx, gridLy));
 
   // Grid resistance
   const Rg = gridResistance(rho, effectiveLength, A, h);
@@ -254,6 +273,8 @@ export function analyzeGroundGrid(params) {
     conductorLength,
     totalRodLength,
     effectiveLength,
+    Lm,
+    Ls,
     rodCount,
     rodLength,
     D,
@@ -340,7 +361,12 @@ export function analyzeIrregularGrid(params, soilModel = null) {
   } = params;
 
   if (!vertices || vertices.length < 3) throw new Error('At least 3 polygon vertices required');
-  if (spacingX <= 0 || spacingY <= 0) throw new Error('Mesh spacing must be positive');
+  if (!(spacingX > 0) || !(spacingY > 0)) throw new Error('Mesh spacing must be positive');
+  if (!(h > 0)) throw new Error('Burial depth must be positive');
+  if (!(d > 0)) throw new Error('Conductor diameter must be positive');
+  if (!(Ig > 0)) throw new Error('Grid current must be positive');
+  if (!(tf > 0)) throw new Error('Fault duration must be positive');
+  if (!(((soilModel && soilModel.rho1 > 0) ? soilModel.rho1 : params.rho) > 0)) throw new Error('Soil resistivity must be positive');
 
   // Polygon area via shoelace
   let area = 0;
@@ -369,11 +395,13 @@ export function analyzeIrregularGrid(params, soilModel = null) {
   const nxEst = Math.max(2, Math.round((maxX - minX) / spacingX) + 1);
   const nyEst = Math.max(2, Math.round((maxY - minY) / spacingY) + 1);
 
-  // Conductor length: sum of horizontal + vertical runs (approximate for polygon)
-  // Use fill fraction relative to bounding box
+  // Conductor length: perimeter conductors plus the interior runs. Lines spaced
+  // along x run in y (length ~ bounding-box height) and vice versa; the two outer
+  // lines of each family are the perimeter, so only the interior lines are added.
+  // The fill fraction scales the interior runs to the polygon.
   const fillFraction = area / ((maxX - minX) * (maxY - minY));
-  const conductorLength = (nxEst * (maxX - minX) + nyEst * (maxY - minY)) * fillFraction +
-                          perimeter;  // perimeter conductors always present
+  const conductorLength = (Math.max(nxEst - 2, 0) * (maxY - minY) + Math.max(nyEst - 2, 0) * (maxX - minX)) * fillFraction +
+                          perimeter;
 
   const totalRodLength = hasRods ? rodCount * rodLength : 0;
   const effectiveLength = conductorLength + totalRodLength;
@@ -382,7 +410,8 @@ export function analyzeIrregularGrid(params, soilModel = null) {
   const D = Math.sqrt(spacingX * spacingY);
 
   // Reuse formula functions defined earlier in this module
-  const nEff = effectiveN(effectiveLength, perimeter, area);
+  const nEff = effectiveN(conductorLength, perimeter, area);
+  const { Lm, Ls } = effectiveVoltageLengths(conductorLength, totalRodLength, rodLength, Math.hypot(maxX - minX, maxY - minY));
   const Km  = meshFactor(D, h, d, nEff, hasRods);
   const Ks  = stepFactor(D, h, nEff);
   const Ki  = irregularityFactor(nEff);
@@ -390,8 +419,8 @@ export function analyzeIrregularGrid(params, soilModel = null) {
   const effectiveRho = (soilModel && soilModel.rho1 > 0) ? soilModel.rho1 : params.rho;
   const Rg  = gridResistance(effectiveRho, effectiveLength, area, h);
   const GPR = Ig * Rg;
-  const Em  = (effectiveRho * Ig * Km * Ki) / effectiveLength;
-  const Es  = (effectiveRho * Ig * Ks * Ki) / effectiveLength;
+  const Em  = (effectiveRho * Ig * Km * Ki) / Lm;
+  const Es  = (effectiveRho * Ig * Ks * Ki) / Ls;
 
   const effectiveRhoS = rhoS > 0 ? rhoS : effectiveRho;
   const Cs   = surfaceLayerFactor(effectiveRho, effectiveRhoS, hs > 0 ? hs : 0);
@@ -399,7 +428,7 @@ export function analyzeIrregularGrid(params, soilModel = null) {
   const Estep  = tolerableStep(Cs, effectiveRhoS, tf, bw);
 
   return {
-    A: area, Lp: perimeter, conductorLength, totalRodLength, effectiveLength,
+    A: area, Lp: perimeter, conductorLength, totalRodLength, effectiveLength, Lm, Ls,
     D, n: nEff, Km, Ks, Ki, Cs, Rg, GPR, Em, Es, Etouch, Estep,
     touchSafe: Em <= Etouch, stepSafe: Es <= Estep, gprExceedsTouch: GPR > Etouch,
     isIrregular: true, vertices,

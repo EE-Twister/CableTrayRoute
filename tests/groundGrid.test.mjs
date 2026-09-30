@@ -15,6 +15,7 @@ import {
   tolerableTouch,
   tolerableStep,
   analyzeGroundGrid,
+  analyzeIrregularGrid,
 } from '../analysis/groundGrid.mjs';
 
 function describe(name, fn) {
@@ -274,21 +275,55 @@ describe('analyzeGroundGrid — integration', () => {
 
 
   it('throws when derived mesh factor yields a non-physical mesh voltage', () => {
+    // A 0.5 m conductor on a 0.15 m mesh is geometrically impossible: Km goes negative.
     assert.throws(() => analyzeGroundGrid({
-      rho: 100,
-      gridLx: 30.48,
-      gridLy: 30.48,
-      nx: 100,
-      ny: 100,
-      h: 0.4572,
-      d: 0.01,
-      Ig: 5000,
-      tf: 0.5,
-      hasRods: true,
-      rodCount: 10000,
-      rodLength: 1.3716,
-      bw: 70,
+      rho: 100, gridLx: 30.48, gridLy: 30.48, nx: 200, ny: 200,
+      h: 0.4572, d: 0.5, Ig: 5000, tf: 0.5, hasRods: false, bw: 70,
     }), /Computed mesh factor is invalid|Computed mesh voltage is invalid/);
+  });
+});
+
+describe('IEEE 80-2013 effective lengths (Eq. 85, 91, 93)', () => {
+  const base = { rho: 100, gridLx: 30, gridLy: 30, nx: 7, ny: 7, h: 0.5, d: 0.01, Ig: 3000, tf: 0.5 };
+
+  it('without rods Lm = LC and Ls = 0.75 LC; n uses LC only', () => {
+    const r = analyzeGroundGrid(base);
+    // LC = 7*30 + 7*30 = 420 m; Lp = 120 m; na = 2*420/120 = 7; nb = 1
+    approx(r.conductorLength, 420, 1e-9);
+    approx(r.n, 7, 1e-9);
+    approx(r.Lm, 420, 1e-9);
+    approx(r.Ls, 315, 1e-9);
+    approx(r.Es, (base.rho * base.Ig * r.Ks * r.Ki) / 315, 1e-9);
+    approx(r.Em, (base.rho * base.Ig * r.Km * r.Ki) / 420, 1e-9);
+  });
+
+  it('with rods Lm adds 1.55 + 1.22 Lr/diagonal per rod metre and Ls adds 0.85 LR', () => {
+    const r = analyzeGroundGrid({ ...base, hasRods: true, rodCount: 4, rodLength: 3 });
+    const LR = 12;
+    approx(r.n, 7, 1e-9); // rods must not inflate n
+    approx(r.Lm, 420 + (1.55 + 1.22 * 3 / Math.hypot(30, 30)) * LR, 1e-9);
+    approx(r.Ls, 0.75 * 420 + 0.85 * LR, 1e-9);
+    // Grid resistance still uses the full buried length LC + LR
+    approx(r.Rg, gridResistance(100, 432, 900, 0.5), 1e-9);
+  });
+});
+
+describe('analyzeIrregularGrid conductor length', () => {
+  it('a rectangular polygon matches the regular grid conductor length', () => {
+    const r = analyzeIrregularGrid({
+      rho: 100, vertices: [{ x: 0, y: 0 }, { x: 30, y: 0 }, { x: 30, y: 30 }, { x: 0, y: 30 }],
+      spacingX: 5, spacingY: 5, h: 0.5, d: 0.01, Ig: 3000, tf: 0.5,
+    });
+    approx(r.conductorLength, 420, 1e-9); // was 540 when the perimeter was counted twice
+    approx(r.Ls, 315, 1e-9);
+  });
+
+  it('rejects non-positive and blank inputs', () => {
+    const v = [{ x: 0, y: 0 }, { x: 30, y: 0 }, { x: 30, y: 30 }, { x: 0, y: 30 }];
+    const ok = { rho: 100, vertices: v, spacingX: 5, spacingY: 5, h: 0.5, d: 0.01, Ig: 3000, tf: 0.5 };
+    for (const k of ['rho', 'spacingX', 'h', 'd', 'Ig', 'tf']) {
+      assert.throws(() => analyzeIrregularGrid({ ...ok, [k]: NaN }), /must be positive/, k);
+    }
   });
 });
 

@@ -94,11 +94,13 @@ export function calculateRequiredCurrent(areaExposedM2, currentDensityAperM2) {
 }
 
 export function calculateRequiredAnodeMass(requiredCurrentA, designHours, anodeCapacityAhPerKg, utilizationFactor, designFactor) {
-  return (requiredCurrentA * designHours) / (anodeCapacityAhPerKg * utilizationFactor * designFactor);
+  // The design factor is a reliability allowance (>= 1): it increases the mass required.
+  return (requiredCurrentA * designHours * designFactor) / (anodeCapacityAhPerKg * utilizationFactor);
 }
 
 export function calculatePredictedDesignLife(installedMassKg, anodeCapacityAhPerKg, utilizationFactor, designFactor, requiredCurrentA) {
-  return (installedMassKg * anodeCapacityAhPerKg * utilizationFactor * designFactor) / (requiredCurrentA * 8760);
+  // Consistent with the mass equation: the design factor reduces the credited life.
+  return (installedMassKg * anodeCapacityAhPerKg * utilizationFactor) / (requiredCurrentA * 8760 * designFactor);
 }
 
 export function calculateIccpSourceSizing(requiredCurrentA, reserveFactor, groundbedResistanceOhm, voltageAllowanceV, ratedCurrentA, ratedVoltageV) {

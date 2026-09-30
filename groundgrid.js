@@ -807,6 +807,11 @@ document.addEventListener('DOMContentLoaded', () => {
       section.appendChild(renderResult('Rod Count', String(r.rodCount), '', null));
     }
     section.appendChild(renderResult('Effective n', r.n.toFixed(2), '', null));
+    if (Number.isFinite(r.Lm) && Number.isFinite(r.Ls)) {
+      const fmtLen = (v) => (imperial ? `${(v / 0.3048).toFixed(1)} ft` : `${v.toFixed(1)} m`);
+      section.appendChild(renderResult('Mesh Length Lm', fmtLen(r.Lm), '', null));
+      section.appendChild(renderResult('Step Length Ls (0.75 L + 0.85 ΣLr)', fmtLen(r.Ls), '', null));
+    }
     section.appendChild(renderResult('Mesh Spacing Km', r.Km.toFixed(3), '', null));
     section.appendChild(renderResult('Step Factor Ks', r.Ks.toFixed(3), '', null));
     section.appendChild(renderResult('Irregularity Ki', r.Ki.toFixed(3), '', null));

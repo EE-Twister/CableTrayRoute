@@ -195,3 +195,14 @@ assert.deepEqual(withoutGeneratedTimes(workerResult), withoutGeneratedTimes(sync
 terminateWorkerClient();
 
 console.log('✓ cathodic protection analysis engine boundary tests passed');
+
+// Design factor is a reliability allowance: it must increase required mass and reduce credited life.
+(function testDesignFactorDirection() {
+  const base = engineCalculateRequiredAnodeMass(0.3, 8760 * 20, 780, 0.85, 1.0);
+  // W = I * t / (Q * u) = 0.3 * 175200 / (780 * 0.85) = 79.276 kg
+  assert.ok(Math.abs(base - (0.3 * 175200) / (780 * 0.85)) < 1e-9);
+  assert.ok(Math.abs(engineCalculateRequiredAnodeMass(0.3, 8760 * 20, 780, 0.85, 1.25) - base * 1.25) < 1e-9);
+  const life = engineCalculatePredictedDesignLife(base, 780, 0.85, 1.0, 0.3);
+  assert.ok(Math.abs(life - 20) < 1e-9);
+  assert.ok(Math.abs(engineCalculatePredictedDesignLife(base, 780, 0.85, 1.25, 0.3) - 16) < 1e-9);
+})();

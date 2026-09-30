@@ -45,8 +45,8 @@
   "expected": {
     "designCurrentDensityMaM2": 10,
     "requiredCurrentA": 0.2971,
-    "minimumAnodeMassKg": 71.361,
-    "predictedLifeYears": 56.05,
+    "minimumAnodeMassKg": 86.347,
+    "predictedLifeYears": 46.32,
     "distributionGlobalAttenuationFactor": 1.411,
     "criteriaOverallStatus": "pass",
     "interferenceRiskLevel": "low"
