@@ -24,6 +24,7 @@ Results are used to:
 | System voltage | V_sys | kV L-L | Nominal voltage at the scanned bus |
 | Short-circuit MVA | S_sc | MVA | Thevenin SC capacity looking back from the bus |
 | Source X/R ratio | XR | — | Fundamental source reactance-to-resistance ratio |
+| Damping load | P_damp | kW | Optional resistive load in parallel at the bus (R = V²/P) |
 | Capacitor bank size | Q_cap | kVAR | Shunt capacitor(s) at the bus |
 | Filter reactor | % | % | Detuned reactor as % of capacitor reactance |
 | Filter kVAR | Q_filt | kVAR | Filter capacitor bank rating |
@@ -93,7 +94,7 @@ R is assumed frequency-independent at power-frequency harmonics.
 Admittances are summed and inverted:
 
 ```
-Y_total = 1/Z_source_eff + Σ(1/Z_cap_i) + Σ(1/Z_filter_j)
+Y_total = 1/Z_source_eff + Σ(1/Z_cap_i) + Σ(1/Z_filter_j) + P_damp/V²
 Z_dp = 1 / Y_total
 ```
 
@@ -129,7 +130,8 @@ This is the formula used in `analysis/capacitorBank.mjs` `resonanceOrder()`. The
 
 - Single-bus model. Multi-bus systems with distributed harmonic sources require a full Y-bus frequency sweep.
 - Resistance is treated as frequency-independent. Skin effect increases conductor resistance at higher harmonics; this is conserved for preliminary screening.
-- Loads are treated as open circuits. Actual load admittance damps resonance peaks; real systems have lower peak impedances than the model predicts.
+- Loads are treated as open circuits unless a damping load (kW) is entered. Actual load admittance damps resonance peaks; with no damping load the model overstates peak impedance.
+- The scan grid is 0.5 harmonic orders; each detected resonance is then refined on the exact impedance curve at 0.01-order resolution, so the reported order is not limited by the grid.
 - Transformer magnetizing branch is not modelled.
 - Intended for screening-level filter design and resonance identification, not detailed harmonic power flow.
 

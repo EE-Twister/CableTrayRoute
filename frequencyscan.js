@@ -116,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
       systemKv: flt('system-kv'),
       scMva: flt('sc-mva'),
       xrRatio: flt('xr-ratio'),
+      dampingLoadKw: flt('damping-kw') || 0,
       capacitorBanks,
       filters,
       cables,
