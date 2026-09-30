@@ -186,7 +186,7 @@ export const EXTRACTED_MODULE_BUDGETS = Object.freeze({
   'src/cable-schedule/templateModel.js': 155,
   'src/cable-schedule/tagModel.js': 60,
   'src/cable-schedule/scheduleConfig.js': 206,
-  'src/ductbank-route/thermalPrimitives.js': 71,
+  'src/ductbank-route/thermalPrimitives.js': 74,
   'src/ductbank-route/ampacityModel.js': 275,
   'src/studies/cp/analysisEngine.js': 654
 });

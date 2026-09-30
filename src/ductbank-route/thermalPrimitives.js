@@ -1,7 +1,10 @@
+import { CONDUIT_INTERNAL_AREA_IN2 } from '../../analysis/conduitFill.mjs';
+
+// Conduit types the ductbank thermal model supports; areas come from the shared table.
 export const CONDUIT_SPECS = Object.freeze({
-  EMT: { '1/2': 0.304, '3/4': 0.533, '1': 0.864, '1-1/4': 1.496, '1-1/2': 2.036, '2': 3.356, '2-1/2': 5.858, '3': 8.846, '3-1/2': 11.545, '4': 14.753 },
-  RMC: { '1/2': 0.314, '3/4': 0.549, '1': 0.887, '1-1/4': 1.526, '1-1/2': 2.071, '2': 3.408, '2-1/2': 4.866, '3': 7.499, '3-1/2': 10.01, '4': 12.882, '5': 20.212, '6': 29.158 },
-  'PVC Sch 40': { '1/2': 0.285, '3/4': 0.508, '1': 0.832, '1-1/4': 1.453, '1-1/2': 1.986, '2': 3.291, '2-1/2': 4.695, '3': 7.268, '3-1/2': 9.737, '4': 12.554, '5': 19.761, '6': 28.567 }
+  EMT: CONDUIT_INTERNAL_AREA_IN2.EMT,
+  RMC: CONDUIT_INTERNAL_AREA_IN2.RMC,
+  'PVC Sch 40': CONDUIT_INTERNAL_AREA_IN2['PVC Sch 40']
 });
 
 export const INSULATION_TEMP_LIMIT = Object.freeze({

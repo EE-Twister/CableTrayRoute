@@ -703,7 +703,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Raceway
-- Source files: `analysis/bimReconciliation.mjs`, `analysis/manufacturerCatalog.mjs`, `analysis/projectCatalog.mjs`, `analysis/routingCatalog.mjs`, `analysis/scheduleWorkflow.mjs`, `ductbankTable.js`, `e2e-helpers.js`, `exporters/revit.mjs`, `racewaySampleData.mjs`, `racewayschedule.js`, `src/fetchUtils.mjs`, `src/importers/revit.mjs`, `src/projectManagerEntry.js`, `src/racewayschedule.js`, `tableUtils.mjs`, `tour.js`, `utils/safeEvents.mjs`
+- Source files: `analysis/bimReconciliation.mjs`, `analysis/conduitFill.mjs`, `analysis/manufacturerCatalog.mjs`, `analysis/projectCatalog.mjs`, `analysis/routingCatalog.mjs`, `analysis/scheduleWorkflow.mjs`, `ductbankTable.js`, `e2e-helpers.js`, `exporters/revit.mjs`, `racewaySampleData.mjs`, `racewayschedule.js`, `src/fetchUtils.mjs`, `src/importers/revit.mjs`, `src/projectManagerEntry.js`, `src/racewayschedule.js`, `tableUtils.mjs`, `tour.js`, `utils/safeEvents.mjs`
 
 **Undocumented Reads**
 - None
@@ -725,68 +725,68 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - src/racewayschedule.js:1438 getCables()
-  - src/racewayschedule.js:2391 getCables()
-  - src/racewayschedule.js:850 getCables()
+  - src/racewayschedule.js:1439 getCables()
+  - src/racewayschedule.js:2392 getCables()
+  - src/racewayschedule.js:851 getCables()
 - `conduitSchedule`
-  - src/racewayschedule.js:1075 TableUtils.createTable(conduitSchedule)
-  - src/racewayschedule.js:208 getConduits()
-  - src/racewayschedule.js:2390 getConduits()
-  - src/racewayschedule.js:2442 getConduits()
-  - src/racewayschedule.js:760 getConduits()
+  - src/racewayschedule.js:1076 TableUtils.createTable(conduitSchedule)
+  - src/racewayschedule.js:209 getConduits()
+  - src/racewayschedule.js:2391 getConduits()
+  - src/racewayschedule.js:2443 getConduits()
+  - src/racewayschedule.js:761 getConduits()
 - `ductbankSchedule`
   - ductbankTable.js:1089 getDuctbanks()
-  - src/racewayschedule.js:1211 getDuctbanks()
-  - src/racewayschedule.js:2440 getDuctbanks()
+  - src/racewayschedule.js:1212 getDuctbanks()
+  - src/racewayschedule.js:2441 getDuctbanks()
 - `settings.activeSampleWorkflow`
   - ductbankTable.js:88 getItem(activeSampleWorkflow)
 - `settings.bimCoordinationIssues`
-  - src/racewayschedule.js:102 getItem(bimCoordinationIssues)
+  - src/racewayschedule.js:103 getItem(bimCoordinationIssues)
 - `settings.bimCoordinationSnapshot`
-  - src/racewayschedule.js:101 getItem(bimCoordinationSnapshot)
+  - src/racewayschedule.js:102 getItem(bimCoordinationSnapshot)
 - `settings.trayHardwareCatalogCustomProducts`
   - analysis/projectCatalog.mjs:24 getTrayHardwareCatalogCustomProducts()
 - `traySchedule`
-  - src/racewayschedule.js:1005 TableUtils.createTable(traySchedule)
-  - src/racewayschedule.js:208 getTrays()
-  - src/racewayschedule.js:2389 getTrays()
-  - src/racewayschedule.js:2441 getTrays()
-  - src/racewayschedule.js:759 getTrays()
+  - src/racewayschedule.js:1006 TableUtils.createTable(traySchedule)
+  - src/racewayschedule.js:209 getTrays()
+  - src/racewayschedule.js:2390 getTrays()
+  - src/racewayschedule.js:2442 getTrays()
+  - src/racewayschedule.js:760 getTrays()
 
 **Detected Writes**
 - `cableSchedule`
   - ductbankTable.js:1188 addCable()
 - `conduitSchedule`
-  - src/racewayschedule.js:1075 TableUtils.createTable(conduitSchedule)
-  - src/racewayschedule.js:1167 setConduits()
-  - src/racewayschedule.js:1242 setConduits()
-  - src/racewayschedule.js:693 setConduits()
-  - src/racewayschedule.js:949 importFromCad()
+  - src/racewayschedule.js:1076 TableUtils.createTable(conduitSchedule)
+  - src/racewayschedule.js:1168 setConduits()
+  - src/racewayschedule.js:1243 setConduits()
+  - src/racewayschedule.js:694 setConduits()
+  - src/racewayschedule.js:950 importFromCad()
 - `ductbankSchedule`
   - ductbankTable.js:695 setDuctbanks()
-  - src/racewayschedule.js:1163 setDuctbanks()
-  - src/racewayschedule.js:691 setDuctbanks()
-  - src/racewayschedule.js:969 setDuctbanks()
+  - src/racewayschedule.js:1164 setDuctbanks()
+  - src/racewayschedule.js:692 setDuctbanks()
+  - src/racewayschedule.js:970 setDuctbanks()
 - `settings.bimCoordinationIssues`
-  - src/racewayschedule.js:194 setItem(bimCoordinationIssues)
+  - src/racewayschedule.js:195 setItem(bimCoordinationIssues)
 - `settings.bimCoordinationSnapshot`
-  - src/racewayschedule.js:292 setItem(bimCoordinationSnapshot)
+  - src/racewayschedule.js:293 setItem(bimCoordinationSnapshot)
 - `settings.conduitFillData`
-  - src/racewayschedule.js:1098 setItem(conduitFillData)
+  - src/racewayschedule.js:1099 setItem(conduitFillData)
 - `settings.ductbankSession`
   - ductbankTable.js:661 setItem(ductbankSession)
 - `settings.trayFillData`
-  - src/racewayschedule.js:1030 setItem(trayFillData)
+  - src/racewayschedule.js:1031 setItem(trayFillData)
 - `traySchedule`
-  - src/racewayschedule.js:1005 TableUtils.createTable(traySchedule)
-  - src/racewayschedule.js:692 setTrays()
-  - src/racewayschedule.js:949 importFromCad()
+  - src/racewayschedule.js:1006 TableUtils.createTable(traySchedule)
+  - src/racewayschedule.js:693 setTrays()
+  - src/racewayschedule.js:950 importFromCad()
 
 ### Ductbank (`ductbankroute.html`)
 
 - Section: Workflow
 - Group: Raceway
-- Source files: `analysis/ductbankBom.mjs`, `analysis/ductbankRouteProfile.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `ductbankroute.js`, `soilResistivityConfig.js`, `src/ductbank-route/ampacityModel.js`, `src/ductbank-route/thermalPrimitives.js`, `src/ductbankProjectAdapter.mjs`, `src/ductbankroute.js`, `src/projectManagerEntry.js`
+- Source files: `analysis/conduitFill.mjs`, `analysis/ductbankBom.mjs`, `analysis/ductbankRouteProfile.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `ductbankroute.js`, `soilResistivityConfig.js`, `src/ductbank-route/ampacityModel.js`, `src/ductbank-route/thermalPrimitives.js`, `src/ductbankProjectAdapter.mjs`, `src/ductbankroute.js`, `src/projectManagerEntry.js`
 
 **Undocumented Reads**
 - None
@@ -894,11 +894,11 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `settings.conduitFillData`
-  - conduitfill.js:501 getItem(conduitFillData)
+  - conduitfill.js:489 getItem(conduitFillData)
 
 **Detected Writes**
 - `settings.conduitFillData`
-  - conduitfill.js:518 removeItem(conduitFillData)
+  - conduitfill.js:506 removeItem(conduitFillData)
 
 ### Conduit Bend Schedule (`conduitbend.html`)
 
@@ -1421,35 +1421,35 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - app.mjs:908 getCables()
+  - app.mjs:896 getCables()
 - `conduitSchedule`
-  - app.mjs:912 getConduits()
+  - app.mjs:900 getConduits()
 - `ductbankSchedule`
-  - app.mjs:911 getDuctbanks()
+  - app.mjs:899 getDuctbanks()
 - `settings.ctrSession`
-  - app.mjs:472 getItem(ctrSession)
-  - app.mjs:821 getItem(ctrSession)
+  - app.mjs:460 getItem(ctrSession)
+  - app.mjs:809 getItem(ctrSession)
 - `settings.latestRouteResults`
-  - app.mjs:1082 getItem(latestRouteResults)
+  - app.mjs:1070 getItem(latestRouteResults)
 - `traySchedule`
-  - app.mjs:907 getTrays()
+  - app.mjs:895 getTrays()
 
 **Detected Writes**
 - `cableSchedule`
-  - app.mjs:2964 setCables()
+  - app.mjs:2952 setCables()
 - `settings.conduitFillData`
-  - app.mjs:1429 setItem(conduitFillData)
-  - app.mjs:1463 setItem(conduitFillData)
+  - app.mjs:1417 setItem(conduitFillData)
+  - app.mjs:1451 setItem(conduitFillData)
 - `settings.ctrSession`
-  - app.mjs:481 setItem(ctrSession)
-  - app.mjs:810 setItem(ctrSession)
+  - app.mjs:469 setItem(ctrSession)
+  - app.mjs:798 setItem(ctrSession)
 - `settings.ductbankRouteData`
-  - app.mjs:1447 setItem(ductbankRouteData)
+  - app.mjs:1435 setItem(ductbankRouteData)
 - `settings.latestRouteResults`
-  - app.mjs:263 setItem(latestRouteResults)
+  - app.mjs:251 setItem(latestRouteResults)
 - `settings.trayFillData`
-  - app.mjs:1404 setItem(trayFillData)
-  - app.mjs:2581 setItem(trayFillData)
+  - app.mjs:1392 setItem(trayFillData)
+  - app.mjs:2569 setItem(trayFillData)
 
 ### Pull Cards (`pullcards.html`)
 
