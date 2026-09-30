@@ -128,6 +128,11 @@ the alternative embodied footprint and shows a delta card:
 - **Positive delta** — alternative has higher CO₂e than the primary design
 - **Negative delta** — alternative is lower-carbon than the primary design
 
+The comparison covers embodied and operating (Scope 2) carbon. Enter **Alternative average
+conductor losses (kW)** to credit a larger-conductor alternative for its lower I²R losses; if
+left blank the alternative is assumed to have the same losses as the primary design. Invalid
+alternative JSON is reported next to the field instead of being silently ignored.
+
 Example alternative BOM JSON:
 ```json
 [
