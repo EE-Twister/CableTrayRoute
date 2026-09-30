@@ -312,6 +312,17 @@ async function loadDevices(ids = [], providedDevices = []) {
   return uniqueIds.map(id => deviceCache.get(id)).filter(Boolean);
 }
 
+/**
+ * Current (kA) flowing through a protective device for an arc at another voltage level.
+ * The arc current seen at the equipment is referred through any transformer between them
+ * by the voltage ratio: a 480 V arc of 15 kA is about 0.52 kA through a 13.8 kV device.
+ * Without both voltages the current is returned unchanged.
+ */
+export function currentAtDeviceKA(arcKA, equipmentKV, deviceKV) {
+  if (!(arcKA > 0) || !(equipmentKV > 0) || !(deviceKV > 0)) return arcKA;
+  return arcKA * (equipmentKV / deviceKV);
+}
+
 // Determine the protective device clearing time. Per IEEE 1584-2018 the device
 // is evaluated at the ARCING current (evalKA), not the bolted fault current —
 // the arc current is lower, so it generally clears more slowly.
@@ -367,13 +378,16 @@ function clearingTime(comp, evalKA, devices, protectiveComp, scResults, protecti
   const deviceKA = Number.isFinite(scResults?.[deviceComp.id]?.threePhaseKA) && scResults[deviceComp.id].threePhaseKA > 0
     ? scResults[deviceComp.id].threePhaseKA
     : 0;
-  const effectiveKA = deviceComp !== comp && downstreamKA > 0
-    ? downstreamKA
+  // The arc current flows through the clearing device whether it is upstream of the equipment
+  // or the equipment itself, so the device curve is evaluated at the arcing current (referred
+  // through any transformer between them), not at the device's own bolted fault current.
+  const equipmentKV = scResults?.[comp.id]?.prefaultKV;
+  const deviceKV = scResults?.[deviceComp.id]?.prefaultKV;
+  const effectiveKA = downstreamKA > 0
+    ? currentAtDeviceKA(downstreamKA, equipmentKV, deviceKV)
     : deviceKA > 0
       ? deviceKA
-      : downstreamKA > 0
-        ? downstreamKA
-        : 0.001;
+      : 0.001;
   if (settings.instantaneous && effectiveKA * 1000 >= settings.instantaneous) {
     return {
       time: Math.max(settings.instantaneousDelay || 0.01, 0.005),
@@ -485,7 +499,10 @@ export async function runArcFlash(options = {}) {
     const cfgRaw = typeof cfgCandidate === 'string' ? cfgCandidate.toUpperCase() : null;
     const cfg = ELECTRODE_CONFIGS.includes(cfgRaw) ? cfgRaw : (enclosure === 'open' ? 'VOA' : 'VCB');
     const voltageSettingRaw = firstParsedNumeric(pickValue(comp, 'kV'), pickValue(comp, 'baseKV'), pickValue(comp, 'prefault_voltage'));
-    const V = Number.isFinite(voltageSettingRaw) && voltageSettingRaw > 0 ? voltageSettingRaw : 0.48;
+    const componentVoltageV = resolveVoltage(comp);
+    const V = Number.isFinite(voltageSettingRaw) && voltageSettingRaw > 0
+      ? voltageSettingRaw
+      : (Number.isFinite(componentVoltageV) && componentVoltageV > 0 ? componentVoltageV / 1000 : 0.48);
 
     // IEEE 1584-2018 incident-energy model. Evaluate BOTH the maximum (full)
     // and minimum (reduced) arcing-current scenarios — each with its own
@@ -586,7 +603,7 @@ export async function runArcFlash(options = {}) {
     }
     if (Number.isFinite(voltageSettingRaw) && voltageSettingRaw <= 0) {
       addNote('Nominal voltage value was non-positive; defaulted to 0.48 kV for calculations.');
-    } else if (!Number.isFinite(voltageSettingRaw)) {
+    } else if (!Number.isFinite(voltageSettingRaw) && !(componentVoltageV > 0)) {
       addNote('No nominal voltage provided; defaulted to 0.48 kV for the energy model.');
     }
     if (energy > 40) {

@@ -379,7 +379,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - oneline.js:8237 getLoads()
   - src/one-line/propertyDetailView.mjs:589 getLoads()
 - `oneLineDiagram`
-  - analysis/arcFlash.mjs:446 getOneLine()
+  - analysis/arcFlash.mjs:460 getOneLine()
   - analysis/harmonicNetwork.mjs:264 getOneLine()
   - analysis/harmonics.js:226 getOneLine()
   - analysis/harmonics.js:300 getOneLine()
@@ -421,7 +421,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.studySettings`
   - oneline.js:2379 getItem(studySettings)
 - `settings.tccSettings`
-  - analysis/arcFlash.mjs:353 getItem(tccSettings)
+  - analysis/arcFlash.mjs:364 getItem(tccSettings)
   - analysis/shortCircuit.mjs:774 getItem(tccSettings)
 - `studyResults`
   - analysis/harmonics.js:531 getStudies()
@@ -1919,14 +1919,14 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - analysis/shortCircuit.mjs:1183 getCables()
   - analysis/tcc.js:2983 getCables()
 - `oneLineDiagram`
-  - analysis/arcFlash.mjs:446 getOneLine()
+  - analysis/arcFlash.mjs:460 getOneLine()
   - analysis/shortCircuit.mjs:1178 getOneLine()
   - analysis/tcc.js:2101 getOneLine()
   - analysis/tcc.js:2206 getOneLine()
   - analysis/tcc.js:3504 getOneLine()
   - ... 4 more
 - `settings.tccSettings`
-  - analysis/arcFlash.mjs:353 getItem(tccSettings)
+  - analysis/arcFlash.mjs:364 getItem(tccSettings)
   - analysis/shortCircuit.mjs:774 getItem(tccSettings)
   - analysis/tcc.js:771 getItem(tccSettings)
 - `settings.trayHardwareCatalogCustomProducts`
@@ -2750,7 +2750,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `cableSchedule`
   - analysis/shortCircuit.mjs:1183 getCables()
 - `oneLineDiagram`
-  - analysis/arcFlash.mjs:446 getOneLine()
+  - analysis/arcFlash.mjs:460 getOneLine()
   - analysis/shortCircuit.mjs:1178 getOneLine()
   - studies/arcFlash.js:145 getOneLine()
   - studies/arcFlash.js:15 getOneLine()
@@ -2759,7 +2759,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `settings.tccSettings`
-  - analysis/arcFlash.mjs:353 getItem(tccSettings)
+  - analysis/arcFlash.mjs:364 getItem(tccSettings)
   - analysis/shortCircuit.mjs:774 getItem(tccSettings)
 - `studyResults`
   - studies/arcFlash.js:129 getStudies()
