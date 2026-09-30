@@ -692,7 +692,7 @@ if (typeof window !== 'undefined') {
       nextActionEl.innerHTML = `
         <div>
           <strong>${READINESS_VOCABULARY.missingInputs}: Complete load readiness</strong>
-          <p>${validation.incomplete} load${validation.incomplete === 1 ? '' : 's'} still need source, kW, voltage, power factor, or phases.</p>
+          <p>${validation.incomplete} load${validation.incomplete === 1 ? '' : 's'} still need a source and valid kW, voltage, power factor (0–1), and phases.</p>
         </div>
         <button class="btn primary-btn" type="button" data-filter="${blockerFilter}">Show Blockers</button>
       `;

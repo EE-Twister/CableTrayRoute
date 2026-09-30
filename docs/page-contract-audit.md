@@ -1773,47 +1773,47 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `studyResults`
   - src/projectreport.js:313 getStudies()
 - `studyResults.arcFlash`
-  - analysis/projectReport.mjs:459 studies.arcFlash
+  - analysis/projectReport.mjs:483 studies.arcFlash
 - `studyResults.bessHazard`
-  - analysis/projectReport.mjs:994 studies.bessHazard
+  - analysis/projectReport.mjs:1018 studies.bessHazard
 - `studyResults.contingency`
-  - analysis/projectReport.mjs:765 studies.contingency
+  - analysis/projectReport.mjs:789 studies.contingency
 - `studyResults.cyberCompliance`
-  - analysis/projectReport.mjs:770 studies.cyberCompliance
+  - analysis/projectReport.mjs:794 studies.cyberCompliance
 - `studyResults.duty`
   - validation/rules.js:666 studies.duty
   - validation/rules.js:666 studies?.duty
 - `studyResults.frequencyScan`
-  - analysis/projectReport.mjs:767 studies.frequencyScan
+  - analysis/projectReport.mjs:791 studies.frequencyScan
 - `studyResults.harmonics`
-  - analysis/projectReport.mjs:578 studies.harmonics
+  - analysis/projectReport.mjs:602 studies.harmonics
 - `studyResults.heatTraceSizing`
-  - analysis/projectReport.mjs:209 studies.heatTraceSizing
+  - analysis/projectReport.mjs:233 studies.heatTraceSizing
 - `studyResults.heatTraceSizingCircuits`
-  - analysis/projectReport.mjs:210 studies.heatTraceSizingCircuits
+  - analysis/projectReport.mjs:234 studies.heatTraceSizingCircuits
 - `studyResults.loadFlow`
-  - analysis/projectReport.mjs:544 studies.loadFlow
+  - analysis/projectReport.mjs:568 studies.loadFlow
 - `studyResults.motorStart`
-  - analysis/projectReport.mjs:608 studies.motorStart
+  - analysis/projectReport.mjs:632 studies.motorStart
 - `studyResults.optimalPowerFlow`
-  - analysis/projectReport.mjs:769 studies.optimalPowerFlow
+  - analysis/projectReport.mjs:793 studies.optimalPowerFlow
 - `studyResults.probabilisticLoadFlow`
-  - analysis/projectReport.mjs:764 studies.probabilisticLoadFlow
+  - analysis/projectReport.mjs:788 studies.probabilisticLoadFlow
 - `studyResults.quasiDynamic`
-  - analysis/projectReport.mjs:763 studies.quasiDynamic
+  - analysis/projectReport.mjs:787 studies.quasiDynamic
 - `studyResults.reliability`
-  - analysis/projectReport.mjs:681 studies.reliability
+  - analysis/projectReport.mjs:705 studies.reliability
   - validation/rules.js:671 studies?.reliability
   - validation/rules.js:672 studies.reliability
   - validation/rules.js:674 studies?.reliability
 - `studyResults.shortCircuit`
-  - analysis/projectReport.mjs:488 studies.shortCircuit
+  - analysis/projectReport.mjs:512 studies.shortCircuit
 - `studyResults.transientStability`
-  - analysis/projectReport.mjs:768 studies.transientStability
+  - analysis/projectReport.mjs:792 studies.transientStability
 - `studyResults.voltageDropStudy`
-  - analysis/projectReport.mjs:633 studies.voltageDropStudy
+  - analysis/projectReport.mjs:657 studies.voltageDropStudy
 - `studyResults.voltageStability`
-  - analysis/projectReport.mjs:766 studies.voltageStability
+  - analysis/projectReport.mjs:790 studies.voltageStability
 - `traySchedule`
   - src/projectreport.js:291 getTrays()
 
