@@ -38,6 +38,7 @@ export const ICNIRP_LIMITS = {
  */
 export function fieldFromSingleConductor(currentA, distanceM) {
   if (!(distanceM > 0)) throw new Error('Distance must be positive');
+  if (!Number.isFinite(currentA)) throw new Error('Current must be a finite number');
   // Convert T → µT (× 1e6)
   return (MU0 / (2 * Math.PI)) * (Math.abs(currentA) / distanceM) * 1e6;
 }
@@ -99,8 +100,14 @@ export function fieldFromConductorArray(conductors, measurePoint) {
 /**
  * Build a standard 3-phase conductor layout for a cable tray cross-section.
  *
- * Cables are assumed to rest on the tray floor in a single layer, evenly spaced.
+ * Each cable set is a compact flat group of three phases with conductor centres one cable
+ * diameter apart (the three phases of a set run together, which is what limits the field), and
+ * the sets are spread evenly across the tray width. When the sets would not fit at that spacing
+ * the phase spacing is reduced so they do not overlap.
  * Phase A = 0°, Phase B = 120°, Phase C = 240°.
+ *
+ * (Spreading every conductor evenly across the tray, as an earlier version did, separates the
+ * phases of one cable by up to the tray width/4 and overstates the field several times over.)
  *
  * @param {number} currentA - Load current per phase (A)
  * @param {number} nCables - Number of 3-phase cable sets
@@ -109,19 +116,23 @@ export function fieldFromConductorArray(conductors, measurePoint) {
  * @returns {Array} Conductor array for fieldFromConductorArray()
  */
 export function buildThreePhaseConductors(currentA, nCables, trayWidthM, cableOdM) {
+  if (!Number.isFinite(currentA) || currentA < 0) throw new Error('Current must be a non-negative number');
+  if (!(trayWidthM > 0)) throw new Error('Tray width must be positive');
+  if (!(cableOdM > 0)) throw new Error('Cable outside diameter must be positive');
   const conductors = [];
   const setCount = Math.max(1, parseInt(nCables, 10) || 1);
-  const totalConductors = setCount * 3;
-  const spacingM = totalConductors > 1 ? trayWidthM / (totalConductors + 1) : 0;
+  const phaseSpacingM = Math.min(cableOdM, trayWidthM / (3 * setCount + 1));
   const phaseAngles = [0, 120, 240];
-  for (let i = 0; i < totalConductors; i++) {
-    const x = totalConductors > 1 ? -trayWidthM / 2 + spacingM * (i + 1) : 0;
-    conductors.push({
-      x,
-      y: cableOdM / 2,
-      currentA,
-      phaseAngleDeg: phaseAngles[i % phaseAngles.length],
-    });
+  for (let k = 0; k < setCount; k++) {
+    const centreX = -trayWidthM / 2 + (k + 1) * trayWidthM / (setCount + 1);
+    for (let j = 0; j < 3; j++) {
+      conductors.push({
+        x: centreX + (j - 1) * phaseSpacingM,
+        y: cableOdM / 2,
+        currentA,
+        phaseAngleDeg: phaseAngles[j],
+      });
+    }
   }
   return conductors;
 }
@@ -137,12 +148,9 @@ export function buildThreePhaseConductors(currentA, nCables, trayWidthM, cableOd
 export function fieldProfile(conductors, trayWidthM, distancesM) {
   return distancesM.map(d => {
     const measurePoint = { x: trayWidthM / 2 + d, y: 0.6 }; // 0.6 m above tray floor (body height)
-    try {
-      const { bPeak_uT, bRms_uT } = fieldFromConductorArray(conductors, measurePoint);
-      return { distanceM: d, bPeak_uT, bRms_uT };
-    } catch {
-      return { distanceM: d, bPeak_uT: 0, bRms_uT: 0 };
-    }
+    // Errors propagate: reporting 0 µT for a failed point would read as a passing result.
+    const { bPeak_uT, bRms_uT } = fieldFromConductorArray(conductors, measurePoint);
+    return { distanceM: d, bPeak_uT, bRms_uT };
   });
 }
 

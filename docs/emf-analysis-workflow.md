@@ -15,6 +15,7 @@ This guide documents user expectations for the EMF workflow (`emf.html`) after i
   - tray width (in),
   - cable outer diameter (in),
   - measurement distance (in).
+- **Layout model**: each cable set is a flat group of three phases with conductor centres one cable outer diameter apart (reduced if the sets would not fit), and the sets are spread evenly across the tray width on the tray floor. Closer phases cancel better, so a bigger cable outer diameter gives a higher field; the model assumes balanced currents and no neutral, ground or return current, and ignores the tray's height above the floor and any shielding by the tray or conduit. Results are screening values, not a measurement.
 - For deterministic comparisons, use fixed fixtures (same geometry/current/frequency each run).
 
 ---
