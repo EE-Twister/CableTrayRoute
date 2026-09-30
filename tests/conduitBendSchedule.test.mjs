@@ -2,7 +2,7 @@
  * Tests for analysis/conduitBendSchedule.mjs and analysis/pullBoxSizing.mjs
  *
  * Covers: bend geometry for all four types, cumulative-degree accumulation,
- * NEC 358.24 violation detection, pull-box sizing (straight and angle),
+ * NEC 358.26 violation detection, pull-box sizing (straight and angle),
  * runConduitBendSchedule integration, and input-validation paths.
  */
 import assert from 'assert';
@@ -241,7 +241,7 @@ describe('runConduitBendSchedule() integration', () => {
     assert.ok(r.runs[0].totalDegrees > 0);
   });
 
-  it('detects NEC 358.24 violation on a run with > 360°', () => {
+  it('detects NEC 358.26 violation on a run with > 360°', () => {
     const r = runConduitBendSchedule([{
       label: 'Overcrowded',
       tradeSize: 1,
@@ -518,5 +518,26 @@ describe('pull box review regressions', () => {
     assert.throws(() => sizePullBox({ pullType: 'straight', largestTradeSize: NaN }), /trade size/);
     assert.throws(() => sizePullBox({ pullType: 'angle', wallA: [], wallB: [] }), /at least one conduit/);
     assert.throws(() => sizePullBox({ pullType: 'angle', wallA: [2], wallB: [], invalidSizes: ['x'] }), /Unrecognised/);
+  });
+});
+
+describe('bend schedule review regressions', () => {
+  it('reports degrees from the angle actually used (60° request snaps to 45°/45° = 90°)', () => {
+    const g = bendGeometry('offset', 6, { angle: 60 });
+    assert.strictEqual(g.degrees, 90);
+    assert.strictEqual(g.markSpacing, 8.48); // 6 x 1.414
+  });
+  it('a kick reports the snapped angle', () => {
+    assert.strictEqual(bendGeometry('kick', 4, { angle: 28 }).degrees, 30);
+  });
+  it('a run with an invalid bend cannot pass NEC 358.26', () => {
+    const r = runConduitBendSchedule([{ label: 'R', bends: [
+      { type: '90', dimension: 12 }, { type: '90', dimension: 12 },
+      { type: '90', dimension: 'abc' }, { type: '90', dimension: 12 },
+    ] }]);
+    assert.strictEqual(r.runs[0].totalDegrees, 270);
+    assert.strictEqual(r.runs[0].nec358_24Pass, false);
+    assert.match(r.runs[0].nec358_24Message, /cannot be verified/);
+    assert.strictEqual(r.summary.allPass, false);
   });
 });

@@ -411,7 +411,7 @@ document.addEventListener('DOMContentLoaded', () => {
     el.hidden = false;
     el.innerHTML = `
       <div class="warning-panel" style="border-left:4px solid var(--color-error,#c00);padding:.75rem 1rem;margin:1rem 0;background:var(--color-bg-warn,#fff3f3)">
-        <strong>NEC 358.24 Violations</strong>
+        <strong>NEC 358.26 Violations</strong>
         <ul>
           ${fail.map(r => `<li>${escapeHtml(r.label)}: ${escapeHtml(r.nec358_24Message)}</li>`).join('')}
         </ul>
@@ -622,7 +622,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!saved || !saved.runs) return;
 
     const rows = [['Run', 'Trade Size (in)', 'Bend #', 'Type', 'Dimension (in)',
-                   'Degrees', 'Mark Spacing (in)', 'Shrink (in)', 'Total Degrees', 'NEC 358.24', 'Notes']];
+                   'Degrees', 'Mark Spacing (in)', 'Shrink (in)', 'Total Degrees', 'NEC 358.26', 'Notes']];
 
     for (const run of saved.runs) {
       if (run.bends.length === 0) {
