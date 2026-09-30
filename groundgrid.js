@@ -757,7 +757,7 @@ document.addEventListener('DOMContentLoaded', () => {
         bw,
       });
     } catch (err) {
-      resultsDiv.innerHTML = `<p class="alert-error" role="alert">Error: ${err.message}</p>`;
+      resultsDiv.innerHTML = `<p class="alert-error" role="alert">Error: ${escapeHtml(err.message)}</p>`;
       return;
     }
     latestAnalysisResult = r;
@@ -894,7 +894,7 @@ document.addEventListener('DOMContentLoaded', () => {
       calculate().catch(err => {
         console.error('[groundgrid] calculate failed', err);
         if (resultsDiv) {
-          resultsDiv.innerHTML = `<p class="alert-error" role="alert">Error: ${err.message || err}</p>`;
+          resultsDiv.innerHTML = `<p class="alert-error" role="alert">Error: ${escapeHtml(err.message || err)}</p>`;
         }
       });
     });

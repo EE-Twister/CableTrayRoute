@@ -671,7 +671,10 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
     baseIdentities = new Set(baseProducts.map(catalogIdentity));
     allProducts = mergeCatalogProducts(baseProducts, getCustomProducts());
   } catch (err) {
-    container.innerHTML = `<p class="catalog-error">Failed to load catalog: ${err.message}</p>`;
+    const failure = document.createElement('p');
+    failure.className = 'catalog-error';
+    failure.textContent = `Failed to load catalog: ${err.message}`;
+    container.replaceChildren(failure);
     return;
   }
 
