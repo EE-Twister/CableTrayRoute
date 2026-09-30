@@ -88,10 +88,14 @@ export function ppeCategoryForEnergy(incidentEnergyCalCm2) {
  * @param {number} p.batteryInternalResistanceOhm  — total battery string resistance (Ω)
  * @param {number} [p.cableResistanceOhm=0]        — one-way cable resistance (Ω)
  * @param {number} [p.busbarResistanceOhm=0]        — bus/busbar resistance (Ω)
+ * @param {number} [p.parallelStrings=1]            — identical battery strings in parallel
  * @returns {number} Total resistance in Ω
  */
-export function totalCircuitResistance({ batteryInternalResistanceOhm, cableResistanceOhm = 0, busbarResistanceOhm = 0 }) {
-  const Rb = Number(batteryInternalResistanceOhm);
+export function totalCircuitResistance({ batteryInternalResistanceOhm, cableResistanceOhm = 0, busbarResistanceOhm = 0, parallelStrings = 1 }) {
+  const strings = Number(parallelStrings ?? 1);
+  if (!Number.isInteger(strings) || strings < 1) throw new Error('parallelStrings must be a positive integer');
+  // Identical strings on the same bus share the fault: the source resistance is R / N.
+  const Rb = Number(batteryInternalResistanceOhm) / strings;
   const Rc = Number(cableResistanceOhm) || 0;
   const Rbus = Number(busbarResistanceOhm) || 0;
   if (!Number.isFinite(Rb) || Rb <= 0) throw new Error('batteryInternalResistanceOhm must be a positive number');
@@ -151,11 +155,12 @@ export function calcDcFaultCurrent({
   cableResistanceOhm = 0,
   busbarResistanceOhm = 0,
   inductanceMH = 0,
+  parallelStrings = 1,
 }) {
   const V_oc = Number(batteryVoltageV);
   if (!Number.isFinite(V_oc) || V_oc <= 0) throw new Error('batteryVoltageV must be a positive number');
 
-  const R_total = totalCircuitResistance({ batteryInternalResistanceOhm, cableResistanceOhm, busbarResistanceOhm });
+  const R_total = totalCircuitResistance({ batteryInternalResistanceOhm, cableResistanceOhm, busbarResistanceOhm, parallelStrings });
   const L_mH = Number(inductanceMH) || 0;
   if (!Number.isFinite(L_mH) || L_mH < 0) throw new Error('inductanceMH must be ≥ 0');
 
@@ -258,6 +263,7 @@ export function calcDcArcFlash({
   workingDistanceMm = 455,
   arcDurationMs,
   enclosureType = 'open_air',
+  parallelStrings = 1,
 }) {
   const V_oc = Number(batteryVoltageV);
   if (!Number.isFinite(V_oc) || V_oc <= 0) throw new Error('batteryVoltageV must be a positive number');
@@ -271,7 +277,7 @@ export function calcDcArcFlash({
   const gap = Math.max(Number(gapMm) || 25, 1);
   const t_s = t_ms / 1000;
 
-  const R_total = totalCircuitResistance({ batteryInternalResistanceOhm, cableResistanceOhm, busbarResistanceOhm });
+  const R_total = totalCircuitResistance({ batteryInternalResistanceOhm, cableResistanceOhm, busbarResistanceOhm, parallelStrings });
   const I_bf = V_oc / R_total;
 
   const { arcCurrentA, arcVoltageV } = calcDcArcingCurrent(V_oc, R_total, I_bf, gap);
@@ -347,7 +353,7 @@ export function calcDcArcFlash({
  * @param {Array}  p.devices                 — array of { tag, type, ratedCurrentA, interruptRatingA, clearingTimeMs }
  * @returns {Array} Per-device assessment results
  */
-export function selectDcProtection({ availableFaultCurrentA, devices }) {
+export function selectDcProtection({ availableFaultCurrentA, devices, systemVoltageV = null }) {
   const I_avail = Number(availableFaultCurrentA);
   if (!Number.isFinite(I_avail) || I_avail <= 0) throw new Error('availableFaultCurrentA must be a positive number');
   if (!Array.isArray(devices)) throw new Error('devices must be an array');
@@ -362,13 +368,20 @@ export function selectDcProtection({ availableFaultCurrentA, devices }) {
       return { tag, type: dev.type || 'unknown', pass: null, note: 'Interrupt rating not provided — cannot assess.' };
     }
 
-    const pass = I_avail <= interruptA;
+    const voltRatingV = Number(dev.voltageRatingV);
+    const sysV = Number(systemVoltageV);
+    const voltageOk = !(Number.isFinite(voltRatingV) && voltRatingV > 0 && Number.isFinite(sysV) && sysV > 0)
+      || voltRatingV >= sysV;
+    const pass = I_avail <= interruptA && voltageOk;
     const margin = interruptA - I_avail;
     const marginPct = (margin / I_avail) * 100;
 
     const notes = [];
     if (!pass) {
       notes.push(`Interrupt rating ${interruptA.toFixed(0)} A is insufficient for available fault current ${I_avail.toFixed(0)} A. Replace with a higher-rated device.`);
+    }
+    if (!voltageOk) {
+      notes.push(`DC voltage rating ${voltRatingV.toFixed(0)} V is below the ${sysV.toFixed(0)} V system voltage; the interrupt rating is only valid up to the rated DC voltage.`);
     }
     if (Number.isFinite(ratedA) && ratedA > 0 && I_avail > ratedA * 10) {
       notes.push(`Available fault current is ${(I_avail / ratedA).toFixed(1)}× the device continuous rating — verify device type is appropriate for DC fault duty.`);
@@ -382,6 +395,7 @@ export function selectDcProtection({ availableFaultCurrentA, devices }) {
       type: dev.type || 'unknown',
       ratedCurrentA: Number.isFinite(ratedA) ? ratedA : null,
       interruptRatingA: interruptA,
+      voltageRatingV: Number.isFinite(voltRatingV) && voltRatingV > 0 ? voltRatingV : null,
       pass,
       marginA: Number(margin.toFixed(0)),
       marginPct: Number(marginPct.toFixed(1)),
@@ -403,6 +417,7 @@ export function runDcShortCircuitStudy(inputs) {
     cableResistanceOhm = 0,
     busbarResistanceOhm = 0,
     inductanceMH = 0,
+    parallelStrings = 1,
     runArcFlash = false,
     gapMm = 25,
     workingDistanceMm = 455,
@@ -419,6 +434,7 @@ export function runDcShortCircuitStudy(inputs) {
     cableResistanceOhm,
     busbarResistanceOhm,
     inductanceMH,
+    parallelStrings,
   });
 
   const result = {
@@ -440,12 +456,14 @@ export function runDcShortCircuitStudy(inputs) {
       workingDistanceMm,
       arcDurationMs,
       enclosureType,
+      parallelStrings,
     });
   }
 
   if (Array.isArray(devices) && devices.length > 0) {
     result.protectionCheck = selectDcProtection({
       availableFaultCurrentA: faultResult.boltedFaultCurrentA,
+      systemVoltageV: faultResult.openCircuitVoltageV,
       devices,
     });
   }

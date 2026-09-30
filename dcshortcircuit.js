@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chem = chemistrySelect.value;
     const vPerCell = CELL_VOLTAGE[chem] || 2.0;
     if (Number.isFinite(cells) && cells > 0) {
-      voltageInput.value = (cells * vPerCell).toFixed(0);
+      voltageInput.value = String(Math.round(cells * vPerCell * 10) / 10);
     }
   }
   cellCountInput.addEventListener('input', updateVoltageFromCells);
@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --------------------------------------------------------------------------
 
-  function addDeviceRow(tag = '', type = 'fuse', ratedA = '', interruptA = '', clearMs = '') {
+  function addDeviceRow(tag = '', type = 'fuse', ratedA = '', interruptA = '', clearMs = '', voltRatingV = '') {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><input type="text" class="dev-tag" value="${escHtml(String(tag))}"
@@ -103,6 +103,8 @@ document.addEventListener('DOMContentLoaded', () => {
           value="${escHtml(String(ratedA))}" placeholder="100" aria-label="Rated current A"></td>
       <td><input type="number" class="dev-interrupt" min="1" step="100"
           value="${escHtml(String(interruptA))}" placeholder="10000" required aria-label="Interrupt rating A"></td>
+      <td><input type="number" class="dev-vrating" min="1" step="1"
+          value="${escHtml(String(voltRatingV ?? ''))}" placeholder="125" aria-label="DC voltage rating V"></td>
       <td><input type="number" class="dev-clear" min="1" step="1"
           value="${escHtml(String(clearMs))}" placeholder="50" aria-label="Clearing time ms"></td>
       <td><button type="button" class="remove-device-btn btn-icon"
@@ -119,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cableResistanceOhm = (getFloat('cable-resistance') || 0) / 1000;
     const busbarResistanceOhm = (getFloat('bus-resistance') || 0) / 1000;
     const inductanceMH = getFloat('inductance') || 0;
+    const parallelStrings = Math.max(1, Math.round(getFloat('parallel-strings') || 1));
     const studyLabel = getEl('study-label').value.trim();
 
     if (!Number.isFinite(batteryVoltageV) || batteryVoltageV <= 0) {
@@ -151,8 +154,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const ratedCurrentA = parseFloat(row.querySelector('.dev-rated').value) || null;
       const interruptRatingA = parseFloat(row.querySelector('.dev-interrupt').value);
       const clearingTimeMs = parseFloat(row.querySelector('.dev-clear').value) || null;
+      const voltageRatingV = parseFloat(row.querySelector('.dev-vrating').value) || null;
       if (Number.isFinite(interruptRatingA) && interruptRatingA > 0) {
-        devices.push({ tag: tag || type, type, ratedCurrentA, interruptRatingA, clearingTimeMs });
+        devices.push({ tag: tag || type, type, ratedCurrentA, interruptRatingA, clearingTimeMs, voltageRatingV });
       }
     });
 
@@ -162,6 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
       cableResistanceOhm,
       busbarResistanceOhm,
       inductanceMH,
+      parallelStrings,
       runArcFlash,
       arcDurationMs,
       gapMm,
@@ -185,6 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
     set('cable-resistance', ((inputs.cableResistanceOhm || 0) * 1000).toFixed(2));
     set('bus-resistance', ((inputs.busbarResistanceOhm || 0) * 1000).toFixed(2));
     set('inductance', inputs.inductanceMH || 0);
+    set('parallel-strings', inputs.parallelStrings || 1);
     if (inputs.runArcFlash) {
       arcFlashToggle.checked = true;
       arcFlashSection.hidden = false;
@@ -194,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
       set('enclosure-type', inputs.enclosureType);
     }
     if (Array.isArray(inputs.devices)) {
-      inputs.devices.forEach(d => addDeviceRow(d.tag, d.type, d.ratedCurrentA, d.interruptRatingA, d.clearingTimeMs));
+      inputs.devices.forEach(d => addDeviceRow(d.tag, d.type, d.ratedCurrentA, d.interruptRatingA, d.clearingTimeMs, d.voltageRatingV));
     }
   }
 
@@ -248,7 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
       html += `<h3>Protection Device Assessment</h3>`;
       html += `<table class="results-table data-table">
         <thead>
-          <tr><th>Tag</th><th>Type</th><th>Rated (A)</th><th>Interrupt Rating (A)</th><th>Status</th><th>Notes</th></tr>
+          <tr><th>Tag</th><th>Type</th><th>Rated (A)</th><th>Interrupt Rating (A)</th><th>DC Rating (V)</th><th>Status</th><th>Notes</th></tr>
         </thead>
         <tbody>`;
       pc.forEach(dev => {
@@ -259,6 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <td>${escHtml(dev.type)}</td>
           <td>${dev.ratedCurrentA != null ? dev.ratedCurrentA.toLocaleString() : '—'}</td>
           <td>${dev.interruptRatingA != null ? dev.interruptRatingA.toLocaleString() : '—'}</td>
+          <td>${dev.voltageRatingV != null ? dev.voltageRatingV.toLocaleString() : '—'}</td>
           <td class="${statusClass}">${statusLabel}</td>
           <td>${dev.note ? escHtml(dev.note) : '—'}</td>
         </tr>`;

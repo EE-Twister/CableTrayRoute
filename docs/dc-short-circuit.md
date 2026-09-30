@@ -37,7 +37,7 @@ I_bf = V_oc / R_total
 
 where:
 - `V_oc` = open-circuit (no-load) voltage of the DC source (V)
-- `R_total = R_battery + 2R_cable(one-way) + R_bus` (Ω)
+- `R_total = R_battery / N + 2R_cable(one-way) + R_bus` (Ω), where `N` is the number of identical parallel battery strings (default 1). The internal resistance entered is for one string.
 
 **Battery voltage by chemistry:**
 
@@ -165,6 +165,10 @@ const checks = selectDcProtection({
 // checks[0].pass === true (10 kA fuse passes)
 // checks[1].pass === false (3 kA breaker fails — insufficient for 4808 A fault)
 ```
+
+Each device may also carry `voltageRatingV` (its DC voltage rating). When the `systemVoltageV`
+argument is supplied and a device's DC rating is lower than the system voltage, the device fails,
+since a DC interrupt rating is only valid up to the rated DC voltage.
 
 ### `runDcShortCircuitStudy(inputs)`
 
