@@ -331,8 +331,13 @@ export function runMonteCarloLoadFlow(baseModel, config = {}, opts = {}) {
   const busLabel = {};
 
   for (let s = 0; s < samples; s++) {
-    const loadScale = sampleDistribution(rng, loadDist);
-    const genScale = sampleDistribution(rng, genDist);
+    // A negative (or non-numeric) multiplier would turn loads into generation and
+    // vice versa, so floor every sampled scale at zero whatever distribution the
+    // user picked (a wide Normal easily dips below 0 without an explicit clamp).
+    const rawLoadScale = sampleDistribution(rng, loadDist);
+    const rawGenScale = sampleDistribution(rng, genDist);
+    const loadScale = Number.isFinite(rawLoadScale) ? Math.max(0, rawLoadScale) : 1;
+    const genScale = Number.isFinite(rawGenScale) ? Math.max(0, rawGenScale) : 1;
     loadScaleValues.push(loadScale);
     genScaleValues.push(genScale);
 

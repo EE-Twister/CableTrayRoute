@@ -220,4 +220,16 @@ function fixtureModel() {
   );
 })();
 
+// A wide Normal with no clamp must never produce a negative load or generation multiplier
+(function testNegativeScaleFloor() {
+  const r = runMonteCarloLoadFlow(
+    fixtureModel(),
+    { samples: 400, seed: 77, loadDist: { type: 'normal', mean: 0.3, sd: 1.0 }, genDist: { type: 'normal', mean: 0.2, sd: 1.0 } },
+    { baseMVA: 100, balanced: true }
+  );
+  assert.ok(r.loadScaleStats.min >= 0, `load scale min ${r.loadScaleStats.min}`);
+  assert.ok(r.genScaleStats.min >= 0, `gen scale min ${r.genScaleStats.min}`);
+  assert.ok(r.loadScaleStats.mean > 0.3, 'flooring at 0 lifts the mean above the raw 0.3');
+})();
+
 console.log('probabilisticLoadFlow.test.mjs — all assertions passed');
