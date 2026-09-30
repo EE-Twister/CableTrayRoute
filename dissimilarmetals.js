@@ -829,6 +829,11 @@ function renderInspectionMilestones(result) {
   `;
 }
 
+function round(value, decimals) {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+}
+
 function getCorrosionTimelineConfig(result) {
   const estimatedLifeYears = finiteNumber(result?.estimatedLifeYears, NaN);
   const maxYears = Number.isFinite(estimatedLifeYears) && estimatedLifeYears > 0

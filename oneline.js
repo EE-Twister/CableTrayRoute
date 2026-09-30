@@ -3757,17 +3757,6 @@ function withStudyProvenance(state, studyKey) {
   if (provenance.status === 'stale') {
     return { key: 'stale', label: `${state.label} · stale result`, color: '#7c3aed', provenance };
   }
-  if (profile === 'transferSwitch') {
-    return {
-      width: 72,
-      height: 72,
-      ports: [
-        { x: 18, y: 0 },
-        { x: 54, y: 0 },
-        { x: 36, y: 72 }
-      ]
-    };
-  }
   if (provenance.status === 'unknown') {
     return { key: 'unknown', label: `${state.label} · freshness unknown`, color: '#64748b', provenance };
   }
@@ -4704,72 +4693,6 @@ function editPrefixes() {
       closeModal();
     }
   };
-
-  function renderCategoryButtons() {
-    categoryListEl.innerHTML = '';
-    categoryButtonMap.clear();
-    categoryOrder.forEach(categoryKey => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'prop-category-option';
-      button.textContent = getCategoryLabel(categoryKey);
-      button.dataset.category = categoryKey;
-      button.setAttribute('aria-pressed', 'false');
-      button.addEventListener('click', () => {
-        if (activeCategory === categoryKey) return;
-        activeCategory = categoryKey;
-        const nextDevice = categoryEntries.get(activeCategory)?.[0] || null;
-        renderDeviceButtons();
-        updateCategoryStates();
-        if (nextDevice) {
-          setActiveComponent(nextDevice);
-        } else {
-          selected = null;
-          selection = [];
-          selectedConnection = null;
-          renderPropertiesFor(null);
-          updateButtonStates();
-        }
-      });
-      categoryButtonMap.set(categoryKey, button);
-      categoryListEl.appendChild(button);
-    });
-  }
-
-  function renderDeviceButtons() {
-    componentListEl.innerHTML = '';
-    buttonMap.clear();
-    const devices = categoryEntries.get(activeCategory) || [];
-    const headingLabel = activeCategory ? `Device Tags – ${getCategoryLabel(activeCategory)}` : 'Device Tags';
-    componentHeading.textContent = headingLabel;
-    devices.forEach(device => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'prop-component-option';
-      button.dataset.componentId = device.id;
-      button.textContent = getComponentListLabel(device);
-      button.setAttribute('aria-pressed', 'false');
-      button.addEventListener('click', () => setActiveComponent(device));
-      button.addEventListener('keydown', event => {
-        if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-        event.preventDefault();
-        const list = categoryEntries.get(activeCategory) || [];
-        const currentIndex = list.findIndex(item => item.id === device.id);
-        if (currentIndex === -1) return;
-        const offset = event.key === 'ArrowUp' ? -1 : 1;
-        let nextIndex = currentIndex + offset;
-        if (nextIndex < 0) nextIndex = 0;
-        if (nextIndex >= list.length) nextIndex = list.length - 1;
-        const nextDevice = list[nextIndex];
-        if (!nextDevice) return;
-        setActiveComponent(nextDevice);
-        const nextButton = buttonMap.get(nextDevice.id);
-        nextButton?.focus();
-      });
-      buttonMap.set(device.id, button);
-      componentListEl.appendChild(button);
-    });
-  }
 
   const header = document.createElement('div');
   header.className = 'modal-header';

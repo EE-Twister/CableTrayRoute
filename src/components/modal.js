@@ -15,7 +15,7 @@ function getFocusableElements(container) {
   });
 }
 
-function trapFocus(event, container) {
+export function trapFocus(event, container) {
   if (event.key !== 'Tab') return;
   const focusable = getFocusableElements(container);
   if (!focusable.length) {

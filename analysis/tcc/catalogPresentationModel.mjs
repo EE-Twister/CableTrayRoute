@@ -86,7 +86,7 @@ function resolveTypePriority(rawValue) {
   return TYPE_PRIORITY.get('other');
 }
 
-function getTypeInfo(entry) {
+export function getTypeInfo(entry) {
   if (!entry) return { id: 'other', label: 'Other Devices', priority: TYPE_PRIORITY.get('other') };
   const base = entry.baseDevice || {};
   const category = entry.deviceCategory || base.type || entry.deviceType || entry.kind || 'other';

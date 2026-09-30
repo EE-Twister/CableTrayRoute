@@ -83,6 +83,7 @@ export async function renderTccChart(dependencies = {}) {
   let {
     activeCoordMarkerDrawer,
     activeCurvesUpdater,
+    activeDeviceInputsUpdater,
     activeEquipmentConstraintChecks,
     activeEquipmentOverlays,
     activeLegendFocusKey,
@@ -1271,6 +1272,7 @@ export async function renderTccChart(dependencies = {}) {
   // Expose closures for autoCoordinate() which runs outside plot()
   activePlotted = plotted;
   activeCurvesUpdater = updateCurves;
+  activeDeviceInputsUpdater = updateDeviceInputs;
   activeCoordMarkerDrawer = (coordResults, orderedEntries) => {
     indicatorLayer.selectAll('.tcc-coord-violation').remove();
     if (!coordResults) return;
@@ -1331,6 +1333,7 @@ export async function renderTccChart(dependencies = {}) {
     Object.assign(state, {
       activeCoordMarkerDrawer,
       activeCurvesUpdater,
+      activeDeviceInputsUpdater,
       activeEquipmentConstraintChecks,
       activeEquipmentOverlays,
       activeLegendFocusKey,
