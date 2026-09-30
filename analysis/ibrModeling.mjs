@@ -40,19 +40,25 @@ export const STC_TEMP_C = 25;
  * Segment endpoints are the "default operating point" values from the standard.
  */
 export const VOLT_VAR_CURVES = {
-  /** Category A — utility-scale, tighter deadband */
+  /**
+   * Category A — lower reactive-power capability (25 % of rating), no deadband at
+   * the reference voltage.
+   */
   A: [
+    [0.90, 0.25],
+    [1.00, 0.0],
+    [1.00, 0.0],
+    [1.10, -0.25],
+  ],
+  /**
+   * Category B — 44 % reactive-power capability with a ±2 % deadband
+   * (0.92 / 0.98 / 1.02 / 1.08). This is also the CA Rule 21 default curve.
+   */
+  B: [
     [0.92, 0.44],
     [0.98, 0.0],
     [1.02, 0.0],
     [1.08, -0.44],
-  ],
-  /** Category B — distributed rooftop, wider deadband */
-  B: [
-    [0.90, 0.44],
-    [0.98, 0.0],
-    [1.02, 0.0],
-    [1.10, -0.44],
   ],
 };
 
