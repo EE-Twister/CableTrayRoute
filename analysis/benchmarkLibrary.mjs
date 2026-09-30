@@ -420,7 +420,8 @@ export const BENCHMARKS = [
     standardRef: 'Thevenin equivalent motor-starting screening model',
     description:
       'A 100 hp, 480 V motor at 0.90 power factor and efficiency uses 6× locked-rotor current ' +
-      'behind 0.01 + j0.02 ohm source impedance. The live engine must reproduce starting current and sag.',
+      'behind 0.01 + j0.02 ohm per-phase source impedance. The live engine must reproduce starting current ' +
+      'and the line-to-line sag: sqrt(3) x 665 A x 0.02236 ohm / 480 V = 5.36 %.',
     run() {
       const result = calculateMotorStartCase({
         id: 'M1',
@@ -450,7 +451,7 @@ export const BENCHMARKS = [
     checks: [
       { key: 'ready', description: 'Input case accepted', expectedVal: true, tolerance: 0, type: 'boolean' },
       { key: 'inrush_ka', description: 'Starting current (kA)', expectedVal: 0.665, tolerance: 0.001 },
-      { key: 'voltage_sag_pct', description: 'Voltage sag (%)', expectedVal: 3.10, tolerance: 0.01 }
+      { key: 'voltage_sag_pct', description: 'Voltage sag (%)', expectedVal: 5.36, tolerance: 0.01 }
     ]
   },
 

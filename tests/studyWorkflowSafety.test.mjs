@@ -64,6 +64,7 @@ const motorResult = calculateMotorStartCase({
 assert.strictEqual(motorResult.ready, true);
 assert.strictEqual(motorResult.status, 'pass');
 assert.strictEqual(motorResult.inrushKA, 0.665);
-assert.strictEqual(motorResult.voltageSagPct, 3.1);
+// Line-to-line drop = sqrt(3) * I_start * Z / V = 1.732 * 665 A * 0.02236 ohm / 480 V = 5.36 %.
+assert.strictEqual(motorResult.voltageSagPct, 5.36);
 
 console.log('study workflow safety tests passed');
