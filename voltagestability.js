@@ -310,6 +310,11 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>Not a physical margin</td>
             </tr>
             <tr>
+              <td>Voltage-Limited Margin (${summary.voltageLimitLambda != null ? 'below 0.90 pu' : 'no violation in sweep'})</td>
+              <td>${summary.voltageLimitedMarginMW != null ? `${summary.voltageLimitedMarginMW.toFixed(3)} MW (${summary.voltageLimitedMarginPct.toFixed(1)}%)` : '—'}</td>
+              <td>${summary.voltageLimitedMarginMW != null ? 'Load before a bus falls below 0.90 pu' : 'Sweep ended before the limit'}</td>
+            </tr>
+            <tr>
               <td>Critical Bus</td>
               <td>${escapeHtml(summary.criticalBusId || '—')}</td>
               <td>—</td>

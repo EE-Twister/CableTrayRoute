@@ -208,6 +208,9 @@ function solveNR(buses, baseMVA) {
     iterations = iter + 1;
   }
 
+  // A "converged" point with a zero or negative voltage magnitude is a mathematical root, not an operating point.
+  if (converged && Vm.some(v => !(v > 0))) converged = false;
+
   return { Vm: [...Vm], Va: [...Va], converged, iterations };
 }
 
@@ -250,6 +253,7 @@ function validateBuses(buses) {
  * @param {number}   opts.lambdaStart   Initial load factor (default 1.0).
  * @param {number}   opts.lambdaMax     Maximum load factor to attempt (default 3.0).
  * @param {number}   opts.lambdaStep    Step size for each increment (default 0.05).
+ * @param {number}   opts.minVoltagePu  Lowest acceptable PQ-bus voltage (default 0.90 pu) for the voltage-limited margin.
  * @returns {{
  *   points: Array<{lambda:number, totalLoadMW:number, buses:Array<{id:string,Vm:number,Va:number}>, converged:boolean}>,
  *   collapseFound: boolean,
@@ -269,6 +273,7 @@ export function buildPVCurve(buses, opts = {}) {
     lambdaStart = 1.0,
     lambdaMax = 3.0,
     lambdaStep = 0.05,
+    minVoltagePu = 0.90,
   } = opts;
 
   if (!(lambdaStep > 0)) throw new Error('lambdaStep must be positive.');
@@ -279,9 +284,8 @@ export function buildPVCurve(buses, opts = {}) {
   let solverLimitEncountered = false;
   let solverLimitLambda = null;
   let lastConvergedLambda = lambdaStart;
-
-  // Base-case operating point total load (MW)
-  const baseLoadMW = buses.reduce((s, b) => s + (b.Pd || 0), 0) / 1000;
+  let voltageLimitLambda = null;
+  const pqIds = new Set(buses.filter(b => (b.type || '').toLowerCase() === 'pq').map(b => b.id));
 
   for (let lam = lambdaStart; lam <= lambdaMax + 1e-9; lam = Math.round((lam + lambdaStep) * 1e8) / 1e8) {
     const scaled = scaleBuses(buses, lam);
@@ -293,6 +297,9 @@ export function buildPVCurve(buses, opts = {}) {
 
     if (converged) {
       lastConvergedLambda = lam;
+      if (voltageLimitLambda === null && busSnap.some(b => pqIds.has(b.id) && b.Vm < minVoltagePu)) {
+        voltageLimitLambda = lam;
+      }
     } else {
       solverLimitEncountered = true;
       solverLimitLambda = lam;
@@ -318,10 +325,29 @@ export function buildPVCurve(buses, opts = {}) {
     );
   }
 
-  const operatingLoadMW = baseLoadMW * lambdaStart;
-  const maxLoadMW = baseLoadMW * lastConvergedLambda;
+  // Only PQ-bus loads are scaled, so the loads come from the evaluated points rather than
+  // lambda x (sum of every bus's Pd), which would also scale fixed slack/PV-bus loads.
+  const firstPoint = points.find(p => p.converged);
+  const lastPoint = [...points].reverse().find(p => p.converged);
+  const operatingLoadMW = firstPoint ? firstPoint.totalLoadMW : 0;
+  const maxLoadMW = lastPoint ? lastPoint.totalLoadMW : operatingLoadMW;
   const loadabilityMarginMW = maxLoadMW - operatingLoadMW;
   const loadabilityMarginPct = operatingLoadMW > 0 ? (loadabilityMarginMW / operatingLoadMW) * 100 : 0;
+
+  // Margin to the voltage limit: the last load level before any PQ bus drops below minVoltagePu
+  let voltageLimitedMarginMW = null;
+  let voltageLimitedMarginPct = null;
+  if (operatingPt && operatingPt.buses.some(b => pqIds.has(b.id) && b.Vm < minVoltagePu)) {
+    warnings.push(`At the base case (λ = ${lambdaStart.toFixed(2)}) at least one load bus is already below ${minVoltagePu} pu; there is no voltage-limited margin.`);
+    voltageLimitedMarginMW = 0;
+    voltageLimitedMarginPct = 0;
+  } else if (voltageLimitLambda !== null) {
+    const beforeLimit = [...points].reverse().find(p => p.converged && p.lambda < voltageLimitLambda);
+    const loadAtLimit = beforeLimit ? beforeLimit.totalLoadMW : operatingLoadMW;
+    voltageLimitedMarginMW = loadAtLimit - operatingLoadMW;
+    voltageLimitedMarginPct = operatingLoadMW > 0 ? (voltageLimitedMarginMW / operatingLoadMW) * 100 : 0;
+    warnings.push(`A load bus falls below ${minVoltagePu} pu at λ = ${voltageLimitLambda.toFixed(2)}; the voltage-limited margin is ${voltageLimitedMarginMW.toFixed(2)} MW, less than the solver margin.`);
+  }
 
   return {
     points,
@@ -334,6 +360,10 @@ export function buildPVCurve(buses, opts = {}) {
     maxLoadMW,
     loadabilityMarginMW,
     loadabilityMarginPct,
+    minVoltagePu,
+    voltageLimitLambda,
+    voltageLimitedMarginMW,
+    voltageLimitedMarginPct,
     warnings,
     calculationStatus: 'screening-only',
   };
@@ -484,6 +514,7 @@ export function runVoltageStabilityStudy(inputs = {}) {
     qMinMvar = -50,
     qMaxMvar = 50,
     qStepMvar = 2,
+    minVoltagePu = 0.90,
     systemLabel = '',
   } = inputs;
 
@@ -500,7 +531,7 @@ export function runVoltageStabilityStudy(inputs = {}) {
     targetBusId = (pqBus || nonSlackBus || buses[0]).id;
   }
 
-  const pvCurve = buildPVCurve(buses, { baseMVA, lambdaStart: 1.0, lambdaMax, lambdaStep });
+  const pvCurve = buildPVCurve(buses, { baseMVA, lambdaStart: 1.0, lambdaMax, lambdaStep, minVoltagePu });
   const qvCurve = buildQVCurve(buses, { targetBusId, baseMVA, qMinMvar, qMaxMvar, qStepMvar });
   const margin = calcLoadabilityMargin(pvCurve);
 
@@ -518,6 +549,9 @@ export function runVoltageStabilityStudy(inputs = {}) {
     maxLoadMW: margin.maxLoadMW,
     loadabilityMarginMW: margin.marginMW,
     loadabilityMarginPct: margin.marginPct,
+    voltageLimitedMarginMW: pvCurve.voltageLimitedMarginMW,
+    voltageLimitedMarginPct: pvCurve.voltageLimitedMarginPct,
+    voltageLimitLambda: pvCurve.voltageLimitLambda,
     criticalBusId: pvCurve.criticalBusId,
     collapseFound: pvCurve.collapseFound,
     collapseLambda: pvCurve.collapseLambda,

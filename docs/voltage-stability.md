@@ -39,8 +39,9 @@ Use **Import Project One-Line** to populate buses, loads, generation, and modele
 |---|---|
 | Operating load (MW) | Total system active load at base case (λ = 1) |
 | Last converged sample (MW) | Total load at the final converged Newton-Raphson step; not a confirmed maximum-transfer point |
-| Sampled converged range (MW, %) | Distance from the operating point to the last converged sample; not a physical loadability margin |
+| Sampled converged range (MW, %) | Only PQ-bus loads are scaled with λ; slack and PV bus loads stay fixed. Distance from the operating point to the last converged sample; not a physical loadability margin |
 | Critical bus | Bus with lowest voltage at the operating point |
+| Voltage-limited margin (MW, %) | Load increase available before any load bus falls below 0.90 pu (the sweep's own limit, not a collapse margin); 0 when a bus is already below it at the base case |
 | Reactive margin (MVAR) | Not assigned by the sequential sweep; continuation power flow is required |
 | Collapse at λ | Load factor at which the power flow first failed to converge |
 | P-V curve | Voltage vs. total load for all buses (SVG) |
