@@ -747,6 +747,23 @@ describe('minimizeCostConductors', () => {
   });
 });
 
+describe('terminal temperature inference for feeders and transformers', () => {
+  it('feeder above 100 A OCPD uses the 75C column when no equipment rating is entered', () => {
+    const r = sizeFeeder({ loadAmps: 200, continuous: false, material: 'copper', tempRating: 75 });
+    assert.strictEqual(r.terminalTempRating, 75);
+    assert.strictEqual(r.conductorSize, '3/0 AWG');
+  });
+  it('feeder at or below 100 A OCPD stays on the 60C column', () => {
+    assert.strictEqual(sizeFeeder({ loadAmps: 60, continuous: false }).terminalTempRating, 60);
+  });
+  it('an explicit equipment rating still wins over the OCPD', () => {
+    assert.strictEqual(sizeFeeder({ loadAmps: 200, continuous: false, equipmentRatedAmps: 90 }).terminalTempRating, 60);
+  });
+  it('transformer secondary above 100 A uses the 75C column by default', () => {
+    assert.strictEqual(sizeTransformer({ loadKva: 75, primaryVoltage: 480, secondaryVoltage: 208 }).secondaryTerminalTempRating, 75);
+  });
+});
+
 describe('blank and non-numeric form input is rejected, not propagated as NaN', () => {
   it('sizeFeeder rejects NaN load current', () => {
     assert.throws(() => sizeFeeder({ loadAmps: NaN }), /Load current must be a number greater than zero/);

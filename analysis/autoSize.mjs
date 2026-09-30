@@ -641,8 +641,10 @@ export function sizeFeeder(params) {
 
   const requiredAmps = continuous ? loadAmps * 1.25 : loadAmps;
   const ocpd = nextStandardOcpd(requiredAmps);
+  // With no equipment rating entered, the feeder OCPD is the equipment rating
+  // that governs the NEC 110.14(C)(1) terminal temperature screen.
   const appliedTerminalTempRating = terminalTempRating == null || terminalTempRating === ''
-    ? inferTerminalTempRating({ requiredOcpd: ocpd, equipmentRatedAmps })
+    ? inferTerminalTempRating({ requiredOcpd: ocpd, equipmentRatedAmps: equipmentRatedAmps ?? ocpd })
     : terminalTempRating;
   const conductor = selectConductorSize(requiredAmps, material, tempRating, {
     ambientTempC,
@@ -867,7 +869,7 @@ export function sizeTransformer(params) {
   const secondaryOcpdRequired = secondaryRatedAmps * 1.25;
   const secondaryOcpd = nextStandardOcpd(secondaryOcpdRequired);
   const appliedSecondaryTerminalTempRating = secondaryTerminalTempRating == null || secondaryTerminalTempRating === ''
-    ? inferTerminalTempRating({ requiredOcpd: secondaryOcpd, equipmentRatedAmps: secondaryEquipmentRatedAmps })
+    ? inferTerminalTempRating({ requiredOcpd: secondaryOcpd, equipmentRatedAmps: secondaryEquipmentRatedAmps ?? secondaryOcpd })
     : secondaryTerminalTempRating;
 
   // Size secondary conductors: 125% of secondary rated current (continuous load rule)

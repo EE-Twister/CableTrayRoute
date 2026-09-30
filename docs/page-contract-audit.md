@@ -359,7 +359,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - analysis/shortCircuit.mjs:1145 getCables()
+  - analysis/shortCircuit.mjs:1183 getCables()
   - oneline.js:11210 getCables()
   - oneline.js:12695 getCables()
   - oneline.js:12870 getCables()
@@ -1916,11 +1916,11 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - analysis/shortCircuit.mjs:1145 getCables()
+  - analysis/shortCircuit.mjs:1183 getCables()
   - analysis/tcc.js:2979 getCables()
 - `oneLineDiagram`
   - analysis/arcFlash.mjs:446 getOneLine()
-  - analysis/shortCircuit.mjs:1140 getOneLine()
+  - analysis/shortCircuit.mjs:1178 getOneLine()
   - analysis/tcc.js:2097 getOneLine()
   - analysis/tcc.js:2202 getOneLine()
   - analysis/tcc.js:3500 getOneLine()
@@ -2646,10 +2646,10 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - analysis/shortCircuit.mjs:1145 getCables()
+  - analysis/shortCircuit.mjs:1183 getCables()
   - studies/shortCircuit.js:13 getCables()
 - `oneLineDiagram`
-  - analysis/shortCircuit.mjs:1140 getOneLine()
+  - analysis/shortCircuit.mjs:1178 getOneLine()
   - studies/shortCircuit.js:8 getOneLine()
 - `settings.designBasis`
   - src/components/studyBasis.js:37 getDesignBasis()
@@ -2700,9 +2700,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - analysis/shortCircuit.mjs:1145 getCables()
+  - analysis/shortCircuit.mjs:1183 getCables()
 - `oneLineDiagram`
-  - analysis/shortCircuit.mjs:1140 getOneLine()
+  - analysis/shortCircuit.mjs:1178 getOneLine()
   - iec60909.js:50 getOneLine()
 - `settings.designBasis`
   - src/components/studyBasis.js:37 getDesignBasis()
@@ -2748,10 +2748,10 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - analysis/shortCircuit.mjs:1145 getCables()
+  - analysis/shortCircuit.mjs:1183 getCables()
 - `oneLineDiagram`
   - analysis/arcFlash.mjs:446 getOneLine()
-  - analysis/shortCircuit.mjs:1140 getOneLine()
+  - analysis/shortCircuit.mjs:1178 getOneLine()
   - studies/arcFlash.js:145 getOneLine()
   - studies/arcFlash.js:15 getOneLine()
 - `settings.designBasis`
