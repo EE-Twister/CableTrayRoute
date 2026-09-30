@@ -60,6 +60,8 @@ The tool draws a required working-space zone in front of each equipment item and
 - Workspace or equipment intersects interior walls.
 - Access clearance is constrained near the room perimeter.
 
+Working-space depth follows NEC Table 110.26(A)(1). Metal, `Concrete` and `CMU` walls are treated as grounded (Condition 2, for example 3.5 ft at 151–600 V), as the Code considers concrete, brick and tile walls grounded; `Gypsum`, `Fire Rated` and `Removable Panel` walls use Condition 1.
+
 The sidebar lists the specific clearance reason for each flagged equipment item, and the same details appear in the equipment detail modal.
 
 This screen is meant for early layout checks and collaboration during planning.
