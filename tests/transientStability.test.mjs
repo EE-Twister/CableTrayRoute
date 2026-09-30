@@ -180,3 +180,47 @@ describe('equalAreaCriterion', () => {
       `EAC CCT ${eac.eac_cct_s.toFixed(4)}s vs numerical ${cct.cct_s.toFixed(4)}s (ratio ${ratio.toFixed(2)})`);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Review regressions: closed-form CCT, first-swing criterion independent of t_end
+// ---------------------------------------------------------------------------
+{
+  const assert = (await import('node:assert/strict')).default;
+  const { equalAreaCriterion, findCriticalClearingTime, initialRotorAngle, simulateSwingEquation } =
+    await import('../analysis/transientStability.mjs');
+  // Bolted fault (Pmax_fault = 0): the rotor accelerates at a constant ωs·Pm/(2H), so
+  //   δ(t) = δ0 + ωs·Pm·t²/(4H), and the equal-area balance gives
+  //   cos δcr = (Pm/Pmax_post)(δmax − δ0) + cos δmax,  δmax = π − asin(Pm/Pmax_post)
+  const p = { H: 5, f: 60, Pm: 0.8, Pmax_pre: 2.0, Pmax_fault: 0, Pmax_post: 1.5 };
+  const ws = 2 * Math.PI * p.f;
+  const d0 = Math.asin(p.Pm / p.Pmax_pre);
+  const dmax = Math.PI - Math.asin(p.Pm / p.Pmax_post);
+  const dcr = Math.acos((p.Pm / p.Pmax_post) * (dmax - d0) + Math.cos(dmax));
+  const tClosed = Math.sqrt(4 * p.H * (dcr - d0) / (ws * p.Pm));
+
+  const eac = equalAreaCriterion(p);
+  assert.ok(Math.abs(eac.deltaCr_deg - dcr * 180 / Math.PI) < 0.01, `δcr ${eac.deltaCr_deg}`);
+  assert.ok(Math.abs(eac.eac_cct_s - tClosed) < 1e-3, `EAC CCT ${eac.eac_cct_s} vs ${tClosed}`);
+
+  const cct = findCriticalClearingTime({ ...p, delta0: d0, t_end: 2.0 });
+  assert.ok(Math.abs(cct.cct_s - tClosed) < 2e-3, `numerical CCT ${cct.cct_s} vs ${tClosed}`);
+
+  // The verdict must not depend on how long the simulation window is: clearing 10 ms after the
+  // CCT is unstable whether the run lasts 0.25 s or 2 s (δ ≥ 180° is not reached within 0.25 s).
+  const late = { ...p, delta0: d0, t_clear: tClosed + 0.01 };
+  assert.equal(simulateSwingEquation({ ...late, t_end: 2.0 }).stable, false);
+  assert.equal(simulateSwingEquation({ ...late, t_end: 0.25 }).stable, false, 'short window must still flag the swing');
+  const early = { ...p, delta0: d0, t_clear: tClosed - 0.01 };
+  assert.equal(simulateSwingEquation({ ...early, t_end: 0.25 }).stable, true);
+  const cctShort = findCriticalClearingTime({ ...p, delta0: d0, t_end: 0.4 }, { tMax: 0.36 });
+  assert.ok(Math.abs(cctShort.cct_s - tClosed) < 2e-3, `short-window CCT ${cctShort.cct_s}`);
+
+  // A fault that never reduces power below Pm... with Pmax_post < Pm there is no post-fault equilibrium
+  const noEq = simulateSwingEquation({ ...p, Pmax_post: 0.7, delta0: d0, t_clear: 0.05, t_end: 0.2 });
+  assert.equal(noEq.stable, false);
+
+  // Input validation
+  assert.throws(() => simulateSwingEquation({ ...p, delta0: d0, t_clear: 0.1, t_end: 1, f: 0 }), /frequency/);
+  assert.throws(() => simulateSwingEquation({ ...p, delta0: NaN, t_clear: 0.1, t_end: 1 }), /delta0/);
+  assert.throws(() => simulateSwingEquation({ ...p, Pmax_post: NaN, delta0: d0, t_clear: 0.1, t_end: 1 }), /Pmax/);
+}

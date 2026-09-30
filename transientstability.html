@@ -118,7 +118,7 @@ where M = 2H / ωs,  Pe = Pmax × sin(δ)</pre>
         <p>Integration method: <strong>4th-order Runge-Kutta</strong> at 1 ms time steps.</p>
 
         <p>The <strong>Critical Clearing Time (CCT)</strong> is found by bisection: the
-        latest clearing time at which the system remains stable (δ &lt; 180°).</p>
+        latest clearing time at which the first swing stays below the post-fault unstable equilibrium angle (an energy test at clearing, so the result does not depend on the simulation length).</p>
 
         <p>The <strong>Equal-Area Criterion (EAC)</strong> provides a fast analytical
         estimate of CCT, valid for OMIB systems.</p>
@@ -277,7 +277,7 @@ where M = 2H / ωs,  Pe = Pmax × sin(δ)</pre>
       system remains stable.</p>
       <p><strong>Key outputs:</strong></p>
       <ul>
-        <li>Stability status (stable = δ never exceeds 180°)</li>
+        <li>Stability status (stable = the first swing stays below the post-fault unstable equilibrium; δ ≥ 180° also counts as unstable)</li>
         <li>Maximum rotor angle δ_max</li>
         <li>Critical Clearing Time (numerical + EAC estimate)</li>
         <li>Rotor angle vs. time plot</li>
