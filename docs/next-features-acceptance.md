@@ -282,14 +282,14 @@ After saving branch `HT-A101`, `Export Package (.xlsx)` downloads a workbook nam
 
 Using same geometry and frequency as EMF-Normal-01, vary only current.
 
-- At **~33,957 A** current, expected B_rms is near **200 µT** (boundary band)
+- At **33,900 A** current, expected B_rms is just under **200 µT** (≈199.7 µT; General Public PASS)
 - At **34,500 A**, expected General Public = FAIL, Occupational = PASS
 
 ### EMF-Boundary-02 (occupational threshold crossing)
 
 Using same geometry and frequency:
 
-- At **~169,785 A**, expected B_rms is near **1000 µT** (boundary band)
+- At **169,800 A**, expected B_rms is just over **1000 µT** (≈1000.1 µT; Occupational FAIL)
 - Above this, both Occupational and General Public should be FAIL
 
 ### EMF-Invalid-01 (zero current)
