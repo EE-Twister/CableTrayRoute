@@ -605,9 +605,11 @@ export const BENCHMARKS = [
     studyType: 'Frequency Scan',
     standardRef: 'Parallel resonance h ≈ √(Ssc / Qc), frequency-domain screening',
     description:
-      'A 4.16 kV bus with 50 MVA short-circuit strength and a 600 kvar capacitor bank has an ' +
-      'analytical resonance near harmonic order √(50,000/600) = 9.13. The half-order scan must ' +
-      'identify the nearest peak at h = 9.',
+      'A 4.16 kV bus with 50 MVA short-circuit strength (X/R = 10) and a 600 kvar capacitor bank ' +
+      'resonates where the source reactance equals the capacitor reactance, h = √(Xc1 / Xs1) = ' +
+      '√(28.843 / 0.34439) = 9.151 (≈ √(Ssc / Qc) = 9.13 for a purely reactive source). The scan ' +
+      'refines its half-order grid peak to that order; the undamped peak impedance is ≈ (h·Xs1)² / Rs ' +
+      '= 288.4 Ω.',
     run() {
       const result = runFrequencyScan({
         baseFreqHz: 60,
@@ -627,9 +629,9 @@ export const BENCHMARKS = [
       };
     },
     checks: [
-      { key: 'resonance_order', description: 'Detected parallel-resonance order', expectedVal: 9, tolerance: 0 },
-      { key: 'resonance_frequency_hz', description: 'Detected resonance frequency (Hz)', expectedVal: 540, tolerance: 0 },
-      { key: 'peak_impedance_ohm', description: 'Peak impedance (ohm)', expectedVal: 89.7481, tolerance: 0.01 },
+      { key: 'resonance_order', description: 'Detected parallel-resonance order', expectedVal: 9.151, tolerance: 0.01 },
+      { key: 'resonance_frequency_hz', description: 'Detected resonance frequency (Hz)', expectedVal: 549.1, tolerance: 1 },
+      { key: 'peak_impedance_ohm', description: 'Peak impedance (ohm)', expectedVal: 288.4, tolerance: 0.5 },
     ],
   },
 
