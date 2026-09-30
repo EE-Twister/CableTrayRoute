@@ -67,6 +67,7 @@ function readForm() {
   return {
     requiredCurrentA: value('db-current'),
     continuousFactor: value('db-continuous'),
+    designMarginPct: value('db-margin'),
     requiredCircuits: value('db-circuits'),
     cover: { coverMm: Number(value('db-cover')) * MM_PER_IN },
     cable: {

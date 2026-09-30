@@ -55,6 +55,7 @@ const SQRT3_2 = Math.sqrt(3) / 2;
 const DEFAULTS = Object.freeze({
   requiredCurrentA: 102,
   continuousFactor: 1,
+  designMarginPct: 10,
   requiredCircuits: null,
   maxCircuits: 20,
   cable: {
@@ -132,6 +133,7 @@ export function normalizeDirectBurialInputs(raw = {}) {
   return {
     requiredCurrentA: positiveNumber(raw.requiredCurrentA, DEFAULTS.requiredCurrentA, 'Required current'),
     continuousFactor: positiveNumber(raw.continuousFactor, DEFAULTS.continuousFactor, 'Continuous-load factor'),
+    designMarginPct: nonNegativeNumber(raw.designMarginPct, DEFAULTS.designMarginPct, 'Model margin'),
     requiredCircuits,
     maxCircuits,
     cable: {
@@ -305,7 +307,9 @@ function round2(v) { return Math.round(v * 100) / 100; }
  */
 export function runDirectBurial(raw = {}) {
   const inputs = normalizeDirectBurialInputs(raw);
-  const targetAmpacityA = inputs.requiredCurrentA * inputs.continuousFactor;
+  // Spot checks show the IEC 60287 engine reading above published tabulated
+  // ratings, so the target carries an explicit, user-visible margin.
+  const targetAmpacityA = inputs.requiredCurrentA * inputs.continuousFactor * (1 + inputs.designMarginPct / 100);
   const rows = [];
 
   for (const size of inputs.sizes) {
@@ -363,6 +367,9 @@ function buildNotes(inputs, rows, best) {
   }
   if (inputs.cover.coverMm < 24 * MM_PER_IN - 1) {
     notes.push('Cover is less than 24 in; confirm minimum cover for the voltage and location under NEC 300.5.');
+  }
+  if (inputs.designMarginPct < 10) {
+    notes.push(`Model margin is ${inputs.designMarginPct}%. In spot checks the underlying IEC 60287 engine read roughly 5-15% above published tabulated ratings, so a margin of 10% or more is recommended.`);
   }
   notes.push('Screening result: IEC 60287 steady state at 100% load factor, uniform soil, no soil dry-out. Verify against NEC 310.14 / Annex B or a full Neher-McGrath study before issuing for construction.');
   return notes;

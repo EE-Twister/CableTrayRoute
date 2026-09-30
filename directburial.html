@@ -120,6 +120,11 @@
               <input id="db-continuous" type="number" min="1" max="2" step="0.05" value="1">
             </div>
             <div class="field-row">
+              <label for="db-margin">Model margin (%)</label>
+              <input id="db-margin" type="number" min="0" max="50" step="1" value="10">
+              <p class="field-hint">Added to the target ampacity. Spot checks show the thermal model reading roughly 5-15% above published tabulated ratings, so 10% or more is recommended.</p>
+            </div>
+            <div class="field-row">
               <label for="db-circuits">Circuits needed (blank = find the maximum)</label>
               <input id="db-circuits" type="number" min="1" max="60" step="1" value="6">
             </div>

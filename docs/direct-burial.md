@@ -13,6 +13,7 @@ Use the Ductbank page when cables run in conduits. Use this page when they are d
 | --- | --- |
 | Current per circuit | Default 102 A. |
 | Continuous-load multiplier | Multiplies the current to get the target ampacity (for example 1.25 for continuous loads). |
+| Model margin | Percent added to the target ampacity. Default 10%. Spot checks against published tabulated ratings (for example IEC 60364-5-52 Table B.52.4) showed the thermal model reading roughly 5-15% high, so the margin is explicit and editable. |
 | Circuits needed | Leave blank to find the maximum each option can carry; enter a count to rank options for that count. |
 | Cover to top of cable | Default 24 in. Cable centre depth is cover plus half the cable or circuit height. |
 | Material, insulation, arrangement | Three single-conductor cables in trefoil or flat, or one three-conductor cable. |

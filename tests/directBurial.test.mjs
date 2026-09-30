@@ -92,6 +92,16 @@ describe('runDirectBurial', () => {
     assert.strictEqual(result.best, null);
     assert.ok(result.notes[0].includes('No size'));
   });
+  it('a larger model margin tightens the result and raises the target', () => {
+    const none = runDirectBurial({ sizes: ['2 AWG'], spacingsMm: [200], maxCircuits: 20, designMarginPct: 0 });
+    const margin = runDirectBurial({ sizes: ['2 AWG'], spacingsMm: [200], maxCircuits: 20, designMarginPct: 25 });
+    assert.ok(margin.targetAmpacityA > none.targetAmpacityA);
+    assert.ok(margin.rows[0].maxCircuits <= none.rows[0].maxCircuits);
+    assert.strictEqual(none.targetAmpacityA, 102);
+  });
+  it('defaults to a 10% margin', () => {
+    assert.strictEqual(runDirectBurial({ sizes: ['2 AWG'], spacingsMm: [200] }).targetAmpacityA, 112.2);
+  });
   it('a continuous-load multiplier tightens the result', () => {
     const base = runDirectBurial({ sizes: ['2 AWG'], spacingsMm: [200], maxCircuits: 20 }).rows[0].maxCircuits;
     const cont = runDirectBurial({ sizes: ['2 AWG'], spacingsMm: [200], maxCircuits: 20, continuousFactor: 1.25 }).rows[0].maxCircuits;
