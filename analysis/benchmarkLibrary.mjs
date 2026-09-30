@@ -640,8 +640,8 @@ export const BENCHMARKS = [
     standardRef: 'Classical swing equation and equal-area criterion',
     description:
       'A one-machine infinite-bus case with H = 5 s is checked using both the equal-area estimate ' +
-      'and the independent numerical bisection search. The numerical CCT must be 0.3434 s and remain ' +
-      'within 0.03 s of the analytical estimate.',
+      'and the independent numerical bisection search. The numerical CCT must be 0.3434 s and the ' +
+      'equal-area estimate, which integrates the faulted swing, must agree within 1 ms.',
     run() {
       const inputs = {
         H: 5,
@@ -666,7 +666,7 @@ export const BENCHMARKS = [
       };
     },
     checks: [
-      { key: 'eac_cct_s', description: 'Equal-area CCT estimate (s)', expectedVal: 0.3192, tolerance: 0.001 },
+      { key: 'eac_cct_s', description: 'Equal-area CCT estimate (s)', expectedVal: 0.3433, tolerance: 0.001 },
       { key: 'numerical_cct_s', description: 'Numerical CCT (s)', expectedVal: 0.3434, tolerance: 0.001 },
       { key: 'converged', description: 'Numerical CCT search converges', expectedVal: true, tolerance: 0, type: 'boolean' },
     ],
