@@ -91,17 +91,20 @@ export function resolveCableStudyInputs(cables = [], loads = [], loadFlowResult 
       cable.load_current,
       cable.amps,
     );
+    // cable_rating is the insulation class (600 V, 5 kV, ...), not the operating voltage:
+    // a 600 V cable on a 480 V system would understate the % drop by 20%. It is used only
+    // when no operating voltage, load-flow bus or load-list voltage is available.
     const explicitVoltage = finiteNumber(
       cable.operating_voltage,
-      cable.cable_rating,
       cable.voltage,
       cable.voltageV,
     );
+    const ratingVoltage = finiteNumber(cable.cable_rating);
     const phaseLabels = normalizeCablePhases(cable?.phases ?? cable?.num_phases);
     const phases = phaseLabels.length || finiteNumber(load?.phases, 3);
     const flowVoltage = finiteNumber(flowBus?.voltageV, Number(flowBus?.baseKV) * 1000);
     const loadVoltage = finiteNumber(load?.voltage, load?.voltageV, load?.nominal_voltage);
-    const voltage = explicitVoltage || flowVoltage || loadVoltage;
+    const voltage = explicitVoltage || flowVoltage || loadVoltage || ratingVoltage;
     const flowPf = powerFactorFromPQ(flowBus?.Pd, flowBus?.Qd, 0.9);
     const flowCurrent = flowBus
       ? currentFromLoad({
@@ -123,6 +126,7 @@ export function resolveCableStudyInputs(cables = [], loads = [], loadFlowResult 
     if (explicitVoltage > 0) voltageSource = 'Cable Schedule';
     else if (flowVoltage > 0) voltageSource = 'Load Flow';
     else if (loadVoltage > 0) voltageSource = 'Load List';
+    else if (ratingVoltage > 0) voltageSource = 'Cable insulation rating (assumed)';
 
     return {
       ...cable,
@@ -163,7 +167,7 @@ export function evaluateCable(cable, lengthFt) {
   const phaseLabels = normalizeCablePhases(cable?.phases ?? cable?.num_phases ?? cable);
   const phase = phaseLabels.length || 3;
   const currentA = finiteNumber(cable?.est_load, cable?.current, cable?.load_current);
-  const voltageV = finiteNumber(cable?.operating_voltage, cable?.cable_rating, cable?.voltage);
+  const voltageV = finiteNumber(cable?.operating_voltage, cable?.voltage, cable?.cable_rating);
   const conductorSize = cable?.conductor_size || '';
   const normalizedCable = {
     ...cable,
@@ -330,6 +334,8 @@ export function runVoltageDropStudy(cables = [], options = {}) {
     return counts;
   }, {});
   const warnings = [];
+  const ratingAssumed = results.filter(result => result.inputSource?.voltage === 'Cable insulation rating (assumed)').length;
+  if (ratingAssumed) warnings.push(`${ratingAssumed} cable(s) use the insulation rating as the operating voltage because no operating, load-flow or load-list voltage was found; enter the operating voltage for an accurate percent drop.`);
   if (summary.notEvaluated) warnings.push(`${summary.notEvaluated} cable(s) could not be evaluated.`);
   if (summary.combinedFail) warnings.push(`${summary.combinedFail} feeder-plus-branch path(s) exceed the combined recommendation.`);
 
