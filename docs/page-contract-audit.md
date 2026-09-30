@@ -3296,23 +3296,23 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.designBasis`
   - src/components/studyBasis.js:37 getDesignBasis()
 - `settings.studyApprovals`
-  - heattracesizing.js:2167 getStudyApprovals()
+  - heattracesizing.js:2166 getStudyApprovals()
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `settings.trayHardwareCatalogCustomProducts`
-  - heattracesizing.js:2260 getTrayHardwareCatalogCustomProducts()
+  - heattracesizing.js:2259 getTrayHardwareCatalogCustomProducts()
 - `studyResults`
   - heattracesizing.js:100 getStudies()
-  - heattracesizing.js:1795 getStudies()
-  - heattracesizing.js:1834 getStudies()
+  - heattracesizing.js:1794 getStudies()
+  - heattracesizing.js:1833 getStudies()
   - heattracesizing.js:185 getStudies()
-  - heattracesizing.js:2050 getStudies()
+  - heattracesizing.js:2049 getStudies()
   - ... 7 more
 - `studyResults.heatTraceSizing`
-  - heattracesizing.js:1795 getStudies().heatTraceSizing
-  - heattracesizing.js:1834 getStudies().heatTraceSizing
+  - heattracesizing.js:1794 getStudies().heatTraceSizing
+  - heattracesizing.js:1833 getStudies().heatTraceSizing
   - heattracesizing.js:185 getStudies().heatTraceSizing
-  - heattracesizing.js:211 getStudies().heatTraceSizing
-  - heattracesizing.js:2155 getStudies().heatTraceSizing
+  - heattracesizing.js:2154 getStudies().heatTraceSizing
+  - heattracesizing.js:222 getStudies().heatTraceSizing
   - ... 3 more
 - `studyResults.heatTraceSizingCircuits`
   - heattracesizing.js:100 getStudies().heatTraceSizingCircuits
@@ -3323,12 +3323,12 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
-  - heattracesizing.js:2052 setStudies()
-  - heattracesizing.js:250 setStudies()
+  - heattracesizing.js:2051 setStudies()
+  - heattracesizing.js:261 setStudies()
 - `studyResults.heatTraceSizing`
-  - heattracesizing.js:246 studies.heatTraceSizing
+  - heattracesizing.js:257 studies.heatTraceSizing
 - `studyResults.heatTraceSizingCircuits`
-  - heattracesizing.js:2051 studies.heatTraceSizingCircuits
+  - heattracesizing.js:2050 studies.heatTraceSizingCircuits
 
 ### Reliability (`reliability.html`)
 

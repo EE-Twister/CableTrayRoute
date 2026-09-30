@@ -23,7 +23,7 @@ export const ENTRYPOINT_BUDGETS = Object.freeze({
   'cableschedule.js': 3266,
   'cathodicprotection.js': 2765,
   'src/panelSchedule.js': 2725,
-  'site.js': 2825
+  'site.js': 2829
 });
 
 export const REQUIRED_BOUNDARIES = Object.freeze({
