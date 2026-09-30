@@ -782,3 +782,30 @@ describe('blank and non-numeric form input is rejected, not propagated as NaN', 
     assert.throws(() => sizeTransformer({ loadKva: 75, primaryVoltage: 480, secondaryVoltage: NaN }), /Secondary voltage/);
   });
 });
+
+describe('review regressions', () => {
+  it('NEC 310.16 spot values (#3 AWG Cu 90C = 115, 600 kcmil Cu 60C = 350, #6 Al 90C = 55, 300 kcmil Al 90C = 260)', () => {
+    assert.strictEqual(tableAmpacity('#3 AWG', 'copper', 90), 115);
+    assert.strictEqual(tableAmpacity('600 kcmil', 'copper', 60), 350);
+    assert.strictEqual(tableAmpacity('#6 AWG', 'aluminum', 90), 55);
+    assert.strictEqual(tableAmpacity('300 kcmil', 'aluminum', 90), 260);
+  });
+  it('480 V and 208/220-240 V motors use the 460 V / 230 V table columns', () => {
+    assert.strictEqual(motorFLC3Ph(50, 480), 65);
+    assert.strictEqual(motorFLC3Ph(10, 240), 28);
+    assert.strictEqual(motorFLC3Ph(25, 600), 27);
+    assert.strictEqual(motorFLC1Ph(1, 120), 16);
+    assert.strictEqual(motorFLC1Ph(1, 240), 8);
+  });
+  it('above 800 A the conductor must carry the OCPD rating (NEC 240.4(C))', () => {
+    // 700 A continuous -> 875 A required -> 1000 A OCPD; 2 x 750 kcmil (950 A) is not enough
+    const r = sizeFeeder({ loadAmps: 700, continuous: true });
+    assert.ok(r.error);
+    assert.ok(r.parallelSuggestion.installedAmpacity >= 1000, `suggestion ${r.parallelSuggestion.note}`);
+  });
+  it('at or below 800 A the next-size-up OCPD rule is unchanged', () => {
+    // 400 A continuous -> 500 A required -> 500 A OCPD (not above 800)
+    const r = sizeFeeder({ loadAmps: 400, continuous: true });
+    assert.strictEqual(r.ocpdRating, 500);
+  });
+});

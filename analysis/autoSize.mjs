@@ -40,9 +40,9 @@ export const NEC_AMPACITY_TABLE = [
   { size: '#12 AWG',  cu60: 20,  cu75: 25,  cu90: 30,  al60: 15,   al75: 20,   al90: 25    },
   { size: '#10 AWG',  cu60: 30,  cu75: 35,  cu90: 40,  al60: 25,   al75: 30,   al90: 35    },
   { size: '#8 AWG',   cu60: 40,  cu75: 50,  cu90: 55,  al60: 35,   al75: 40,   al90: 45    },
-  { size: '#6 AWG',   cu60: 55,  cu75: 65,  cu90: 75,  al60: 40,   al75: 50,   al90: 60    },
+  { size: '#6 AWG',   cu60: 55,  cu75: 65,  cu90: 75,  al60: 40,   al75: 50,   al90: 55    },
   { size: '#4 AWG',   cu60: 70,  cu75: 85,  cu90: 95,  al60: 55,   al75: 65,   al90: 75    },
-  { size: '#3 AWG',   cu60: 85,  cu75: 100, cu90: 110, al60: 65,   al75: 75,   al90: 85    },
+  { size: '#3 AWG',   cu60: 85,  cu75: 100, cu90: 115, al60: 65,   al75: 75,   al90: 85    },
   { size: '#2 AWG',   cu60: 95,  cu75: 115, cu90: 130, al60: 75,   al75: 90,   al90: 100   },
   { size: '#1 AWG',   cu60: 110, cu75: 130, cu90: 145, al60: 85,   al75: 100,  al90: 115   },
   { size: '1/0 AWG',  cu60: 125, cu75: 150, cu90: 170, al60: 100,  al75: 120,  al90: 135   },
@@ -50,11 +50,11 @@ export const NEC_AMPACITY_TABLE = [
   { size: '3/0 AWG',  cu60: 165, cu75: 200, cu90: 225, al60: 130,  al75: 155,  al90: 175   },
   { size: '4/0 AWG',  cu60: 195, cu75: 230, cu90: 260, al60: 150,  al75: 180,  al90: 205   },
   { size: '250 kcmil',cu60: 215, cu75: 255, cu90: 290, al60: 170,  al75: 205,  al90: 230   },
-  { size: '300 kcmil',cu60: 240, cu75: 285, cu90: 320, al60: 195,  al75: 230,  al90: 255   },
+  { size: '300 kcmil',cu60: 240, cu75: 285, cu90: 320, al60: 195,  al75: 230,  al90: 260   },
   { size: '350 kcmil',cu60: 260, cu75: 310, cu90: 350, al60: 210,  al75: 250,  al90: 280   },
   { size: '400 kcmil',cu60: 280, cu75: 335, cu90: 380, al60: 225,  al75: 270,  al90: 305   },
   { size: '500 kcmil',cu60: 320, cu75: 380, cu90: 430, al60: 260,  al75: 310,  al90: 350   },
-  { size: '600 kcmil',cu60: 355, cu75: 420, cu90: 475, al60: 285,  al75: 340,  al90: 385   },
+  { size: '600 kcmil',cu60: 350, cu75: 420, cu90: 475, al60: 285,  al75: 340,  al90: 385   },
   { size: '750 kcmil',cu60: 400, cu75: 475, cu90: 535, al60: 320,  al75: 385,  al90: 435   },
   { size: '1000 kcmil',cu60: 455,cu75: 545, cu90: 615, al60: 375,  al75: 445,  al90: 500   },
 ];
@@ -551,6 +551,27 @@ export function minimizeCostConductors(requiredAmps, tempRating = 75, options = 
 }
 
 /**
+ * Map a nameplate / system voltage to the NEC Table 430.250 column. The table
+ * footnote applies the 230 V column to 220–240 V and the 460 V column to
+ * 440–480 V, and the 575 V column to 550–600 V.
+ */
+export function tableVoltage3Ph(voltage) {
+  const v = Number(voltage);
+  if (v >= 220 && v <= 240) return 230;
+  if (v >= 440 && v <= 480) return 460;
+  if (v >= 550 && v <= 600) return 575;
+  return v;
+}
+
+/** Map a voltage to the NEC Table 430.248 column (110–120 V → 115, 220–240 V → 230). */
+export function tableVoltage1Ph(voltage) {
+  const v = Number(voltage);
+  if (v >= 110 && v <= 120) return 115;
+  if (v >= 220 && v <= 240) return 230;
+  return v;
+}
+
+/**
  * Look up the three-phase motor FLC from NEC Table 430.250.
  *
  * @param {number} hp   Motor nameplate horsepower
@@ -558,7 +579,7 @@ export function minimizeCostConductors(requiredAmps, tempRating = 75, options = 
  * @returns {number|null} Full load current in amperes
  */
 export function motorFLC3Ph(hp, voltage) {
-  const vKey = `v${voltage}`;
+  const vKey = `v${tableVoltage3Ph(voltage)}`;
   // Find exact match first, then interpolate to nearest hp
   let row = MOTOR_FLC_3PH.find(r => r.hp === hp);
   if (!row) {
@@ -580,7 +601,7 @@ export function motorFLC3Ph(hp, voltage) {
  * @returns {number|null}
  */
 export function motorFLC1Ph(hp, voltage) {
-  const vKey = `v${voltage}`;
+  const vKey = `v${tableVoltage1Ph(voltage)}`;
   let row = MOTOR_FLC_1PH.find(r => r.hp === hp);
   if (!row) {
     const candidates = MOTOR_FLC_1PH.filter(r => r[vKey] != null);
@@ -646,7 +667,10 @@ export function sizeFeeder(params) {
   const appliedTerminalTempRating = terminalTempRating == null || terminalTempRating === ''
     ? inferTerminalTempRating({ requiredOcpd: ocpd, equipmentRatedAmps: equipmentRatedAmps ?? ocpd })
     : terminalTempRating;
-  const conductor = selectConductorSize(requiredAmps, material, tempRating, {
+  // NEC 240.4(B) lets the next standard OCPD size protect a conductor only up to
+  // 800 A; above that (240.4(C)) the conductor ampacity must be at least the OCPD.
+  const conductorTargetAmps = ocpd !== null && ocpd > 800 ? Math.max(requiredAmps, ocpd) : requiredAmps;
+  const conductor = selectConductorSize(conductorTargetAmps, material, tempRating, {
     ambientTempC,
     bundledConductors,
     installationType,
@@ -657,7 +681,7 @@ export function sizeFeeder(params) {
     // Find the minimum parallel set count that satisfies the load (NEC 310.10(H))
     let parallelSuggestion = null;
     for (let nParallel = 2; nParallel <= 6; nParallel++) {
-      const opt = evaluateConductorOption(requiredAmps, material, tempRating, nParallel, {
+      const opt = evaluateConductorOption(conductorTargetAmps, material, tempRating, nParallel, {
         ambientTempC, installationType, terminalTempRating: appliedTerminalTempRating,
       });
       if (opt && !opt.violatesParallelRule) {
