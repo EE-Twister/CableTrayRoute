@@ -21,7 +21,8 @@
 import { detectClashes, overallSeverity } from './clashDetect.mjs';
 import { buildHeatTraceReport } from './heatTraceReport.mjs';
 import { generateSpoolSheets } from './spoolSheets.mjs';
-import { buildConduitCableMap, evaluateConduitFill, recordId as conduitRecordId } from './conduitFill.mjs';
+import { buildConduitCableMap, evaluateConduitFill, extractRacewayIds, recordId as conduitRecordId } from './conduitFill.mjs';
+import { evaluateTrayFill } from './trayFill.mjs';
 import { parseTradeSize } from './pullBoxSizing.mjs';
 
 // ---------------------------------------------------------------------------
@@ -117,12 +118,35 @@ function buildCableSection(cables) {
 function buildFillSection(trays, conduits, cables) {
   const trayRows = trays.map(tray => {
     const id       = tray.tray_id || tray.id || '—';
+    const widthIn  = parseFloat(tray.inside_width) || 12;
+    const assigned = cables.filter(c => {
+      const ids = [
+        ...extractRacewayIds(c),
+        ...String(c.route_preference ?? '').split(/[,;|>\n]+/).map(v => v.trim()).filter(Boolean),
+      ];
+      return ids.includes(String(id).trim());
+    });
+    // Same NEC 392.22(A) evaluation as the Tray Fill page; fall back to the crude
+    // width x depth estimate only when the tray/cable data cannot be evaluated.
+    const evaluation = evaluateTrayFill(tray, assigned);
+    if (evaluation.evaluable === true) {
+      const allowableArea = evaluation.allowable?.smallCableAreaIn2 ?? evaluation.allowable?.baseTableAreaIn2 ?? null;
+      const usedArea = evaluation.used?.smallCableAreaIn2 ?? null;
+      const usedPct = evaluation.utilizationPercent;
+      const status = usedPct > 100 ? 'over' : usedPct > 90 ? 'near' : 'ok';
+      return {
+        id, type: tray.tray_type || '—', widthIn,
+        areaIn2: allowableArea != null ? +allowableArea.toFixed(2) : 0,
+        fillIn2: usedArea != null ? +usedArea.toFixed(2) : 0,
+        usedPct: +usedPct.toFixed(1), limitPct: 100, status, basis: evaluation.clause,
+      };
+    }
     const areaIn2  = trayAreaIn2(tray);
     const fillIn2  = cableFillIn2(cables, id);
     const limitPct = fillLimitPct(tray.tray_type || '');
     const usedPct  = areaIn2 > 0 ? (fillIn2 / areaIn2) * 100 : 0;
     const status   = usedPct > limitPct ? 'over' : usedPct > limitPct * 0.9 ? 'near' : 'ok';
-    return { id, type: tray.tray_type || '—', widthIn: parseFloat(tray.inside_width) || 12, areaIn2: +areaIn2.toFixed(2), fillIn2: +fillIn2.toFixed(2), usedPct: +usedPct.toFixed(1), limitPct, status };
+    return { id, type: tray.tray_type || '—', widthIn, areaIn2: +areaIn2.toFixed(2), fillIn2: +fillIn2.toFixed(2), usedPct: +usedPct.toFixed(1), limitPct, status };
   });
 
   // Same NEC Chapter 9 area table and 53/31/40 % limits the Conduit Fill page uses,

@@ -124,3 +124,22 @@ console.log('project report section tests passed');
   assert.strictEqual(single.status, 'ok');
   console.log('✓ report conduit fill');
 })();
+
+// Report tray fill follows the Tray Fill study (NEC 392.22(A) table areas), not width x depth x 50 %
+(function testReportTrayFill() {
+  const cables = Array.from({ length: 6 }, (_, i) => ({
+    id: `C${i}`, conductors: 3, conductor_size: '#12 AWG', cable_area: 0.5, route_preference: 'T-1',
+  }));
+  const tray = { tray_id: 'T-1', tray_type: 'Ladder', inside_width: 12, tray_depth: 4 };
+  const row = generateProjectReport({ cables, trays: [tray] }).fill.trays[0];
+  // 6 x 0.5 = 3.0 in2 against the 392.22(A)(1)(b) allowance for a 12 in ladder tray (Table 392.22(A)(1), 14.0 in2)
+  assert.strictEqual(row.limitPct, 100);
+  assert.ok(Math.abs(row.usedPct - (3.0 / 14.0) * 100) < 0.1, `used ${row.usedPct}%`);
+  assert.strictEqual(row.status, 'ok');
+  const overloaded = generateProjectReport({
+    cables: Array.from({ length: 25 }, (_, i) => ({ id: `D${i}`, conductors: 3, conductor_size: '#12 AWG', cable_area: 0.5, raceway_ids: ['T-2'] })),
+    trays: [{ ...tray, tray_id: 'T-2' }],
+  }).fill.trays[0];
+  assert.strictEqual(overloaded.status, 'over');
+  console.log('✓ report tray fill');
+})();
