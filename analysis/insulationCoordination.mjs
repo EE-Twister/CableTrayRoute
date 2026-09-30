@@ -264,8 +264,8 @@ export function selectStandardBil(umKv, ucwLiKvPeak) {
  * where:
  *   μs  = mean representative overvoltage (kV peak)
  *   σs  = standard deviation of overvoltage distribution = μs × covStress
- *   U50 = 50% disruptive-discharge voltage = selected BIL / 1.22 (lightning)
- *          or selected SIL / 1.06 (switching), since test withstand = U50 × (1 − 1.3 β_w)
+ *   U50 = 50% disruptive-discharge voltage = withstand / (1 − 1.28 × covWithstand),
+ *          because the standard withstand voltage is the 10 % point U10 = U50 × (1 − 1.28 β_w)
  *   σw  = U50 × covWithstand
  *   Φ   = standard normal cumulative distribution function
  *
@@ -477,6 +477,12 @@ export function runInsulationCoordinationStudy(inputs) {
       }
     }
 
+    if (availableSiwv.length === 0) {
+      warnings.push(
+        `IEC 60071-1 lists no standard switching impulse withstand voltage for Um = ${standardRow.um} kV (Range I). The switching-impulse stress was not assessed against a standard level; verify it in a detailed study.`
+      );
+    }
+
     if (availableSiwv.length > 0 && selectedSilKv === null) {
       warnings.push(
         `No standard SIL in IEC 60071-1 Table 3 for Um = ${standardRow.um} kV satisfies the required Ucw = ${ucwSI} kV.`
@@ -528,7 +534,9 @@ export function runInsulationCoordinationStudy(inputs) {
       (siResult.protectiveMargin ? siResult.protectiveMargin.pass : true)
     : null;
   const mcovPass = mcovCheck ? mcovCheck.pass : null;
-  const allPassed = [liPass, siPass, mcovPass].every(p => p === null || p === true);
+  // A TOV that no standard power-frequency withstand level covers is a failure too.
+  const tovPass = tovResult && tovResult.availablePfwvKv.length > 0 ? tovResult.selectedPfwvKv !== null : null;
+  const allPassed = [liPass, siPass, mcovPass, tovPass].every(p => p === null || p === true);
 
   return {
     inputs: {
