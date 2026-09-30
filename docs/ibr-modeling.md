@@ -140,7 +140,7 @@ Typical `k_limit` values:
 | `mode` | `'discharge'` | Operating mode |
 | `setpointKw` | sRated_kW | Requested active power setpoint |
 | `vBus_pu` | 1.0 | Bus voltage (for volt_var mode) |
-| `roundTripEff` | 0.92 | AC-AC round-trip efficiency |
+| `roundTripEff` | 0.92 | AC-AC round-trip efficiency; each charge or discharge leg applies its square root |
 | `minSocPct` | 10 | Minimum SOC for discharge |
 | `maxSocPct` | 95 | Maximum SOC for charge |
 

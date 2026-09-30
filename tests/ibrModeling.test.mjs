@@ -265,9 +265,17 @@ describe('bessDispatch()', () => {
     assert.ok(r.qAC_kvar > 0, 'Should inject Q at low voltage in volt_var mode');
   });
 
-  it('discharge applies round-trip efficiency', () => {
-    const r = bessDispatch({ sRated_kW: 100, sRated_kVA: 100, soc_pct: 80, mode: 'discharge', roundTripEff: 0.9 });
-    approx(r.pAC_kW, 90, 0.001, 'pAC_kW with 90% efficiency: ');
+  it('discharge applies the one-way efficiency sqrt(round trip) = sqrt(0.81) = 0.9', () => {
+    const r = bessDispatch({ sRated_kW: 100, sRated_kVA: 100, soc_pct: 80, mode: 'discharge', roundTripEff: 0.81 });
+    approx(r.pAC_kW, 90, 0.001, 'pAC_kW with 90% one-way efficiency: ');
+  });
+
+  it('a charge leg followed by a discharge leg loses exactly the round-trip efficiency', () => {
+    const charge = bessDispatch({ sRated_kW: 100, sRated_kVA: 100, soc_pct: 50, mode: 'charge', roundTripEff: 0.81 });
+    const discharge = bessDispatch({ sRated_kW: 100, sRated_kVA: 100, soc_pct: 50, mode: 'discharge', roundTripEff: 0.81 });
+    // energy stored per kW delivered to the battery terminals = 100 kW; AC drawn = 100/0.9, AC returned = 100*0.9
+    approx(-charge.pAC_kW, 100 / 0.9, 1e-9, 'AC drawn while charging: ');
+    approx(discharge.pAC_kW / (-charge.pAC_kW), 0.81, 1e-9, 'AC out / AC in = round trip: ');
   });
 
   it('throws on invalid soc_pct', () => {

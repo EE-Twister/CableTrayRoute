@@ -288,7 +288,7 @@ export const BESS_MODES = {
  * @param {number} [p.setpointKw=sRated_kW] — requested active power setpoint (kW)
  * @param {number} [p.vBus_pu=1.0]          — bus voltage for Volt-VAR in volt_var mode
  * @param {'A'|'B'} [p.voltVarCategory='B'] — IEEE 1547 Volt-VAR category
- * @param {number} [p.roundTripEff=0.92]    — round-trip efficiency (0–1)
+ * @param {number} [p.roundTripEff=0.92]    — AC-AC round-trip efficiency (0–1); each one-way leg uses its square root
  * @param {number} [p.minSocPct=10]         — minimum allowed SOC (%)
  * @param {number} [p.maxSocPct=95]         — maximum allowed SOC (%)
  * @returns {{ pAC_kW, qAC_kvar, socLimited, mode }}
@@ -308,7 +308,9 @@ export function bessDispatch({
   const Pk = Number(sRated_kW);
   const Sk = Number(sRated_kVA) || Pk;
   const soc = Number(soc_pct);
-  const eta = Math.max(0.5, Math.min(1, Number(roundTripEff)));
+  // The efficiency input is AC-AC round trip; charging and discharging each lose
+  // half of it (applying the full figure to one leg double-counts the loss).
+  const eta = Math.sqrt(Math.max(0.5, Math.min(1, Number(roundTripEff))));
   const spKw = Number.isFinite(Number(setpointKw)) ? Number(setpointKw) : Pk;
   const minSoc = Number(minSocPct);
   const maxSoc = Number(maxSocPct);
