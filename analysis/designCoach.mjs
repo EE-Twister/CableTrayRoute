@@ -129,7 +129,7 @@ export function extractArcFlashRecs(arcFlashResults) {
         detail: `Incident energy ${ie.toFixed(1)} cal/cm² is a severe exposure that warrants engineering mitigation and a documented energized-work risk assessment. ` +
           `Options include an upstream current-limiting fuse, reduced protective-device clearing time, remote operation, or other hierarchy-of-risk-control measures.`,
         location: busId,
-        studyPage: 'arcflash.html',
+        studyPage: 'arcFlash.html',
         safe_to_apply: false,
         tradeoffs: 'Reducing clearing time may affect selectivity with downstream devices.',
       });
@@ -145,7 +145,7 @@ export function extractArcFlashRecs(arcFlashResults) {
           title: `Arc flash at ${busId} needs additional input`,
           detail: msg,
           location: busId,
-          studyPage: 'arcflash.html',
+          studyPage: 'arcFlash.html',
           safe_to_apply: false,
         });
       });
@@ -174,7 +174,7 @@ export function extractShortCircuitRecs(scResults) {
           title: `Short-circuit warning at ${busId}`,
           detail: w,
           location: busId,
-          studyPage: 'shortcircuit.html',
+          studyPage: 'shortCircuit.html',
           safe_to_apply: false,
         });
       });
@@ -336,7 +336,7 @@ export function extractLoadFlowRecs(loadFlowResult) {
               ? `Adjust transformer tap, add shunt capacitors, or resize the feeder.`
               : `Reduce generation, lower transformer tap, or add shunt reactors.`),
           location: busLabel,
-          studyPage: 'loadflow.html',
+          studyPage: 'loadFlow.html',
           safe_to_apply: false,
         });
       }
@@ -360,7 +360,7 @@ export function extractLoadFlowRecs(loadFlowResult) {
         title: 'Load flow convergence issue',
         detail: typeof w === 'string' ? w : (w.message || JSON.stringify(w)),
         location: 'Load Flow',
-        studyPage: 'loadflow.html',
+        studyPage: 'loadFlow.html',
         safe_to_apply: false,
       });
     });

@@ -461,4 +461,16 @@ describe('runDesignCoach()', () => {
   });
 });
 
+describe('study page links', () => {
+  it('every studyPage the coach can emit is a real page (file names are case-sensitive on the host)', async () => {
+    const { readFileSync, existsSync } = await import('node:fs');
+    const source = readFileSync(new URL('../analysis/designCoach.mjs', import.meta.url), 'utf8');
+    const pages = [...source.matchAll(/studyPage:\s*'([^']+)'/g)].map(match => match[1]);
+    assert.ok(pages.length > 5);
+    for (const page of new Set(pages)) {
+      assert.ok(existsSync(new URL(`../${page}`, import.meta.url)), `${page} does not exist`);
+    }
+  });
+});
+
 console.log('\nAll designCoach tests complete.');
