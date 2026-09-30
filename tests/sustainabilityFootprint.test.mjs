@@ -481,3 +481,23 @@ describe('buildSustainabilityReport()', () => {
     assert.strictEqual(r.projectLifeYears, 25);
   });
 });
+
+describe('alternative comparison includes its own operating losses', () => {
+  const primary = [{ type: 'cable', quantity: 100, size: '4 AWG', material: 'Cu', conductors: 3 }];
+  const larger = [{ type: 'cable', quantity: 100, size: '2 AWG', material: 'Cu', conductors: 3 }];
+  it('defaults to the same losses as the primary design', () => {
+    const r = buildSustainabilityReport(primary, { lossesKw: 2, gridFactorKgPerKwh: 0.5, projectLifeYears: 10, alternative: larger });
+    assert.strictEqual(r.alternativeComparison.lossesBasis, 'same-as-primary');
+    assert.strictEqual(r.alternativeComparison.operatingKg, r.operating.lifetimeKgCO2e);
+  });
+  it('a lower-loss alternative shows its operating saving (2 kW -> 1 kW at 0.5 kg/kWh over 10 y = 43,800 kg)', () => {
+    const r = buildSustainabilityReport(primary, {
+      lossesKw: 2, gridFactorKgPerKwh: 0.5, projectLifeYears: 10, alternative: larger, alternativeLossesKw: 1,
+    });
+    const op = r.operating.lifetimeKgCO2e; // 2 * 8760 * 10 * 0.5 = 87,600
+    assert.strictEqual(op, 87600);
+    assert.strictEqual(r.alternativeComparison.operatingKg, 43800);
+    const embodiedDelta = r.alternativeComparison.embodiedKg - r.embodied.totalKg;
+    assert.ok(Math.abs(r.alternativeComparison.deltaKg - (embodiedDelta - 43800)) < 1e-6);
+  });
+});

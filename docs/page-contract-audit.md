@@ -2188,21 +2188,21 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - sustainability.js:206 getCables()
+  - sustainability.js:214 getCables()
 - `conduitSchedule`
-  - sustainability.js:208 getConduits()
+  - sustainability.js:216 getConduits()
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
   - sustainability.js:111 getStudies()
-  - sustainability.js:303 getStudies()
+  - sustainability.js:311 getStudies()
   - sustainability.js:91 getStudies()
 - `studyResults.iec60287`
-  - sustainability.js:304 studies.iec60287
+  - sustainability.js:312 studies.iec60287
 - `studyResults.sustainabilityFootprint`
   - sustainability.js:91 getStudies().sustainabilityFootprint
 - `traySchedule`
-  - sustainability.js:207 getTrays()
+  - sustainability.js:215 getTrays()
 
 **Detected Writes**
 - `settings.studyApprovals`

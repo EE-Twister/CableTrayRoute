@@ -150,6 +150,11 @@
             <textarea id="alt-bom-json" rows="6" aria-label="Alternative BOM JSON array"
                       placeholder='[{"type":"cable","quantity":100,"size":"4 AWG","material":"Al","conductors":3}]'></textarea>
           </label>
+          <label for="alt-losses-kw">Alternative average conductor losses (kW, optional)
+            <input type="number" id="alt-losses-kw" min="0" step="0.1" placeholder="same as primary"
+                   aria-label="Alternative design average conductor losses in kW">
+          </label>
+          <p class="hint">Larger conductors carry more embodied carbon but waste less energy. Enter the alternative's losses to see its operating (Scope 2) carbon; leave blank to assume the same losses as the primary design.</p>
         </div>
 
         <div class="controls-row">
