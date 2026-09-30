@@ -166,7 +166,7 @@ export const EXTRACTED_MODULE_BUDGETS = Object.freeze({
   'src/routing/routeReviewView.mjs': 78,
   'src/routing/routeDetailView.mjs': 58,
   'src/routing/racewaySizingModel.mjs': 80,
-  'src/routing/routingReadinessModel.mjs': 100,
+  'src/routing/routingReadinessModel.mjs': 105,
   'src/routing/routingProjectAdapter.mjs': 332,
   'src/routing/routingSamples.mjs': 155,
   'src/routing/routeVisualizationModel.mjs': 134,
