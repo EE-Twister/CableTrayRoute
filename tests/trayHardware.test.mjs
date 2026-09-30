@@ -435,3 +435,41 @@ try {
 }
 
 console.log('\nAll trayHardware tests complete.');
+
+describe('buildTrayHardwareBOM — branch off the middle of a continuous run', () => {
+  it('a branch ending mid-run is a tee (not missed because only one endpoint is there)', () => {
+    const trays = [
+      makeTray('RUN', 0, 0, 10, 80, 0, 10),
+      makeTray('BR', 40, 0, 10, 40, 30, 10),
+    ];
+    const { fittings } = buildTrayHardwareBOM(trays);
+    assert.strictEqual(fittings.filter(f => f.type === 'tee').length, 1);
+    assert.deepStrictEqual(fittings.find(f => f.type === 'tee').tray_ids.sort(), ['BR', 'RUN']);
+  });
+  it('branches from both sides at the same spot make one cross', () => {
+    const trays = [
+      makeTray('RUN', 0, 0, 10, 80, 0, 10),
+      makeTray('N', 40, 0, 10, 40, 30, 10),
+      makeTray('S', 40, 0, 10, 40, -30, 10),
+    ];
+    const { fittings } = buildTrayHardwareBOM(trays);
+    assert.strictEqual(fittings.filter(f => f.type === 'cross').length, 1);
+    assert.strictEqual(fittings.filter(f => f.type === 'tee').length, 0);
+  });
+  it('a tray end that merely lies near another tray end is still an ordinary junction, not a branch', () => {
+    const trays = [
+      makeTray('A', 0, 0, 10, 40, 0, 10),
+      makeTray('B', 40, 0, 10, 80, 0, 10),
+    ];
+    const { fittings } = buildTrayHardwareBOM(trays);
+    assert.strictEqual(fittings.length, 1);
+    assert.strictEqual(fittings[0].type, 'splice_plate');
+  });
+  it('an unconnected tray far from any run produces no fitting', () => {
+    const { fittings } = buildTrayHardwareBOM([
+      makeTray('RUN', 0, 0, 10, 80, 0, 10),
+      makeTray('FAR', 40, 20, 10, 40, 50, 10),
+    ]);
+    assert.strictEqual(fittings.length, 0);
+  });
+});
