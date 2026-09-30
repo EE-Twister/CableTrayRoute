@@ -89,7 +89,7 @@ A **detuned reactor** is a series inductor placed in the capacitor branch. The L
 
 | Detuning factor p | Tuning order h_tune | Protects against |
 |---|---|---|
-| 5.67% | 4.30 | 5th harmonic resonance |
+| 5.67% | 4.20 | 5th harmonic resonance |
 | 7% | 3.78 | 5th harmonic (wider margin) |
 | 14% | 2.68 | 3rd harmonic resonance |
 

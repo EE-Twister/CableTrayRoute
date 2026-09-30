@@ -148,7 +148,7 @@ describe('detuningRecommendation — reactor specification', () => {
     const r = detuningRecommendation(4.87, 'danger');
     assert.strictEqual(r.needed, true);
     assert.strictEqual(r.detuningPct, 5.67);
-    assert.strictEqual(r.tunedToOrder, 4.30);
+    assert.strictEqual(r.tunedToOrder, 4.20);
   });
 
   it('danger near 7th harmonic → 7% detuning', () => {
@@ -285,3 +285,32 @@ describe('runCapacitorBankAnalysis — integration', () => {
 });
 
 console.log('\nAll capacitorBank tests completed.');
+
+describe('capacitor bank review regressions', () => {
+  it('blank (NaN) power factors throw instead of sizing a 2400 kVAR bank', () => {
+    assert.throws(() => requiredKvar({ pKw: 500, pfExisting: NaN, pfTarget: 0.95 }), /pfExisting/);
+    assert.throws(() => requiredKvar({ pKw: 500, pfExisting: 0.8, pfTarget: NaN }), /pfTarget/);
+    assert.throws(() => standardBankSizes(NaN), /kvarRequired/);
+  });
+
+  it('a requirement above the largest standard bank uses identical banks in parallel', () => {
+    const r = standardBankSizes(5000);
+    assert.strictEqual(r.bankCount, 3); // 3 x 1800 = 5400 >= 5000
+    assert.strictEqual(r.recommended, 5400);
+    const a = runCapacitorBankAnalysis({ pKw: 10000, pfExisting: 0.7, pfTarget: 0.95, kvaScMva: 200 });
+    assert.ok(a.bankSize >= a.kvarRequired, 'bank must cover the requirement');
+    assert.ok(a.warnings.some(w => w.includes('identical banks')));
+  });
+
+  it('screens resonance against the caller-supplied harmonic list', () => {
+    // 600 kVAR on 15 MVA: h_r = sqrt(15000/600) = 5.0
+    assert.strictEqual(resonanceOrder({ kvaScMva: 15, kvarCap: 600 }).riskLevel, 'danger');
+    assert.strictEqual(resonanceOrder({ kvaScMva: 15, kvarCap: 600, dominantHarmonics: [3] }).riskLevel, 'safe');
+  });
+
+  it('5.67% reactor tunes to 4.20 (1/sqrt(0.0567)) and the note mentions capacitor voltage rise', () => {
+    const d = detuningRecommendation(5, 'danger');
+    assert.ok(Math.abs(d.tunedToOrder - 1 / Math.sqrt(0.0567)) < 0.01);
+    assert.ok(/V_cap = V \/ \(1 − p\)/.test(d.rationale));
+  });
+});
