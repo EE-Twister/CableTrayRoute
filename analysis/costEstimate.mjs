@@ -9,6 +9,7 @@
 
 import { buildBomCatalogFields } from './manufacturerCatalog.mjs';
 import { buildDuctbankBOM } from './ductbankBom.mjs';
+import { parseTradeSize } from './pullBoxSizing.mjs';
 
 export const COST_SOURCE_URLS = Object.freeze({
   oewsElectricians: 'https://www.bls.gov/ooh/construction-and-extraction/electricians.htm',
@@ -391,7 +392,13 @@ export function estimateConduitCosts(conduits = [], prices = {}) {
     const tradeSize = String(c.trade_size || c.diameter || '').trim();
     const lengthFt = parseFloat(c.length_ft || 0) || 0;
 
-    const priceEvidence = lookupCatalogOrAttributePriceEvidence(conduitPrices, c, tradeSize);
+    // Trade sizes are written as fractions ('3/4', '1-1/2'); parseFloat would read
+    // them as 3 and 1. Convert to the decimal key the price table uses.
+    const parsedTradeSize = parseTradeSize(tradeSize);
+    const tradeSizeKey = conduitPrices[tradeSize] !== undefined || !Number.isFinite(parsedTradeSize)
+      ? tradeSize
+      : String(parsedTradeSize);
+    const priceEvidence = lookupCatalogOrAttributePriceEvidence(conduitPrices, c, tradeSizeKey);
     const unitPrice = priceEvidence.unitPrice;
     const materialCost = unitPrice * lengthFt;
     const laborHrs = lengthFt / (productivity.conduitInstallFtPerHr || 25);

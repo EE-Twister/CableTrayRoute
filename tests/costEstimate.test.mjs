@@ -648,3 +648,23 @@ describe('cable sizes as written in schedules map to the price table', () => {
     assert.strictEqual(line.usedDefaultPrice, true);
   });
 });
+
+describe('conduit trade sizes written as fractions', () => {
+  const price = ts => estimateConduitCosts([{ conduit_id: 'C', trade_size: ts, length_ft: 100 }], {})[0];
+  it("3/4 prices as 3/4 inch ($0.85/ft), not 3 inch ($5.80/ft)", () => {
+    assert.strictEqual(price('3/4').unitPrice, DEFAULT_PRICES.conduit['0.75']);
+    assert.strictEqual(price('1/2').unitPrice, DEFAULT_PRICES.conduit['0.5']);
+  });
+  it('mixed fractions map to their decimal keys (1-1/4, 1-1/2, 1 1/2, 2-1/2)', () => {
+    assert.strictEqual(price('1-1/4').unitPrice, DEFAULT_PRICES.conduit['1.25']);
+    assert.strictEqual(price('1-1/2').unitPrice, DEFAULT_PRICES.conduit['1.5']);
+    assert.strictEqual(price('1 1/2').unitPrice, DEFAULT_PRICES.conduit['1.5']);
+    assert.strictEqual(price('2-1/2').unitPrice, DEFAULT_PRICES.conduit['2.5']);
+  });
+  it('whole and decimal sizes and exact user keys are unchanged', () => {
+    assert.strictEqual(price('2').unitPrice, DEFAULT_PRICES.conduit['2']);
+    assert.strictEqual(price('0.75').unitPrice, DEFAULT_PRICES.conduit['0.75']);
+    const custom = estimateConduitCosts([{ conduit_id: 'C', trade_size: '3/4', length_ft: 10 }], { conduit: { '3/4': 7 } })[0];
+    assert.strictEqual(custom.unitPrice, 7);
+  });
+});
