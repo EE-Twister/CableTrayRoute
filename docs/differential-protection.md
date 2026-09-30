@@ -27,27 +27,31 @@ GE, ABB, Siemens, and other relay vendors. The study supports three zone types:
 
 ### Step 1 — CT Ratio and Tap
 
-Each winding of the protected element has a dedicated CT. The relay's **tap** compensates for
-different CT ratios so that equal through-currents produce equal per-unit secondary currents.
+Each winding of the protected element has a dedicated CT. The relay's **tap** multiplies the
+terminal-1 secondary current so that a healthy through-current cancels against terminal 2.
+With rated winding currents I₁/I₂ = V₂/V₁ and CT turns ratios n = CT / CT_sec:
 
 ```
-Nominal tap = CT₁ ratio / CT₂ ratio
+Nominal tap = i₂_sec / i₁_sec = (V₁ / V₂) × (CT₁ ratio / CT₂ ratio)
 Mismatch %  = |tap_set − nominal_tap| / nominal_tap × 100
 ```
 
-IEEE C37.91 allows up to 5% mismatch without additional correction. Above 5%, the relay
-either saturates on through-faults or fails to trip for small internal faults near the
-trip boundary.
+For a bus or generator zone (V₁ = V₂) this is CT₁ / CT₂. For a transformer, enter both winding
+voltages. IEEE C37.91 allows up to 5% mismatch without additional correction. Above 5%, the
+relay either saturates on through-faults or fails to trip for small internal faults near the
+trip boundary. The model works with current magnitudes; delta-wye phase shift and CT connection
+compensation are not modelled.
 
 ### Step 2 — Operating and Restraint Currents
 
-Terminal currents are converted to per-unit of CT secondary (normalised to tap):
+Terminal currents are converted to per-unit of the CT secondary rating, with the tap applied to
+terminal 1 (I_B is negative for current leaving the zone):
 
 ```
-I₁_pu = (I_A / (CT₁/CT_sec)) / tap
-I₂_pu = (I_B / (CT₂/CT_sec)) / tap
+I₁_pu = tap × (I_A / (CT₁/CT_sec)) / CT_sec
+I₂_pu = (I_B / (CT₂/CT_sec)) / CT_sec
 
-I_op  = | I₁_pu − I₂_pu |              (operating / differential current)
+I_op  = | I₁_pu + I₂_pu |              (operating / differential current)
 I_rst = ( |I₁_pu| + |I₂_pu| ) / 2      (restraint current)
 ```
 
@@ -106,7 +110,9 @@ Bus differential (87B) does not apply harmonic restraint — buses do not exhibi
 | CT₁ ratio | Primary turns on terminal 1 (e.g., 600 for 600:5 CT) |
 | CT₂ ratio | Primary turns on terminal 2 |
 | CT secondary | 5 A or 1 A |
-| Tap setting | Relay compensation tap — set to CT₁/CT₂ or nearest available value |
+| Terminal 1 / 2 voltage | Winding voltages (kV) for a transformer zone; blank for a bus or generator zone |
+| Tap setting | Relay compensation tap — set to (V₁/V₂) × (CT₁/CT₂) or the nearest available value |
+| Unrestrained pickup (optional) | High-set pickup (pu) that trips regardless of harmonic restraint |
 | Slope 1 (%) | Restraint slope for low-current region. Default: 25% |
 | Slope 2 (%) | Restraint slope for high-current region. Default: 65% |
 | I_min (pu) | Minimum operating current pickup. Default: 0.20 pu |
@@ -144,36 +150,34 @@ subtype `relay_87`.
 
 ## Worked Example — 2000 kVA Transformer (87T)
 
-**System**: 2000 kVA, 13.8 kV / 480 V, Δ-Y transformer.
+**System**: 2000 kVA, 13.8 kV / 480 V. Rated currents: I₁ = 2000 / (√3 × 13.8) = 83.7 A, I₂ = 2000 / (√3 × 0.48) = 2406 A.
 
-**CTs**: HV side — 600:5 (CT₁ = 600), LV side — 100:5 (CT₂ = 100).
+**CTs**: HV side 100:5 (CT₁ = 100), LV side 3000:5 (CT₂ = 3000).
 
-**Tap**: 600 / 100 = 6.0 (exact).
+**Nominal tap**: (13.8 / 0.48) × (100 / 3000) = 0.9583. Use 0.9583 (or the nearest available setting).
 
 **Settings**: Slope 1 = 25%, Slope 2 = 65%, I_min = 0.20 pu, I_bp = 3.0 pu.
 
-**Normal load (500 A primary, HV side)**:
+**Normal load**: I_A = +83.7 A, I_B = −2406 A.
 
 ```
-I_A = +500 A  (into zone, HV terminal)
-I_B = −500 A  (out of zone, LV terminal; approximately 500 × 13.8/0.48 ≈ 14,375 A LV
-               but here primary-referred)
+i₁_sec = 83.7 / 20  = 4.185 A → × 0.9583 = 4.011 A
+i₂_sec = 2406 / 600 = 4.010 A (leaving the zone, negative)
+I_op ≈ 0, I_rst = 0.80 pu → no trip
 ```
 
-For a perfect tap and balanced transformer, I_op ≈ 0, I_rst ≈ load level. No trip.
+**Transformer energisation with 20% 2nd harmonic**: inrush flows into one winding only
+(I_B = 0). 20% > 15% → harmonic restraint active → **NO TRIP**. If the differential current is
+more than twice the threshold the study warns that an unrestrained high-set element is needed to
+clear a heavy internal fault with CT saturation.
 
-**Transformer energisation with 20% 2nd harmonic**:
-- 2nd harmonic 20% > 15% → harmonic restraint active → **NO TRIP** (correct, prevents
-  false trip on energisation).
-
-**In-zone fault (Ia = 5000 A, Ib = 0)**:
+**In-zone fault (I_A = 800 A, I_B = 0)**:
 ```
-I₁_pu = (5000 / 120) / 6 = 6.94 pu
-I₂_pu = 0
-I_op  = 6.94 pu
-I_rst = 3.47 pu  (above I_bp = 3.0)
-threshold = 0.75 + 0.65×(3.47−3.0) = 0.75 + 0.31 = 1.06 pu
-6.94 > 1.06 → TRIP ✓
+i₁_sec = 800 / 20 = 40 A → × 0.9583 = 38.3 A → 7.67 pu
+I_op  = 7.67 pu
+I_rst = 3.83 pu  (above I_bp = 3.0)
+threshold = 0.75 + 0.65 × (3.83 − 3.0) = 1.29 pu
+7.67 > 1.29 → TRIP ✓
 ```
 
 ## Verification Against Competitors

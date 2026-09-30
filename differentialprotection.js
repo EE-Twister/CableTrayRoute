@@ -78,6 +78,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const slope2Pct   = getF('slope2');
     const minPickupPu = getF('min-pickup');
     const breakpointPu = getF('breakpoint');
+    const voltage1Kv  = getF('voltage1-kv');
+    const voltage2Kv  = getF('voltage2-kv');
+    const unrestrainedPu = getF('unrestrained-pu');
     const iaA         = getF('ia-amps');
     const ibA         = getF('ib-amps');
     const secondHarmPct = getF('second-harm-pct');
@@ -128,6 +131,10 @@ document.addEventListener('DOMContentLoaded', () => {
       ct2Ratio,
       ctSecondary,
       tapSetting,
+      // Blank voltages mean a bus/generator zone: only the ratio V1/V2 matters, so equal values are used.
+      voltage1Kv: Number.isFinite(voltage1Kv) && Number.isFinite(voltage2Kv) ? voltage1Kv : 1,
+      voltage2Kv: Number.isFinite(voltage1Kv) && Number.isFinite(voltage2Kv) ? voltage2Kv : 1,
+      unrestrainedPu: Number.isFinite(unrestrainedPu) ? unrestrainedPu : null,
       slope1: slope1Pct / 100,
       slope2: slope2Pct / 100,
       minPickupPu,
@@ -151,6 +158,11 @@ document.addEventListener('DOMContentLoaded', () => {
     set('ct2-ratio', inputs.ct2Ratio);
     set('ct-secondary', inputs.ctSecondary);
     set('tap-setting', inputs.tapSetting);
+    if (inputs.voltage1Kv !== undefined && inputs.voltage1Kv !== inputs.voltage2Kv) {
+      set('voltage1-kv', inputs.voltage1Kv);
+      set('voltage2-kv', inputs.voltage2Kv);
+    }
+    set('unrestrained-pu', inputs.unrestrainedPu);
     set('slope1', inputs.slope1 !== undefined ? (inputs.slope1 * 100).toFixed(0) : 25);
     set('slope2', inputs.slope2 !== undefined ? (inputs.slope2 * 100).toFixed(0) : 65);
     set('min-pickup', inputs.minPickupPu);
@@ -223,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <tbody>
             <tr><td>I₁ (CT₁ secondary normalised to tap, pu)</td><td>${r.currents.i1Pu.toFixed(4)}</td></tr>
             <tr><td>I₂ (CT₂ secondary normalised to tap, pu)</td><td>${r.currents.i2Pu.toFixed(4)}</td></tr>
-            <tr><td>CT₁ / CT₂ nominal tap</td><td>${r.ctMismatch.nominalTap.toFixed(4)}</td></tr>
+            <tr><td>Nominal tap (V₁/V₂ × CT₁/CT₂)</td><td>${r.ctMismatch.nominalTap.toFixed(4)}</td></tr>
             <tr><td>Set tap</td><td>${escHtml(String(r.inputs.tapSetting ?? ''))}</td></tr>
             <tr><td>CT mismatch</td><td>${r.ctMismatch.mismatchPct.toFixed(2)}%</td></tr>
             <tr><td>2nd harmonic</td><td>${r.harmonic.secondPct.toFixed(1)}%</td></tr>

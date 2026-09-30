@@ -206,8 +206,9 @@ describe('calcOperatingRestraintCurrents()', () => {
     // i1_pu = 25, i2_pu = 25, I_op = |25 - 25| = 0 — incorrect intuition.
     // Correct in-zone fault: Ia=500 (in), Ib=0 (no through current)
     const r2 = calcOperatingRestraintCurrents(500, 0, 100, 100, 1, 5);
-    approx(r2.iOp, 25, 0.001, 'I_op for in-zone fault: ');
-    approx(r2.iRst, 12.5, 0.001, 'I_rst for in-zone fault: ');
+    // 500 A on a 100:5 CT = 25 A secondary = 5 pu of the 5 A rating; no current at terminal 2
+    approx(r2.iOp, 5, 0.001, 'I_op for in-zone fault: ');
+    approx(r2.iRst, 2.5, 0.001, 'I_rst for in-zone fault: ');
   });
 
   it('throws on zero ct1Ratio', () => {
@@ -372,7 +373,9 @@ describe('runDifferentialStudy() — 87T transformer zone', () => {
     minPickupPu: 0.20,
     breakpointPu: 3.0,
     iaA: 500,
-    ibA: -90,  // slight mismatch from balanced -83.33; I_op ≈ 0.056 pu < 0.20 min pickup → no trip
+    // Bus-type zone (equal voltages): tap 6 = CT1/CT2 balances 500 A against 500 A.
+    // -490 A is a 2% error: I_op = |500/120 × 6 − 490/20| / 5 = 0.1 pu < 0.20 min pickup → no trip
+    ibA: -490,
     secondHarmPct: 0,
     fifthHarmPct: 0,
   };
@@ -403,8 +406,8 @@ describe('runDifferentialStudy() — 87T transformer zone', () => {
   });
 
   it('inrush (2nd harmonic 18%) → harmonic restraint active, no trip', () => {
-    // Large inrush current; Ib = -2000 × 100/600 ≈ -333 (balanced through-fault ratio)
-    const p = { ...baseParams, secondHarmPct: 18, iaA: 2000, ibA: -340 };
+    // Energisation inrush flows into one winding only (no current out of terminal 2)
+    const p = { ...baseParams, secondHarmPct: 18, iaA: 2000, ibA: 0 };
     const r = runDifferentialStudy(p);
     assert.strictEqual(r.harmonic.restrain, true);
     assert.strictEqual(r.tripResult.trip, false);
@@ -520,3 +523,65 @@ describe('runDifferentialStudy() — input validation', () => {
 });
 
 console.log('\n  Done.\n');
+
+
+// ---------------------------------------------------------------------------
+// Review regressions: tap compensation, transformer ratio, unrestrained element
+// ---------------------------------------------------------------------------
+describe('tap compensation (healthy through-current must not look like a fault)', () => {
+  it('2000 kVA 13.8/0.48 kV transformer with 100:5 and 3000:5 CTs balances at load', () => {
+    // I1 = 2000 / (sqrt(3) × 13.8) = 83.67 A; I2 = 2000 / (sqrt(3) × 0.48) = 2405.7 A
+    const I1 = 2000 / (Math.sqrt(3) * 13.8);
+    const I2 = 2000 / (Math.sqrt(3) * 0.48);
+    // nominal tap = i2_sec / i1_sec = (I2/600) / (I1/20) = (V1/V2)(CT1/CT2) = 28.75 × (100/3000)
+    const mism = ctRatioMismatch(100, 3000, 0.9583, 13.8, 0.48);
+    approx(mism.nominalTap, 0.9583, 0.0005, 'nominal tap: ');
+    assert.strictEqual(mism.acceptable, true);
+    const r = runDifferentialStudy({
+      zoneType: '87T', ct1Ratio: 100, ct2Ratio: 3000, voltage1Kv: 13.8, voltage2Kv: 0.48,
+      tapSetting: 0.9583, slope1: 0.25, slope2: 0.65, minPickupPu: 0.2, breakpointPu: 3,
+      iaA: I1, ibA: -I2,
+    });
+    assert.ok(r.currents.iOp < 0.01, `healthy load I_op ${r.currents.iOp}`);
+    assert.strictEqual(r.tripResult.trip, false);
+    assert.strictEqual(r.warnings.length, 0);
+  });
+
+  it('the tap is a compensation: a wrong tap unbalances a healthy through-current', () => {
+    const r = calcOperatingRestraintCurrents(500, -500, 600, 100, 1, 5);
+    assert.ok(r.iOp > 1, 'tap 1 cannot compensate 600:5 against 100:5');
+    const ok = calcOperatingRestraintCurrents(500, -500, 600, 100, 6, 5);
+    approx(ok.iOp, 0, 0.001, 'tap = CT1/CT2: ');
+  });
+
+  it('the page default example (500 A / -490 A, CT 600/100, tap 6) does not trip', () => {
+    const r = runDifferentialStudy({
+      zoneType: '87T', ct1Ratio: 600, ct2Ratio: 100, tapSetting: 6,
+      slope1: 0.25, slope2: 0.65, minPickupPu: 0.2, breakpointPu: 3, iaA: 500, ibA: -490,
+    });
+    assert.strictEqual(r.tripResult.trip, false);
+  });
+
+  it('voltage ratio enters the nominal tap', () => {
+    approx(ctRatioMismatch(600, 100, 1, 1, 6).nominalTap, 1, 1e-4, 'V1/V2 = 1/6: ');
+    assert.throws(() => ctRatioMismatch(600, 100, 6, 0, 1), /voltages/);
+  });
+});
+
+describe('harmonic restraint and the unrestrained element', () => {
+  const p = {
+    zoneType: '87T', ct1Ratio: 600, ct2Ratio: 100, tapSetting: 6,
+    slope1: 0.25, slope2: 0.65, minPickupPu: 0.2, breakpointPu: 3, iaA: 6000, ibA: 0, secondHarmPct: 20,
+  };
+  it('harmonic restraint blocks and warns about a very large differential current', () => {
+    const r = runDifferentialStudy(p);
+    assert.strictEqual(r.tripResult.trip, false);
+    assert.ok(r.warnings.some(w => /unrestrained/.test(w)));
+  });
+  it('an unrestrained high-set element trips regardless of harmonics', () => {
+    const r = runDifferentialStudy({ ...p, unrestrainedPu: 10 });
+    assert.strictEqual(r.tripResult.trip, true);
+    assert.strictEqual(r.tripResult.unrestrainedTrip, true);
+    assert.strictEqual(r.tripResult.restrainReason, null);
+  });
+});

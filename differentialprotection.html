@@ -192,6 +192,18 @@ Slope 2 region  (I_rst ≥ I_bp):
           </div>
 
           <div class="field-row">
+            <label for="voltage1-kv">Terminal 1 voltage (kV)</label>
+            <input type="number" id="voltage1-kv" min="0.001" step="any" placeholder="same as terminal 2" aria-describedby="voltage-hint">
+          </div>
+          <div class="field-row">
+            <label for="voltage2-kv">Terminal 2 voltage (kV)</label>
+            <input type="number" id="voltage2-kv" min="0.001" step="any" placeholder="same as terminal 1" aria-describedby="voltage-hint">
+            <p id="voltage-hint" class="field-hint">
+              Winding voltages for a transformer zone (leave both blank for a bus or generator zone). They set the nominal tap:
+              (V₁ / V₂) × (CT₁ / CT₂).
+            </p>
+          </div>
+          <div class="field-row">
             <label for="tap-setting">
               Relay tap setting
               <button type="button" class="helpBtn" aria-label="Help — tap setting">?</button>
@@ -199,7 +211,7 @@ Slope 2 region  (I_rst ≥ I_bp):
             <input type="number" id="tap-setting" min="0.01" step="0.01" value="6"
                    required aria-describedby="tap-setting-hint">
             <p id="tap-setting-hint" class="field-hint">
-              Dimensionless relay compensation tap. Nominal value = CT₁ / CT₂ (e.g., 600 / 100 = 6).
+              Dimensionless compensation tap applied to terminal 1 so that a healthy through-current cancels. Nominal value = (V₁ / V₂) × (CT₁ / CT₂); for a bus zone (equal voltages) this is CT₁ / CT₂ (e.g., 600 / 100 = 6). The model handles magnitudes only; delta-wye phase shift and CT connection compensation are not modelled.
               Set to the nearest available relay setting. Mismatch &gt; 5% triggers a warning
               per IEEE C37.91.
             </p>
@@ -244,7 +256,17 @@ Slope 2 region  (I_rst ≥ I_bp):
                    required aria-describedby="min-pickup-hint">
             <p id="min-pickup-hint" class="field-hint">
               Floor of the operate region. The relay will not trip below this differential current
-              regardless of restraint. Typical: 0.20 pu. Per-unit of CT secondary / tap setting.
+              regardless of restraint. Typical: 0.20 pu. Per-unit of the CT secondary rating (1 pu = 5 A on a 5 A CT).
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="unrestrained-pu">
+              Unrestrained (high-set) pickup I<sub>87U</sub> (pu, optional)
+            </label>
+            <input type="number" id="unrestrained-pu" min="0.5" step="0.1" placeholder="none" aria-describedby="unrestrained-hint">
+            <p id="unrestrained-hint" class="field-hint">
+              Differential current above which the relay trips regardless of restraint and harmonic blocking. Typical 8–10 pu for transformers. Leave blank to omit.
             </p>
           </div>
 
