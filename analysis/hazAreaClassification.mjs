@@ -146,13 +146,15 @@ export const EX_PROTECTION_TYPES = Object.freeze([
   { value: 'ic',  label: 'Ex ic — Intrinsic safety (Cat ic)',      zones: ['2'],         dustZones: ['22'] },
   { value: 'ma',  label: 'Ex ma — Encapsulation (Cat a)',          zones: ['0','1','2'], dustZones: ['20','21','22'] },
   { value: 'mb',  label: 'Ex mb — Encapsulation (Cat b)',          zones: ['1','2'],     dustZones: ['21','22'] },
+  { value: 'mc',  label: 'Ex mc — Encapsulation (Cat c)',          zones: ['2'],         dustZones: ['22'] },
   { value: 'n',   label: 'Ex n — Non-sparking (Zone 2 only)',      zones: ['2'],         dustZones: [] },
   { value: 'nA',  label: 'Ex nA — Non-sparking (Zone 2)',          zones: ['2'],         dustZones: [] },
   { value: 'nC',  label: 'Ex nC — Sparking parts (Zone 2)',        zones: ['2'],         dustZones: [] },
   { value: 'o',   label: 'Ex o — Oil immersion',                   zones: ['1','2'],     dustZones: [] },
   { value: 'p',   label: 'Ex p — Pressurization',                  zones: ['1','2'],     dustZones: [] },
   { value: 'px',  label: 'Ex px — Pressurized (Zone 1/21)',        zones: ['1','2'],     dustZones: ['21','22'] },
-  { value: 'py',  label: 'Ex py — Pressurized (Zone 2 only)',      zones: ['2'],         dustZones: [] },
+  { value: 'py',  label: 'Ex py — Pressurized (Zone 1/2, 21/22)',  zones: ['1','2'],     dustZones: ['21','22'] },
+  { value: 'pz',  label: 'Ex pz — Pressurized (Zone 2/22 only)',   zones: ['2'],         dustZones: ['22'] },
   { value: 'q',   label: 'Ex q — Powder filling',                  zones: ['1','2'],     dustZones: [] },
   { value: 't',   label: 'Ex t — Dust ignition-proof enclosure',   zones: [],            dustZones: ['20','21','22'] },
   { value: 'ta',  label: 'Ex ta — Dust enclosure (Cat 1)',         zones: [],            dustZones: ['20','21','22'] },
@@ -654,6 +656,30 @@ export function checkEquipmentCompatibility(equip, area) {
       if (GAS_GROUP_RANK[equip.exGroup] < GAS_GROUP_RANK[areaGroup]) {
         failures.push(
           `${equip.label}: Equipment group ${equip.exGroup} does NOT cover area gas group ` +
+          `${areaGroup} (need ${areaGroup} or higher)`
+        );
+      }
+    }
+
+    // Equipment group must match the hazard type: Group I is for mines, II for
+    // gas, III for dust (IEC 60079-0). A Group II device is not dust-rated and
+    // vice versa, whatever the sub-group.
+    const areaIsDust = Boolean(area.dustZone) || area.necClass === 'II' || area.necClass === 'III';
+    const equipIsDust = /^III/.test(equip.exGroup);
+    if (equip.exGroup === 'I') {
+      failures.push(`${equip.label}: Equipment group I is for underground mining and is not suitable for surface hazardous areas`);
+    } else if (areaIsDust && !equipIsDust) {
+      failures.push(`${equip.label}: Equipment group ${equip.exGroup} is gas-rated; a dust area requires Group III equipment`);
+    } else if (!areaIsDust && equipIsDust) {
+      failures.push(`${equip.label}: Equipment group ${equip.exGroup} is dust-rated; a gas/vapour area requires Group II equipment`);
+    }
+
+    // IEC dust sub-groups: IIIC covers IIIB and IIIA
+    if (['IIIA','IIIB','IIIC'].includes(equip.exGroup) && ['IIIA','IIIB','IIIC'].includes(areaGroup)) {
+      const rank = { IIIA: 0, IIIB: 1, IIIC: 2 };
+      if (rank[equip.exGroup] < rank[areaGroup]) {
+        failures.push(
+          `${equip.label}: Equipment group ${equip.exGroup} does NOT cover area dust group ` +
           `${areaGroup} (need ${areaGroup} or higher)`
         );
       }
