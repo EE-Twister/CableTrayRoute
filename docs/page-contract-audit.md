@@ -931,10 +931,10 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `studyResults`
   - conduitbend.js:309 getStudies()
   - conduitbend.js:55 getStudies()
-  - conduitbend.js:619 getStudies()
+  - conduitbend.js:621 getStudies()
 - `studyResults.conduitBendSchedule`
   - conduitbend.js:55 getStudies().conduitBendSchedule
-  - conduitbend.js:619 getStudies().conduitBendSchedule
+  - conduitbend.js:621 getStudies().conduitBendSchedule
 
 **Detected Writes**
 - `settings.studyApprovals`

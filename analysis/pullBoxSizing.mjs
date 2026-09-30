@@ -47,6 +47,54 @@ export const STANDARD_BOX_SIZES = Object.freeze([
 ]);
 
 // ---------------------------------------------------------------------------
+// Trade-size parsing
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse one trade size: decimal ("1.5"), fraction ("3/4"), or mixed number
+ * ("1-1/2", "1 1/2"). Returns NaN when the text is not a positive size.
+ * parseFloat('1-1/2') is 1, which would silently undersize the box.
+ *
+ * @param {string|number} value
+ * @returns {number}
+ */
+export function parseTradeSize(value) {
+  if (typeof value === 'number') return value > 0 && Number.isFinite(value) ? value : NaN;
+  const text = String(value ?? '').trim().replace(/["”″]|in\.?$/gi, '').trim();
+  if (!text) return NaN;
+  const mixed = text.match(/^(\d+)[\s-]+(\d+)\/(\d+)$/);
+  if (mixed) return Number(mixed[3]) > 0 ? Number(mixed[1]) + Number(mixed[2]) / Number(mixed[3]) : NaN;
+  const fraction = text.match(/^(\d+)\/(\d+)$/);
+  if (fraction) return Number(fraction[2]) > 0 ? Number(fraction[1]) / Number(fraction[2]) : NaN;
+  if (!/^\d*\.?\d+$/.test(text)) return NaN;
+  const n = Number(text);
+  return n > 0 ? n : NaN;
+}
+
+/**
+ * Parse a list of trade sizes separated by commas or semicolons (whitespace also
+ * separates plain numbers, but "2 1/2" is read as the mixed number 2-1/2).
+ *
+ * @param {string} text
+ * @returns {{ sizes: number[], invalid: string[] }}
+ */
+export function parseTradeSizeList(text) {
+  const sizes = [];
+  const invalid = [];
+  for (const rawToken of String(text ?? '').split(/[,;]+/)) {
+    const token = rawToken.trim();
+    if (!token) continue;
+    const whole = parseTradeSize(token);
+    if (Number.isFinite(whole)) { sizes.push(whole); continue; }
+    for (const part of token.split(/\s+/)) {
+      const n = parseTradeSize(part);
+      if (Number.isFinite(n)) sizes.push(n); else invalid.push(part);
+    }
+  }
+  return { sizes, invalid };
+}
+
+// ---------------------------------------------------------------------------
 // Straight-pull sizing — NEC 314.28(A)(1)
 // ---------------------------------------------------------------------------
 
@@ -57,7 +105,8 @@ export const STANDARD_BOX_SIZES = Object.freeze([
  * @returns {{ minLength: number, formula: string }}
  */
 export function straightPullMinLength(largestTradeSize) {
-  const ts = Math.abs(parseFloat(largestTradeSize) || 0);
+  const ts = parseTradeSize(largestTradeSize);
+  if (!(ts > 0)) throw new Error('Enter the trade size of the largest conduit (greater than 0).');
   const minLength = round2(8 * ts);
   return {
     minLength,
@@ -81,7 +130,8 @@ export function anglePullMinDimension(tradeSizesOnWall) {
   if (!Array.isArray(tradeSizesOnWall) || tradeSizesOnWall.length === 0) {
     return { minDimension: 0, formula: 'No conduits on this wall' };
   }
-  const sizes   = tradeSizesOnWall.map(ts => Math.abs(parseFloat(ts) || 0));
+  const sizes   = tradeSizesOnWall.map(parseTradeSize);
+  if (sizes.some(ts => !(ts > 0))) throw new Error('Conduit trade sizes must be positive numbers (e.g. 2, 1-1/2, 3/4).');
   const largest = Math.max(...sizes);
   const others  = sizes.filter((_, i) => {
     // Exclude the first occurrence of the largest value only
@@ -112,14 +162,21 @@ export function anglePullMinDimension(tradeSizesOnWall) {
  * @returns {{ length: number, width: number, adequate: boolean }}
  */
 export function selectStandardBox(minLength, minWidth) {
-  const reqL = Math.abs(parseFloat(minLength) || 0);
-  const reqW = Math.abs(parseFloat(minWidth) ?? reqL);
+  const reqL = Math.max(0, Number(minLength) || 0);
+  const parsedW = Number(minWidth);
+  const reqW = minWidth === undefined || minWidth === null || !Number.isFinite(parsedW) ? reqL : Math.max(0, parsedW);
 
+  // A box can be installed either way round, so 24 × 30 is satisfied by a 30 × 24 box.
+  let best = null;
   for (const [l, w] of STANDARD_BOX_SIZES) {
-    if (l >= reqL && w >= reqW) {
-      return { length: l, width: w, adequate: true };
+    const fits = l >= reqL && w >= reqW;
+    const fitsRotated = l >= reqW && w >= reqL;
+    if (!fits && !fitsRotated) continue;
+    if (!best || l * w < best.length * best.width) {
+      best = fits ? { length: l, width: w, adequate: true } : { length: w, width: l, adequate: true };
     }
   }
+  if (best) return best;
 
   // No standard size is sufficient; return the largest in the catalogue with a flag
   const [maxL, maxW] = STANDARD_BOX_SIZES[STANDARD_BOX_SIZES.length - 1];
@@ -161,8 +218,7 @@ export function sizePullBox(input) {
   const pullType = (input.pullType || 'straight').toLowerCase();
 
   if (pullType === 'straight') {
-    const ts = parseFloat(input.largestTradeSize) || 0;
-    const { minLength, formula } = straightPullMinLength(ts);
+    const { minLength, formula } = straightPullMinLength(input.largestTradeSize);
     const box = selectStandardBox(minLength, minLength);
     return {
       label,
@@ -179,6 +235,12 @@ export function sizePullBox(input) {
   const wallA = Array.isArray(input.wallA) ? input.wallA : [];
   const wallB = Array.isArray(input.wallB) ? input.wallB : [];
 
+  if (Array.isArray(input.invalidSizes) && input.invalidSizes.length) {
+    throw new Error(`Unrecognised conduit size(s): ${input.invalidSizes.join(', ')}. Use values like 2, 1-1/2 or 3/4.`);
+  }
+  if (wallA.length === 0 && wallB.length === 0) {
+    throw new Error('Enter at least one conduit trade size for an angle or U pull.');
+  }
   const resA = anglePullMinDimension(wallA);
   const resB = anglePullMinDimension(wallB);
 

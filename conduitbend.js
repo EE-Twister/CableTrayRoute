@@ -5,7 +5,7 @@ import {
   normalizeConduitRunLayout,
   normalizePullBoxPosition
 } from './analysis/conduitBendVisualModel.mjs';
-import { sizePullBox, STANDARD_BOX_SIZES } from './analysis/pullBoxSizing.mjs';
+import { sizePullBox, STANDARD_BOX_SIZES, parseTradeSizeList } from './analysis/pullBoxSizing.mjs';
 import { getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
@@ -260,8 +260,8 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
       <div class="pb-angle-section" hidden>
         <p class="hint">Enter trade sizes of all conduits entering each wall (comma-separated).</p>
-        <label>Wall A conduit sizes (in): <input type="text" class="pb-walla" placeholder="e.g. 2, 1.5, 1" value="${escapeHtml(sanitizeTradeSizeList(wallA).join(', '))}"></label>
-        <label>Wall B conduit sizes (in): <input type="text" class="pb-wallb" placeholder="e.g. 2, 1.5"    value="${escapeHtml(sanitizeTradeSizeList(wallB).join(', '))}"></label>
+        <label>Wall A conduit sizes (in): <input type="text" class="pb-walla" placeholder="e.g. 2, 1-1/2, 1" value="${escapeHtml(sanitizeTradeSizeList(wallA).join(', '))}"></label>
+        <label>Wall B conduit sizes (in): <input type="text" class="pb-wallb" placeholder="e.g. 2, 1-1/2" value="${escapeHtml(sanitizeTradeSizeList(wallB).join(', '))}"></label>
       </div>
     `;
 
@@ -364,12 +364,14 @@ document.addEventListener('DOMContentLoaded', () => {
           wallBName: card.querySelector('.pb-wallb-name').value.trim(),
         };
       }
-      const parseWall = el => el.value.split(/[\s,]+/).map(parseFloat).filter(v => v > 0);
+      const wallALists = parseTradeSizeList(card.querySelector('.pb-walla').value);
+      const wallBLists = parseTradeSizeList(card.querySelector('.pb-wallb').value);
       return {
         label:    card.querySelector('.pb-label').value.trim(),
         pullType: card.querySelector('.pb-type').value,
-        wallA:    parseWall(card.querySelector('.pb-walla')),
-        wallB:    parseWall(card.querySelector('.pb-wallb')),
+        wallA:    wallALists.sizes,
+        wallB:    wallBLists.sizes,
+        invalidSizes: [...wallALists.invalid, ...wallBLists.invalid],
         position: readPullBoxPosition(card),
         wallAName: card.querySelector('.pb-walla-name').value.trim(),
         wallBName: card.querySelector('.pb-wallb-name').value.trim(),

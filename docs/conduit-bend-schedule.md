@@ -77,6 +77,8 @@ minimum dimension = **6 × largest trade size + sum of other trade sizes on the 
 
 Example: Wall A has 2", 1½", 1½" conduits → 6 × 2 + 1.5 + 1.5 = 15".
 
+Enter wall sizes as decimals, fractions or mixed numbers separated by commas (for example `2, 1-1/2, 3/4`). An unrecognised size or an empty entry is reported as an error rather than ignored, because a dropped conduit would undersize the box. The standard-box selection accepts a box turned on its side, so a required 24" × 30" is met by a 30" × 24" box. NEC 314.28(A)(2) also requires the distance between the entries of conduits carrying the same conductor to be at least 6 × the largest trade size; check that separately when laying out the wall.
+
 ## Input Fields
 
 ### Conduit Run

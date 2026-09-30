@@ -19,6 +19,8 @@ import {
   straightPullMinLength,
   anglePullMinDimension,
   selectStandardBox,
+  parseTradeSize,
+  parseTradeSizeList,
   sizePullBox,
 } from '../analysis/pullBoxSizing.mjs';
 import {
@@ -477,5 +479,44 @@ describe('sizePullBox()', () => {
   it('returns standardBox with adequate flag', () => {
     const r = sizePullBox({ label: 'PB-4', pullType: 'straight', largestTradeSize: 1 });
     assert.ok('adequate' in r.standardBox);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('pull box review regressions', () => {
+  it('parseTradeSize reads fractions and mixed numbers (parseFloat read 1-1/2 as 1)', () => {
+    assert.strictEqual(parseTradeSize('1-1/2'), 1.5);
+    assert.strictEqual(parseTradeSize('2 1/2'), 2.5);
+    assert.strictEqual(parseTradeSize('3/4'), 0.75);
+    assert.strictEqual(parseTradeSize('2"'), 2);
+    assert.ok(Number.isNaN(parseTradeSize('abc')));
+    assert.ok(Number.isNaN(parseTradeSize('0')));
+  });
+
+  it('parseTradeSizeList keeps 2-1/2 whole and reports unknown tokens', () => {
+    assert.deepStrictEqual(parseTradeSizeList('2, 1-1/2; 3/4').sizes, [2, 1.5, 0.75]);
+    assert.deepStrictEqual(parseTradeSizeList('2 1/2, 1').sizes, [2.5, 1]);
+    assert.deepStrictEqual(parseTradeSizeList('2, x').invalid, ['x']);
+  });
+
+  it('a 2-1/2" + 2" wall needs 6 x 2.5 + 2 = 17" (not 6 x 2 + 1)', () => {
+    assert.strictEqual(anglePullMinDimension([parseTradeSize('2-1/2'), 2]).minDimension, 17);
+  });
+
+  it('selectStandardBox defaults the width to the length when omitted', () => {
+    const box = selectStandardBox(12);
+    assert.strictEqual(box.adequate, true);
+    assert.strictEqual(box.length, 12);
+  });
+
+  it('selectStandardBox uses a box turned on its side (24 x 30 -> 30 x 24)', () => {
+    const box = selectStandardBox(24, 30);
+    assert.deepStrictEqual([box.length, box.width, box.adequate], [24, 30, true]);
+  });
+
+  it('rejects empty or zero inputs instead of returning a 4 x 4 box', () => {
+    assert.throws(() => sizePullBox({ pullType: 'straight', largestTradeSize: NaN }), /trade size/);
+    assert.throws(() => sizePullBox({ pullType: 'angle', wallA: [], wallB: [] }), /at least one conduit/);
+    assert.throws(() => sizePullBox({ pullType: 'angle', wallA: [2], wallB: [], invalidSizes: ['x'] }), /Unrecognised/);
   });
 });
