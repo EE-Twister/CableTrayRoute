@@ -137,25 +137,25 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - src/workflowDashboard.js:172 getStudies()
   - ... 2 more
 - `studyResults.arcFlash`
-  - analysis/designCoach.mjs:479 studies.arcFlash
+  - analysis/designCoach.mjs:483 studies.arcFlash
   - analysis/equipmentEvaluation.mjs:240 studies?.arcFlash
 - `studyResults.cableThermalEnvironment`
-  - analysis/designCoach.mjs:486 studies.cableThermalEnvironment
+  - analysis/designCoach.mjs:490 studies.cableThermalEnvironment
 - `studyResults.duty`
   - validation/rules.js:666 studies.duty
   - validation/rules.js:666 studies?.duty
 - `studyResults.groundGrid`
-  - analysis/designCoach.mjs:483 studies.groundGrid
+  - analysis/designCoach.mjs:487 studies.groundGrid
 - `studyResults.harmonics`
-  - analysis/designCoach.mjs:482 studies.harmonics
+  - analysis/designCoach.mjs:486 studies.harmonics
 - `studyResults.loadFlow`
-  - analysis/designCoach.mjs:484 studies.loadFlow
+  - analysis/designCoach.mjs:488 studies.loadFlow
 - `studyResults.reliability`
   - validation/rules.js:671 studies?.reliability
   - validation/rules.js:672 studies.reliability
   - validation/rules.js:674 studies?.reliability
 - `studyResults.shortCircuit`
-  - analysis/designCoach.mjs:480 studies.shortCircuit
+  - analysis/designCoach.mjs:484 studies.shortCircuit
   - analysis/equipmentEvaluation.mjs:239 studies?.shortCircuit
 - `traySchedule`
   - src/workflowDashboard.js:145 getTrays()
@@ -1195,18 +1195,18 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `studyResults`
   - src/designCoach.js:160 getStudies()
 - `studyResults.arcFlash`
-  - analysis/designCoach.mjs:479 studies.arcFlash
+  - analysis/designCoach.mjs:483 studies.arcFlash
   - analysis/equipmentEvaluation.mjs:240 studies?.arcFlash
 - `studyResults.cableThermalEnvironment`
-  - analysis/designCoach.mjs:486 studies.cableThermalEnvironment
+  - analysis/designCoach.mjs:490 studies.cableThermalEnvironment
 - `studyResults.groundGrid`
-  - analysis/designCoach.mjs:483 studies.groundGrid
+  - analysis/designCoach.mjs:487 studies.groundGrid
 - `studyResults.harmonics`
-  - analysis/designCoach.mjs:482 studies.harmonics
+  - analysis/designCoach.mjs:486 studies.harmonics
 - `studyResults.loadFlow`
-  - analysis/designCoach.mjs:484 studies.loadFlow
+  - analysis/designCoach.mjs:488 studies.loadFlow
 - `studyResults.shortCircuit`
-  - analysis/designCoach.mjs:480 studies.shortCircuit
+  - analysis/designCoach.mjs:484 studies.shortCircuit
   - analysis/equipmentEvaluation.mjs:239 studies?.shortCircuit
 - `traySchedule`
   - src/designCoach.js:159 getTrays()
@@ -1618,7 +1618,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Deliverables
-- Source files: `analysis/deliverableArtifacts.mjs`, `analysis/fieldExecution.mjs`, `analysis/manufacturerCatalog.mjs`, `src/projectManagerEntry.js`, `src/submittal.js`, `submittal.js`
+- Source files: `analysis/conduitFill.mjs`, `analysis/deliverableArtifacts.mjs`, `analysis/fieldExecution.mjs`, `analysis/manufacturerCatalog.mjs`, `analysis/trayFill.mjs`, `src/projectManagerEntry.js`, `src/submittal.js`, `submittal.js`
 
 **Undocumented Reads**
 - None
@@ -1649,41 +1649,41 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - submittal.js:117 getCables()
-  - submittal.js:205 getCables()
-  - submittal.js:628 getCables()
+  - submittal.js:119 getCables()
+  - submittal.js:207 getCables()
+  - submittal.js:627 getCables()
 - `conduitSchedule`
-  - submittal.js:119 getConduits()
-  - submittal.js:206 getConduits()
-  - submittal.js:630 getConduits()
+  - submittal.js:121 getConduits()
+  - submittal.js:208 getConduits()
+  - submittal.js:629 getConduits()
 - `ductbankSchedule`
-  - submittal.js:121 getDuctbanks()
-  - submittal.js:206 getDuctbanks()
+  - submittal.js:123 getDuctbanks()
+  - submittal.js:208 getDuctbanks()
 - `equipment`
-  - submittal.js:120 getEquipment()
-  - submittal.js:204 getEquipment()
-  - submittal.js:631 getEquipment()
+  - submittal.js:122 getEquipment()
+  - submittal.js:206 getEquipment()
+  - submittal.js:630 getEquipment()
 - `settings.deliverableArtifacts`
-  - submittal.js:156 getDeliverableArtifacts()
-  - submittal.js:188 getDeliverableArtifacts()
-  - submittal.js:755 getDeliverableArtifacts()
+  - submittal.js:158 getDeliverableArtifacts()
+  - submittal.js:190 getDeliverableArtifacts()
+  - submittal.js:754 getDeliverableArtifacts()
 - `settings.fieldExecutionRecords`
-  - submittal.js:160 getFieldExecutionRecords()
-  - submittal.js:207 getFieldExecutionRecords()
-  - submittal.js:766 getFieldExecutionRecords()
+  - submittal.js:162 getFieldExecutionRecords()
+  - submittal.js:209 getFieldExecutionRecords()
+  - submittal.js:765 getFieldExecutionRecords()
 - `settings.projectMeta`
-  - submittal.js:45 getProjectMeta()
-  - submittal.js:60 getProjectMeta()
+  - submittal.js:47 getProjectMeta()
+  - submittal.js:62 getProjectMeta()
 - `traySchedule`
-  - submittal.js:118 getTrays()
-  - submittal.js:206 getTrays()
-  - submittal.js:629 getTrays()
+  - submittal.js:120 getTrays()
+  - submittal.js:208 getTrays()
+  - submittal.js:628 getTrays()
 
 **Detected Writes**
 - `settings.deliverableArtifacts`
-  - submittal.js:210 upsertDeliverableArtifact()
+  - submittal.js:212 upsertDeliverableArtifact()
 - `settings.projectMeta`
-  - submittal.js:62 setProjectMeta()
+  - submittal.js:64 setProjectMeta()
 
 ### Project Report (`projectreport.html`)
 

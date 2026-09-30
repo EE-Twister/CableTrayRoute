@@ -15,6 +15,8 @@ import { showAlertModal } from './src/components/modal.js';
 import { buildBomCatalogFields, buildCatalogTraceabilityReport, buildCatalogWarnings } from './analysis/manufacturerCatalog.mjs';
 import { buildArtifactRegisterRows, normalizeDeliverableArtifact } from './analysis/deliverableArtifacts.mjs';
 import { summarizeFieldExecution } from './analysis/fieldExecution.mjs';
+import { evaluateTrayFill, summarizeTrayFillResult } from './analysis/trayFill.mjs';
+import { extractRacewayIds } from './analysis/conduitFill.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -505,52 +507,49 @@ function buildTrayFillSection(trays, cables) {
     </section>`;
   }
 
-  // Compute fill: sum OD² of cables assigned to each tray
-  const trayFill = {};
-  trays.forEach(t => { trayFill[t.tray_id] = { totalOdSq: 0, cableCount: 0, width: parseFloat(t.inside_width) || 0 }; });
-  cables.forEach(c => {
-    const trayId = c.route_preference;
-    if (trayId && trayFill[trayId] !== undefined) {
-      const od = parseFloat(c.od || c.outer_diameter || 0);
-      trayFill[trayId].totalOdSq += od * od;
-      trayFill[trayId].cableCount += 1;
-    }
+  // Same NEC 392.22 evaluation the Tray Fill page uses (Table 392.22(A) allowable areas,
+  // 4/0 rules, real cable cross-sections), so the submittal cannot disagree with the study.
+  const assignedCables = tray => cables.filter(cable => {
+    const ids = [
+      ...extractRacewayIds(cable),
+      ...String(cable.route_preference ?? '').split(/[,;|>\n]+/).map(id => id.trim()).filter(Boolean),
+    ];
+    return ids.includes(String(tray.tray_id ?? '').trim());
   });
 
   const rows = trays.map(t => {
-    const fill = trayFill[t.tray_id] || { totalOdSq: 0, cableCount: 0, width: 0 };
-    const trayWidth = parseFloat(t.inside_width) || 0;
-    // NEC 392.22: fill area = tray_width × 6 in for ladder/ventilated trough
-    const allowedArea = trayWidth * 6;
-    const actualArea = fill.totalOdSq;
-    const fillPct = allowedArea > 0 ? ((actualArea / allowedArea) * 100).toFixed(1) : '—';
-    const status = allowedArea > 0
-      ? (actualArea <= allowedArea * 0.4 ? 'result-ok' : actualArea <= allowedArea ? 'result-warn' : 'result-fail')
-      : '';
-    return `<tr class="${status}">
+    const assigned = assignedCables(t);
+    const result = evaluateTrayFill(t, assigned);
+    const evaluated = result.evaluable === true;
+    const empty = assigned.length === 0;
+    const statusClass = empty ? 'result-ok' : !evaluated ? 'result-warn' : result.status === 'pass' ? 'result-ok' : 'result-fail';
+    const statusText = empty ? 'No cables' : !evaluated ? 'Incomplete' : result.status === 'pass' ? 'Pass' : 'Fail';
+    return `<tr class="${statusClass}">
       <td>${esc(t.tray_id)}</td>
       <td>${esc(t.inside_width || '—')}</td>
-      <td>${fill.cableCount}</td>
-      <td>${actualArea.toFixed(2)}</td>
-      <td>${allowedArea > 0 ? allowedArea.toFixed(2) : '—'}</td>
-      <td class="status-badge ${status}">${fillPct}${fillPct !== '—' ? '%' : ''}</td>
+      <td>${assigned.length}</td>
+      <td>${evaluated ? esc(result.clause) : '—'}</td>
+      <td>${evaluated ? `${result.utilizationPercent.toFixed(1)}%` : empty ? '0.0%' : '—'}</td>
+      <td class="status-badge ${statusClass}">${statusText}</td>
+      <td>${empty ? 'No cables assigned to this tray.' : esc(summarizeTrayFillResult(result))}</td>
     </tr>`;
   }).join('');
 
   return `
     <section class="submittal-section" aria-label="Tray fill summary">
       <h2>Tray Fill Summary</h2>
-      <p class="field-hint">Fill calculated per NEC 392.22 (40% fill limit for combinations of cables).
-      Cables matched to trays via Route Preference field.</p>
+      <p class="field-hint">Fill evaluated per NEC 392.22(A) with the same method as the Tray Fill study.
+      Cables are matched to trays through their assigned raceway (Route Preference).</p>
       <table class="result-table submittal-table" aria-label="Tray fill summary">
         <thead>
           <tr>
             <th scope="col">Tray ID</th>
             <th scope="col">Width (in)</th>
             <th scope="col">Cables</th>
-            <th scope="col">OD² Area (in²)</th>
-            <th scope="col">Allowed Area (in²)</th>
-            <th scope="col">Fill %</th>
+            <th scope="col">NEC clause</th>
+            <th scope="col">Utilization</th>
+            <th scope="col">Status</th>
+            <th scope="col">Basis</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
