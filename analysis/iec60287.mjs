@@ -285,10 +285,19 @@ export function thermalResistances({
     const L = burialDepthMm / 1000;
     const ratio = 2 * L / D_cond;
     const T4_soil = (soilResistivity / (2 * Math.PI)) * Math.log(ratio + Math.sqrt(ratio ** 2 - 1));
-    // Air gap in conduit: simplified (IEC 60287-2-1 §2.2.3)
-    // T4_air ≈ 0.1 K·m/W for typical conduit-to-cable clearance (conservative)
-    const T4_air = 0.10;
-    T4 = T4_soil + T4_air;
+    // Air gap between cable and duct, IEC 60287-2-1 §4.2.7.2:
+    //   T4' = U / (1 + 0.1 (V + Y θm) D_e)      (D_e in mm)
+    // with the constants for non-metallic (PVC/PE) ducts in earth
+    // (U = 1.87, V = 0.312, Y = 0.0037) and θm the mean gap temperature.
+    // This is about 0.7 K·m/W for a 35 mm cable, not the 0.1 K·m/W the model
+    // previously assumed, which rated ducts above direct burial.
+    const THETA_M = 60; // °C, mean temperature of the gap medium
+    const T4_air = 1.87 / (1 + 0.1 * (0.312 + 0.0037 * THETA_M) * D_e_mm);
+    // Duct wall: cylindrical resistance of PVC/PE (ρ = 6 K·m/W), wall ~ 4.5% of OD
+    const RHO_DUCT = 6.0;
+    const D_duct_od = D_cond * 1000;
+    const T4_wall = (RHO_DUCT / (2 * Math.PI)) * Math.log(D_duct_od / (D_duct_od * (1 - 0.09)));
+    T4 = T4_soil + T4_air + T4_wall;
   } else if (installMethod === 'tray') {
     // Cable tray in air: natural convection + radiation (IEC 60287-2-1 §2.2.6)
     // Simplified: T4 = 1/(h × π × D_e) where h ≈ 8 W/(m²·K) combined convection + radiation

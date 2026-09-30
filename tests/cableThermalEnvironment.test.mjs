@@ -18,6 +18,7 @@ import {
   INSTALLATION_KEYS,
 } from '../analysis/cableThermalEnvironment.mjs';
 import { calcAmpacity } from '../analysis/iec60287.mjs';
+import { mutualHeatingT4 } from '../analysis/buriedCableThermal.mjs';
 
 function describe(name, fn) {
   console.log(name);
@@ -293,6 +294,130 @@ describe('Limiting factor identification', () => {
     // The Ambient or Installation-specific step should dominate; just confirm
     // grouping is NOT the limit when only one cable is present.
     assert.doesNotMatch(tray.waterfall.limitingFactor, /Grouping/);
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// Physical checks added in the technical review
+// ---------------------------------------------------------------------------
+
+describe('Sizes between IEC preferred cross-sections', () => {
+  it('100 mm², 4/0 AWG and 1/0 AWG evaluate in every installation instead of erroring', () => {
+    for (const cable of [{ sizeMm2: 100 }, { sizeAwg: '4/0' }, { sizeAwg: '1/0' }]) {
+      const inputs = baseInputs();
+      inputs.cable = { ...inputs.cable, sizeMm2: undefined, ...cable };
+      const study = runThermalEnvironment(inputs);
+      for (const c of study.cases) assert.ok(!c.error, `${JSON.stringify(cable)} ${c.installation}: ${c.error}`);
+    }
+  });
+  it('a size between two table sizes rates between its neighbours', () => {
+    const rate = size => {
+      const inputs = baseInputs();
+      inputs.cable.sizeMm2 = size;
+      return runThermalEnvironment(inputs).cases.find(c => c.installation === 'direct-burial').deratedAmpacity_A;
+    };
+    assert.ok(rate(95) < rate(100) && rate(100) < rate(120));
+  });
+});
+
+describe('Waterfall factors are computed, not tabulated or plugged', () => {
+  it('ambient factor equals sqrt((θmax - θamb) / (θmax - θref)) for a tray in 40 °C air', () => {
+    const inputs = baseInputs();
+    inputs.ambient.tempC = 40;
+    const tray = runThermalEnvironment(inputs).cases.find(c => c.installation === 'tray');
+    within(tray.waterfall.steps[1].factor, Math.sqrt((90 - 40) / (90 - 30)), 0.002, 'tray ambient factor: ');
+  });
+  it('ambient factor for buried cables uses the 20 °C soil reference', () => {
+    const inputs = baseInputs();
+    inputs.ambient.soilTempC = 30;
+    const direct = runThermalEnvironment(inputs).cases.find(c => c.installation === 'direct-burial');
+    within(direct.waterfall.steps[1].factor, Math.sqrt((90 - 30) / (90 - 20)), 0.002, 'soil ambient factor: ');
+  });
+  it('a cooler-than-reference ambient raises the rating (factor above 1) and is never the limiting factor', () => {
+    const inputs = baseInputs();
+    inputs.ambient.soilTempC = 10;
+    const direct = runThermalEnvironment(inputs).cases.find(c => c.installation === 'direct-burial');
+    assert.ok(direct.waterfall.steps[1].factor > 1);
+    assert.strictEqual(direct.waterfall.limitingFactor, null);
+  });
+  it('the factors multiply exactly to derated / base', () => {
+    const inputs = baseInputs();
+    inputs.grouping = { nCables: 4, arrangement: 'flat' };
+    inputs.ambient = { tempC: 40, soilTempC: 25, frequencyHz: 60 };
+    for (const c of runThermalEnvironment(inputs).cases) {
+      const product = c.waterfall.steps.reduce((p, x) => p * x.factor, 1);
+      within(product, c.deratedAmpacity_A / c.baseAmpacity_A, 0.002, `${c.installation}: `);
+    }
+  });
+});
+
+describe('Buried cases respond to their geometry', () => {
+  const duct = mutate => {
+    const inputs = baseInputs();
+    Object.assign(inputs.installations['duct-bank'], mutate);
+    return runThermalEnvironment(inputs).cases.find(c => c.installation === 'duct-bank').deratedAmpacity_A;
+  };
+  it('mutualHeatingT4 matches the hand image-method value for two cables', () => {
+    // rho/(2 pi) x ln( sqrt(s^2 + (2L)^2) / s ) with L = 800 mm, s = 200 mm, rho = 1
+    const expected = (1 / (2 * Math.PI)) * Math.log(Math.hypot(200, 1600) / 200);
+    const actual = mutualHeatingT4([{ x: -100, y: 800 }, { x: 100, y: 800 }], 0, 1);
+    within(actual, expected, 1e-9, 'image method: ');
+  });
+  it('wider duct spacing raises the duct-bank rating', () => {
+    assert.ok(duct({ spacingMm: 500 }) > duct({ spacingMm: 200 }));
+    assert.ok(duct({ spacingMm: 200 }) > duct({ spacingMm: 100 }));
+  });
+  it('the duct-bank rows and columns change the result', () => {
+    assert.notStrictEqual(duct({ rows: 1, cols: 6 }), duct({ rows: 3, cols: 2 }));
+  });
+  it('more loaded ducts lower the rating', () => {
+    assert.ok(duct({ ductCount: 3, rows: 1, cols: 3 }) > duct({ ductCount: 9, rows: 3, cols: 3 }));
+  });
+  it('direct-burial spacing changes the result for a group of cables', () => {
+    const rate = spacing => {
+      const inputs = baseInputs();
+      inputs.grouping = { nCables: 4, arrangement: 'flat' };
+      inputs.installations['direct-burial'].spacingMm = spacing;
+      return runThermalEnvironment(inputs).cases.find(c => c.installation === 'direct-burial').deratedAmpacity_A;
+    };
+    assert.ok(rate(400) > rate(0));
+  });
+  it('the soil resistivity applies to conduit and duct bank as well as direct burial', () => {
+    const rate = (rho, key) => {
+      const inputs = baseInputs();
+      inputs.installations['direct-burial'].soilResistivity = rho;
+      return runThermalEnvironment(inputs).cases.find(c => c.installation === key).deratedAmpacity_A;
+    };
+    for (const key of ['conduit', 'duct-bank', 'direct-burial']) {
+      assert.ok(rate(2.5, key) < rate(1.0, key) * 0.9, `${key} did not respond to soil resistivity`);
+    }
+  });
+  it('a cable in a duct rates below the same cable directly buried (air gap and wall)', () => {
+    const cases = runThermalEnvironment(baseInputs()).cases;
+    const direct = cases.find(c => c.installation === 'direct-burial').deratedAmpacity_A;
+    const conduit = cases.find(c => c.installation === 'conduit').deratedAmpacity_A;
+    assert.ok(conduit < direct, `conduit ${conduit} vs direct burial ${direct}`);
+  });
+});
+
+describe('Load-profile thermal model', () => {
+  it('has a realistic conductor time constant (not the 60 s floor)', () => {
+    const inputs = baseInputs();
+    inputs.loadProfile = { hourly: Array.from({ length: 24 }, () => 1), basis: 'per-unit' };
+    assert.ok(runThermalEnvironment(inputs).loadProfile.tau_s > 600);
+  });
+  it('a flat profile at the rated current settles at the conductor temperature limit', () => {
+    const inputs = baseInputs();
+    inputs.loadProfile = { hourly: Array.from({ length: 24 }, () => 1), basis: 'per-unit' };
+    const lp = runThermalEnvironment(inputs).loadProfile;
+    within(lp.maxTempC, lp.thetaMax, 1.5, 'steady-state temperature: ');
+  });
+  it('a short peak stays below the steady-state temperature of that peak', () => {
+    const inputs = baseInputs();
+    inputs.loadProfile = { hourly: Array.from({ length: 24 }, (_, i) => (i === 12 ? 1.4 : 0.4)), basis: 'per-unit' };
+    const lp = runThermalEnvironment(inputs).loadProfile;
+    assert.ok(lp.maxTempC > 0 && lp.maxTempC < lp.thetaMax + 40);
   });
 });
 

@@ -25,6 +25,7 @@
 
 import { calcAmpacity, thermalResistances, defaultInsulThickMm, MAX_TEMP_C } from './iec60287.mjs';
 import { AWG_TO_MM2 } from './cableThermalEnvironment.mjs';
+import { mutualHeatingT4 } from './buriedCableThermal.mjs';
 import { DEFAULT_PRICES } from './costEstimate.mjs';
 
 export const ARRANGEMENTS = ['trefoil', 'flat', 'three-core'];
@@ -236,18 +237,10 @@ export function rowAmpacity(build, inputs, nCircuits, clearanceMm) {
   let ampacityA = Infinity;
 
   for (const p of sources.filter(s => mid.includes(s.circuit))) {
-    let sumLn = 0;
-    for (const k of sources) {
-      if (k === p) continue;
-      const dx = p.x - k.x;
-      const d = Math.hypot(dx, p.y - k.y);
-      const dImage = Math.hypot(dx, p.y + k.y);
-      sumLn += Math.log(dImage / d);
-    }
     const { I_base } = calcAmpacity({
       ...build.base,
       burialDepthMm: p.y,
-      externalT4Extra: (rho / (2 * Math.PI)) * sumLn,
+      externalT4Extra: mutualHeatingT4(sources, sources.indexOf(p), rho),
       nCables: 1,
     });
     ampacityA = Math.min(ampacityA, I_base);

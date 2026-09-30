@@ -21,11 +21,7 @@ import {
   defaultInsulThickMm,
   MAX_TEMP_C,
 } from './iec60287.mjs';
-import {
-  ambientTempFactor,
-  bundlingFactor,
-  trayFillFactor,
-} from './autoSize.mjs';
+import { mutualHeatingT4 } from './buriedCableThermal.mjs';
 
 export const INSTALLATION_KEYS = ['tray', 'conduit', 'duct-bank', 'direct-burial'];
 
@@ -216,22 +212,27 @@ function normalizeInstallation(key, raw = {}) {
         conduitMaterial: r.conduitMaterial === 'steel' ? 'steel' : 'PVC',
         burialDepthMm: r.burialDepthMm ?? 800,
       };
-    case 'duct-bank':
+    case 'duct-bank': {
+      const ductCount = Math.max(1, Math.round(Number(r.ductCount ?? 6)));
+      // With no explicit layout, pack the ducts into a compact grid (6 -> 2 x 3).
+      const cols = Math.max(1, Math.round(Number(r.cols ?? Math.ceil(Math.sqrt(ductCount * 1.5)))));
+      const rows = Math.max(1, Math.round(Number(r.rows ?? Math.ceil(ductCount / cols))));
       return {
         included,
-        ductCount: r.ductCount ?? 6,
-        rows: r.rows ?? 2,
-        cols: r.cols ?? 3,
+        ductCount,
+        rows,
+        cols,
         spacingMm: r.spacingMm ?? 200,
         burialDepthMm: r.burialDepthMm ?? 900,
         conduitOD_mm: r.conduitOD_mm ?? 100,
       };
+    }
     case 'direct-burial':
       return {
         included,
         burialDepthMm: r.burialDepthMm ?? 800,
         soilResistivity: r.soilResistivity ?? 1.0,
-        thermalBackfillRho: r.thermalBackfillRho ?? null,
+        spacingMm: r.spacingMm ?? null,
       };
     default:
       return { included };
@@ -242,9 +243,19 @@ function normalizeInstallation(key, raw = {}) {
 // computeInstallationCases
 // ---------------------------------------------------------------------------
 
+/** Reference ambient temperatures (°C) at which "base table ampacity" is quoted. */
+const REFERENCE_AMBIENT_C = { air: 30, soil: 20 };
+
 /**
  * Run each enabled installation through calcAmpacity() and return the raw
  * IEC 60287 result plus a derating waterfall.
+ *
+ * "Base" is the single-cable rating in that installation at the reference
+ * ambient (30 °C air, 20 °C soil). Ambient and grouping then follow as real,
+ * computed factors, so the waterfall multiplies exactly to the derated rating.
+ * Grouping in tray or a single conduit uses the IEC group table; buried
+ * cases (direct burial, duct bank) use the geometric image method so cable
+ * spacing, rows and columns affect the result.
  *
  * @param {NormalizedInputs} norm
  * @returns {{ cases: ResultCase[] }}
@@ -256,10 +267,9 @@ export function computeInstallationCases(norm) {
     const inst = norm.installations[key];
     if (!inst || !inst.included) continue;
 
-    const params = buildAmpacityParams(norm, key);
-    let iecResult;
+    let rated;
     try {
-      iecResult = calcAmpacity(params);
+      rated = rateInstallation(norm, key);
     } catch (err) {
       cases.push({
         installation: key,
@@ -274,38 +284,119 @@ export function computeInstallationCases(norm) {
       continue;
     }
 
-    const waterfall = buildDeratingWaterfall({ key, norm, iecResult });
+    const waterfall = buildDeratingWaterfall({ key, norm, iecResult: rated.raw, refBaseA: rated.refA });
     cases.push({
       installation: key,
       label: INSTALLATION_LABELS[key],
-      baseAmpacity_A: round1(iecResult.I_base),
-      deratedAmpacity_A: round1(iecResult.I_rated),
+      nCores: norm.cable.nCores,
+      baseAmpacity_A: round1(rated.refA),
+      deratedAmpacity_A: round1(rated.raw.I_rated),
       waterfall,
-      maxConductorTempC: iecResult.thetaConductorActual,
-      iec60287Raw: iecResult,
-      warnings: iecResult.warnings || [],
+      maxConductorTempC: rated.raw.thetaConductorActual,
+      iec60287Raw: rated.raw,
+      warnings: rated.raw.warnings || [],
     });
   }
 
   return { cases };
 }
 
+function rateInstallation(norm, key) {
+  const { grouping, ambient } = norm;
+  const buried = key !== 'tray';
+  const refAmbient = buried ? REFERENCE_AMBIENT_C.soil : REFERENCE_AMBIENT_C.air;
+  const actualAmbient = buried ? ambient.soilTempC : ambient.tempC;
+  const single = buildAmpacityParams(norm, key);
+  const rate = (overrides = {}) => calcAmpacity({ ...single, ...overrides });
+
+  // Reference conditions may sit at or above the insulation limit for low-temperature
+  // ratings (e.g. 70 °C PVC at a 30 °C reference is fine; guard anyway).
+  const refA = rate({ ambientTempC: Math.min(refAmbient, MAX_TEMP_C[norm.cable.insulation] - 1) }).I_base;
+  const singleActual = rate();
+
+  if (key === 'tray' || key === 'conduit') {
+    const grouped = rate({ nCables: grouping.nCables, groupArrangement: grouping.arrangement });
+    return { refA, raw: { ...grouped, groupingMethod: 'table' } };
+  }
+
+  const sources = buriedSources(norm, key, singleActual.D_e_mm);
+  const rho = norm.installations['direct-burial'].soilResistivity;
+  let hottest = null;
+  let hottestExtra = 0;
+  sources.forEach((source, index) => {
+    const extra = sources.length > 1 ? mutualHeatingT4(sources, index, rho) : 0;
+    const result = rate({ burialDepthMm: source.y, externalT4Extra: extra, nCables: 1 });
+    if (!hottest || result.I_base < hottest.I_base) {
+      hottest = result;
+      hottestExtra = extra;
+    }
+  });
+
+  const grouped = hottest.I_base;
+  return {
+    refA,
+    raw: {
+      ...hottest,
+      I_base: singleActual.I_base,
+      I_rated: grouped,
+      nCables: sources.length,
+      groupArrangement: key === 'duct-bank' ? 'duct-bank' : grouping.arrangement,
+      f_group: Math.round((grouped / singleActual.I_base) * 10000) / 10000,
+      groupingMethod: 'image-method',
+      thermalResistances: { ...hottest.thermalResistances, T4: hottest.thermalResistances.T4 + hottestExtra },
+    },
+  };
+}
+
+/**
+ * Cable centres (mm, y = depth) for the buried cases. Heat sources are the
+ * cables themselves; in a duct bank each conduit carries one loaded cable
+ * at its centre.
+ */
+function buriedSources(norm, key, cableOdMm) {
+  const { grouping } = norm;
+  if (key === 'duct-bank') {
+    const inst = norm.installations['duct-bank'];
+    const loaded = Math.min(200, Math.max(grouping.nCables, inst.ductCount));
+    const cols = inst.cols;
+    const pitch = inst.conduitOD_mm + inst.spacingMm;
+    const sources = [];
+    for (let i = 0; i < loaded; i += 1) {
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+      sources.push({ x: (col - (cols - 1) / 2) * pitch, y: inst.burialDepthMm + row * pitch });
+    }
+    return sources;
+  }
+
+  const inst = norm.installations['direct-burial'];
+  const n = Math.max(1, grouping.nCables);
+  const depth = inst.burialDepthMm;
+  if (n === 1) return [{ x: 0, y: depth }];
+  if (grouping.arrangement === 'trefoil' && n <= 3) {
+    const offsets = n === 2
+      ? [{ x: -cableOdMm / 2, y: 0 }, { x: cableOdMm / 2, y: 0 }]
+      : [{ x: 0, y: 0 }, { x: -cableOdMm / 2, y: cableOdMm * Math.sqrt(3) / 2 }, { x: cableOdMm / 2, y: cableOdMm * Math.sqrt(3) / 2 }];
+    return offsets.map(o => ({ x: o.x, y: depth + o.y }));
+  }
+  const touching = grouping.arrangement === 'trefoil' || grouping.arrangement === 'flat-touching';
+  const clearance = inst.spacingMm ?? (touching ? 0 : cableOdMm);
+  const pitch = cableOdMm + clearance;
+  return Array.from({ length: n }, (_, i) => ({ x: (i - (n - 1) / 2) * pitch, y: depth }));
+}
+
 function buildAmpacityParams(norm, key) {
-  const { cable, ambient, grouping, installations } = norm;
+  const { cable, ambient, installations } = norm;
   const inst = installations[key];
 
   // IEC 60287 install methods supported: direct-burial | conduit | tray | air
-  // Duct bank is modelled as 'conduit' with N parallel circuits passed via nCables.
+  // Duct bank conduits are rated as 'conduit'; their mutual heating is applied
+  // through externalT4Extra by the caller.
   const installMethod = key === 'duct-bank' ? 'conduit' : key;
 
   // For tray/air, use ambient air temperature; for buried, use soil temperature.
-  const useSoilTemp = key === 'direct-burial' || key === 'conduit' || key === 'duct-bank';
+  const useSoilTemp = key !== 'tray';
   const ambientTempC = useSoilTemp ? ambient.soilTempC : ambient.tempC;
-
-  // For duct bank, fold N circuits into the grouping count.
-  const nCables = key === 'duct-bank'
-    ? Math.max(grouping.nCables, inst.ductCount)
-    : grouping.nCables;
 
   return {
     sizeMm2: cable.sizeMm2,
@@ -316,13 +407,16 @@ function buildAmpacityParams(norm, key) {
     armoured: cable.armoured,
     installMethod,
     burialDepthMm: inst.burialDepthMm ?? 800,
-    soilResistivity: inst.soilResistivity ?? 1.0,
+    // Soil resistivity is a site property: every buried installation sees the same soil.
+    soilResistivity: installations['direct-burial'].soilResistivity ?? 1.0,
     conduitOD_mm: inst.conduitOD_mm ?? 0,
     ambientTempC,
     frequencyHz: ambient.frequencyHz,
     U0_kV: cable.U0_kV,
-    nCables,
-    groupArrangement: grouping.arrangement,
+    nCables: 1,
+    groupArrangement: norm.grouping.arrangement,
+    // Sizes between IEC preferred cross-sections (AWG/kcmil) interpolate R20.
+    interpolateResistance: true,
   };
 }
 
@@ -334,92 +428,73 @@ function buildAmpacityParams(norm, key) {
  * Build an ordered derating waterfall for a single installation case.
  *
  * Step order is fixed and verified by tests:
- *   1. Base table ampacity (factor = 1.0)
- *   2. Ambient temperature correction
- *   3. Grouping / mutual heating
- *   4. Installation-specific (tray fill / conduit / soil ρ)
+ *   1. Base table ampacity — single cable in this installation at the
+ *      reference ambient (30 °C air, 20 °C soil)
+ *   2. Ambient temperature correction — actual vs reference ambient, from the
+ *      IEC 60287 rating formula (not a look-up table)
+ *   3. Grouping / mutual heating — computed effect of neighbouring cables
+ *   4. Installation-specific — any further derating; none is modelled because
+ *      conduit, tray and burial effects are already inside the base rating
  *
- * The product of all step factors equals deratedAmpacity_A / baseAmpacity_A.
+ * Every factor is computed, so the product of all step factors equals
+ * deratedAmpacity_A / baseAmpacity_A exactly and the limiting factor is the
+ * smallest factor below 1.0.
  *
- * @param {object} ctx { key, norm, iecResult }
- * @returns {{ steps: WaterfallStep[], limitingFactor: string }}
+ * @param {object} ctx { key, norm, iecResult, refBaseA }
+ * @returns {{ steps: WaterfallStep[], limitingFactor: string|null }}
  */
-export function buildDeratingWaterfall({ key, norm, iecResult }) {
+export function buildDeratingWaterfall({ key, norm, iecResult, refBaseA }) {
   const steps = [];
-  const I_base = iecResult.I_base;
-  const I_rated = iecResult.I_rated;
+  const buried = key !== 'tray';
+  const refAmbient = buried ? REFERENCE_AMBIENT_C.soil : REFERENCE_AMBIENT_C.air;
+  const ambientUsed = buried ? norm.ambient.soilTempC : norm.ambient.tempC;
+  const thetaMax = MAX_TEMP_C[norm.cable.insulation];
 
-  // Step 1 — base table ampacity (the calcAmpacity I_base at this ambient + install method)
+  const refA = refBaseA ?? iecResult.I_base;
+  const singleActualA = iecResult.I_base;
+  const ratedA = iecResult.I_rated;
+
   steps.push({
     label: STEP_LABELS.base,
     factor: 1.0,
-    value: round1(I_base),
+    value: round1(refA),
     delta: 0,
-    source: 'IEC 60287-1-1 §3.1.1',
+    source: `Single cable, ${INSTALLATION_LABELS[key]}, ${refAmbient} °C reference ambient (IEC 60287-1-1 §3.1.1)`,
   });
 
-  // Step 2 — Ambient temperature correction (NEC 310.15(B)(1)(a) factor)
-  // Use the NEC factor as the user-visible derating step. The actual physics
-  // is already embedded in I_base via Δθ; this presentation step explains the
-  // contribution at NEC reference 30 °C ambient.
-  const tempRating = MAX_TEMP_C[norm.cable.insulation];
-  const useSoilTemp = key === 'direct-burial' || key === 'conduit' || key === 'duct-bank';
-  const ambientUsed = useSoilTemp ? norm.ambient.soilTempC : norm.ambient.tempC;
-  const necTempRating = tempRating >= 90 ? 90 : tempRating >= 75 ? 75 : 60;
-  const fAmbient = ambientTempFactor(ambientUsed, necTempRating);
-  // Anchor the cumulative waterfall on I_rated so the product matches exactly.
-  // The presentational factor is the NEC table value; the cumulative running
-  // value continues to track the IEC physics.
-  const runningAfterAmbient = round1(I_base * fAmbient);
+  const fAmbient = singleActualA / Math.max(refA, 1e-9);
+  const afterAmbient = refA * fAmbient;
   steps.push({
     label: STEP_LABELS.ambient,
     factor: round4(fAmbient),
-    value: runningAfterAmbient,
-    delta: round1(runningAfterAmbient - I_base),
-    source: `NEC 310.15(B)(1)(a) @ ${round1(ambientUsed)} °C, ${necTempRating} °C rating`,
+    value: round1(afterAmbient),
+    delta: round1(afterAmbient - refA),
+    source: `${round1(ambientUsed)} °C ambient vs ${refAmbient} °C reference; θ_max ${thetaMax} °C (IEC 60287-1-1 Δθ)`,
   });
 
-  // Step 3 — Grouping / mutual heating (use IEC factor from calcAmpacity result)
-  const fGroup = iecResult.f_group ?? groupDerating(norm.grouping.nCables, norm.grouping.arrangement);
-  const runningAfterGroup = round1(runningAfterAmbient * fGroup);
+  const fGroup = ratedA / Math.max(singleActualA, 1e-9);
+  const afterGroup = afterAmbient * fGroup;
+  const groupSource = iecResult.groupingMethod === 'image-method'
+    ? (key === 'duct-bank'
+      ? `Mutual heating of ${iecResult.nCables} ducts, ${norm.installations['duct-bank'].rows}×${norm.installations['duct-bank'].cols} grid @ ${norm.installations['duct-bank'].spacingMm} mm (IEC 60287-2-1 image method)`
+      : `Mutual heating of ${iecResult.nCables} buried cables (IEC 60287-2-1 image method)`)
+    : `IEC group table, n=${iecResult.nCables}, ${iecResult.groupArrangement}`;
   steps.push({
     label: STEP_LABELS.grouping,
     factor: round4(fGroup),
-    value: runningAfterGroup,
-    delta: round1(runningAfterGroup - runningAfterAmbient),
-    source: `IEC 60287-2-1 grouping (n=${iecResult.nCables}, ${iecResult.groupArrangement})`,
+    value: round1(afterGroup),
+    delta: round1(afterGroup - afterAmbient),
+    source: groupSource,
   });
 
-  // Step 4 — Installation-specific factor (closes the gap to I_rated)
-  // The IEC physics already accounts for installation method and grouping in
-  // I_rated; this final step represents what's left after the previous two
-  // presentational factors and is labelled by the installation key.
-  let installSource;
-  let installFactor;
-  if (key === 'tray') {
-    const fTray = trayFillFactor(norm.installations.tray.fillType === 'solid' ? 'tray_touching' : 'tray_spaced');
-    installFactor = round4(I_rated / Math.max(runningAfterGroup, 1e-6));
-    installSource = `NEC 392.80(A) tray fill (${norm.installations.tray.fillType} = ${fTray})`;
-  } else if (key === 'conduit') {
-    installFactor = round4(I_rated / Math.max(runningAfterGroup, 1e-6));
-    installSource = `IEC 60287-2-1 conduit T4 (OD ${norm.installations.conduit.conduitOD_mm} mm, depth ${norm.installations.conduit.burialDepthMm} mm)`;
-  } else if (key === 'duct-bank') {
-    installFactor = round4(I_rated / Math.max(runningAfterGroup, 1e-6));
-    installSource = `Duct bank ${norm.installations['duct-bank'].rows}×${norm.installations['duct-bank'].cols} @ ${norm.installations['duct-bank'].spacingMm} mm`;
-  } else {
-    installFactor = round4(I_rated / Math.max(runningAfterGroup, 1e-6));
-    installSource = `IEC 60287-2-1 direct burial (ρ_soil ${norm.installations['direct-burial'].soilResistivity} K·m/W)`;
-  }
   steps.push({
     label: `${STEP_LABELS.installation} (${INSTALLATION_LABELS[key]})`,
-    factor: installFactor,
-    value: round1(I_rated),
-    delta: round1(I_rated - runningAfterGroup),
-    source: installSource,
+    factor: 1.0,
+    value: round1(ratedA),
+    delta: round1(ratedA - afterGroup),
+    source: 'No further derating modelled; installation effects are included in the base rating',
   });
 
-  // Limiting factor = step with the smallest factor < 1.0
-  // (excluding the base step which is by definition 1.0)
   let limitingFactor = null;
   let minFactor = 1.0;
   for (let i = 1; i < steps.length; i++) {
@@ -455,16 +530,17 @@ export function simulateLoadProfile(caseResult, profile) {
   if (!iec) return null;
 
   const { T1, T2, T3, T4 } = iec.thermalResistances;
-  const nCores = iec.iec60287Raw?.nCores ?? 3;
+  const nCores = iec.nCores ?? caseResult.nCores ?? 3;
   const R_ac = iec.R_ac;
   const ambientC = iec.ambientTempC;
   const thetaMax = iec.thetaMax;
 
-  // Lumped Cth ≈ nCores × sizeMm2 × specific heat per metre.
-  // Specific heat of copper: ~385 J/(kg·K); density: 8960 kg/m³
-  // For 1 m of cable with cross-section A (mm² → m²): C = ρ · V · cp
+  // Lumped conductor heat capacity per metre: volumetric heat capacity x area x
+  // number of conductors. Copper ≈ 3.45 MJ/(m³·K), aluminium ≈ 2.43 MJ/(m³·K).
+  // Insulation and soil capacitance are ignored, which makes the time constant
+  // shorter (and the cyclic result more conservative) than a full IEC 60853 model.
   const sizeM2 = iec.sizeMm2 * 1e-6;
-  const cv_per_metre = (iec.material === 'Al' ? 2400 : 3450) * sizeM2 * nCores; // J/(K·m), approx
+  const cv_per_metre = (iec.material === 'Al' ? 2.43e6 : 3.45e6) * sizeM2 * nCores; // J/(K·m)
   const Rth_total = T1 + nCores * (T2 + T3 + T4);
   const tau_s = Math.max(60, Rth_total * cv_per_metre); // floor of 1 minute
 
@@ -474,26 +550,33 @@ export function simulateLoadProfile(caseResult, profile) {
     profile.basis === 'per-unit' ? Number(v) * peak : Number(v),
   );
 
-  // Per-hour steady-state theta then exponential approach with τ
-  // theta_t(t) = theta_{t-1} + (theta_ss - theta_{t-1}) * (1 - exp(-Δt/τ))
+  // Exponential approach to the steady-state temperature of each hour. The
+  // daily profile repeats, so cycle it until the conductor temperature settles
+  // (starting from ambient would understate the second day onward).
   const dt_s = 3600;
   const alpha = 1 - Math.exp(-dt_s / tau_s);
 
   let theta = ambientC;
-  const timeline = [];
+  let timeline = [];
   let maxTempC = -Infinity;
   let hottestHour = 0;
 
-  for (let i = 0; i < ampsArray.length; i++) {
-    const I = ampsArray[i];
-    const rise = (I ** 2) * R_ac * Rth_total;
-    const thetaSs = ambientC + rise;
-    theta = theta + (thetaSs - theta) * alpha;
-    timeline.push({ hour: i, currentA: round1(I), tempC: round1(theta) });
-    if (theta > maxTempC) {
-      maxTempC = theta;
-      hottestHour = i;
+  for (let day = 0; day < 20; day++) {
+    const startTheta = theta;
+    timeline = [];
+    maxTempC = -Infinity;
+    hottestHour = 0;
+    for (let i = 0; i < ampsArray.length; i++) {
+      const I = ampsArray[i];
+      const thetaSs = ambientC + (I ** 2) * R_ac * Rth_total;
+      theta = theta + (thetaSs - theta) * alpha;
+      timeline.push({ hour: i, currentA: round1(I), tempC: round1(theta) });
+      if (theta > maxTempC) {
+        maxTempC = theta;
+        hottestHour = i;
+      }
     }
+    if (Math.abs(theta - startTheta) < 0.01) break;
   }
 
   return {
@@ -602,8 +685,11 @@ export function extractThermalEnvRecs(study) {
   }
 
   // 3. High direct-burial soil resistivity
+  // Soil resistivity is a site property shared by every buried case.
   const burial = study.inputs?.installations?.['direct-burial'];
-  if (burial?.included && burial.soilResistivity > 2.5) {
+  const anyBuried = ['direct-burial', 'conduit', 'duct-bank']
+    .some(k => study.inputs?.installations?.[k]?.included);
+  if (burial && anyBuried && burial.soilResistivity > 2.5) {
     recs.push({
       id: 'thermal-env-soil-rho',
       sourceStudy: 'cableThermalEnvironment',

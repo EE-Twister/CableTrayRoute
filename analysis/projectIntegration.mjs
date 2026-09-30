@@ -681,8 +681,11 @@ export function buildCableThermalProjectInputs(scope, project = {}) {
     || racewayIds.some(id => (project.conduits || []).some(conduit => [conduit.id, conduit.conduit_id, conduit.tag].includes(id)));
   const voltage = scope.voltageV;
   const rawSizeMm2 = cableSizeMm2(cable.conductor_size || cable.size || cable.size_mm2);
-  const standardSizesMm2 = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240, 300, 400, 500, 630, 800, 1000, 1200, 1600, 2000, 2500];
-  const sizeMm2 = standardSizesMm2.find(size => size >= rawSizeMm2) || standardSizesMm2.at(-1);
+  // Use the cable's actual cross-section. Rounding UP to the next IEC size (a
+  // #4 AWG cable as 25 mm², 500 kcmil as 300 mm²) overstated the rating by
+  // roughly 15%; the rating engine interpolates between tabulated sizes.
+  const smallestStandardMm2 = 1.5;
+  const sizeMm2 = rawSizeMm2 > 0 ? Math.round(rawSizeMm2 * 10) / 10 : smallestStandardMm2;
   const insulationText = text(cable.insulation || cable.insulation_type || designBasis.sizingDefaults?.insulationType, 'XLPE').toUpperCase();
   const insulation = insulationText.includes('EPR') ? 'EPR'
     : insulationText.includes('LSZH') ? 'LSZH'
