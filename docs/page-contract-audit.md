@@ -285,7 +285,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Planning
-- Source files: `analysis/loadWorkflow.mjs`, `loadlist.mjs`, `src/components/projectDeletionReview.js`, `src/crossProbe.js`, `src/htmlUtils.mjs`, `src/loadlist.js`, `src/mcc-lineup/breakerBucketSizing.mjs`, `src/mccLineupModel.mjs`, `src/projectManagerEntry.js`
+- Source files: `analysis/autoSize.mjs`, `analysis/loadWorkflow.mjs`, `loadlist.mjs`, `src/components/projectDeletionReview.js`, `src/crossProbe.js`, `src/htmlUtils.mjs`, `src/loadlist.js`, `src/mcc-lineup/breakerBucketSizing.mjs`, `src/mccLineupModel.mjs`, `src/projectManagerEntry.js`
 
 **Undocumented Reads**
 - None

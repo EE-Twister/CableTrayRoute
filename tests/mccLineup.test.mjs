@@ -383,4 +383,17 @@ const afterStandaloneSync = syncMccLineupsToEquipment([], [standalone]);
 assert.equal(afterStandaloneSync.length, 0);
 assert.equal(findMccLineupForEquipment([standalone], { mccLineupId: 'mcc-standalone' })?.tag, 'MCC-STANDALONE');
 
+// Motor starter device vs NEC Table 430.250 FLC (480 V uses the 460 V column: 25 hp = 34 A)
+const motorBucket = (hp, breakerA, extra = {}) => normalizeMccLineup({
+  tag: 'MCC-MOT', voltage: '480V',
+  sections: [{ name: 'S1', widthIn: 20, buckets: [{ label: 'P-1', type: 'starter', sizeUnits: 1, equipmentTag: 'P-1', hp, breakerA, ...extra }] }]
+});
+const motorMessages = (hp, breakerA) => validateMccLineup(motorBucket(hp, breakerA)).filter(message => /full-load current/.test(message.message));
+assert.ok(motorMessages(25, 30).some(message => message.severity === 'error' && message.message.includes('34 A')), '30 A cannot carry a 34 A motor');
+assert.ok(motorMessages(25, 40).some(message => message.severity === 'warning' && message.message.includes('under 125%')), '40 A is under 125% of 34 A');
+assert.equal(motorMessages(25, 60).length, 0, '60 A for 34 A FLC is 176%: no message');
+assert.ok(motorMessages(25, 100).some(message => message.severity === 'warning' && message.message.includes('over 250%')), '100 A is over 250% of 34 A');
+assert.equal(motorMessages(0, 60).length, 0, 'no hp, no check');
+assert.equal(validateMccLineup(createDefaultMccLineup()).filter(message => /full-load current/.test(message.message)).length, 0, 'default sample lineup is clean');
+
 console.log('MCC lineup model tests passed');
