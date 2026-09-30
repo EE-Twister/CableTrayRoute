@@ -47,6 +47,26 @@ for (const [kva, pct, mva] of [[1500, 5.75, 500], [750, 5.75, 500], [2500, 6, 25
   console.log(`  ✓ ${kva} kVA, ${pct}%, ${mva} MVA utility -> ${result.threePhaseKA} kA (hand ${expected.toFixed(2)})`);
 }
 
+// Two transformers in cascade: 13.8 kV -> 4.16 kV -> 480 V. Both upstream
+// impedances must be referred through their own turns ratio.
+setOneLine({ activeSheet: 0, sheets: [{ name: 'Cascade', components: [
+  { id: 'src', type: 'utility_source', voltage: 13800, thevenin_mva: 500, connections: [{ target: 't1', sourcePort: 0, targetPort: 0 }] },
+  { id: 't1', type: 'transformer', subtype: 'two_winding', percent_secondary: 6.5, kva_secondary: 5000, volts_primary: 13800, volts_secondary: 4160, connections: [{ target: 'mv', sourcePort: 1, targetPort: 0 }] },
+  { id: 'mv', type: 'bus', subtype: 'Bus', connections: [{ target: 't2', sourcePort: 0, targetPort: 0 }] },
+  { id: 't2', type: 'transformer', subtype: 'two_winding', percent_secondary: 5.75, kva_secondary: 1500, volts_primary: 4160, volts_secondary: 480, connections: [{ target: 'lv', sourcePort: 1, targetPort: 0 }] },
+  { id: 'lv', type: 'bus', subtype: 'Bus' }
+] }] });
+{
+  const result = runShortCircuit();
+  const zUtility = (0.48 ** 2) / 500;
+  const zT1 = 0.065 * (4.16 ** 2) / 5 * (0.48 / 4.16) ** 2;
+  const zT2 = 0.0575 * (0.48 ** 2) / 1.5;
+  const expected = (480 * 1.05) / (Math.sqrt(3) * (zUtility + zT1 + zT2)) / 1000;
+  assert(Math.abs(result.lv.threePhaseKA - expected) / expected < 0.02,
+    `cascade: got ${result.lv.threePhaseKA} kA, expected about ${expected.toFixed(2)} kA`);
+  console.log(`  ✓ two-transformer cascade -> ${result.lv.threePhaseKA} kA (hand ${expected.toFixed(2)})`);
+}
+
 // Provenance reports the source impedance on the same (secondary) base as the total.
 setOneLine(buildModel(1500));
 const provenance = runShortCircuit().bus480.impedanceProvenance;

@@ -2411,7 +2411,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - analysis/motorStart.js:54 getLoads()
 - `oneLineDiagram`
   - analysis/motorStart.js:52 getOneLine()
-  - analysis/motorStartCalc.mjs:190 getOneLine()
+  - analysis/motorStartCalc.mjs:192 getOneLine()
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
