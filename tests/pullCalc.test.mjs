@@ -227,3 +227,36 @@ function near(actual, expected, tolerance = 0.01, label = '') {
 }
 
 console.log('pullCalc tests passed');
+
+// ---------------------------------------------------------------------------
+// Inclined runs: gravity term w·L·(μ cosφ + sinφ)
+// ---------------------------------------------------------------------------
+{
+  const { calcStraightTensionDelta } = await import('../src/pullCalc.js');
+  near(calcStraightTensionDelta(2, 0.35, 100, 0), 70, 1e-9, 'horizontal: w μ L');
+  near(calcStraightTensionDelta(2, 0.35, 30, 30), 60, 1e-9, '30 ft vertical riser pulled up: w × 30');
+  near(calcStraightTensionDelta(2, 0.35, 20, 10), 2 * 20 * (0.35 * Math.sqrt(0.75) + 0.5), 1e-9, '30° incline');
+  near(calcStraightTensionDelta(2, 0.35, 30, -30), -60, 1e-9, 'pulled down a riser: gravity assists');
+
+  // Route: 50 ft horizontal, 30 ft riser up, 20 ft horizontal. Tension = 2·0.35·50 + 2·30 + 2·0.35·20 = 109
+  const up = calcPullTension([
+    { type: 'straight', length: 50, start: [0, 0, 0], end: [50, 0, 0] },
+    { type: 'straight', length: 30, start: [50, 0, 0], end: [50, 0, 30] },
+    { type: 'straight', length: 20, start: [50, 0, 30], end: [70, 0, 30] },
+  ], { weight: 2, mu: 0.35 });
+  near(up.totalTension, 109, 1e-6, 'riser pulled up adds w × rise');
+  assert.equal(up.gravityAssisted, false);
+
+  // Same route pulled from the top: the riser now runs downward; tension floors at zero there
+  const down = calcPullTension([
+    { type: 'straight', length: 20, start: [70, 0, 30], end: [50, 0, 30] },
+    { type: 'straight', length: 30, start: [50, 0, 30], end: [50, 0, 0] },
+    { type: 'straight', length: 50, start: [50, 0, 0], end: [0, 0, 0] },
+  ], { weight: 2, mu: 0.35 });
+  // 14 after the first run, riser would give 14 - 60 < 0 -> floored at 0, then 35 over the last run
+  near(down.totalTension, 2 * 0.35 * 50, 1e-6, 'downward riser floors at zero, then friction');
+  assert.equal(down.gravityAssisted, true);
+
+  // A segment without coordinates or rise keeps the original horizontal behaviour
+  near(calcPullTension([{ type: 'straight', length: 100 }], { weight: 2, mu: 0.35 }).totalTension, 70, 1e-9, 'no rise data');
+}

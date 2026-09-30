@@ -51,7 +51,10 @@ const calcPullTension = globalThis.calcPullTension || function(routeSegments = [
             const swp = calcSidewallPressure(radius, tension);
             if (swp > maxSidewall) maxSidewall = swp;
         } else {
-            tension += weight * muEff * (seg.length || 0);
+            const L = seg.length || 0;
+            const sinPhi = L > 0 ? Math.max(-1, Math.min(1, (Number(seg.rise) || 0) / L)) : 0;
+            tension += weight * L * (muEff * Math.sqrt(1 - sinPhi * sinPhi) + sinPhi);
+            if (tension < 0) tension = 0;
         }
         if (tension > maxTension) maxTension = tension;
     }
@@ -1062,7 +1065,7 @@ function gatherPullSegments(segs) {
     const pullSegs = [];
     const vec = s => [s.end[0]-s.start[0], s.end[1]-s.start[1], s.end[2]-s.start[2]];
     let prev = vec(segs[0]);
-    pullSegs.push({ type: 'straight', length: segs[0].length });
+    pullSegs.push({ type: 'straight', length: segs[0].length, rise: segs[0].end[2] - segs[0].start[2] });
     for (let i = 1; i < segs.length; i++) {
         const seg = segs[i];
         const curr = vec(seg);
@@ -1078,7 +1081,7 @@ function gatherPullSegments(segs) {
                 pullSegs.push({ type: 'bend', radius, angle, length: radius * angle });
             }
         }
-        pullSegs.push({ type: 'straight', length: seg.length });
+        pullSegs.push({ type: 'straight', length: seg.length, rise: seg.end[2] - seg.start[2] });
         prev = curr;
     }
     return pullSegs;
