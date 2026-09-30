@@ -98,9 +98,9 @@ global.localStorage = {
   // thermalMFactor
   // -----------------------------------------------------------------------
   describe('thermalMFactor — DC heating factor m', () => {
-    it('m = 0 at κ boundary (1.02)', () => {
+    it('m is tiny at κ = 1.02 (DC component almost gone)', () => {
       const m = thermalMFactor(1.02, 1.0, 50);
-      assert(m === 0, `Expected 0, got ${m}`);
+      assert(m > 0 && m < 0.01, `Expected a tiny positive m, got ${m}`);
     });
     it('m > 0 for realistic κ and fault duration', () => {
       // κ ≈ 1.746 (X/R=10), Tk = 1 s — m should be a small positive number

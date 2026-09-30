@@ -32,12 +32,14 @@ global.localStorage = {
       assert(Math.abs(a.threePhaseKA - 26.29) < 0.1);
       assert(Math.abs(a.lineToGroundKA - 22.54) < 0.1);
       assert(Math.abs(a.lineToLineKA - 22.77) < 0.1);
-      assert(Math.abs(a.doubleLineGroundKA - 49.3) < 0.1);
+      // 2LG is the earth current 3*I0 = 3V|Z2| / |Z1Z2 + Z1Z0 + Z2Z0| (Z0 = 1.499 Z1 here) = 19.73 kA
+      assert(Math.abs(a.doubleLineGroundKA - 19.73) < 0.1);
       const b = res.bus480V;
       assert(Math.abs(b.threePhaseKA - 20.37) < 0.1);
       assert(Math.abs(b.lineToGroundKA - 20.37) < 0.1);
       assert(Math.abs(b.lineToLineKA - 17.64) < 0.1);
-      assert(Math.abs(b.doubleLineGroundKA - 40.74) < 0.1);
+      // equal sequence impedances: earth current equals the three-phase current
+      assert(Math.abs(b.doubleLineGroundKA - 20.37) < 0.1);
       assert(Math.abs(b.asymKA - 45.86) < 0.1);
     });
 
