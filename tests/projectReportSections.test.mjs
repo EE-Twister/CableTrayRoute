@@ -2,6 +2,7 @@ import assert from 'assert';
 import { buildReportPackage } from '../analysis/reportPackage.mjs';
 import {
   buildDRCSection,
+  generateProjectReport,
   buildHarmonicsSection,
   buildShortCircuitSection,
   renderPackageHTML,
@@ -100,3 +101,26 @@ for (const entry of pkg.sections.toc.entries) {
 }
 
 console.log('project report section tests passed');
+
+// Conduit fill in the report uses the shared NEC area table, fractional trade sizes and count-based limits
+(function testReportConduitFill() {
+  const cables = ['A', 'B', 'C'].map(n => ({ id: n, cable_area: 0.12, route_preference: 'CND-1' }));
+  const report = generateProjectReport({
+    cables,
+    conduits: [{ conduit_id: 'CND-1', conduit_type: 'EMT', trade_size: '3/4' }],
+  });
+  const row = report.fill.conduits[0];
+  assert.strictEqual(row.areaIn2, 0.53, 'EMT 3/4 internal area is 0.533 in2 (not a 3 inch pipe)');
+  assert.strictEqual(row.tradeSizeIn, 0.75);
+  assert.strictEqual(row.limitPct, 40, 'three cables use the 40% limit');
+  assert.ok(Math.abs(row.fillIn2 - 0.36) < 1e-9);
+  assert.strictEqual(row.status, 'over', '0.36 / 0.533 = 67.5% exceeds 40%');
+
+  const single = generateProjectReport({
+    cables: [{ id: 'S', cable_area: 0.2, route_preference: 'CND-2' }],
+    conduits: [{ conduit_id: 'CND-2', conduit_type: 'EMT', trade_size: '1' }],
+  }).fill.conduits[0];
+  assert.strictEqual(single.limitPct, 53, 'one cable uses the 53% limit');
+  assert.strictEqual(single.status, 'ok');
+  console.log('✓ report conduit fill');
+})();

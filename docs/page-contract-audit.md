@@ -1560,7 +1560,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Deliverables
-- Source files: `analysis/costEstimate.mjs`, `analysis/deliverableArtifacts.mjs`, `analysis/ductbankBom.mjs`, `analysis/manufacturerCatalog.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `costestimate.js`, `src/costestimate.js`, `src/projectManagerEntry.js`
+- Source files: `analysis/costEstimate.mjs`, `analysis/deliverableArtifacts.mjs`, `analysis/ductbankBom.mjs`, `analysis/manufacturerCatalog.mjs`, `analysis/pullBoxSizing.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `costestimate.js`, `src/costestimate.js`, `src/projectManagerEntry.js`
 
 **Undocumented Reads**
 - None
@@ -1689,7 +1689,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Deliverables
-- Source files: `analysis/autoSize.mjs`, `analysis/clashDetect.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableArtifacts.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designRuleChecker.mjs`, `analysis/ductbankConduitAssignment.mjs`, `analysis/equipmentWorkflow.mjs`, `analysis/fieldObservations.mjs`, `analysis/heatTraceReport.mjs`, `analysis/heatTraceSizing.mjs`, `analysis/loadWorkflow.mjs`, `analysis/projectReport.mjs`, `analysis/projectWorkflowCore.mjs`, `analysis/pullCards.mjs`, `analysis/pullConstructability.mjs`, `analysis/racewayAssurance.mjs`, `analysis/reportPackage.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/trayFill.mjs`, `src/components/projectInputBinding.js`, `src/projectManagerEntry.js`, `src/projectreport.js`, `src/pullCalc.js`, `utils/componentLabels.js`, `validation/rules.js`
+- Source files: `analysis/autoSize.mjs`, `analysis/clashDetect.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableArtifacts.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designRuleChecker.mjs`, `analysis/ductbankConduitAssignment.mjs`, `analysis/equipmentWorkflow.mjs`, `analysis/fieldObservations.mjs`, `analysis/heatTraceReport.mjs`, `analysis/heatTraceSizing.mjs`, `analysis/loadWorkflow.mjs`, `analysis/projectReport.mjs`, `analysis/projectWorkflowCore.mjs`, `analysis/pullBoxSizing.mjs`, `analysis/pullCards.mjs`, `analysis/pullConstructability.mjs`, `analysis/racewayAssurance.mjs`, `analysis/reportPackage.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/trayFill.mjs`, `src/components/projectInputBinding.js`, `src/projectManagerEntry.js`, `src/projectreport.js`, `src/pullCalc.js`, `utils/componentLabels.js`, `validation/rules.js`
 
 **Undocumented Reads**
 - None
@@ -1773,47 +1773,47 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `studyResults`
   - src/projectreport.js:313 getStudies()
 - `studyResults.arcFlash`
-  - analysis/projectReport.mjs:449 studies.arcFlash
+  - analysis/projectReport.mjs:459 studies.arcFlash
 - `studyResults.bessHazard`
-  - analysis/projectReport.mjs:984 studies.bessHazard
+  - analysis/projectReport.mjs:994 studies.bessHazard
 - `studyResults.contingency`
-  - analysis/projectReport.mjs:755 studies.contingency
+  - analysis/projectReport.mjs:765 studies.contingency
 - `studyResults.cyberCompliance`
-  - analysis/projectReport.mjs:760 studies.cyberCompliance
+  - analysis/projectReport.mjs:770 studies.cyberCompliance
 - `studyResults.duty`
   - validation/rules.js:666 studies.duty
   - validation/rules.js:666 studies?.duty
 - `studyResults.frequencyScan`
-  - analysis/projectReport.mjs:757 studies.frequencyScan
+  - analysis/projectReport.mjs:767 studies.frequencyScan
 - `studyResults.harmonics`
-  - analysis/projectReport.mjs:568 studies.harmonics
+  - analysis/projectReport.mjs:578 studies.harmonics
 - `studyResults.heatTraceSizing`
-  - analysis/projectReport.mjs:199 studies.heatTraceSizing
+  - analysis/projectReport.mjs:209 studies.heatTraceSizing
 - `studyResults.heatTraceSizingCircuits`
-  - analysis/projectReport.mjs:200 studies.heatTraceSizingCircuits
+  - analysis/projectReport.mjs:210 studies.heatTraceSizingCircuits
 - `studyResults.loadFlow`
-  - analysis/projectReport.mjs:534 studies.loadFlow
+  - analysis/projectReport.mjs:544 studies.loadFlow
 - `studyResults.motorStart`
-  - analysis/projectReport.mjs:598 studies.motorStart
+  - analysis/projectReport.mjs:608 studies.motorStart
 - `studyResults.optimalPowerFlow`
-  - analysis/projectReport.mjs:759 studies.optimalPowerFlow
+  - analysis/projectReport.mjs:769 studies.optimalPowerFlow
 - `studyResults.probabilisticLoadFlow`
-  - analysis/projectReport.mjs:754 studies.probabilisticLoadFlow
+  - analysis/projectReport.mjs:764 studies.probabilisticLoadFlow
 - `studyResults.quasiDynamic`
-  - analysis/projectReport.mjs:753 studies.quasiDynamic
+  - analysis/projectReport.mjs:763 studies.quasiDynamic
 - `studyResults.reliability`
-  - analysis/projectReport.mjs:671 studies.reliability
+  - analysis/projectReport.mjs:681 studies.reliability
   - validation/rules.js:671 studies?.reliability
   - validation/rules.js:672 studies.reliability
   - validation/rules.js:674 studies?.reliability
 - `studyResults.shortCircuit`
-  - analysis/projectReport.mjs:478 studies.shortCircuit
+  - analysis/projectReport.mjs:488 studies.shortCircuit
 - `studyResults.transientStability`
-  - analysis/projectReport.mjs:758 studies.transientStability
+  - analysis/projectReport.mjs:768 studies.transientStability
 - `studyResults.voltageDropStudy`
-  - analysis/projectReport.mjs:623 studies.voltageDropStudy
+  - analysis/projectReport.mjs:633 studies.voltageDropStudy
 - `studyResults.voltageStability`
-  - analysis/projectReport.mjs:756 studies.voltageStability
+  - analysis/projectReport.mjs:766 studies.voltageStability
 - `traySchedule`
   - src/projectreport.js:291 getTrays()
 
@@ -2166,7 +2166,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Studies
 - Group: Equipment Sizing
-- Source files: `analysis/sustainabilityFootprint.mjs`, `src/components/studyApproval.js`, `src/htmlUtils.mjs`, `src/projectManagerEntry.js`, `src/sustainability.js`, `sustainability.js`
+- Source files: `analysis/pullBoxSizing.mjs`, `analysis/sustainabilityFootprint.mjs`, `src/components/studyApproval.js`, `src/htmlUtils.mjs`, `src/projectManagerEntry.js`, `src/sustainability.js`, `sustainability.js`
 
 **Undocumented Reads**
 - None
@@ -2188,30 +2188,30 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - sustainability.js:214 getCables()
+  - sustainability.js:215 getCables()
 - `conduitSchedule`
-  - sustainability.js:216 getConduits()
+  - sustainability.js:217 getConduits()
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
-  - sustainability.js:111 getStudies()
-  - sustainability.js:311 getStudies()
-  - sustainability.js:91 getStudies()
+  - sustainability.js:112 getStudies()
+  - sustainability.js:314 getStudies()
+  - sustainability.js:92 getStudies()
 - `studyResults.iec60287`
-  - sustainability.js:312 studies.iec60287
+  - sustainability.js:315 studies.iec60287
 - `studyResults.sustainabilityFootprint`
-  - sustainability.js:91 getStudies().sustainabilityFootprint
+  - sustainability.js:92 getStudies().sustainabilityFootprint
 - `traySchedule`
-  - sustainability.js:215 getTrays()
+  - sustainability.js:216 getTrays()
 
 **Detected Writes**
 - `settings.studyApprovals`
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
-  - sustainability.js:113 setStudies()
+  - sustainability.js:114 setStudies()
 - `studyResults.sustainabilityFootprint`
-  - sustainability.js:112 studies.sustainabilityFootprint
+  - sustainability.js:113 studies.sustainabilityFootprint
 
 ### Generator Sizing (`generatorsizing.html`)
 

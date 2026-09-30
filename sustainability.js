@@ -8,6 +8,7 @@ import {
 import { getCables, getTrays, getConduits, getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { parseTradeSize } from './analysis/pullBoxSizing.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -262,7 +263,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     for (const c of conduits) {
-      const tradeSizeIn = parseFloat(c.trade_size || c.diameter || 0) || 0;
+      // '3/4' and '1-1/2' must read as 0.75 and 1.5, not 3 and 1
+      const parsedTradeSize = parseTradeSize(c.trade_size || c.diameter || 0);
+      const tradeSizeIn = Number.isFinite(parsedTradeSize) ? parsedTradeSize : 0;
       const lengthFt    = parseFloat(c.length_ft || 0) || 0;
       const lengthM     = lengthFt * 0.3048;
       const material    = normaliseConduitType(c.conduit_type || c.material || 'emt');

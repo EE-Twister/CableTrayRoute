@@ -21,6 +21,8 @@
 import { detectClashes, overallSeverity } from './clashDetect.mjs';
 import { buildHeatTraceReport } from './heatTraceReport.mjs';
 import { generateSpoolSheets } from './spoolSheets.mjs';
+import { buildConduitCableMap, evaluateConduitFill, recordId as conduitRecordId } from './conduitFill.mjs';
+import { parseTradeSize } from './pullBoxSizing.mjs';
 
 // ---------------------------------------------------------------------------
 // Fill helpers
@@ -123,14 +125,22 @@ function buildFillSection(trays, conduits, cables) {
     return { id, type: tray.tray_type || '—', widthIn: parseFloat(tray.inside_width) || 12, areaIn2: +areaIn2.toFixed(2), fillIn2: +fillIn2.toFixed(2), usedPct: +usedPct.toFixed(1), limitPct, status };
   });
 
+  // Same NEC Chapter 9 area table and 53/31/40 % limits the Conduit Fill page uses,
+  // so the report cannot disagree with the page it summarizes.
+  // The cable schedule names the assigned raceway in route_preference or raceway.
+  const conduitCableMap = buildConduitCableMap(
+    conduits,
+    cables.map(c => ({ ...c, raceway: c.raceway || c.route_preference }))
+  );
   const conduitRows = conduits.map(c => {
     const id       = c.conduit_id || c.id || '—';
-    const trade    = parseFloat(c.trade_size) || 1;
-    // NEC Table 1 inside diameter approximation
-    const idApprox = trade * 0.88;
-    const areaIn2  = Math.PI * (idApprox / 2) ** 2;
-    const fillIn2  = cableFillIn2(cables, id);
-    const limitPct = 40;
+    const evaluation = evaluateConduitFill(c, conduitCableMap.get(conduitRecordId(c)) || []);
+    const parsedTrade = parseTradeSize(c.trade_size);
+    const trade    = Number.isFinite(parsedTrade) ? parsedTrade : 1;
+    // Unknown type/size: fall back to a nominal inside-diameter approximation.
+    const areaIn2  = evaluation.internalAreaIn2 ?? Math.PI * ((trade * 0.88) / 2) ** 2;
+    const fillIn2  = evaluation.cableAreaTotalIn2 || cableFillIn2(cables, id);
+    const limitPct = (evaluation.fillLimit ?? 0.40) * 100;
     const usedPct  = areaIn2 > 0 ? (fillIn2 / areaIn2) * 100 : 0;
     const status   = usedPct > limitPct ? 'over' : usedPct > limitPct * 0.9 ? 'near' : 'ok';
     return { id, type: c.type || 'Conduit', tradeSizeIn: trade, areaIn2: +areaIn2.toFixed(2), fillIn2: +fillIn2.toFixed(2), usedPct: +usedPct.toFixed(1), limitPct, status };
