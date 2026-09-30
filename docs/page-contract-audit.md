@@ -138,7 +138,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - ... 2 more
 - `studyResults.arcFlash`
   - analysis/designCoach.mjs:479 studies.arcFlash
-  - analysis/equipmentEvaluation.mjs:236 studies?.arcFlash
+  - analysis/equipmentEvaluation.mjs:240 studies?.arcFlash
 - `studyResults.cableThermalEnvironment`
   - analysis/designCoach.mjs:486 studies.cableThermalEnvironment
 - `studyResults.duty`
@@ -156,7 +156,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - validation/rules.js:674 studies?.reliability
 - `studyResults.shortCircuit`
   - analysis/designCoach.mjs:480 studies.shortCircuit
-  - analysis/equipmentEvaluation.mjs:235 studies?.shortCircuit
+  - analysis/equipmentEvaluation.mjs:239 studies?.shortCircuit
 - `traySchedule`
   - src/workflowDashboard.js:145 getTrays()
   - src/workflowDashboard.js:1470 getTrays()
@@ -307,13 +307,13 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `equipment`
-  - loadlist.mjs:713 getEquipment()
+  - loadlist.mjs:717 getEquipment()
 - `loadList`
-  - loadlist.mjs:1048 getLoads()
-  - loadlist.mjs:1281 getLoads()
-  - loadlist.mjs:1318 getLoads()
-  - loadlist.mjs:1815 getLoads()
-  - loadlist.mjs:1834 getLoads()
+  - loadlist.mjs:1052 getLoads()
+  - loadlist.mjs:1285 getLoads()
+  - loadlist.mjs:1322 getLoads()
+  - loadlist.mjs:1819 getLoads()
+  - loadlist.mjs:1838 getLoads()
   - ... 18 more
 - `oneLineDiagram`
   - src/crossProbe.js:139 getOneLine()
@@ -324,14 +324,14 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Writes**
 - `loadList`
-  - loadlist.mjs:1320 setLoads()
-  - loadlist.mjs:1738 addLoad()
-  - loadlist.mjs:1826 setLoads()
-  - loadlist.mjs:1837 setLoads()
-  - loadlist.mjs:1849 setLoads()
+  - loadlist.mjs:1324 setLoads()
+  - loadlist.mjs:1742 addLoad()
+  - loadlist.mjs:1830 setLoads()
+  - loadlist.mjs:1841 setLoads()
+  - loadlist.mjs:1853 setLoads()
   - ... 11 more
 - `settings.loadListViewPreset`
-  - loadlist.mjs:1949 setItem(settings.loadListViewPreset)
+  - loadlist.mjs:1953 setItem(settings.loadListViewPreset)
 
 ### One-Line (`oneline.html`)
 
@@ -1196,7 +1196,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - src/designCoach.js:160 getStudies()
 - `studyResults.arcFlash`
   - analysis/designCoach.mjs:479 studies.arcFlash
-  - analysis/equipmentEvaluation.mjs:236 studies?.arcFlash
+  - analysis/equipmentEvaluation.mjs:240 studies?.arcFlash
 - `studyResults.cableThermalEnvironment`
   - analysis/designCoach.mjs:486 studies.cableThermalEnvironment
 - `studyResults.groundGrid`
@@ -1207,7 +1207,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - analysis/designCoach.mjs:484 studies.loadFlow
 - `studyResults.shortCircuit`
   - analysis/designCoach.mjs:480 studies.shortCircuit
-  - analysis/equipmentEvaluation.mjs:235 studies?.shortCircuit
+  - analysis/equipmentEvaluation.mjs:239 studies?.shortCircuit
 - `traySchedule`
   - src/designCoach.js:159 getTrays()
 
@@ -2900,9 +2900,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `studyResults`
   - src/equipmentEvaluation.js:68 getStudies()
 - `studyResults.arcFlash`
-  - analysis/equipmentEvaluation.mjs:236 studies?.arcFlash
+  - analysis/equipmentEvaluation.mjs:240 studies?.arcFlash
 - `studyResults.shortCircuit`
-  - analysis/equipmentEvaluation.mjs:235 studies?.shortCircuit
+  - analysis/equipmentEvaluation.mjs:239 studies?.shortCircuit
 
 **Detected Writes**
 - None
