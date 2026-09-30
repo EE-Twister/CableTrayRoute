@@ -103,6 +103,9 @@ export function validateSwitchingProcedure(procedure = {}) {
     if (step.type === SWITCHING_STEP_TYPES.operate && !step.deviceId) {
       issues.push({ severity: 'error', code: 'device-required', stepNumber, message: `Step ${stepNumber}: choose the device to operate.` });
     }
+    // Any switching operation changes the energized state, so an earlier test
+    // no longer proves the equipment is dead: verification must follow the last operation.
+    if (step.type === SWITCHING_STEP_TYPES.operate) absenceVerified = false;
     if (step.type === SWITCHING_STEP_TYPES.verify) absenceVerified = true;
     if (step.type === SWITCHING_STEP_TYPES.ground) {
       if (!absenceVerified) issues.push({ severity: 'error', code: 'verify-before-ground', stepNumber, message: `Step ${stepNumber}: verify absence of voltage before applying protective grounds.` });
