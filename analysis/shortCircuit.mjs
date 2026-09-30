@@ -7,6 +7,7 @@ import { computeImpedanceFromPerKm } from '../utils/cableImpedance.js';
 import { table9Impedance } from '../src/necTable9.mjs';
 import {
   computeIEC60909Bus,
+  doubleLineGroundEarthCurrent,
   cFactor as iecCFactor,
   generatorCorrectionKG,
   transformerCorrectionKT
@@ -1333,8 +1334,8 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       const I3 = V / mag(z1);
       const ILG = (3 * V) / mag(add(add(z1, z2), z0));
       const ILL = (Math.sqrt(3) * V) / mag(add(z1, z2));
-      const Z2Z0 = parallel(z2, z0);
-      const IDLG = (3 * V) / mag(add(z1, Z2Z0));
+      // Double-line-to-ground is reported as the earth current 3·I0
+      const IDLG = doubleLineGroundEarthCurrent(V, z1, z2, z0);
 
       const xr = Math.abs(comp.xr_ratio || 0);
       const asym = I3 * Math.SQRT2 * (1 + Math.exp(-Math.PI / Math.max(xr, 0.01)));

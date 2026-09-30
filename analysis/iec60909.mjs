@@ -115,34 +115,41 @@ export function kappaIEC(xr) {
 // ---------------------------------------------------------------------------
 
 /**
- * Calculates the thermal factor m for DC component heating (IEC 60909-0 Fig. 22).
+ * Calculates the thermal factor m for the DC component heating effect
+ * (IEC 60909-0:2016 Eq. 102, Fig. 21):
  *
- * Uses the analytical approximation:
- *   m = (1 / (2 × f × Tk × ln(κ²))) × (e^(2 × f × Tk × ln(κ²)) − 1)
+ *   m = (e^(4 × f × Tk × ln(κ − 1)) − 1) / (2 × f × Tk × ln(κ − 1))
  *
- * This is exact for the IEC exponential DC decay model.
+ * m tends to 2 as κ → 2 (a DC component that never decays) and to 0 for
+ * long fault durations with a strongly damped DC component.
  *
- * @param {number} kappa - Peak factor κ
+ * @param {number} kappa - Peak factor κ (1.02 ≤ κ ≤ 2)
  * @param {number} faultDurationS - Fault duration Tk in seconds (default 1.0 s)
  * @param {number} freqHz - System frequency in Hz (default 50 Hz per IEC)
  * @returns {number} m factor (≥ 0)
  */
 export function thermalMFactor(kappa, faultDurationS = 1.0, freqHz = 50) {
-  const Tk = Math.max(faultDurationS, 0.02);
-  // DC component decrement: lnKsq = ln(κ²) but derived from κ = 1.02 + 0.98×e^(−3/xr)
-  // Equivalent: the DC time constant τ = X / (ω × R) = X/R / (2πf)
-  // From κ: κ − 1.02 = 0.98 × e^(−3/xr) → 3/xr = −ln((κ−1.02)/0.98)
-  // xr = −3 / ln((κ−1.02)/0.98)
-  const inner = (kappa - 1.02) / 0.98;
-  if (inner <= 0 || inner >= 1) {
-    // κ at boundary — m approaches 0
-    return 0;
-  }
-  const xr = -3 / Math.log(inner);
-  const tau = xr / (2 * Math.PI * freqHz); // DC time constant in seconds
-  const exponent = 2 * Tk / tau;
-  if (exponent < 1e-9) return 0;
-  return (tau / (2 * Tk)) * (Math.exp(exponent) - 1) * Math.exp(-exponent);
+  const Tk = Math.max(Number(faultDurationS) || 0, 0.02);
+  const k = Math.min(Math.max(Number(kappa) || 1.02, 1.02), 2);
+  const lnTerm = Math.log(k - 1);
+  const y = 2 * freqHz * Tk * lnTerm;
+  // κ = 2 gives ln(1) = 0: the DC component does not decay and m = 2.
+  if (Math.abs(y) < 1e-9) return 2;
+  return (Math.exp(2 * y) - 1) / y;
+}
+
+/**
+ * Earth current for a two-phase-to-earth fault, I"kE2E (IEC 60909-0 Eq. 33):
+ *   I"kE2E = 3 × I0 = √3 × c × Un × |Z2| / |Z1·Z2 + Z1·Z0 + Z2·Z0|
+ * The caller supplies the phase voltage V = c × Un / √3 in the same units
+ * as the impedances, so the result is V × 3 × |Z2| / |denominator|.
+ *
+ * @param {number} V - Phase voltage (c × Un / √3)
+ * @returns {number} earth current in the units of V / |Z|
+ */
+export function doubleLineGroundEarthCurrent(V, z1, z2, z0) {
+  const den = add(add(mult(z1, z2), mult(z1, z0)), mult(z2, z0));
+  return (3 * V * mag(z2)) / mag(den);
 }
 
 // ---------------------------------------------------------------------------
@@ -392,11 +399,10 @@ export function computeIEC60909Bus(params) {
   const z1z2z0 = add(add(z1, z2), z0);
   const Ik1 = (3 * V) / mag(z1z2z0);
 
-  // IEC 60909-0 §4.5: Two-phase-to-earth (double-line-to-ground)
-  // Using symmetrical components: Ia1 = V / (Z1 + Z2||Z0)
-  // Reported value = 3×|Ia1| — the reference fault current for the 2LG sequence network
-  const Z2Z0 = parallel(z2, z0);
-  const Ik2E = (3 * V) / mag(add(z1, Z2Z0));
+  // IEC 60909-0 §4.5 (Eq. 33): Two-phase-to-earth. The reported value is the
+  // earth current I"kE2E = 3·I0, the quantity used for ground-return and
+  // touch-voltage checks (3·I1 would overstate it by (Z2 + Z0)/Z2).
+  const Ik2E = doubleLineGroundEarthCurrent(V, z1, z2, z0);
 
   // --- Peak factor and peak current (IEC 60909-0 §4.3.1.1) ---
   const kappa = kappaIEC(xr);
