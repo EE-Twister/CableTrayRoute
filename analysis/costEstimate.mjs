@@ -220,6 +220,35 @@ export function lookupPriceEvidence(priceMap, key) {
   return { unitPrice: priceMap['default'] ?? 0, priceKey: 'default', usedDefaultPrice: true };
 }
 
+/**
+ * Candidate price-map keys for a conductor size written the way schedules write
+ * it: '#12 AWG', '12', '1/0 AWG', '#1/0', '4/0 AWG', '500 MCM', '3-#4 CU'.
+ * The built-in price map is keyed '12 AWG', '1/0', '500 kcmil', so without this
+ * every size with a '#' or a trailing 'AWG' on a 1/0-4/0 priced at the default.
+ */
+export function cableSizeKeyCandidates(size) {
+  const raw = String(size ?? '').trim();
+  if (!raw) return [];
+  const text = raw.toUpperCase()
+    .replace(/^\d+\s*C?\s*[-xX]\s*(?=#|\d)/, '') // leading conductor count: '3-#4', '3C-#4'
+    .replace(/\b(CU|AL|COPPER|ALUMINUM|ALUMINIUM)\b/g, '')
+    .replace(/#/g, '')
+    .trim();
+  const aught = text.match(/(\d)\s*\/\s*0/);
+  if (aught) return [`${aught[1]}/0`, `${aught[1]}/0 AWG`];
+  const kcmil = text.match(/(\d+)\s*(KCMIL|MCM|KCM)\b/);
+  if (kcmil) return [`${kcmil[1]} kcmil`];
+  const awg = text.match(/^(\d{1,2})(?:\s*AWG)?\b/);
+  if (awg) return [`${Number(awg[1])} AWG`];
+  return [];
+}
+
+function resolveCableSizeKey(priceMap, size) {
+  const exact = String(size ?? '').trim();
+  if (priceMap[exact] !== undefined) return exact;
+  return cableSizeKeyCandidates(size).find(key => priceMap[key] !== undefined) ?? exact;
+}
+
 function lookupCatalogOrAttributePriceEvidence(priceMap, record, attributeKey) {
   const catalog = buildBomCatalogFields(record).catalogNumber;
   if (catalog && priceMap[catalog] !== undefined) {
@@ -259,7 +288,7 @@ export function estimateCableCosts(cables = [], routeResults = [], prices = {}) 
     ) || 1);
     const lengthFt = routeLengthFt * runCount;
 
-    const priceEvidence = lookupCatalogOrAttributePriceEvidence(cablePrices, c, size);
+    const priceEvidence = lookupCatalogOrAttributePriceEvidence(cablePrices, c, resolveCableSizeKey(cablePrices, size));
     const unitPrice = priceEvidence.unitPrice;
     const materialCost = unitPrice * conductors * lengthFt;
     const laborHrs = lengthFt / (productivity.cablePullFtPerHr || 150);

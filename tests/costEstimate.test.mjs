@@ -17,6 +17,7 @@ import {
   applyEstimateBasis,
   parsePricingCSV,
   exportPricingCSV,
+  cableSizeKeyCandidates,
 } from '../analysis/costEstimate.mjs';
 
 function describe(name, fn) {
@@ -616,5 +617,34 @@ describe('exportPricingCSV — roundtrip', () => {
     const { prices, meta } = parsePricingCSV(csv);
     assert.strictEqual(prices.cable['4 AWG, special'], 1.25);
     assert.strictEqual(meta.source, 'Distributor, Inc.');
+  });
+});
+
+describe('cable sizes as written in schedules map to the price table', () => {
+  const price = size => estimateCableCosts([{ cable_tag: 'A', conductor_size: size, conductors: 1, length_ft: 100 }], [], {})[0];
+  it('#12 AWG, 12 and 12 AWG all price as 12 AWG ($0.25/ft), not the $1.50 default', () => {
+    for (const size of ['#12 AWG', '12', '12 AWG']) {
+      const line = price(size);
+      assert.strictEqual(line.unitPrice, DEFAULT_PRICES.cable['12 AWG'], size);
+      assert.strictEqual(line.usedDefaultPrice, false, size);
+    }
+  });
+  it('1/0 AWG, #1/0 and 4/0 AWG map to the 1/0 and 4/0 keys; 500 MCM to 500 kcmil', () => {
+    assert.strictEqual(price('1/0 AWG').unitPrice, DEFAULT_PRICES.cable['1/0']);
+    assert.strictEqual(price('#1/0').unitPrice, DEFAULT_PRICES.cable['1/0']);
+    assert.strictEqual(price('4/0 AWG').unitPrice, DEFAULT_PRICES.cable['4/0']);
+    assert.strictEqual(price('500 MCM').unitPrice, DEFAULT_PRICES.cable['500 kcmil']);
+  });
+  it('a leading conductor count and material suffix are ignored (3-#4 CU -> 4 AWG)', () => {
+    assert.deepStrictEqual(cableSizeKeyCandidates('3-#4 CU'), ['4 AWG']);
+  });
+  it('a user price keyed exactly as the schedule writes it still wins', () => {
+    const line = estimateCableCosts([{ cable_tag: 'A', conductor_size: '#12 AWG', conductors: 1, length_ft: 100 }], [],
+      { cable: { '#12 AWG': 9.99 } })[0];
+    assert.strictEqual(line.unitPrice, 9.99);
+  });
+  it('an unknown size still falls back to the flagged default', () => {
+    const line = price('#22 AWG');
+    assert.strictEqual(line.usedDefaultPrice, true);
   });
 });
