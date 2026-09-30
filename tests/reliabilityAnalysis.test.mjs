@@ -210,7 +210,7 @@ describe('blank repair time is missing data, not zero', () => {
     for (const blank of ['', '  ', null]) {
       const r = runReliability(build(blank));
       assert.strictEqual(r.ready, false, `mttr=${JSON.stringify(blank)}`);
-      assert.deepStrictEqual(r.missingData[0].missing, ['MTTR']);
+      assert.deepStrictEqual(r.missingData.find(m => m.id === 'T').missing, ['MTTR']);
     }
   });
   it('an explicit 0 is still accepted (instant repair)', () => {
