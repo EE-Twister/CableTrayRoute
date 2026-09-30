@@ -1,3 +1,4 @@
+import { showAlertModal } from './src/components/modal.js';
 import { detectClashes, overallSeverity, CLASH_SEVERITY } from './analysis/clashDetect.mjs';
 import { getTrays } from './dataStore.mjs';
 

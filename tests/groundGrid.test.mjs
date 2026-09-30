@@ -291,3 +291,15 @@ describe('analyzeGroundGrid — integration', () => {
     }), /Computed mesh factor is invalid|Computed mesh voltage is invalid/);
   });
 });
+
+describe('analyzeGroundGrid rejects blank (NaN) inputs', () => {
+  const valid = {
+    rho: 100, gridLx: 30, gridLy: 30, nx: 6, ny: 6, h: 0.5, d: 0.01,
+    Ig: 3000, tf: 0.5, hasRods: false, rodCount: 0, rodLength: 0, bw: 70,
+  };
+  for (const key of ['rho', 'gridLx', 'gridLy', 'nx', 'ny', 'h', 'd', 'Ig', 'tf']) {
+    it(`NaN ${key} throws`, () => {
+      assert.throws(() => analyzeGroundGrid({ ...valid, [key]: NaN }));
+    });
+  }
+});

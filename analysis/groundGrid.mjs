@@ -186,13 +186,13 @@ export function analyzeGroundGrid(params) {
   } = params;
 
   // Validate inputs
-  if (rho <= 0) throw new Error('Soil resistivity must be positive');
-  if (gridLx <= 0 || gridLy <= 0) throw new Error('Grid dimensions must be positive');
-  if (nx < 2 || ny < 2) throw new Error('At least 2 conductors required in each direction');
-  if (h <= 0) throw new Error('Burial depth must be positive');
-  if (d <= 0) throw new Error('Conductor diameter must be positive');
-  if (Ig <= 0) throw new Error('Grid current must be positive');
-  if (tf <= 0) throw new Error('Fault duration must be positive');
+  if (!(rho > 0)) throw new Error('Soil resistivity must be positive');
+  if (!(gridLx > 0) || !(gridLy > 0)) throw new Error('Grid dimensions must be positive');
+  if (!(nx >= 2) || !(ny >= 2)) throw new Error('At least 2 conductors required in each direction');
+  if (!(h > 0)) throw new Error('Burial depth must be positive');
+  if (!(d > 0)) throw new Error('Conductor diameter must be positive');
+  if (!(Ig > 0)) throw new Error('Grid current must be positive');
+  if (!(tf > 0)) throw new Error('Fault duration must be positive');
   if (!Number.isFinite(rodCount) || rodCount < 0) throw new Error('Rod count must be non-negative');
   if (!Number.isFinite(rodLength) || rodLength < 0) throw new Error('Rod length must be non-negative');
 

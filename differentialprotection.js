@@ -1,3 +1,4 @@
+import { showModal } from './src/components/modal.js';
 import { runDifferentialStudy, ZONE_TYPES } from './analysis/differentialProtection.mjs';
 import { getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';

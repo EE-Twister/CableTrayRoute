@@ -1,3 +1,4 @@
+import { showAlertModal } from './src/components/modal.js';
 import { evaluateLoadCombinations } from './analysis/loadCombinations.mjs';
 import { calcBraceForces, calcSeismicDesignCategory, maxBraceSpacing } from './analysis/seismicBracing.mjs';
 import { calcWindForce, calcVelocityPressure } from './analysis/windLoad.mjs';

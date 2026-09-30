@@ -595,6 +595,16 @@ export function motorFLC1Ph(hp, voltage) {
 // ---------------------------------------------------------------------------
 
 /**
+ * Reject blank, non-numeric, zero and negative values. A bare `x <= 0` check
+ * lets NaN through, which then propagates into every derived result.
+ */
+function requirePositive(value, label) {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${label} must be a number greater than zero`);
+  }
+}
+
+/**
  * Size a feeder or branch circuit for a general load (NEC 210.20 / 215.3 / 240.4).
  *
  * Rules applied:
@@ -627,7 +637,7 @@ export function sizeFeeder(params) {
     equipmentRatedAmps = null,
   } = params;
 
-  if (loadAmps <= 0) throw new Error('Load current must be positive');
+  requirePositive(loadAmps, 'Load current');
 
   const requiredAmps = continuous ? loadAmps * 1.25 : loadAmps;
   const ocpd = nextStandardOcpd(requiredAmps);
@@ -737,8 +747,8 @@ export function sizeMotorBranch(params) {
     equipmentRatedAmps = null,
   } = params;
 
-  if (hp <= 0) throw new Error('Motor HP must be positive');
-  if (voltage <= 0) throw new Error('Voltage must be positive');
+  requirePositive(hp, 'Motor HP');
+  requirePositive(voltage, 'Voltage');
 
   const flc = phase === '1ph' ? motorFLC1Ph(hp, voltage) : motorFLC3Ph(hp, voltage);
   if (flc === null) {
@@ -838,8 +848,9 @@ export function sizeTransformer(params) {
     secondaryEquipmentRatedAmps = null,
   } = params;
 
-  if (loadKva <= 0) throw new Error('Load kVA must be positive');
-  if (primaryVoltage <= 0 || secondaryVoltage <= 0) throw new Error('Voltages must be positive');
+  requirePositive(loadKva, 'Load kVA');
+  requirePositive(primaryVoltage, 'Primary voltage');
+  requirePositive(secondaryVoltage, 'Secondary voltage');
 
   const xfmrKva = nextStandardXfmrKva(loadKva, phase);
   const sqrtPhase = phase === '3ph' ? Math.sqrt(3) : 1;
@@ -917,9 +928,9 @@ export function sizeFeederFromKw(params) {
     ...rest
   } = params;
 
-  if (kw <= 0) throw new Error('kW must be positive');
-  if (pf <= 0 || pf > 1) throw new Error('Power factor must be between 0 and 1');
-  if (voltage <= 0) throw new Error('Voltage must be positive');
+  requirePositive(kw, 'Load kW');
+  if (!Number.isFinite(pf) || pf <= 0 || pf > 1) throw new Error('Power factor must be a number between 0 and 1');
+  requirePositive(voltage, 'Voltage');
 
   const sqrtPhase = phase === '3ph' ? Math.sqrt(3) : 1;
   const loadAmps = (kw * 1000) / (sqrtPhase * voltage * pf);

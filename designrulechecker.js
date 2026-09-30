@@ -4,6 +4,7 @@
  * Runs NEC/IEEE design validation rules against the project's cable and
  * raceway data and displays findings grouped by severity.
  */
+import { showAlertModal } from './src/components/modal.js';
 import { runDRC, formatDrcReport, DRC_SEVERITY } from './analysis/designRuleChecker.mjs';
 import { getTrays, getConduits, getCables, getItem, getDrcAcceptedFindings, setDrcAcceptedFindings } from './dataStore.mjs';
 import { openModal } from './src/components/modal.js';

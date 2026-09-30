@@ -1,3 +1,4 @@
+import { showAlertModal } from './src/components/modal.js';
 import { analyzeGroundGrid, analyzeIrregularGrid } from './src/workers/groundGridClient.js';
 import { normalizePreviewGeometry } from './src/groundgridPreviewGeometry.js';
 import {

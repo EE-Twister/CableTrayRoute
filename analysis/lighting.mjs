@@ -188,8 +188,8 @@ export function parseIES(text) {
  * @returns {number}
  */
 export function roomCavityRatio(lengthFt, widthFt, mountingHeightFt, workplaneHeightFt) {
-  if (lengthFt <= 0) throw new Error('Room length must be > 0');
-  if (widthFt <= 0) throw new Error('Room width must be > 0');
+  if (!(lengthFt > 0)) throw new Error('Room length must be > 0');
+  if (!(widthFt > 0)) throw new Error('Room width must be > 0');
   if (mountingHeightFt <= workplaneHeightFt) {
     throw new Error('Mounting height must be above the workplane height');
   }
@@ -247,11 +247,11 @@ export function coefficientOfUtilization(rcr, ceilingReflPct, wallReflPct) {
  * @returns {number}  Average maintained illuminance in foot-candles.
  */
 export function averageIlluminance(numFixtures, lumensPerFixture, cu, llf, roomAreaSqFt) {
-  if (numFixtures <= 0) throw new Error('Number of fixtures must be > 0');
-  if (lumensPerFixture <= 0) throw new Error('Lumens per fixture must be > 0');
+  if (!(numFixtures > 0)) throw new Error('Number of fixtures must be > 0');
+  if (!(lumensPerFixture > 0)) throw new Error('Lumens per fixture must be > 0');
   if (cu <= 0 || cu > 2) throw new Error('CU must be in range (0, 2]');
   if (llf <= 0 || llf > 1) throw new Error('LLF must be in range (0, 1]');
-  if (roomAreaSqFt <= 0) throw new Error('Room area must be > 0');
+  if (!(roomAreaSqFt > 0)) throw new Error('Room area must be > 0');
   return (numFixtures * lumensPerFixture * cu * llf) / roomAreaSqFt;
 }
 
@@ -355,7 +355,7 @@ export function pointIlluminanceGrid(
   { rows = 10, cols = 10 } = {},
 ) {
   if (!fixtures || fixtures.length === 0) throw new Error('At least one fixture position required');
-  if (mountingHeightFt <= 0) throw new Error('Mounting height must be > 0');
+  if (!(mountingHeightFt > 0)) throw new Error('Mounting height must be > 0');
 
   const cellW = roomLengthFt / cols;
   const cellH = roomWidthFt  / rows;

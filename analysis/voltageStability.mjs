@@ -271,7 +271,7 @@ export function buildPVCurve(buses, opts = {}) {
     lambdaStep = 0.05,
   } = opts;
 
-  if (lambdaStep <= 0) throw new Error('lambdaStep must be positive.');
+  if (!(lambdaStep > 0)) throw new Error('lambdaStep must be positive.');
   if (lambdaMax <= lambdaStart) throw new Error('lambdaMax must exceed lambdaStart.');
 
   const warnings = [];
@@ -375,7 +375,7 @@ export function buildQVCurve(buses, opts = {}) {
   if (!targetBusId) throw new Error('opts.targetBusId is required.');
   const targetIdx = buses.findIndex(b => b.id === targetBusId);
   if (targetIdx < 0) throw new Error(`Target bus "${targetBusId}" not found in buses array.`);
-  if (qStepMvar <= 0) throw new Error('qStepMvar must be positive.');
+  if (!(qStepMvar > 0)) throw new Error('qStepMvar must be positive.');
 
   const warnings = [];
   const points = [];
@@ -490,7 +490,7 @@ export function runVoltageStabilityStudy(inputs = {}) {
   let { targetBusId } = inputs;
 
   validateBuses(buses);
-  if (baseMVA <= 0) throw new Error('baseMVA must be positive.');
+  if (!(baseMVA > 0)) throw new Error('baseMVA must be positive.');
   if (lambdaMax <= 1) throw new Error('lambdaMax must be greater than 1.');
 
   // Default target bus: first PQ bus (or first non-slack)

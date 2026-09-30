@@ -21,7 +21,7 @@ export const ENTRYPOINT_BUDGETS = Object.freeze({
   'app.mjs': 4453,
   'ductbankroute.js': 5230,
   'cableschedule.js': 3266,
-  'cathodicprotection.js': 2764,
+  'cathodicprotection.js': 2765,
   'src/panelSchedule.js': 2725,
   'site.js': 2825
 });

@@ -152,7 +152,7 @@ export function requiredEnergyKwh(loadProfilePeriods) {
  * }}
  */
 export function designCapacityKwh(kwhNet, chemistry, ambientTempC, designMarginPct = 10) {
-  if (kwhNet <= 0) throw new Error('kwhNet must be greater than zero.');
+  if (!(kwhNet > 0)) throw new Error('kwhNet must be greater than zero.');
   const chem = CHEMISTRY[chemistry];
   if (!chem) {
     throw new Error(
@@ -226,8 +226,8 @@ export function standardBankSize(kwhRequired) {
  * @returns {{ loadFraction: number, loadKw: number, runtimeHours: number }[]}
  */
 export function runtimeCurve(kwhSelected, nominalLoadKw, chemistry) {
-  if (kwhSelected <= 0) throw new Error('kwhSelected must be greater than zero.');
-  if (nominalLoadKw <= 0) throw new Error('nominalLoadKw must be greater than zero.');
+  if (!(kwhSelected > 0)) throw new Error('kwhSelected must be greater than zero.');
+  if (!(nominalLoadKw > 0)) throw new Error('nominalLoadKw must be greater than zero.');
   const chem = CHEMISTRY[chemistry];
   if (!chem) {
     throw new Error(
@@ -258,7 +258,7 @@ export function runtimeCurve(kwhSelected, nominalLoadKw, chemistry) {
  * @returns {{ kvaRequired: number, standardKva: number, powerFactor: number }}
  */
 export function upsKvaRequired(peakKw, upsPowerFactor = 0.9) {
-  if (peakKw <= 0) throw new Error('peakKw must be greater than zero.');
+  if (!(peakKw > 0)) throw new Error('peakKw must be greater than zero.');
   if (upsPowerFactor <= 0 || upsPowerFactor > 1) {
     throw new Error('upsPowerFactor must be in (0, 1].');
   }

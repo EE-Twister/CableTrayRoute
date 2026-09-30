@@ -1,3 +1,4 @@
+import { showModal } from './src/components/modal.js';
 import { runGeneratorSizingAnalysis, NFPA110_TYPES } from './analysis/generatorSizing.mjs';
 import { getStudies, setStudies, getLoads, getEquipment, getProjectMeta } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';

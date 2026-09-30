@@ -746,3 +746,22 @@ describe('minimizeCostConductors', () => {
     });
   });
 });
+
+describe('blank and non-numeric form input is rejected, not propagated as NaN', () => {
+  it('sizeFeeder rejects NaN load current', () => {
+    assert.throws(() => sizeFeeder({ loadAmps: NaN }), /Load current must be a number greater than zero/);
+  });
+  it('sizeFeederFromKw rejects NaN kW, power factor and voltage', () => {
+    assert.throws(() => sizeFeederFromKw({ kw: NaN, pf: 0.9, voltage: 480 }), /Load kW/);
+    assert.throws(() => sizeFeederFromKw({ kw: 50, pf: NaN, voltage: 480 }), /Power factor/);
+    assert.throws(() => sizeFeederFromKw({ kw: 50, pf: 0.9, voltage: NaN }), /Voltage/);
+  });
+  it('sizeMotorBranch rejects NaN HP', () => {
+    assert.throws(() => sizeMotorBranch({ hp: NaN, voltage: 460 }), /Motor HP/);
+  });
+  it('sizeTransformer rejects NaN kVA and voltages', () => {
+    assert.throws(() => sizeTransformer({ loadKva: NaN, primaryVoltage: 480, secondaryVoltage: 208 }), /Load kVA/);
+    assert.throws(() => sizeTransformer({ loadKva: 75, primaryVoltage: NaN, secondaryVoltage: 208 }), /Primary voltage/);
+    assert.throws(() => sizeTransformer({ loadKva: 75, primaryVoltage: 480, secondaryVoltage: NaN }), /Secondary voltage/);
+  });
+});

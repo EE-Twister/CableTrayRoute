@@ -47,7 +47,7 @@ const CAUTION_BAND = 1.0;
  * @returns {{ kvarRequired: number, tanDeltaExisting: number, tanDeltaTarget: number }}
  */
 export function requiredKvar({ pKw, pfExisting, pfTarget }) {
-  if (pKw <= 0) throw new Error('Real power pKw must be greater than zero');
+  if (!(pKw > 0)) throw new Error('Real power pKw must be greater than zero');
   if (pfExisting <= 0 || pfExisting > 1) throw new Error('pfExisting must be in (0, 1]');
   if (pfTarget <= 0 || pfTarget > 1) throw new Error('pfTarget must be in (0, 1]');
 
@@ -82,8 +82,8 @@ export function requiredKvar({ pKw, pfExisting, pfTarget }) {
  *             nearestDominant: number|null }}
  */
 export function resonanceOrder({ kvaScMva, kvarCap }) {
-  if (kvaScMva <= 0) throw new Error('kvaScMva must be greater than zero');
-  if (kvarCap <= 0) throw new Error('kvarCap must be greater than zero');
+  if (!(kvaScMva > 0)) throw new Error('kvaScMva must be greater than zero');
+  if (!(kvarCap > 0)) throw new Error('kvarCap must be greater than zero');
 
   const kvaScKva = kvaScMva * 1000;
   const hr = Math.sqrt(kvaScKva / kvarCap);

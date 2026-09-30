@@ -1,3 +1,4 @@
+import { showModal } from './src/components/modal.js';
 import {
   runVoltageFlickerStudy,
   PST_LIMIT,

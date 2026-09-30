@@ -37,7 +37,7 @@ export const ICNIRP_LIMITS = {
  * @returns {number} Magnetic flux density in µT
  */
 export function fieldFromSingleConductor(currentA, distanceM) {
-  if (distanceM <= 0) throw new Error('Distance must be positive');
+  if (!(distanceM > 0)) throw new Error('Distance must be positive');
   // Convert T → µT (× 1e6)
   return (MU0 / (2 * Math.PI)) * (Math.abs(currentA) / distanceM) * 1e6;
 }

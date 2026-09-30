@@ -72,7 +72,7 @@ export const DIESEL_SFC_LB_PER_HP_HR = 0.38; // Typical for 75% load, 4-stroke d
  * @returns {{ deratedKw: number, altitudeFactor: number, note: string }}
  */
 export function derateForAltitude(ratedKw, altitudeFt, aspiration = 'naturally-aspirated') {
-  if (ratedKw <= 0) throw new Error('ratedKw must be greater than zero');
+  if (!(ratedKw > 0)) throw new Error('ratedKw must be greater than zero');
   if (altitudeFt < 0) throw new Error('altitudeFt must be ≥ 0');
 
   const excessKft = Math.max(0, (altitudeFt - 500) / 1000);
@@ -103,7 +103,7 @@ export function derateForAltitude(ratedKw, altitudeFt, aspiration = 'naturally-a
  * @returns {{ deratedKw: number, tempFactor: number, note: string }}
  */
 export function derateForTemperature(ratedKw, ambientC) {
-  if (ratedKw <= 0) throw new Error('ratedKw must be greater than zero');
+  if (!(ratedKw > 0)) throw new Error('ratedKw must be greater than zero');
 
   const excessC = Math.max(0, ambientC - 40);
   const tempFactor = Math.max(0.6, 1 - 0.01 * excessC);
@@ -143,10 +143,10 @@ export function largestMotorStepLoad({
   efficiency = 0.92,
   lrcMultiplier = 6,
 }) {
-  if (motorHp <= 0) throw new Error('motorHp must be greater than zero');
+  if (!(motorHp > 0)) throw new Error('motorHp must be greater than zero');
   if (powerFactor <= 0 || powerFactor > 1) throw new Error('powerFactor must be in (0, 1]');
   if (efficiency <= 0 || efficiency > 1) throw new Error('efficiency must be in (0, 1]');
-  if (lrcMultiplier <= 0) throw new Error('lrcMultiplier must be greater than zero');
+  if (!(lrcMultiplier > 0)) throw new Error('lrcMultiplier must be greater than zero');
 
   const runningKw = (motorHp * 0.746) / efficiency;
   const startingKva = Math.round((runningKw / powerFactor) * lrcMultiplier * 10) / 10;
@@ -177,7 +177,7 @@ export function largestMotorStepLoad({
  */
 export function estimateVoltageDip({ stepLoadKva, genKva, xdPrimePct = 25, limitPct = 35 }) {
   if (stepLoadKva < 0) throw new Error('stepLoadKva must be ≥ 0');
-  if (genKva <= 0) throw new Error('genKva must be greater than zero');
+  if (!(genKva > 0)) throw new Error('genKva must be greater than zero');
   if (xdPrimePct <= 0 || xdPrimePct >= 100) throw new Error('xdPrimePct must be in (0, 100)');
   if (limitPct <= 0 || limitPct >= 100) throw new Error('limitPct must be in (0, 100)');
 
@@ -232,9 +232,9 @@ export function continuousLoad(loads) {
  * @returns {{ runtimeHours: number, fuelRateGalPerHr: number }}
  */
 export function fuelRuntime({ loadKw, fuelCapGal, sfcLbPerHpHr = DIESEL_SFC_LB_PER_HP_HR }) {
-  if (loadKw <= 0) throw new Error('loadKw must be greater than zero');
-  if (fuelCapGal <= 0) throw new Error('fuelCapGal must be greater than zero');
-  if (sfcLbPerHpHr <= 0) throw new Error('sfcLbPerHpHr must be greater than zero');
+  if (!(loadKw > 0)) throw new Error('loadKw must be greater than zero');
+  if (!(fuelCapGal > 0)) throw new Error('fuelCapGal must be greater than zero');
+  if (!(sfcLbPerHpHr > 0)) throw new Error('sfcLbPerHpHr must be greater than zero');
 
   const DIESEL_DENSITY = 6.791; // lb/US gal
   const HP_PER_KW = 1.341;

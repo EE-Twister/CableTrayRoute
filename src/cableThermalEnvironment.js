@@ -12,6 +12,7 @@ import {
   INSTALLATION_KEYS,
 } from '../analysis/cableThermalEnvironment.mjs';
 import { getStudies, setStudies } from '../dataStore.mjs';
+import { showAlertModal } from './components/modal.js';
 import { initStudyBasisPanel } from './components/studyBasis.js';
 import { initStudyApprovalPanel } from './components/studyApproval.js';
 
@@ -79,7 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
       setStudies(studies);
       renderAll(study);
     } catch (err) {
-      alert(`Cable Thermal Environment error: ${err.message}`);
+      showAlertModal('Cable Thermal Environment', err.message);
     }
   });
 

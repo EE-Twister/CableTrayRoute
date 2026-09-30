@@ -479,8 +479,8 @@ export function calcAmpacity({
   const numerator = deltaTheta - W_d * (0.5 * T1 + n * (T2 + T3 + T4));
   const denominator = R_ac * (T1 + n * (1 + lambda1) * T2 + n * (1 + lambda1 + lambda2) * (T3 + T4));
 
-  if (denominator <= 0) throw new Error('Thermal circuit denominator ≤ 0 — check insulation thickness and installation inputs');
-  if (numerator <= 0) throw new Error('Dielectric losses exceed the temperature budget — cable voltage rating or insulation input is likely incorrect');
+  if (!(denominator > 0)) throw new Error('Thermal circuit denominator ≤ 0 — check insulation thickness and installation inputs');
+  if (!(numerator > 0)) throw new Error('Dielectric losses exceed the temperature budget — cable voltage rating or insulation input is likely incorrect');
 
   const I_base = Math.sqrt(numerator / denominator); // A (ungrouped)
 

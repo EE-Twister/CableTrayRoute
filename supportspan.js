@@ -1,3 +1,4 @@
+import { showAlertModal } from './src/components/modal.js';
 import { calcMaxSpan, NEMA_LOAD_CLASSES, CABLE_WEIGHT_LB_FT, sumCableWeights } from './analysis/supportSpan.mjs';
 import { getTrays, getCables } from './dataStore.mjs';
 

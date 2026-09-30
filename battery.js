@@ -1,3 +1,4 @@
+import { showModal } from './src/components/modal.js';
 import { runBatterySizingAnalysis } from './analysis/batterySizing.mjs';
 import { buildBatteryRackLayoutModel } from './analysis/batteryRackLayout.mjs';
 import { getStudies, setStudies, getLoads, getDesignBasis, getProjectMeta } from './dataStore.mjs';

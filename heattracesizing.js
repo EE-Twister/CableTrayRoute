@@ -1,3 +1,4 @@
+import { showModal } from './src/components/modal.js';
 import {
   HEAT_TRACE_CABLE_TYPES,
   HEAT_TRACE_COMPONENT_ALLOWANCE_TYPES,

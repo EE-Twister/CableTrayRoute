@@ -256,8 +256,8 @@ export function buildPolygonGeometry(vertices, meshSpacing, depth, rodLocations 
   if (!vertices || vertices.length < 3) {
     throw new Error('At least 3 vertices required');
   }
-  if (meshSpacing <= 0) throw new Error('meshSpacing must be positive');
-  if (depth <= 0) throw new Error('depth must be positive');
+  if (!(meshSpacing > 0)) throw new Error('meshSpacing must be positive');
+  if (!(depth > 0)) throw new Error('depth must be positive');
 
   const z = -depth; // conductor elevation (below grade)
 

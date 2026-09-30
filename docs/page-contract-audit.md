@@ -971,9 +971,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - supportspan.js:166 getCables()
+  - supportspan.js:167 getCables()
 - `traySchedule`
-  - supportspan.js:165 getTrays()
+  - supportspan.js:166 getTrays()
 
 **Detected Writes**
 - None
@@ -1004,9 +1004,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - seismicBracing.js:174 getCables()
+  - seismicBracing.js:175 getCables()
 - `traySchedule`
-  - seismicBracing.js:173 getTrays()
+  - seismicBracing.js:174 getTrays()
 
 **Detected Writes**
 - None
@@ -1104,7 +1104,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `traySchedule`
-  - clashdetect.js:17 getTrays()
+  - clashdetect.js:18 getTrays()
 
 **Detected Writes**
 - None
@@ -1137,25 +1137,25 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - designrulechecker.js:151 getCables()
+  - designrulechecker.js:152 getCables()
 - `conduitSchedule`
-  - designrulechecker.js:150 getConduits()
+  - designrulechecker.js:151 getConduits()
 - `oneLineDiagram`
   - src/crossProbe.js:139 getOneLine()
   - src/crossProbe.js:152 getOneLine()
   - src/crossProbe.js:201 getOneLine()
 - `settings.drcAcceptedFindings`
-  - designrulechecker.js:31 getDrcAcceptedFindings()
+  - designrulechecker.js:32 getDrcAcceptedFindings()
 - `settings.latestRouteResults`
-  - designrulechecker.js:157 getItem(latestRouteResults)
+  - designrulechecker.js:158 getItem(latestRouteResults)
 - `traySchedule`
-  - designrulechecker.js:149 getTrays()
+  - designrulechecker.js:150 getTrays()
 
 **Detected Writes**
 - `settings.drcAcceptedFindings`
-  - designrulechecker.js:136 setDrcAcceptedFindings()
-  - designrulechecker.js:143 setDrcAcceptedFindings()
-  - designrulechecker.js:50 setDrcAcceptedFindings()
+  - designrulechecker.js:137 setDrcAcceptedFindings()
+  - designrulechecker.js:144 setDrcAcceptedFindings()
+  - designrulechecker.js:51 setDrcAcceptedFindings()
 
 ### Design Coach (`designcoach.html`)
 
@@ -1292,9 +1292,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - windload.js:231 getCables()
+  - windload.js:232 getCables()
 - `traySchedule`
-  - windload.js:230 getTrays()
+  - windload.js:231 getTrays()
 
 **Detected Writes**
 - None
@@ -2038,19 +2038,19 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
-  - capacitorbank.js:18 getStudies()
-  - capacitorbank.js:38 getStudies()
+  - capacitorbank.js:19 getStudies()
+  - capacitorbank.js:39 getStudies()
 - `studyResults.capacitorBank`
-  - capacitorbank.js:18 getStudies().capacitorBank
+  - capacitorbank.js:19 getStudies().capacitorBank
 
 **Detected Writes**
 - `settings.studyApprovals`
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
-  - capacitorbank.js:40 setStudies()
+  - capacitorbank.js:41 setStudies()
 - `studyResults.capacitorBank`
-  - capacitorbank.js:39 studies.capacitorBank
+  - capacitorbank.js:40 studies.capacitorBank
 
 ### Frequency Scan (`frequencyscan.html`)
 
@@ -2239,28 +2239,28 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `equipment`
-  - generatorsizing.js:36 getEquipment()
+  - generatorsizing.js:37 getEquipment()
 - `loadList`
-  - generatorsizing.js:35 getLoads()
+  - generatorsizing.js:36 getLoads()
 - `settings.projectMeta`
-  - generatorsizing.js:38 getProjectMeta()
+  - generatorsizing.js:39 getProjectMeta()
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
-  - generatorsizing.js:134 getStudies()
-  - generatorsizing.js:37 getStudies()
-  - generatorsizing.js:81 getStudies()
+  - generatorsizing.js:135 getStudies()
+  - generatorsizing.js:38 getStudies()
+  - generatorsizing.js:82 getStudies()
 - `studyResults.generatorSizing`
-  - generatorsizing.js:81 getStudies().generatorSizing
+  - generatorsizing.js:82 getStudies().generatorSizing
 
 **Detected Writes**
 - `settings.studyApprovals`
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
-  - generatorsizing.js:136 setStudies()
+  - generatorsizing.js:137 setStudies()
 - `studyResults.generatorSizing`
-  - generatorsizing.js:135 studies.generatorSizing
+  - generatorsizing.js:136 studies.generatorSizing
 
 ### IBR Modeling (PV/BESS) (`ibr.html`)
 
@@ -2291,46 +2291,46 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
-  - ibr.js:170 getStudies()
-  - ibr.js:246 getStudies()
-  - ibr.js:28 getStudies()
-  - ibr.js:320 getStudies()
-  - ibr.js:454 getStudies()
+  - ibr.js:171 getStudies()
+  - ibr.js:247 getStudies()
+  - ibr.js:29 getStudies()
+  - ibr.js:321 getStudies()
+  - ibr.js:455 getStudies()
   - ... 1 more
 - `studyResults.bessResult`
-  - ibr.js:466 studies.bessResult
   - ibr.js:467 studies.bessResult
+  - ibr.js:468 studies.bessResult
 - `studyResults.faultResult`
-  - ibr.js:473 studies.faultResult
   - ibr.js:474 studies.faultResult
+  - ibr.js:475 studies.faultResult
 - `studyResults.ibr`
-  - ibr.js:171 studies.ibr
   - ibr.js:172 studies.ibr
   - ibr.js:173 studies.ibr
-  - ibr.js:247 studies.ibr
+  - ibr.js:174 studies.ibr
   - ibr.js:248 studies.ibr
+  - ibr.js:249 studies.ibr
   - ... 9 more
 - `studyResults.pvResult`
-  - ibr.js:457 studies.pvResult
   - ibr.js:458 studies.pvResult
+  - ibr.js:459 studies.pvResult
 - `studyResults.voltVarResult`
-  - ibr.js:480 studies.voltVarResult
   - ibr.js:481 studies.voltVarResult
+  - ibr.js:482 studies.voltVarResult
 
 **Detected Writes**
 - `settings.studyApprovals`
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
-  - ibr.js:174 setStudies()
-  - ibr.js:250 setStudies()
-  - ibr.js:324 setStudies()
-  - ibr.js:83 setStudies()
+  - ibr.js:175 setStudies()
+  - ibr.js:251 setStudies()
+  - ibr.js:325 setStudies()
+  - ibr.js:84 setStudies()
 - `studyResults.ibr`
-  - ibr.js:171 studies.ibr
-  - ibr.js:247 studies.ibr
-  - ibr.js:321 studies.ibr
-  - ibr.js:80 studies.ibr
+  - ibr.js:172 studies.ibr
+  - ibr.js:248 studies.ibr
+  - ibr.js:322 studies.ibr
+  - ibr.js:81 studies.ibr
 
 ### DER Interconnection (`derinterconnect.html`)
 
@@ -2361,24 +2361,24 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
-  - derinterconnect.js:29 getStudies()
-  - derinterconnect.js:293 getStudies()
-  - derinterconnect.js:315 getStudies()
-  - derinterconnect.js:89 getStudies()
+  - derinterconnect.js:294 getStudies()
+  - derinterconnect.js:30 getStudies()
+  - derinterconnect.js:316 getStudies()
+  - derinterconnect.js:90 getStudies()
 - `studyResults.derInterconnect`
-  - derinterconnect.js:29 getStudies().derInterconnect
-  - derinterconnect.js:315 getStudies().derInterconnect
+  - derinterconnect.js:30 getStudies().derInterconnect
+  - derinterconnect.js:316 getStudies().derInterconnect
 - `studyResults.ibr`
-  - derinterconnect.js:293 getStudies().ibr
+  - derinterconnect.js:294 getStudies().ibr
 
 **Detected Writes**
 - `settings.studyApprovals`
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
-  - derinterconnect.js:91 setStudies()
+  - derinterconnect.js:92 setStudies()
 - `studyResults.derInterconnect`
-  - derinterconnect.js:90 studies.derInterconnect
+  - derinterconnect.js:91 studies.derInterconnect
 
 ### Motor Start (`motorStart.html`)
 
@@ -2805,19 +2805,19 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
-  - dcshortcircuit.js:34 getStudies()
-  - dcshortcircuit.js:80 getStudies()
+  - dcshortcircuit.js:35 getStudies()
+  - dcshortcircuit.js:81 getStudies()
 - `studyResults.dcShortCircuit`
-  - dcshortcircuit.js:34 getStudies().dcShortCircuit
+  - dcshortcircuit.js:35 getStudies().dcShortCircuit
 
 **Detected Writes**
 - `settings.studyApprovals`
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
-  - dcshortcircuit.js:82 setStudies()
+  - dcshortcircuit.js:83 setStudies()
 - `studyResults.dcShortCircuit`
-  - dcshortcircuit.js:81 studies.dcShortCircuit
+  - dcshortcircuit.js:82 studies.dcShortCircuit
 
 ### Differential Protection (87) (`differentialprotection.html`)
 
@@ -2848,21 +2848,21 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
-  - differentialprotection.js:23 getStudies()
-  - differentialprotection.js:51 getStudies()
-  - differentialprotection.js:60 getStudies()
+  - differentialprotection.js:24 getStudies()
+  - differentialprotection.js:52 getStudies()
+  - differentialprotection.js:61 getStudies()
 - `studyResults.differentialProtection`
-  - differentialprotection.js:23 getStudies().differentialProtection
-  - differentialprotection.js:60 getStudies().differentialProtection
+  - differentialprotection.js:24 getStudies().differentialProtection
+  - differentialprotection.js:61 getStudies().differentialProtection
 
 **Detected Writes**
 - `settings.studyApprovals`
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
-  - differentialprotection.js:53 setStudies()
+  - differentialprotection.js:54 setStudies()
 - `studyResults.differentialProtection`
-  - differentialprotection.js:52 studies.differentialProtection
+  - differentialprotection.js:53 studies.differentialProtection
 
 ### Equipment Evaluation (`equipmentevaluation.html`)
 
@@ -3024,35 +3024,35 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - insulationcoordination.js:69 getCables()
+  - insulationcoordination.js:70 getCables()
 - `equipment`
-  - insulationcoordination.js:69 getEquipment()
+  - insulationcoordination.js:70 getEquipment()
 - `loadList`
-  - insulationcoordination.js:69 getLoads()
+  - insulationcoordination.js:70 getLoads()
 - `settings.designBasis`
   - src/components/studyBasis.js:37 getDesignBasis()
 - `settings.projectMeta`
-  - insulationcoordination.js:104 getProjectMeta()
-  - insulationcoordination.js:76 getProjectMeta()
+  - insulationcoordination.js:105 getProjectMeta()
+  - insulationcoordination.js:77 getProjectMeta()
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
-  - insulationcoordination.js:100 getStudies()
-  - insulationcoordination.js:144 getStudies()
-  - insulationcoordination.js:69 getStudies()
-  - insulationcoordination.js:71 getStudies()
+  - insulationcoordination.js:101 getStudies()
+  - insulationcoordination.js:145 getStudies()
+  - insulationcoordination.js:70 getStudies()
+  - insulationcoordination.js:72 getStudies()
 - `studyResults.insulationCoordination`
-  - insulationcoordination.js:100 getStudies().insulationCoordination
-  - insulationcoordination.js:71 getStudies().insulationCoordination
+  - insulationcoordination.js:101 getStudies().insulationCoordination
+  - insulationcoordination.js:72 getStudies().insulationCoordination
 
 **Detected Writes**
 - `settings.studyApprovals`
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
-  - insulationcoordination.js:146 setStudies()
+  - insulationcoordination.js:147 setStudies()
 - `studyResults.insulationCoordination`
-  - insulationcoordination.js:145 studies.insulationCoordination
+  - insulationcoordination.js:146 studies.insulationCoordination
 
 ### Egress Lighting (`lighting.html`)
 
@@ -3157,24 +3157,24 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `settings.studyApprovals`
-  - cathodicprotection.js:1435 getStudyApprovals()
-  - cathodicprotection.js:1664 getStudyApprovals()
-  - cathodicprotection.js:1865 getStudyApprovals()
-  - cathodicprotection.js:907 getStudyApprovals()
+  - cathodicprotection.js:1436 getStudyApprovals()
+  - cathodicprotection.js:1665 getStudyApprovals()
+  - cathodicprotection.js:1866 getStudyApprovals()
+  - cathodicprotection.js:908 getStudyApprovals()
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
-  - cathodicprotection.js:1292 getStudies()
-  - cathodicprotection.js:1427 getStudies()
-  - cathodicprotection.js:1518 getStudies()
-  - cathodicprotection.js:1538 getStudies()
-  - cathodicprotection.js:1573 getStudies()
+  - cathodicprotection.js:1293 getStudies()
+  - cathodicprotection.js:1428 getStudies()
+  - cathodicprotection.js:1519 getStudies()
+  - cathodicprotection.js:1539 getStudies()
+  - cathodicprotection.js:1574 getStudies()
   - ... 9 more
 - `studyResults.cathodicProtection`
-  - cathodicprotection.js:1292 getStudies().cathodicProtection
-  - cathodicprotection.js:1428 studies.cathodicProtection
-  - cathodicprotection.js:1463 studies.cathodicProtection
-  - cathodicprotection.js:1495 studies.cathodicProtection
-  - cathodicprotection.js:1497 studies.cathodicProtection
+  - cathodicprotection.js:1293 getStudies().cathodicProtection
+  - cathodicprotection.js:1429 studies.cathodicProtection
+  - cathodicprotection.js:1464 studies.cathodicProtection
+  - cathodicprotection.js:1496 studies.cathodicProtection
+  - cathodicprotection.js:1498 studies.cathodicProtection
   - ... 37 more
 
 **Detected Writes**
@@ -3182,18 +3182,18 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
-  - cathodicprotection.js:1462 setStudies()
-  - cathodicprotection.js:1494 setStudies()
-  - cathodicprotection.js:1549 setStudies()
-  - cathodicprotection.js:1679 setStudies()
-  - cathodicprotection.js:838 setStudies()
+  - cathodicprotection.js:1463 setStudies()
+  - cathodicprotection.js:1495 setStudies()
+  - cathodicprotection.js:1550 setStudies()
+  - cathodicprotection.js:1680 setStudies()
+  - cathodicprotection.js:839 setStudies()
   - ... 4 more
 - `studyResults.cathodicProtection`
-  - cathodicprotection.js:1456 studies.cathodicProtection
-  - cathodicprotection.js:1488 studies.cathodicProtection
-  - cathodicprotection.js:1543 studies.cathodicProtection
-  - cathodicprotection.js:1666 studies.cathodicProtection
-  - cathodicprotection.js:832 studies.cathodicProtection
+  - cathodicprotection.js:1457 studies.cathodicProtection
+  - cathodicprotection.js:1489 studies.cathodicProtection
+  - cathodicprotection.js:1544 studies.cathodicProtection
+  - cathodicprotection.js:1667 studies.cathodicProtection
+  - cathodicprotection.js:833 studies.cathodicProtection
   - ... 4 more
 
 ### Dissimilar Metals (`dissimilarmetals.html`)
@@ -3222,19 +3222,19 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `studyResults`
-  - dissimilarmetals.js:115 getStudies()
-  - dissimilarmetals.js:67 getStudies()
-  - dissimilarmetals.js:96 getStudies()
+  - dissimilarmetals.js:116 getStudies()
+  - dissimilarmetals.js:68 getStudies()
+  - dissimilarmetals.js:97 getStudies()
 - `studyResults.dissimilarMetals`
-  - dissimilarmetals.js:67 getStudies().dissimilarMetals
+  - dissimilarmetals.js:68 getStudies().dissimilarMetals
 
 **Detected Writes**
 - `studyResults`
-  - dissimilarmetals.js:117 setStudies()
-  - dissimilarmetals.js:98 setStudies()
+  - dissimilarmetals.js:118 setStudies()
+  - dissimilarmetals.js:99 setStudies()
 - `studyResults.dissimilarMetals`
-  - dissimilarmetals.js:116 studies.dissimilarMetals
-  - dissimilarmetals.js:97 studies.dissimilarMetals
+  - dissimilarmetals.js:117 studies.dissimilarMetals
+  - dissimilarmetals.js:98 studies.dissimilarMetals
 
 ### Auto-Size (`autosize.html`)
 
@@ -3296,26 +3296,26 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.designBasis`
   - src/components/studyBasis.js:37 getDesignBasis()
 - `settings.studyApprovals`
-  - heattracesizing.js:2166 getStudyApprovals()
+  - heattracesizing.js:2167 getStudyApprovals()
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `settings.trayHardwareCatalogCustomProducts`
-  - heattracesizing.js:2259 getTrayHardwareCatalogCustomProducts()
+  - heattracesizing.js:2260 getTrayHardwareCatalogCustomProducts()
 - `studyResults`
-  - heattracesizing.js:1794 getStudies()
-  - heattracesizing.js:1833 getStudies()
-  - heattracesizing.js:184 getStudies()
-  - heattracesizing.js:2049 getStudies()
-  - heattracesizing.js:210 getStudies()
+  - heattracesizing.js:100 getStudies()
+  - heattracesizing.js:1795 getStudies()
+  - heattracesizing.js:1834 getStudies()
+  - heattracesizing.js:185 getStudies()
+  - heattracesizing.js:2050 getStudies()
   - ... 7 more
 - `studyResults.heatTraceSizing`
-  - heattracesizing.js:1794 getStudies().heatTraceSizing
-  - heattracesizing.js:1833 getStudies().heatTraceSizing
-  - heattracesizing.js:184 getStudies().heatTraceSizing
-  - heattracesizing.js:210 getStudies().heatTraceSizing
-  - heattracesizing.js:2154 getStudies().heatTraceSizing
+  - heattracesizing.js:1795 getStudies().heatTraceSizing
+  - heattracesizing.js:1834 getStudies().heatTraceSizing
+  - heattracesizing.js:185 getStudies().heatTraceSizing
+  - heattracesizing.js:211 getStudies().heatTraceSizing
+  - heattracesizing.js:2155 getStudies().heatTraceSizing
   - ... 3 more
 - `studyResults.heatTraceSizingCircuits`
-  - heattracesizing.js:98 getStudies().heatTraceSizingCircuits
+  - heattracesizing.js:100 getStudies().heatTraceSizingCircuits
   - heattracesizing.js:99 getStudies().heatTraceSizingCircuits
 
 **Detected Writes**
@@ -3323,12 +3323,12 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
-  - heattracesizing.js:2051 setStudies()
-  - heattracesizing.js:249 setStudies()
+  - heattracesizing.js:2052 setStudies()
+  - heattracesizing.js:250 setStudies()
 - `studyResults.heatTraceSizing`
-  - heattracesizing.js:245 studies.heatTraceSizing
+  - heattracesizing.js:246 studies.heatTraceSizing
 - `studyResults.heatTraceSizingCircuits`
-  - heattracesizing.js:2050 studies.heatTraceSizingCircuits
+  - heattracesizing.js:2051 studies.heatTraceSizingCircuits
 
 ### Reliability (`reliability.html`)
 

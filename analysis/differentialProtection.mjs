@@ -69,9 +69,9 @@ export const ZONE_TYPES = {
  * @returns {{ nominalTap: number, mismatchPct: number, acceptable: boolean }}
  */
 export function ctRatioMismatch(ct1Ratio, ct2Ratio, tapSetting) {
-  if (ct1Ratio <= 0) throw new Error('ct1Ratio must be greater than zero.');
-  if (ct2Ratio <= 0) throw new Error('ct2Ratio must be greater than zero.');
-  if (tapSetting <= 0) throw new Error('tapSetting must be greater than zero.');
+  if (!(ct1Ratio > 0)) throw new Error('ct1Ratio must be greater than zero.');
+  if (!(ct2Ratio > 0)) throw new Error('ct2Ratio must be greater than zero.');
+  if (!(tapSetting > 0)) throw new Error('tapSetting must be greater than zero.');
 
   const nominalTap = ct1Ratio / ct2Ratio;
   const mismatchPct = Math.abs(tapSetting - nominalTap) / nominalTap * 100;
@@ -96,8 +96,8 @@ export function ctRatioMismatch(ct1Ratio, ct2Ratio, tapSetting) {
 export function dualSlopeCharacteristic(slope1, slope2, minPickupPu, breakpointPu) {
   if (slope1 <= 0 || slope1 >= 1) throw new Error('slope1 must be between 0 and 1 (exclusive).');
   if (slope2 <= slope1) throw new Error('slope2 must be greater than slope1.');
-  if (minPickupPu <= 0) throw new Error('minPickupPu must be greater than zero.');
-  if (breakpointPu <= 0) throw new Error('breakpointPu must be greater than zero.');
+  if (!(minPickupPu > 0)) throw new Error('minPickupPu must be greater than zero.');
+  if (!(breakpointPu > 0)) throw new Error('breakpointPu must be greater than zero.');
 
   // Pivot I_rst at breakpoint: threshold there is max(minPickup, slope1×breakpoint)
   const thresholdAtBreak = Math.max(minPickupPu, slope1 * breakpointPu);
@@ -142,10 +142,10 @@ export function dualSlopeCharacteristic(slope1, slope2, minPickupPu, breakpointP
  * @returns {{ i1Pu: number, i2Pu: number, iOp: number, iRst: number }}
  */
 export function calcOperatingRestraintCurrents(ia, ib, ct1Ratio, ct2Ratio, tapSetting, ctSecondary = 5) {
-  if (ct1Ratio <= 0) throw new Error('ct1Ratio must be greater than zero.');
-  if (ct2Ratio <= 0) throw new Error('ct2Ratio must be greater than zero.');
-  if (tapSetting <= 0) throw new Error('tapSetting must be greater than zero.');
-  if (ctSecondary <= 0) throw new Error('ctSecondary must be greater than zero.');
+  if (!(ct1Ratio > 0)) throw new Error('ct1Ratio must be greater than zero.');
+  if (!(ct2Ratio > 0)) throw new Error('ct2Ratio must be greater than zero.');
+  if (!(tapSetting > 0)) throw new Error('tapSetting must be greater than zero.');
+  if (!(ctSecondary > 0)) throw new Error('ctSecondary must be greater than zero.');
 
   // Convert to CT secondary amperes, then to per-unit of tap
   const i1Sec = ia / (ct1Ratio / ctSecondary);
@@ -312,8 +312,8 @@ export function runDifferentialStudy(params) {
   }
   if (slope1 <= 0 || slope1 >= 1) throw new Error('slope1 must be between 0 and 1 (exclusive).');
   if (slope2 <= slope1) throw new Error('slope2 must be greater than slope1.');
-  if (minPickupPu <= 0) throw new Error('minPickupPu must be greater than zero.');
-  if (breakpointPu <= 0) throw new Error('breakpointPu must be greater than zero.');
+  if (!(minPickupPu > 0)) throw new Error('minPickupPu must be greater than zero.');
+  if (!(breakpointPu > 0)) throw new Error('breakpointPu must be greater than zero.');
 
   const warnings = [];
 
