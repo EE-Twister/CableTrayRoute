@@ -273,8 +273,8 @@ After saving branch `HT-A101`, `Export Package (.xlsx)` downloads a workbook nam
 
 **Expected outputs/ranges:**
 
-- B_rms displays approximately **1.771 µT**
-- B_peak displays approximately **2.504 µT**
+- B_rms displays approximately **0.589 µT**
+- B_peak displays approximately **0.833 µT**
 - ICNIRP Occupational: PASS
 - ICNIRP General Public: PASS
 
@@ -282,14 +282,14 @@ After saving branch `HT-A101`, `Export Package (.xlsx)` downloads a workbook nam
 
 Using same geometry and frequency as EMF-Normal-01, vary only current.
 
-- At **~11,292 A** current, expected B_rms is near **200 µT** (boundary band)
-- At **11,500 A**, expected General Public = FAIL, Occupational = PASS
+- At **~33,957 A** current, expected B_rms is near **200 µT** (boundary band)
+- At **34,500 A**, expected General Public = FAIL, Occupational = PASS
 
 ### EMF-Boundary-02 (occupational threshold crossing)
 
 Using same geometry and frequency:
 
-- At **~56,461 A**, expected B_rms is near **1000 µT** (boundary band)
+- At **~169,785 A**, expected B_rms is near **1000 µT** (boundary band)
 - Above this, both Occupational and General Public should be FAIL
 
 ### EMF-Invalid-01 (zero current)

@@ -57,13 +57,13 @@ export const EMF_CANONICAL_FIXTURE = {
     measDistance: '36',
   },
   boundaryCurrents: {
-    nearGeneralPublicBoundary: '11292',
-    overGeneralPublicBoundary: '11500',
-    nearOccupationalBoundary: '56461',
+    nearGeneralPublicBoundary: '33957',
+    overGeneralPublicBoundary: '34500',
+    nearOccupationalBoundary: '169785',
   },
   expected: {
-    normalBrmsMicroTesla: 1.771,
-    normalBpeakMicroTesla: 2.504,
+    normalBrmsMicroTesla: 0.589,
+    normalBpeakMicroTesla: 0.833,
   },
   tolerances: {
     brmsLowCurrentAbs: 0.02,
