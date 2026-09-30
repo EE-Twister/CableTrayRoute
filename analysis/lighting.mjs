@@ -67,6 +67,8 @@ export const GENERIC_CU_TABLE = Object.freeze([
 export const NFPA_EGRESS_AVG_FC  = 1.0;
 /** NFPA 101-2021 §7.9.2.1 — minimum illuminance threshold on egress path. */
 export const NFPA_EGRESS_MIN_FC  = 0.1;
+/** NFPA 101-2021 §7.9.2.1 — maximum-to-minimum illuminance ratio on the egress path. */
+export const NFPA_EGRESS_MAX_MIN_RATIO = 40;
 export const MAX_LIGHTING_FIXTURE_LAYOUT_COUNT = 1000;
 
 // ---------------------------------------------------------------------------
@@ -158,8 +160,14 @@ export function parseIES(text) {
     candelaSets.push(row);
   }
 
+  // lumens/lamp = -1 marks absolute photometry (LED luminaires): the candela values are already
+  // absolute, so the output is found by integrating the intensity over the sphere.
+  const totalLumens = lumensPerLamp > 0
+    ? numLamps * lumensPerLamp * ballastFactor
+    : luminousFluxFromCandela(vertAngles, candelaSets);
+
   return {
-    totalLumens: numLamps * lumensPerLamp * ballastFactor,
+    totalLumens,
     numLamps,
     lumensPerLamp,
     ballastFactor,
@@ -169,6 +177,28 @@ export function parseIES(text) {
     horizAngles,
     candelaSets,
   };
+}
+
+/**
+ * Luminous flux (lm) from candela data by zonal integration:
+ *   Φ = Σ I_avg(zone) × 2π (cos θ₁ − cos θ₂)
+ * with I averaged over the horizontal planes (and the zone end points). Only the
+ * angles present in the file contribute, so a file covering 0–90° gives the downward flux.
+ *
+ * @param {number[]} vertAngles
+ * @param {Float32Array[]} candelaSets  One candela array per horizontal angle
+ * @returns {number}
+ */
+export function luminousFluxFromCandela(vertAngles, candelaSets) {
+  if (!Array.isArray(vertAngles) || vertAngles.length < 2 || !candelaSets?.length) return 0;
+  const avgAt = i => candelaSets.reduce((sum, set) => sum + set[i], 0) / candelaSets.length;
+  let flux = 0;
+  for (let i = 0; i + 1 < vertAngles.length; i++) {
+    const t1 = vertAngles[i] * Math.PI / 180;
+    const t2 = vertAngles[i + 1] * Math.PI / 180;
+    flux += ((avgAt(i) + avgAt(i + 1)) / 2) * 2 * Math.PI * (Math.cos(t1) - Math.cos(t2));
+  }
+  return flux;
 }
 
 // ---------------------------------------------------------------------------
@@ -419,7 +449,7 @@ export function pointIlluminanceGrid(
  * @returns {{ pass: boolean, avgFc: number, minFc: number|null,
  *             avgThresholdFc: number, minThresholdFc: number, violations: string[] }}
  */
-export function egressComplianceCheck({ avgFc, minFc = null } = {}) {
+export function egressComplianceCheck({ avgFc, minFc = null, maxFc = null } = {}) {
   const violations = [];
 
   if (avgFc < NFPA_EGRESS_AVG_FC) {
@@ -432,6 +462,13 @@ export function egressComplianceCheck({ avgFc, minFc = null } = {}) {
     violations.push(
       `Minimum illuminance ${minFc.toFixed(2)} fc is below the NFPA 101 §7.9.2.1 ` +
       `minimum of ${NFPA_EGRESS_MIN_FC} fc`,
+    );
+  }
+
+  // NFPA 101 §7.9.2.1: maximum-to-minimum illuminance ratio must not exceed 40:1
+  if (minFc !== null && maxFc !== null && minFc > 0 && maxFc / minFc > NFPA_EGRESS_MAX_MIN_RATIO) {
+    violations.push(
+      `Maximum-to-minimum illuminance ratio ${(maxFc / minFc).toFixed(1)}:1 exceeds the NFPA 101 §7.9.2.1 limit of ${NFPA_EGRESS_MAX_MIN_RATIO}:1`,
     );
   }
 
@@ -466,12 +503,12 @@ function _validateInput(input) {
   if (isFinite(input.numFixtures)     && input.numFixtures      < 1) errors.push('Number of fixtures must be ≥ 1');
   if (isFinite(input.lumensPerFixture) && input.lumensPerFixture <= 0) errors.push('Lumens per fixture must be > 0');
 
-  const wph = input.workplaneHeightFt ?? 2.5;
+  const wph = Number.isFinite(input.workplaneHeightFt) ? input.workplaneHeightFt : 2.5;
   if (isFinite(input.mountingHeightFt) && isFinite(wph) && input.mountingHeightFt <= wph) {
     errors.push('Mounting height must be above the workplane height');
   }
 
-  const llf = input.llf ?? 0.80;
+  const llf = Number.isFinite(input.llf) ? input.llf : 0.80;
   if (isFinite(llf) && (llf <= 0 || llf > 1)) errors.push('LLF must be in range (0, 1]');
 
   return errors;
@@ -506,16 +543,18 @@ export function runLightingStudy(input) {
     roomLengthFt,
     roomWidthFt,
     mountingHeightFt,
-    workplaneHeightFt = 2.5,
     numFixtures,
     lumensPerFixture,
-    llf            = 0.80,
-    ceilingReflPct = 80,
-    wallReflPct    = 70,
     fixturePositions = null,
     vertAngles       = null,
     candelas         = null,
   } = input;
+  // Blank form fields arrive as NaN; fall back to the documented defaults.
+  const num = (v, fallback) => (Number.isFinite(v) ? v : fallback);
+  const workplaneHeightFt = num(input.workplaneHeightFt, 2.5);
+  const llf            = num(input.llf, 0.80);
+  const ceilingReflPct = num(input.ceilingReflPct, 80);
+  const wallReflPct    = num(input.wallReflPct, 70);
 
   const roomAreaSqFt = roomLengthFt * roomWidthFt;
   const rcr = roomCavityRatio(roomLengthFt, roomWidthFt, mountingHeightFt, workplaneHeightFt);
@@ -538,10 +577,17 @@ export function runLightingStudy(input) {
   // Point-by-point (optional — requires fixture positions and candela data)
   let pointGrid = null;
   if (fixturePositions && fixturePositions.length > 0 && vertAngles && candelas) {
+    // The cosine-cube method needs the fixture height above the workplane, not above the floor.
     pointGrid = pointIlluminanceGrid(
-      fixturePositions, mountingHeightFt, vertAngles, candelas,
+      fixturePositions, mountingHeightFt - workplaneHeightFt, vertAngles, candelas,
       roomLengthFt, roomWidthFt,
     );
+    if (fixturePositions.length !== Math.round(numFixtures)) {
+      warnings.push(
+        `The point-by-point grid uses ${fixturePositions.length} fixture position(s) but the lumen method uses ${numFixtures} fixture(s); ` +
+        'make the two agree before comparing results.',
+      );
+    }
   } else {
     warnings.push(
       'Point-by-point grid not computed — no fixture positions or IES photometric data provided. ' +
@@ -551,11 +597,13 @@ export function runLightingStudy(input) {
 
   // Egress check — use point grid if available, else avg only
   const egressInput = pointGrid
-    ? { avgFc: pointGrid.avgFc, minFc: pointGrid.minFc }
+    ? { avgFc: pointGrid.avgFc, minFc: pointGrid.minFc, maxFc: pointGrid.maxFc }
     : { avgFc };
   const egressCheck = egressComplianceCheck(egressInput);
 
   if (llf < 0.70) warnings.push('Light loss factor below 0.70 — verify maintenance schedule and cleaning interval.');
+  if (rcr > 10) warnings.push(`Room cavity ratio ${rcr.toFixed(1)} is beyond the CU table (0–10); the CU for RCR 10 is used and overstates the light in a tall, narrow space.`);
+  if (workplaneHeightFt > 0.5) warnings.push('NFPA 101 egress illuminance is measured at the floor; set the workplane height to 0 ft when using this result for an egress check.');
   if (cu < 0.50) warnings.push('CU below 0.50 — consider increasing fixture height or room reflectances.');
 
   return {

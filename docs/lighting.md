@@ -52,7 +52,7 @@ E = I(θ) × cos(θ) / D²   [fc]
 where:
 - I(θ) = candela value at vertical angle θ (linearly interpolated from IES table)
 - θ = angle from nadir (straight down)
-- D = slant distance from fixture to point = √(H² + d²)
+- H = fixture mounting height **above the workplane** (mounting height AFF − workplane height); D = slant distance from fixture to point = √(H² + d²)
 - cos(θ) = H / D
 
 ## NFPA 101 Egress Requirements
@@ -61,7 +61,13 @@ Per NFPA 101-2021 §7.9.2.1, emergency egress lighting must provide:
 - **Average** illuminance ≥ **1.0 fc** (10.8 lux) along the path of egress
 - **Minimum** illuminance ≥ **0.1 fc** (1.1 lux) at any point on the path
 
-The minimum check requires a point-by-point grid (IES file + fixture positions).
+- **Uniformity**: the maximum-to-minimum illuminance ratio must not exceed **40:1** (checked when a point-by-point grid is available).
+
+The minimum and uniformity checks require a point-by-point grid (IES file + fixture positions). Egress illuminance is measured at the floor, so set the workplane height to 0 ft for an egress check; the study warns when it is raised. The point-by-point grid uses initial candela values (no light loss factor) and direct light only.
+
+## IES files with absolute photometry
+
+LED luminaire files often give lumens per lamp as -1 (absolute photometry). The loaded luminaire output is then found by integrating the candela data over the angles in the file (zonal method), so the lumens-per-luminaire field is filled in correctly.
 
 ## Sample Layout Preview
 
