@@ -7,6 +7,7 @@ import { getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { csvCell } from './utils/csv.mjs';
 import { downloadLightningProtectionPdf } from './src/lightningProtectionPdf.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1262,10 +1263,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!bom?.ready) return '';
     const imperial = unitSystem === 'imperial';
     const csvLengthUnit = imperial ? 'ft' : 'm';
-    const csvCell = value => {
-      const text = String(value ?? '');
-      return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
-    };
     const lines = [
       ['# Lightning Protection Preliminary BOM'],
       ['Display unit system', imperial ? 'imperial' : 'metric'],

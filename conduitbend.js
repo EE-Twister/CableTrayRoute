@@ -9,6 +9,7 @@ import { sizePullBox, STANDARD_BOX_SIZES, parseTradeSizeList } from './analysis/
 import { getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { csvCell } from './utils/csv.mjs';
 import { renderIsometricSvg } from './src/utils/isometricSvg.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -640,7 +641,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csv = rows.map(r => r.map(csvCell).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
     const a    = Object.assign(document.createElement('a'), { href: url, download: 'conduit-bend-schedule.csv' });

@@ -15,6 +15,7 @@ import {
 import { getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { csvCell } from './utils/csv.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -1261,10 +1262,6 @@ document.addEventListener('DOMContentLoaded', () => {
     mapLegendEl.innerHTML = `
       <div class="haz-map-legend-items">${legendItems}</div>
       ${warnings ? `<ul class="compact-list haz-map-warning-list">${warnings}</ul>` : ''}`;
-  }
-
-  function csvCell(value) {
-    return `"${String(value ?? '').replace(/"/g, '""')}"`;
   }
 
   function exportCsv() {

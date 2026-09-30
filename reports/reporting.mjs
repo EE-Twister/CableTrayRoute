@@ -1,3 +1,5 @@
+import { csvCell } from '../utils/csv.mjs';
+
 let jsPdfPromise = null;
 const dynamicImport = specifier => Function('s', 'return import(s);')(specifier);
 
@@ -46,22 +48,7 @@ async function ensureJsPDF() {
  * @param {Array<Object>} rows
  * @returns {string}
  */
-const PLAIN_NUMBER = /^\s*[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?\s*$/i;
-
-function sanitizeCsvCell(value) {
-  const raw = value ?? '';
-  let cell = String(raw);
-  // Neutralise spreadsheet formulas (=, +, -, @, tab, CR) but leave plain numbers such as
-  // "-5" alone: a negative value stored as text must not gain a stray apostrophe.
-  if (typeof raw === 'string' && /^[\s]*[=+\-@\t\r]/.test(cell) && !PLAIN_NUMBER.test(cell)) {
-    cell = `'${cell}`;
-  }
-  // Quote anything containing a separator, a quote or a line break, or the row splits.
-  if (/[",\r\n]/.test(cell)) {
-    cell = '"' + cell.replace(/"/g, '""') + '"';
-  }
-  return cell;
-}
+const sanitizeCsvCell = csvCell;
 
 export function toCSV(headers = [], rows = []) {
   const lines = [headers.map(h => sanitizeCsvCell(h)).join(',')];

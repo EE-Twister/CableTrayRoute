@@ -1,3 +1,5 @@
+import { csvCell } from '../utils/csv.mjs';
+
 /**
  * Read-only switching-procedure planning helpers.
  *
@@ -117,11 +119,6 @@ export function validateSwitchingProcedure(procedure = {}) {
     }
   });
   return { procedure: normalized, issues, ready: !issues.some(issue => issue.severity === 'error') };
-}
-
-function csvCell(value) {
-  const cell = String(value ?? '');
-  return /[",\r\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell;
 }
 
 export function exportSwitchingProcedureCsv(procedure = {}) {
