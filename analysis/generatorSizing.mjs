@@ -158,6 +158,23 @@ export function largestMotorStepLoad({
 }
 
 /**
+ * Generator nameplate kW needed for the largest motor start to stay within the
+ * project voltage-dip limit. Inverting  dip% = (startKva / genKva) * X'd%  gives
+ *
+ *   genKva >= startKva * X'd% / limit%
+ *
+ * expressed as kW at the 0.80 pf nameplate rating. Unlike
+ * largestMotorStepLoad().recommendedGenKw, which sizes the set to carry 100% of
+ * the starting kVA, this responds to the X'd and dip-limit inputs.
+ */
+export function stepLoadGeneratorKw({ startingKva, xdPrimePct = 25, limitPct = 35 }) {
+  if (!(startingKva >= 0)) throw new Error('startingKva must be ≥ 0');
+  if (!(xdPrimePct > 0 && xdPrimePct < 100)) throw new Error('xdPrimePct must be in (0, 100)');
+  if (!(limitPct > 0 && limitPct < 100)) throw new Error('limitPct must be in (0, 100)');
+  return Math.ceil(startingKva * (xdPrimePct / limitPct) * 0.8);
+}
+
+/**
  * Estimate the transient voltage dip caused by a step kVA load on a finite generator.
  *
  * Simplified model per IEEE 446 §5.4 and generator manufacturer application guides:
@@ -345,8 +362,14 @@ export function runGeneratorSizingAnalysis(inputs) {
       lrcMultiplier,
     });
 
-    // Determine required kW accounting for motor start
-    const requiredFromStep = stepLoad.recommendedGenKw / siteCapacityFactor;
+    // Determine required kW accounting for motor start: the smallest set whose
+    // estimated dip stays within the project limit.
+    stepLoad.dipLimitedGenKw = stepLoadGeneratorKw({
+      startingKva: stepLoad.startingKva,
+      xdPrimePct,
+      limitPct: voltageDipLimitPct,
+    });
+    const requiredFromStep = stepLoad.dipLimitedGenKw / siteCapacityFactor;
 
     // Select a tentative standard size for voltage dip calculation
     const tentativeRequiredKw = Math.max(siteDeratedKw, requiredFromStep);
@@ -373,7 +396,7 @@ export function runGeneratorSizingAnalysis(inputs) {
   // Step 5 — Required standard-condition nameplate kW. Both the continuous
   // load and the step-load screen must be supported after site derating.
   const stepRequiredKw = stepLoad
-    ? Math.round((stepLoad.recommendedGenKw / siteCapacityFactor) * 10) / 10
+    ? Math.round((stepLoad.dipLimitedGenKw / siteCapacityFactor) * 10) / 10
     : 0;
   const requiredKw = Math.max(siteDeratedKw, stepRequiredKw);
 
@@ -383,6 +406,14 @@ export function runGeneratorSizingAnalysis(inputs) {
     warnings.push(
       `Required nameplate capacity ${requiredKw.toFixed(1)} kW exceeds the built-in 2,000 kW catalog range. ` +
       'No generator size was selected; evaluate paralleled units or a manufacturer-specific package.'
+    );
+  }
+
+  if (sizeResult.selectedKw && continuousKw / (sizeResult.selectedKw * siteCapacityFactor) > 0.9) {
+    const loadingPct = (continuousKw / (sizeResult.selectedKw * siteCapacityFactor)) * 100;
+    warnings.push(
+      `The selected ${sizeResult.selectedKw} kW set would run at ${loadingPct.toFixed(0)}% of its site capacity ` +
+      'with no allowance for load growth or future additions. Consider adding a spare-capacity margin to the load list.'
     );
   }
 

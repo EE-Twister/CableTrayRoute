@@ -31,6 +31,7 @@ import {
   fuelRuntime,
   selectStandardSize,
   runGeneratorSizingAnalysis,
+  stepLoadGeneratorKw,
   STANDARD_GEN_SIZES_KW,
   NFPA110_TYPES,
 } from '../analysis/generatorSizing.mjs';
@@ -444,6 +445,34 @@ describe('runGeneratorSizingAnalysis — full integration', () => {
     assert.strictEqual(result.altitudeFactor, 1.0);
     assert.strictEqual(result.tempFactor, 1.0);
     assert.strictEqual(result.continuousKw, result.siteDeratedKw);
+  });
+});
+
+describe('motor-start sizing follows the dip limit and X\'d inputs', () => {
+  const loads = [{ label: 'Loads', kw: 196 }];
+  const start = { loads, motorHp: 100, motorPf: 0.85, motorEff: 0.92, lrcMultiplier: 6 };
+  it('stepLoadGeneratorKw inverts the dip formula: kVA = start kVA x Xd / limit', () => {
+    // 572.4 kVA x 25 / 35 x 0.8 = 327.1 -> 328 kW
+    assert.strictEqual(stepLoadGeneratorKw({ startingKva: 572.4, xdPrimePct: 25, limitPct: 35 }), 328);
+  });
+  it('the selected size holds the dip within the limit', () => {
+    for (const [xd, limit] of [[25, 35], [25, 20], [40, 35], [15, 30]]) {
+      const r = runGeneratorSizingAnalysis({ ...start, xdPrimePct: xd, voltageDipLimitPct: limit });
+      assert.ok(r.voltageDip.dipPct <= limit, `xd ${xd} limit ${limit}: dip ${r.voltageDip.dipPct}`);
+    }
+  });
+  it('a tighter dip limit or a higher X\'d selects a larger set', () => {
+    const base = runGeneratorSizingAnalysis(start).selectedSizeKw;
+    assert.ok(runGeneratorSizingAnalysis({ ...start, voltageDipLimitPct: 20 }).selectedSizeKw > base);
+    assert.ok(runGeneratorSizingAnalysis({ ...start, xdPrimePct: 40 }).selectedSizeKw > base);
+  });
+  it('the full-starting-kVA figure is still reported for comparison', () => {
+    assert.strictEqual(runGeneratorSizingAnalysis(start).stepLoad.recommendedGenKw, 458);
+  });
+  it('warns when the selected set has no margin over the continuous load', () => {
+    const r = runGeneratorSizingAnalysis({ loads: [{ kw: 196 }] });
+    assert.ok(r.warnings.some(w => /no allowance for load growth/.test(w)));
+    assert.ok(!runGeneratorSizingAnalysis({ loads: [{ kw: 130 }] }).warnings.some(w => /load growth/.test(w)));
   });
 });
 

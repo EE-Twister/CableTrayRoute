@@ -342,8 +342,12 @@ document.addEventListener('DOMContentLoaded', () => {
             <span class="result-value">${safe(num(r.stepLoad.startingKva))} kVA / ${safe(num(r.stepLoad.startingKw))} kW</span>
           </div>
           <div class="result-row">
-            <span class="result-label">Site-adjusted nameplate screen for motor start</span>
+            <span class="result-label">Site-adjusted nameplate needed to hold the voltage-dip limit</span>
             <span class="result-value">${safe(num(r.stepRequiredKw))} kW</span>
+          </div>
+          <div class="result-row">
+            <span class="result-label">For comparison: nameplate to carry 100% of the starting kVA</span>
+            <span class="result-value">${safe(num(r.stepLoad.recommendedGenKw))} kW</span>
           </div>
           ${dipHtml}
         </div>` : ''}

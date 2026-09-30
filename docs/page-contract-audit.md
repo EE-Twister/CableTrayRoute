@@ -381,8 +381,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `oneLineDiagram`
   - analysis/arcFlash.mjs:446 getOneLine()
   - analysis/harmonicNetwork.mjs:264 getOneLine()
-  - analysis/harmonics.js:200 getOneLine()
-  - analysis/harmonics.js:274 getOneLine()
+  - analysis/harmonics.js:226 getOneLine()
+  - analysis/harmonics.js:300 getOneLine()
   - analysis/loadFlow.js:1219 getOneLine()
   - ... 21 more
 - `panelSchedule`
@@ -424,8 +424,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - analysis/arcFlash.mjs:353 getItem(tccSettings)
   - analysis/shortCircuit.mjs:774 getItem(tccSettings)
 - `studyResults`
-  - analysis/harmonics.js:505 getStudies()
-  - analysis/harmonics.js:542 getStudies()
+  - analysis/harmonics.js:531 getStudies()
+  - analysis/harmonics.js:568 getStudies()
   - analysis/motorStart.js:265 getStudies()
   - analysis/motorStart.js:55 getStudies()
   - oneline.js:12348 getStudies()
@@ -496,8 +496,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.studySettings`
   - oneline.js:2691 setItem(studySettings)
 - `studyResults`
-  - analysis/harmonics.js:511 setStudies()
-  - analysis/harmonics.js:544 setStudies()
+  - analysis/harmonics.js:537 setStudies()
+  - analysis/harmonics.js:570 setStudies()
   - analysis/motorStart.js:267 setStudies()
   - oneline.js:4456 setStudies()
   - oneline.js:4483 setStudies()
@@ -505,10 +505,10 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `studyResults.duty`
   - validation/rules.js:666 studies.duty
 - `studyResults.harmonicNetwork`
-  - analysis/harmonics.js:510 studies.harmonicNetwork
-  - analysis/harmonics.js:543 studies.harmonicNetwork
+  - analysis/harmonics.js:536 studies.harmonicNetwork
+  - analysis/harmonics.js:569 studies.harmonicNetwork
 - `studyResults.harmonics`
-  - analysis/harmonics.js:509 studies.harmonics
+  - analysis/harmonics.js:535 studies.harmonics
 - `studyResults.loadFlow`
   - src/one-line/studyExecutionController.mjs:125 studies.loadFlow
 - `studyResults.motorStart`
@@ -1989,26 +1989,26 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `oneLineDiagram`
-  - analysis/harmonics.js:200 getOneLine()
-  - analysis/harmonics.js:274 getOneLine()
+  - analysis/harmonics.js:226 getOneLine()
+  - analysis/harmonics.js:300 getOneLine()
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
-  - analysis/harmonics.js:505 getStudies()
-  - analysis/harmonics.js:542 getStudies()
+  - analysis/harmonics.js:531 getStudies()
+  - analysis/harmonics.js:568 getStudies()
 
 **Detected Writes**
 - `settings.studyApprovals`
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
-  - analysis/harmonics.js:511 setStudies()
-  - analysis/harmonics.js:544 setStudies()
+  - analysis/harmonics.js:537 setStudies()
+  - analysis/harmonics.js:570 setStudies()
 - `studyResults.harmonicNetwork`
-  - analysis/harmonics.js:510 studies.harmonicNetwork
-  - analysis/harmonics.js:543 studies.harmonicNetwork
+  - analysis/harmonics.js:536 studies.harmonicNetwork
+  - analysis/harmonics.js:569 studies.harmonicNetwork
 - `studyResults.harmonics`
-  - analysis/harmonics.js:509 studies.harmonics
+  - analysis/harmonics.js:535 studies.harmonics
 
 ### Capacitor Bank (`capacitorbank.html`)
 
