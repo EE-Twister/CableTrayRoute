@@ -199,3 +199,21 @@ describe('runReliability - result structure', () => {
     }
   });
 });
+
+describe('blank repair time is missing data, not zero', () => {
+  const build = mttr => [
+    { id: 'S', type: 'utility', connections: [{ target: 'T' }] },
+    { id: 'T', type: 'transformer', mtbf: 100000, mttr, connections: [{ target: 'B' }] },
+    { id: 'B', type: 'bus', connections: [] },
+  ];
+  it('an empty-string or null MTTR is reported as missing and the run is not ready', () => {
+    for (const blank of ['', '  ', null]) {
+      const r = runReliability(build(blank));
+      assert.strictEqual(r.ready, false, `mttr=${JSON.stringify(blank)}`);
+      assert.deepStrictEqual(r.missingData[0].missing, ['MTTR']);
+    }
+  });
+  it('an explicit 0 is still accepted (instant repair)', () => {
+    assert.strictEqual(runReliability(build(0)).componentStats.T.availability, 1);
+  });
+});

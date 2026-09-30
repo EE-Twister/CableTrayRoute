@@ -21,6 +21,13 @@ function pickValue(component, key) {
   return undefined;
 }
 
+/** Number() turns a blank or null field into 0, which would read as "zero repair time". */
+function numberOrNaN(value) {
+  if (value === null || value === undefined) return NaN;
+  if (typeof value === 'string' && value.trim() === '') return NaN;
+  return Number(value);
+}
+
 function normalizedIdentifier(value) {
   return String(value ?? '').trim().toLowerCase();
 }
@@ -220,8 +227,8 @@ export function runReliability(components = [], options = {}) {
   let governedCount = 0;
 
   eligible.forEach(component => {
-    const mtbf = Number(pickValue(component, 'mtbf'));
-    const mttr = Number(pickValue(component, 'mttr'));
+    const mtbf = numberOrNaN(pickValue(component, 'mtbf'));
+    const mttr = numberOrNaN(pickValue(component, 'mttr'));
     const source = pickValue(component, 'reliabilitySource')
       || pickValue(component, 'reliability_source')
       || options.inputSource
