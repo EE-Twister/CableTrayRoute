@@ -129,6 +129,7 @@ import {
     ROUTE_PLOT_CONFIG as plotConfig,
     ROUTE_VIEW_PRESETS
 } from './src/routing/routeVisualizationModel.mjs';
+import { getRouteGraphTheme } from './src/routing/routeGraphTheme.mjs';
 import { buildPlotlyRouteScene } from './src/routing/plotlyRouteScene.mjs';
 import {
     bindPullReviewActions,
@@ -3653,8 +3654,8 @@ const renderBatchResults = async (results) => {
             console.warn('Plotly is not loaded');
             return;
         }
-        const theme = graphTheme();
-        const view = currentViewDefinition();
+        const theme = getRouteGraphTheme(document.body.classList.contains('dark-mode'));
+        const view = ROUTE_VIEW_PRESETS[state.plotView] || ROUTE_VIEW_PRESETS.isometric;
         state.selectedRouteIndex = null;
         updatePlotSelectionCard();
         updatePlotSummary(trays, routes);
@@ -3955,7 +3956,7 @@ const renderBatchResults = async (results) => {
                 text: [cable.start_tag || 'Start', cable.end_tag || 'End'],
                 mode: 'markers+text', type: 'scatter3d', textposition: 'top center',
                 marker: { color: [ROUTE_COLORS.start, ROUTE_COLORS.end], size: 9, line: { color: '#ffffff', width: 2 } },
-                textfont: { size: 11, color: graphTheme().text }, showlegend: false,
+                textfont: { size: 11, color: getRouteGraphTheme(document.body.classList.contains('dark-mode')).text }, showlegend: false,
                 hovertemplate: '<b>%{text}</b><extra></extra>'
             });
         }
@@ -4032,7 +4033,7 @@ const renderBatchResults = async (results) => {
         if (!globalThis.Plotly) return;
         if (!window.current3DPlot) return;
         state.plotView = ROUTE_VIEW_PRESETS[viewName] ? viewName : 'isometric';
-        const view = currentViewDefinition();
+        const view = ROUTE_VIEW_PRESETS[state.plotView] || ROUTE_VIEW_PRESETS.isometric;
         const camera = { ...structuredClone(view.camera), projection: { type: view.projection } };
         const hiddenAxis = state.plotView === 'plan' ? 'z' : state.plotView === 'front' ? 'y' : state.plotView === 'right' ? 'x' : null;
         const axisTitles = { x: 'X', y: 'Y', z: 'Elevation' };

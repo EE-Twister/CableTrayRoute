@@ -819,6 +819,41 @@ test('equipment tag changes propagate and deletions surface shared-link diagnost
   await expect(dataLinks.getByRole('link', { name: 'Review One-Line' })).toHaveAttribute('href', /oneline\.html\?probe=/);
 });
 
+for (const dark of [false, true]) {
+  test(`routing Plotly fallback without WebGL: ${dark ? 'dark' : 'light'}`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: dark ? 'dark' : 'light' });
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.addInitScript(({ dark }) => {
+      const getContext = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (type, ...args) {
+        return /webgl/i.test(type) ? null : getContext.call(this, type, ...args);
+      };
+      // Record fallback layouts without requiring Plotly's own WebGL renderer.
+      Object.defineProperty(window, 'Plotly', { configurable: false, get: () => ({
+        newPlot: (element, traces, layout) => {
+          element.data = traces;
+          element.on = () => {};
+          window.fallbackLayout = layout;
+          return Promise.resolve();
+        },
+        react: (element, traces, layout) => {
+          element.data = traces;
+          window.fallbackLayout = layout;
+          return Promise.resolve();
+        }
+      }), set: () => {} });
+      document.addEventListener('DOMContentLoaded', () => {
+        document.body.classList.toggle('dark-mode', dark);
+      });
+    }, { dark });
+    await page.goto(server.url('optimalRoute.html?e2e=1'), { waitUntil: 'domcontentloaded' });
+    await expect.poll(() => page.evaluate(() => window.fallbackLayout?.font.color)).toBe(dark ? '#e5e7eb' : '#334155');
+    expect(await page.evaluate(() => window.fallbackLayout.scene.bgcolor)).toBe(dark ? '#0f172a' : '#f4f7fb');
+    expect(errors).toEqual([]);
+  });
+}
+
 for (const file of workflowPages) {
   test(`workflow smoke: ${file}`, async ({ page }) => {
     await expectHealthyPage(page, server, file);
