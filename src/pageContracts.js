@@ -649,6 +649,16 @@ export const PAGE_CONTRACTS_BY_HREF = {
     readiness: ready('Ready when cable, ambient, grouping, and at least one installation condition are valid.', ['Missing cable size, invalid ambient values, no selected installation, or malformed load profile data.']),
     downstream: ['designcoach.html', 'projectreport.html']
   }),
+  'directburial.html': contract({
+    workflowStep: 'studies',
+    standaloneInputs: ['Required circuit current, cover depth, soil thermal resistivity and temperature, conductor material and arrangement, candidate sizes and circuit spacings, and cost allowances.'],
+    projectInputs: [],
+    outputs: [
+      exportOnly('Direct-burial size, spacing, circuit-count and cost comparison CSV.', ['projectreport.html'])
+    ],
+    readiness: ready('Ready when required current, cover depth, and soil properties are valid and at least one conductor size and spacing is selected.', ['Missing or non-positive current, cover, or soil resistivity, or no candidate sizes or spacings.']),
+    downstream: ['projectreport.html']
+  }),
   'tcc.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['Protective device library selections, relay settings, annotations, chart ranges, and selected references.'],

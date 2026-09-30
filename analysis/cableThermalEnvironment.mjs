@@ -47,7 +47,7 @@ const STEP_LABELS = {
 // AWG ↔ mm² mapping (NEC sizes commonly entered alongside IEC mm² inputs)
 // Cross-section areas per NEC Chapter 9 Table 8 (rounded).
 // ---------------------------------------------------------------------------
-const AWG_TO_MM2 = {
+export const AWG_TO_MM2 = {
   '14':   2.08,  '12':  3.31,  '10':  5.26,  '8':   8.37,
   '6':   13.30,  '4':  21.20,  '3':  26.70,  '2':  33.60,
   '1':   42.40,

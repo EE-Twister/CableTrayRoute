@@ -8,8 +8,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 ## Summary
 
-- Routes audited: 80
-- Contracts: 80
+- Routes audited: 81
+- Contracts: 81
 - Missing contracts: 0
 - Extra contracts: 0
 - Routes without source files: 0
