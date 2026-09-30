@@ -53,13 +53,13 @@ For single-phase: `VD_LN = I × 2L × (R·cosφ + X·sinφ)` (forward + return c
 
 ## Fault Stress (IEEE 605-2008)
 
-Electromagnetic force per unit length on the outer conductor of a flat three-phase bus during a fault:
+Maximum electromagnetic force per unit length on a flat three-phase bus during a fault. The force follows the **peak** (first-cycle, asymmetrical) current, not the symmetrical RMS value:
 
 ```
-F/L [lbf/ft] = 0.54 × I_kA² / d_in
+F/L [lbf/ft] = (√3/2) × 5.4×10⁻⁷ × I_peak² / d_in        I_peak = k_p × I_rms
 ```
 
-where `I_kA` = symmetrical RMS fault current (kA) and `d_in` = centre-to-centre conductor spacing (in).
+`I_rms` is the symmetrical RMS fault current (A), `d_in` the centre-to-centre conductor spacing (in), and the peak factor `k_p` follows the UL 857 / NEMA BU 1.1 busway test levels: 1.7 up to 10 kA, 2.0 from 10 to 20 kA, 2.2 above 20 kA. (An earlier version used the RMS value directly and understated the force about five-fold.)
 
 Maximum support span from simply-supported beam mechanics:
 
@@ -91,18 +91,17 @@ L_max [ft] = √(8 × S_y × Z / 12 / (F/L))
 
 **Results:**
 
-- Selected busway: **2000 A Al** (smallest standard ≥ 1500 A with no derating at reference conditions)
-- Derated ampacity: **2000 A** (combined factor = 1.00 at reference conditions)
-- Utilization: **75%**
-- Voltage drop: (0.145 mΩ/ft × 100 ft / 1000 Ω) × 1500 A × (0.85 cos + 0.527 sin) × √3 / 480 × 100 ≈ **0.81%** — **Pass ≤ 3%**
-- Force per foot: 0.54 × 65² / 6 ≈ **380 lbf/ft**
-- Max support span (IEEE 605): √(8 × 6000 × 0.70 / 12 / 380) ≈ **2.8 ft**
-- Installed span 10 ft > 2.8 ft → **Fail** (factory-assembled busway enclosures typically withstand higher loads; verify with manufacturer)
+- Selected busway: **1600 A Al** (smallest standard ≥ 1500 A at reference conditions)
+- Derated ampacity: **1600 A** (combined factor = 1.00 at reference conditions); utilization **94%**
+- Voltage drop: R = 0.01875 mΩ/ft, X = 0.00989 mΩ/ft → √3 × 1500 A × 100 ft × (0.01875 × 0.85 + 0.00989 × 0.527) / 1000 = 5.56 V, about **1.16%** of 480 V — **Pass ≤ 3%**
+- Force per foot: peak factor 2.2 → I_peak = 143 kA; 0.866 × 5.4×10⁻⁷ × (143 000)² / 6 ≈ **1 594 lbf/ft**
+- Max support span (IEEE 605): √(8 × 6000 × 0.58 / 12 / 1594) ≈ **1.2 ft**
+- Installed span 10 ft > 1.2 ft → **Fail** (factory-assembled busway housings and insulators carry much of this load; verify with the manufacturer's certified short-circuit rating and hanger spacing)
 
 ---
 
 ## Limitations
 
-- Resistance and reactance values are indicative mid-range figures from published tables. Verify against the selected manufacturer's product data sheet.
+- Resistance and reactance are generic estimates derived from conductor cross-section (copper about 20/I mΩ/ft, aluminum about 30/I mΩ/ft). They are order-of-magnitude values; use the manufacturer's published impedance for final design.
 - The IEEE 605 formula applies to the bare conductor mechanical properties. Factory-assembled busway enclosures carry additional structural load through their housings; the manufacturer's certified short-time withstand rating and support span specification govern final installation.
 - The ambient temperature derating uses a 75 °C conductor temperature rating as a proxy; confirm the actual insulation class with the manufacturer.
