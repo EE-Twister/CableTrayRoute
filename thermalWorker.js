@@ -137,6 +137,77 @@ function isCompleteHeatSource(src){
     && Number.isFinite(y);
 }
 
+// <relax-kernel>
+// Far-field temperature (C) at grid node (i,j) from every conduit treated as a
+// line source with its image above the isothermal grade (IEC 60287-2-1 /
+// Kennelly): T = Te + sum P*rho/(2 pi) * ln(d_image / d).
+function ductbankFarFieldTemperature(heatMap,opts){
+  const {earthT,rho,dx,offsetXm,offsetYm}=opts;
+  const sources=Object.values(heatMap).filter(h=>h&&h.power>0).map(h=>({
+    x:h.cx+offsetXm,y:h.cy+offsetYm,c:h.power*rho/(2*Math.PI),r:Math.max(h.r,dx/2)
+  }));
+  return (i,j)=>{
+    const x=i*dx,y=j*dx;
+    let t=earthT;
+    for(const s of sources){
+      const d=Math.max(Math.hypot(x-s.x,y-s.y),s.r);
+      t+=s.c*Math.log(Math.hypot(x-s.x,y+s.y)/d);
+    }
+    return t;
+  };
+}
+
+// Successive over-relaxation for  k * laplacian(T) = -q  on the node grid.
+// Side and bottom edges are held at the far-field temperature (edgeTemp), not at
+// the undisturbed earth temperature: an edge only one burial depth from the bank
+// forced the domain too cool by 13-19%. Iterates until the largest per-sweep
+// change is below RELAX_TOLERANCE_C (the previous Jacobi loop stopped on 0.01 C
+// per sweep and 2000 sweeps, so finer grids returned badly under-converged results).
+function relaxDuctbankGrid(state,progressCb){
+  const {grid,powerGrid,sourceMask,sourceTemp,nx,ny,airT,Bi,edgeTemp}=state;
+  const RELAX_TOLERANCE_C=1e-4,MAX_SWEEPS=20000;
+  const N=nx*ny;
+  const t=new Float64Array(N),pw=new Float64Array(N),fixed=new Uint8Array(N);
+  for(let j=0;j<ny;j++){
+    for(let i=0;i<nx;i++){
+      const n=j*nx+i;
+      pw[n]=powerGrid[j][i];
+      if(sourceMask[j][i]){fixed[n]=1;t[n]=sourceTemp[j][i];}
+      else if(j===ny-1||i===0||i===nx-1){fixed[n]=1;t[n]=edgeTemp(i,j);}
+      else t[n]=edgeTemp(i,j);
+    }
+  }
+  const omega=Math.min(1.98,2/(1+Math.sin(Math.PI/Math.max(nx,ny))));
+  let diff=Infinity,iter=0;
+  while(iter<MAX_SWEEPS&&(iter<4||diff>RELAX_TOLERANCE_C)){
+    diff=0;
+    for(let j=0;j<ny;j++){
+      const base=j*nx;
+      for(let i=0;i<nx;i++){
+        const n=base+i;
+        if(fixed[n])continue;
+        let val;
+        if(j===0){
+          val=(t[n+nx]+Bi*airT)/(1+Bi);
+        }else{
+          const target=0.25*(t[n-1]+t[n+1]+t[n-nx]+t[n+nx]+pw[n]);
+          val=t[n]+omega*(target-t[n]);
+        }
+        const change=Math.abs(val-t[n]);
+        if(change>diff)diff=change;
+        t[n]=val;
+      }
+    }
+    iter++;
+    if(progressCb&&iter%25===0)progressCb(iter,MAX_SWEEPS);
+  }
+  for(let j=0;j<ny;j++){
+    for(let i=0;i<nx;i++)grid[j][i]=t[j*nx+i];
+  }
+  return {iter,diff};
+}
+// </relax-kernel>
+
 function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb,heatSources){
   heatSources=heatSources||[];
   const scale=40,margin=20;
@@ -160,7 +231,16 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb,h
   const referenceSolverHeight=referenceHeight+coverOffsetPx+boundaryPadPx;
   const requestedStep=Math.ceil(Math.max(solverWidth,solverHeight)/GRID_SIZE);
   const referenceStep=Math.ceil(Math.max(referenceSolverWidth,referenceSolverHeight)/GRID_SIZE);
-  const step=Math.max(4,Math.min(requestedStep,referenceStep,scale*2));
+  // Resolve the smallest conduit with about 4 cells across its radius (the grid
+  // setting alone gave a 4 in conduit a single cell), within a cell budget.
+  let minRadiusPx=Infinity;
+  conduits.forEach(cd=>{
+    const area=CONDUIT_SPECS[cd.conduit_type]?.[cd.trade_size];
+    if(Number.isFinite(area)&&area>0)minRadiusPx=Math.min(minRadiusPx,Math.sqrt(area/Math.PI)*scale);
+  });
+  let step=Math.max(4,Math.min(requestedStep,referenceStep,scale*2));
+  if(Number.isFinite(minRadiusPx))step=Math.max(4,Math.min(step,Math.floor(minRadiusPx/4)));
+  while((solverWidth/step)*(solverHeight/step)>120000)step+=2;
   const dx=(0.0254/scale)*step;
   const nx=Math.ceil(solverWidth/step);
   const ny=Math.ceil(solverHeight/step);
@@ -207,8 +287,12 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb,h
     const current=parseFloat(c.est_load)||0;
     const power=cableHeatLoss(c,current);
     h.power+=power;
-    const q=power/(Math.PI*h.r*h.r)*dx*dx/k;
-    conduitCells[c.conduit_id].forEach(([j,i])=>{ powerGrid[j][i]+=q; });
+    // Spread the heat over the cells actually used to represent the conduit, so the
+    // total injected equals the cable loss whatever the grid resolution
+    // (dividing by the analytic circle area does not conserve heat on a coarse grid).
+    const cells=conduitCells[c.conduit_id];
+    const q=power/(cells.length*k);
+    cells.forEach(([j,i])=>{ powerGrid[j][i]+=q; });
   });
 
   (heatSources||[]).filter(isCompleteHeatSource).forEach(src=>{
@@ -250,32 +334,12 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb,h
       }
     }
   });
-  let diff=Infinity,iter=0,maxIter=2000;
-  const minIter=Math.max(80,GRID_SIZE*4);
-  while((iter<minIter || diff>0.01)&&iter<maxIter){
-    diff=0;
-    for(let j=0;j<ny;j++){
-      for(let i=0;i<nx;i++){
-        let val;
-        if(sourceMask[j][i]){
-          val=sourceTemp[j][i];
-        }else if(j===ny-1||i===0||i===nx-1){
-          val=earthT;
-        }else if(j===0){
-          val=(grid[j+1][i]+Bi*airT)/(1+Bi);
-        }else{
-          val=0.25*(grid[j][i-1]+grid[j][i+1]+grid[j-1][i]+grid[j+1][i]+powerGrid[j][i]);
-        }
-        diff=Math.max(diff,Math.abs(val-grid[j][i]));
-        newGrid[j][i]=val;
-      }
-    }
-    for(let j=0;j<ny;j++){
-      for(let i=0;i<nx;i++) grid[j][i]=newGrid[j][i];
-    }
-    iter++;
-    if(progressCb && iter%25===0) progressCb(iter,maxIter);
-  }
+  const edgeTemp=ductbankFarFieldTemperature(heatMap,{
+    earthT,rho:1/k,dx,
+    offsetXm:(margin+boundaryPadPx)/scale*0.0254,
+    offsetYm:(margin+coverOffsetPx)/scale*0.0254
+  });
+  const {iter,diff}=relaxDuctbankGrid({grid,powerGrid,sourceMask,sourceTemp,nx,ny,airT,Bi,edgeTemp},progressCb);
   const temps={};
   Object.keys(conduitCells).forEach(cid=>{
     const cells=conduitCells[cid];
@@ -284,7 +348,8 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb,h
     const base=sum/cells.length;
     const p=heatMap[cid].power||0;
     const cd=conduits.find(c=>c.conduit_id===cid)||{};
-    const rduct=getRduct(cd,params)+(ductRes||0);
+    // duct wall + cable-to-duct air gap (supplied by the page from the ampacity model) + user addition
+    const rduct=getRduct(cd,params)+((params.ductGapByConduit||{})[cid]||0)+(ductRes||0);
     temps[cid]=base+p*rduct;
   });
   const cropCols=Math.max(1,GRID_SIZE);

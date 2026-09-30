@@ -809,19 +809,19 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 **Detected Reads**
 - `cableSchedule`
   - ductbankroute.js:1120 getCables()
-  - ductbankroute.js:5193 getCables()
+  - ductbankroute.js:5268 getCables()
 - `conduitSchedule`
-  - ductbankroute.js:5192 getConduits()
+  - ductbankroute.js:5267 getConduits()
 - `ductbankSchedule`
-  - ductbankroute.js:5191 getDuctbanks()
+  - ductbankroute.js:5266 getDuctbanks()
   - ductbankroute.js:963 getDuctbanks()
 - `settings.ductbankPanZoom`
   - ductbankroute.js:130 getItem(ductbankPanZoom)
 - `settings.ductbankRouteData`
-  - ductbankroute.js:5206 getItem(ductbankRouteData)
+  - ductbankroute.js:5281 getItem(ductbankRouteData)
 - `settings.ductbankSession`
   - ductbankroute.js:1054 getItem(ductbankSession)
-  - ductbankroute.js:5195 getItem(ductbankSession)
+  - ductbankroute.js:5270 getItem(ductbankSession)
 
 **Detected Writes**
 - `ductbankSchedule`
@@ -829,10 +829,10 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.ductbankPanZoom`
   - ductbankroute.js:141 setItem(ductbankPanZoom)
 - `settings.ductbankRouteData`
-  - ductbankroute.js:5209 removeItem(ductbankRouteData)
+  - ductbankroute.js:5284 removeItem(ductbankRouteData)
 - `settings.ductbankSession`
   - ductbankroute.js:1050 setItem(ductbankSession)
-  - ductbankroute.js:4925 removeItem(ductbankSession)
+  - ductbankroute.js:5000 removeItem(ductbankSession)
 
 ### Tray Fill (`cabletrayfill.html`)
 

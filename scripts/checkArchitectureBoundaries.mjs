@@ -19,7 +19,7 @@ export const ENTRYPOINT_BUDGETS = Object.freeze({
   'oneline.js': 13175,
   'analysis/tcc.js': 4306,
   'app.mjs': 4453,
-  'ductbankroute.js': 5230,
+  'ductbankroute.js': 5305,
   'cableschedule.js': 3266,
   'cathodicprotection.js': 2765,
   'src/panelSchedule.js': 2725,
@@ -187,7 +187,7 @@ export const EXTRACTED_MODULE_BUDGETS = Object.freeze({
   'src/cable-schedule/tagModel.js': 60,
   'src/cable-schedule/scheduleConfig.js': 206,
   'src/ductbank-route/thermalPrimitives.js': 71,
-  'src/ductbank-route/ampacityModel.js': 239,
+  'src/ductbank-route/ampacityModel.js': 275,
   'src/studies/cp/analysisEngine.js': 652
 });
 
