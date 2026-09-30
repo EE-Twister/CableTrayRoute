@@ -252,7 +252,9 @@ export function stringingTable(conductor, S, designH, designW, designTemp, temps
 
 function rangeTemps(min, max, step) {
   const out = [];
+  if (!Number.isFinite(min) || !Number.isFinite(max)) throw new Error('Stringing temperature range must be numeric.');
   const s = step > 0 ? step : 10;
+  if ((max - min) / s > 500) throw new Error('Stringing temperature range has too many rows; increase the step.');
   for (let t = min; t <= max + 1e-9; t += s) out.push(Math.round(t * 100) / 100);
   if (out.length === 0) out.push(min);
   return out;
@@ -270,14 +272,17 @@ function rangeTemps(min, max, step) {
  * @param {number[]} [config.spans] - Individual spans (ft); ruling span derived.
  * @param {number} [config.rulingSpan] - Ruling span (ft) if spans not given.
  * @param {string} [config.district='heavy'] - NESC district key.
- * @param {number} [config.designTensionPct=33.33] - Max tension as % of UTS at the design (loaded) condition.
+ * @param {number} [config.designTensionPct=50] - Maximum tension (at the support) as % of UTS at the loaded design condition; NESC limit is 60%.
  * @param {{min:number,max:number,step:number}} [config.stringingTemps] - Bare-conductor stringing range (°F).
  * @returns {SagTensionResult}
  */
 export function runSagTension(config = {}) {
   const conductor = config.conductor;
-  if (!conductor || !Number.isFinite(conductor.weight) || !Number.isFinite(conductor.uts) || conductor.uts <= 0) {
+  if (!conductor || !(conductor.weight > 0) || !(conductor.uts > 0)) {
     throw new Error('Select a conductor with valid weight and rated strength (UTS).');
+  }
+  for (const [key, label] of [['diameter', 'diameter'], ['area', 'cross-section area'], ['e', 'modulus of elasticity'], ['alpha', 'thermal expansion coefficient']]) {
+    if (!(conductor[key] > 0)) throw new Error(`Conductor ${label} must be a positive number.`);
   }
   const RS = Array.isArray(config.spans) && config.spans.length
     ? rulingSpan(config.spans)
@@ -289,14 +294,21 @@ export function runSagTension(config = {}) {
   const districtKey = config.district && NESC_DISTRICTS[config.district] ? config.district : 'heavy';
   const district = NESC_DISTRICTS[districtKey];
 
-  const designTensionPct = Number.isFinite(config.designTensionPct) ? config.designTensionPct : 33.33;
+  const designTensionPct = Number.isFinite(config.designTensionPct) ? config.designTensionPct : 50;
   if (designTensionPct <= 0 || designTensionPct >= 100) {
     throw new Error('Design tension must be between 0 and 100 % of UTS.');
   }
 
-  // Loaded design condition: limiting tension at the NESC district loading.
+  // Loaded design condition: the maximum tension, which occurs at the support, is set to
+  // the design percentage of UTS. For a level span T = H + w·D with D = wS²/(8H), so
+  //   H² − T·H + w²S²/8 = 0  →  H = (T + √(T² − w²S²/2)) / 2   (the larger, stable root).
   const load = districtLoad(conductor, district);
-  const designH = (designTensionPct / 100) * conductor.uts;
+  const designMaxTension = (designTensionPct / 100) * conductor.uts;
+  const discriminant = designMaxTension * designMaxTension - (load.wResultant * load.wResultant * RS * RS) / 2;
+  if (!(discriminant >= 0)) {
+    throw new Error(`A ${designTensionPct}% UTS maximum tension cannot be reached for a ${RS.toFixed(0)} ft ruling span under ${district.label} loading: the loaded conductor would need more than that tension at any sag. Shorten the span or choose a stronger conductor.`);
+  }
+  const designH = (designMaxTension + Math.sqrt(discriminant)) / 2;
   const designSag = parabolicSag(load.wResultant, RS, designH);
   const designSupportTension = supportTension(designH, load.wResultant, designSag);
 
@@ -329,9 +341,14 @@ export function runSagTension(config = {}) {
   if (maxFinalPct > 60) {
     warnings.push(`Peak conductor tension reaches ${maxFinalPct.toFixed(1)}% of UTS under loading — review design tension or span.`);
   }
-  const coldString = table[0];
-  if (coldString && (coldString.supportTensionLb / conductor.uts) * 100 > 35) {
-    warnings.push(`Initial (cold) stringing tension is ${((coldString.supportTensionLb / conductor.uts) * 100).toFixed(1)}% of UTS — exceeds the common 35% unloaded limit.`);
+  // Unloaded tension at 60 °F after the design loading: common utility limits are 35% UTS
+  // initial / 25% UTS final (final 25% is the usual no-damper limit for aeolian vibration).
+  const bare60 = stringingTable(conductor, RS, designH, load.wResultant, district.tempF, [60])[0];
+  const unloaded60Pct = (bare60.tensionLb / conductor.uts) * 100;
+  if (unloaded60Pct > 35) {
+    warnings.push(`Unloaded tension at 60 °F is ${unloaded60Pct.toFixed(1)}% of UTS — exceeds the common 35% limit.`);
+  } else if (unloaded60Pct > 25) {
+    warnings.push(`Unloaded tension at 60 °F is ${unloaded60Pct.toFixed(1)}% of UTS — above the usual 25% final limit; add vibration dampers or lower the design tension.`);
   }
   if (designSag > RS * 0.08) {
     warnings.push(`Design sag (${designSag.toFixed(1)} ft) exceeds 8% of the ruling span — confirm ground clearance.`);
@@ -346,6 +363,8 @@ export function runSagTension(config = {}) {
     district: { key: districtKey, ...district },
     loading: load,
     designTensionLb: designH,
+    designMaxTensionLb: designMaxTension,
+    unloaded60FPctUts: unloaded60Pct,
     designTensionPctUts: designTensionPct,
     designSagFt: designSag,
     designSupportTensionLb: designSupportTension,
