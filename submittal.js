@@ -15,8 +15,7 @@ import { showAlertModal } from './src/components/modal.js';
 import { buildBomCatalogFields, buildCatalogTraceabilityReport, buildCatalogWarnings } from './analysis/manufacturerCatalog.mjs';
 import { buildArtifactRegisterRows, normalizeDeliverableArtifact } from './analysis/deliverableArtifacts.mjs';
 import { summarizeFieldExecution } from './analysis/fieldExecution.mjs';
-import { evaluateTrayFill, summarizeTrayFillResult } from './analysis/trayFill.mjs';
-import { extractRacewayIds } from './analysis/conduitFill.mjs';
+import { cablesAssignedToTray, evaluateTrayFill, summarizeTrayFillResult } from './analysis/trayFill.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -509,16 +508,8 @@ function buildTrayFillSection(trays, cables) {
 
   // Same NEC 392.22 evaluation the Tray Fill page uses (Table 392.22(A) allowable areas,
   // 4/0 rules, real cable cross-sections), so the submittal cannot disagree with the study.
-  const assignedCables = tray => cables.filter(cable => {
-    const ids = [
-      ...extractRacewayIds(cable),
-      ...String(cable.route_preference ?? '').split(/[,;|>\n]+/).map(id => id.trim()).filter(Boolean),
-    ];
-    return ids.includes(String(tray.tray_id ?? '').trim());
-  });
-
   const rows = trays.map(t => {
-    const assigned = assignedCables(t);
+    const assigned = cablesAssignedToTray(t, cables);
     const result = evaluateTrayFill(t, assigned);
     const evaluated = result.evaluable === true;
     const empty = assigned.length === 0;

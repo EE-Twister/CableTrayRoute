@@ -474,3 +474,18 @@ describe('study page links', () => {
 });
 
 console.log('\nAll designCoach tests complete.');
+
+describe('tray fill recommendations use the shared NEC 392.22 evaluation', () => {
+  const tray = id => ({ tray_id: id, tray_type: 'Ladder', inside_width: 12, tray_depth: 4 });
+  const cables = (n, id) => Array.from({ length: n }, (_, i) => ({
+    id: `${id}-${i}`, conductors: 3, conductor_size: '#12 AWG', cable_area: 0.5, route_preference: id,
+  }));
+  it('flags a tray whose assigned cables exceed the Table 392.22(A) allowance (35 x 0.5 = 17.5 > 14 in2)', () => {
+    const recs = extractTrayFillRecs([tray('T-1')], cables(35, 'T-1'));
+    assert.strictEqual(recs.length, 1);
+    assert.match(recs[0].detail, /392\.22\(A\)/);
+  });
+  it('does not flag a tray within the allowance (20 x 0.5 = 10 in2) even though it is over 40% of width x depth', () => {
+    assert.strictEqual(extractTrayFillRecs([tray('T-2')], cables(20, 'T-2')).length, 0);
+  });
+});

@@ -21,8 +21,8 @@
 import { detectClashes, overallSeverity } from './clashDetect.mjs';
 import { buildHeatTraceReport } from './heatTraceReport.mjs';
 import { generateSpoolSheets } from './spoolSheets.mjs';
-import { buildConduitCableMap, evaluateConduitFill, extractRacewayIds, recordId as conduitRecordId } from './conduitFill.mjs';
-import { evaluateTrayFill } from './trayFill.mjs';
+import { buildConduitCableMap, evaluateConduitFill, recordId as conduitRecordId } from './conduitFill.mjs';
+import { cablesAssignedToTray, evaluateTrayFill } from './trayFill.mjs';
 import { parseTradeSize } from './pullBoxSizing.mjs';
 
 // ---------------------------------------------------------------------------
@@ -119,13 +119,7 @@ function buildFillSection(trays, conduits, cables) {
   const trayRows = trays.map(tray => {
     const id       = tray.tray_id || tray.id || '—';
     const widthIn  = parseFloat(tray.inside_width) || 12;
-    const assigned = cables.filter(c => {
-      const ids = [
-        ...extractRacewayIds(c),
-        ...String(c.route_preference ?? '').split(/[,;|>\n]+/).map(v => v.trim()).filter(Boolean),
-      ];
-      return ids.includes(String(id).trim());
-    });
+    const assigned = cablesAssignedToTray(tray, cables);
     // Same NEC 392.22(A) evaluation as the Tray Fill page; fall back to the crude
     // width x depth estimate only when the tray/cable data cannot be evaluated.
     const evaluation = evaluateTrayFill(tray, assigned);

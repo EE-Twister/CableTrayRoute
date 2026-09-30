@@ -11,6 +11,7 @@
 import { NEC_AMPACITY_TABLE } from './autoSize.mjs';
 import { runVoltageDropStudy, NEC_LIMITS } from './voltageDropStudy.mjs';
 import { trayFillPercent } from './designRuleChecker.mjs';
+import { evaluateProjectTrayFill } from './trayFill.mjs';
 import { evaluateEquipment, EVAL_STATUS } from './equipmentEvaluation.mjs';
 import { extractThermalEnvRecs } from './cableThermalEnvironment.mjs';
 
@@ -189,29 +190,39 @@ export function extractShortCircuitRecs(scResults) {
  * @param {object[]} trays
  * @returns {Recommendation[]}
  */
-export function extractTrayFillRecs(trays) {
+export function extractTrayFillRecs(trays, cables = []) {
   if (!Array.isArray(trays) || !trays.length) return [];
   const recs = [];
 
-  for (const tray of trays) {
-    const pct = trayFillPercent(tray);
-    if (pct === null) continue;
+  // Trays with assigned cables are judged with the same NEC 392.22(A) evaluation as the
+  // Tray Fill study; a tray with no assignments falls back to its stored aggregate fill.
+  for (const { tray, assigned, result } of evaluateProjectTrayFill(trays, cables)) {
     const id = tray.tray_id || tray.id || 'unknown';
-
-    if (pct > 40) {
-      recs.push({
-        id: `fill:${id}`,
-        sourceStudy: 'trayFill',
-        severity: 'compliance',
-        title: `Reduce fill on tray ${id} (${pct.toFixed(0)}%)`,
-        detail: `Tray ${id} is ${pct.toFixed(1)}% full, exceeding the NEC 392.22(A) 40% fill limit. ` +
-          `Reroute cables to adjacent trays or increase tray width.`,
-        location: id,
-        studyPage: 'cabletrayfill.html',
-        safe_to_apply: false,
-        tradeoffs: 'Rerouting cables may increase cable lengths and material cost.',
-      });
+    let pct = null;
+    let detail = '';
+    if (assigned.length && result.evaluable === true) {
+      if (result.status !== 'fail') continue;
+      pct = result.utilizationPercent;
+      detail = `Tray ${id} uses ${pct.toFixed(1)}% of its NEC ${result.clause} allowance. ` +
+        `Reroute cables to adjacent trays or increase tray width.`;
+    } else {
+      const legacy = trayFillPercent(tray);
+      if (legacy === null || legacy <= 40) continue;
+      pct = legacy;
+      detail = `Tray ${id} is ${legacy.toFixed(1)}% full, exceeding the NEC 392.22(A) 40% fill limit. ` +
+        `Reroute cables to adjacent trays or increase tray width.`;
     }
+    recs.push({
+      id: `fill:${id}`,
+      sourceStudy: 'trayFill',
+      severity: 'compliance',
+      title: `Reduce fill on tray ${id} (${pct.toFixed(0)}%)`,
+      detail,
+      location: id,
+      studyPage: 'cabletrayfill.html',
+      safe_to_apply: false,
+      tradeoffs: 'Rerouting cables may increase cable lengths and material cost.',
+    });
   }
 
   return recs;
@@ -482,7 +493,7 @@ export function runDesignCoach(projectData = {}) {
     ...extractVoltageDropRecs(cables),
     ...extractArcFlashRecs(studies.arcFlash),
     ...extractShortCircuitRecs(studies.shortCircuit),
-    ...extractTrayFillRecs(trays),
+    ...extractTrayFillRecs(trays, cables),
     ...extractHarmonicsRecs(studies.harmonics),
     ...extractGroundGridRecs(studies.groundGrid),
     ...extractLoadFlowRecs(studies.loadFlow),
