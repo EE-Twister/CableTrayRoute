@@ -348,3 +348,27 @@ describe('runContingency — transient stability coupling', () => {
     assert.strictEqual(summary.transientlyUnstable, ts.stable === false ? 1 : 0);
   });
 });
+
+// ---------------------------------------------------------------------------
+describe('pre-existing violations are not blamed on the outage', async () => {
+  const { isPreExisting } = await import('../analysis/contingency.mjs');
+  const base = [
+    { type: 'voltage', element: 'Bus 9', value: '0.9300 pu (low)', magnitude: 0.93 },
+    { type: 'overload', element: 'Line 4', value: '110.0%', magnitude: 110 },
+  ];
+  it('the same low voltage after the outage is pre-existing', () => {
+    assert.strictEqual(isPreExisting({ type: 'voltage', element: 'Bus 9', magnitude: 0.93 }, base), true);
+    assert.strictEqual(isPreExisting({ type: 'voltage', element: 'Bus 9', magnitude: 0.925 }, base), true);
+  });
+  it('a materially lower voltage or heavier loading is new', () => {
+    assert.strictEqual(isPreExisting({ type: 'voltage', element: 'Bus 9', magnitude: 0.90 }, base), false);
+    assert.strictEqual(isPreExisting({ type: 'overload', element: 'Line 4', magnitude: 125 }, base), false);
+    assert.strictEqual(isPreExisting({ type: 'overload', element: 'Line 4', magnitude: 112 }, base), true);
+  });
+  it('a violation on an element that was fine in the base case is new', () => {
+    assert.strictEqual(isPreExisting({ type: 'voltage', element: 'Bus 3', magnitude: 0.94 }, base), false);
+  });
+  it('a base-case convergence failure is pre-existing', () => {
+    assert.strictEqual(isPreExisting({ type: 'convergence', element: 'system' }, [{ type: 'convergence', element: 'system' }]), true);
+  });
+});

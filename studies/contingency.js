@@ -147,7 +147,10 @@ if (typeof document !== 'undefined') {
         summaryEl.innerHTML = `
           <strong>Total branches checked:</strong> ${summary.totalBranches} &nbsp;|&nbsp;
           <strong>Critical contingencies:</strong> ${summary.criticalContingencies} &nbsp;|&nbsp;
-          <strong>Total violations:</strong> ${summary.totalViolations}${
+          <strong>New violations from outages:</strong> ${summary.totalViolations}${
+            (results.baseCaseViolations || []).length
+              ? ` &nbsp;|&nbsp; <strong class="contingency-fail">Already present in the base case: ${results.baseCaseViolations.length}</strong> (${(results.baseCaseViolations || []).slice(0, 3).map(v => `${v.type}: ${v.element}`).join('; ')}${results.baseCaseViolations.length > 3 ? '; …' : ''})`
+              : ''}${
             checkTransientStability
               ? ` &nbsp;|&nbsp; <strong${tsCount > 0 ? ' class="contingency-fail"' : ''}>Transient instabilities: ${tsCount}</strong>`
               : ''}

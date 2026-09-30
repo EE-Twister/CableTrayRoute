@@ -3481,7 +3481,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `oneLineDiagram`
-  - analysis/contingency.mjs:249 getOneLine()
+  - analysis/contingency.mjs:265 getOneLine()
   - analysis/loadFlow.js:1219 getOneLine()
   - studies/contingency.js:109 getOneLine()
   - studies/contingency.js:21 getOneLine()
