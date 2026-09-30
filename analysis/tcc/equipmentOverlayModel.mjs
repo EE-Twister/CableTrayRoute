@@ -18,7 +18,7 @@ const MOTOR_START_POSTTIME_RATIO = 1.1;
 const MOTOR_START_MIN_PRETIME = 0.01;
 const K_CONSTANTS = {
   copper: { 60: 103, 75: 118, 90: 143 },
-  aluminum: { 60: 75, 75: 87, 90: 99 }
+  aluminum: { 60: 75, 75: 87, 90: 94 }
 };
 
 export function componentLabel(comp) {
