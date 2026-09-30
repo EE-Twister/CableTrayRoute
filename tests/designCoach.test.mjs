@@ -64,6 +64,14 @@ describe('SEVERITY_ORDER', () => {
 // DC-11 — nextLargerConductor
 // ---------------------------------------------------------------------------
 describe('nextLargerConductor()', () => {
+  it('reads sizes as schedules write them (#4 AWG, 4 AWG, 4, 1/0, 500 MCM)', () => {
+    assert.strictEqual(nextLargerConductor('4 AWG'), '#3 AWG');
+    assert.strictEqual(nextLargerConductor('4'), '#3 AWG');
+    assert.strictEqual(nextLargerConductor('1/0'), '2/0 AWG');
+    assert.strictEqual(nextLargerConductor('500 MCM'), '600 kcmil');
+    assert.strictEqual(nextLargerConductor('1000 MCM'), null);
+  });
+
   it('returns next size up from 1/0 AWG', () => {
     assert.strictEqual(nextLargerConductor('1/0 AWG'), '2/0 AWG');
   });

@@ -43,7 +43,11 @@ const SEVERITY_RANK = { safety: 0, compliance: 1, efficiency: 2, missing_data: 3
  * @returns {string|null}
  */
 export function nextLargerConductor(currentSize) {
-  const idx = NEC_AMPACITY_TABLE.findIndex(r => r.size === currentSize);
+  // Schedules write '#4 AWG', '4 AWG', '4', '1/0', '500 MCM'; the table uses '#4 AWG', '1/0 AWG', '500 kcmil'.
+  const canon = value => String(value ?? '').toUpperCase().replace(/#/g, '').replace(/\bAWG\b/g, '')
+    .replace(/\b(MCM|KCM|KCMIL)\b/g, 'KCMIL').replace(/\s+/g, ' ').trim();
+  const wanted = canon(currentSize);
+  const idx = wanted ? NEC_AMPACITY_TABLE.findIndex(r => canon(r.size) === wanted) : -1;
   if (idx < 0 || idx >= NEC_AMPACITY_TABLE.length - 1) return null;
   return NEC_AMPACITY_TABLE[idx + 1].size;
 }
