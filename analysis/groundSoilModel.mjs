@@ -36,21 +36,26 @@
  * @param {number} rho2    Bottom-layer resistivity (Ω·m), must be > 0
  * @param {number} h       Top-layer thickness (m), must be > 0
  * @param {number} a       Wenner electrode spacing (m), must be > 0
- * @param {number} [nTerms=8] Number of image terms (higher = more accurate for small a)
+ * @param {number} [nTerms] Number of image terms. Default: sum until the terms are
+ *   negligible (the series converges slowly when |K| is near 1, e.g. rock under clay:
+ *   8 terms returns 16 Ω·m instead of 94 Ω·m for ρ2/ρ1 = 100 at large spacing).
  * @returns {number} Apparent resistivity ρa (Ω·m)
  */
-export function wennerApparentResistivity(rho1, rho2, h, a, nTerms = 8) {
-  if (rho1 <= 0 || rho2 <= 0 || h <= 0 || a <= 0) {
+export function wennerApparentResistivity(rho1, rho2, h, a, nTerms) {
+  if (!(rho1 > 0) || !(rho2 > 0) || !(h > 0) || !(a > 0)) {
     throw new Error('All parameters must be positive');
   }
   const K = (rho2 - rho1) / (rho2 + rho1);
+  // |K| < 1 so the tail is geometric; cap generously for |K| very close to 1.
+  const maxTerms = Number.isFinite(nTerms) && nTerms > 0 ? Math.floor(nTerms) : 20000;
   let series = 0;
-  for (let n = 1; n <= nTerms; n++) {
+  for (let n = 1; n <= maxTerms; n++) {
     const ratio = (2 * n * h) / a;
     series += Math.pow(K, n) * (
       1 / Math.sqrt(1 + ratio * ratio) -
       1 / Math.sqrt(4 + ratio * ratio)
     );
+    if (maxTerms === 20000 && Math.abs(K) ** n < 1e-10) break;
   }
   return rho1 * (1 + 4 * series);
 }
@@ -96,6 +101,9 @@ function rmsRelativeError(rho1, rho2, h, measurements) {
 export function fitTwoLayerSoil(measurements) {
   if (!measurements || measurements.length < 3) {
     throw new Error('At least 3 Wenner measurements required for two-layer soil fitting');
+  }
+  if (measurements.some(m => !(m?.a > 0) || !(m?.rhoA > 0))) {
+    throw new Error('Each Wenner measurement needs a spacing a > 0 and an apparent resistivity rhoA > 0');
   }
 
   // --- Coarse grid search (log-space) ---
@@ -384,12 +392,51 @@ export function buildPolygonGeometry(vertices, meshSpacing, depth, rodLocations 
 // ---------------------------------------------------------------------------
 
 /**
- * Estimate the surface potential at a point (px, py) using a simplified
- * superposition model based on the current-source segments in the grid.
+ * Potential (V) at (px, py, pz) of a buried conductor carrying uniformly distributed
+ * leakage current `current` in a homogeneous half-space (surface at z = 0, conductors
+ * at z < 0). Each segment is integrated exactly (line source plus its image above
+ * grade) instead of being lumped at its midpoint:
  *
- * SCREENING ONLY — not a BEM/FEM solution. Each conductor segment is
- * approximated as a point source at its midpoint. The surface potential
- * fraction relative to GPR is computed from the distance-weighted influence.
+ *   V = ρ I / (4π L) × [asinh((L − s)/d) + asinh(s/d)] × (1 + image term)
+ *
+ * where s is the projection of the point on the segment and d its distance to the line.
+ * At the surface the image term equals the direct term, which gives the familiar
+ * ρ I / (2π r) far field.
+ */
+function segmentPotential(c, px, py, pz, rho, current, wireRadius = 0.005) {
+  const dx = c.x2 - c.x1, dy = c.y2 - c.y1, dz = c.z2 - c.z1;
+  const L = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  if (!(L > 0)) return 0;
+  const ux = dx / L, uy = dy / L, uz = dz / L;
+  const line = (ax, ay, az) => {
+    const vx = px - ax, vy = py - ay, vz = pz - az;
+    const sProj = vx * ux + vy * uy + vz * uz;
+    const d2 = Math.max(vx * vx + vy * vy + vz * vz - sProj * sProj, wireRadius * wireRadius);
+    const d = Math.sqrt(d2);
+    return Math.asinh((L - sProj) / d) + Math.asinh(sProj / d);
+  };
+  const direct = line(c.x1, c.y1, c.z1);
+  // Image source: mirror of the segment about the earth surface (z -> -z)
+  const image = (() => {
+    const imC = { x1: c.x1, y1: c.y1, z1: -c.z1 };
+    const uzi = -uz;
+    const vx = px - imC.x1, vy = py - imC.y1, vz = pz - imC.z1;
+    const sProj = vx * ux + vy * uy + vz * uzi;
+    const d2 = Math.max(vx * vx + vy * vy + vz * vz - sProj * sProj, wireRadius * wireRadius);
+    const d = Math.sqrt(d2);
+    return Math.asinh((L - sProj) / d) + Math.asinh(sProj / d);
+  })();
+  return (rho * current) / (4 * Math.PI * L) * (direct + image);
+}
+
+/**
+ * Estimate the earth-surface potential at a point (px, py) for a grid whose
+ * conductors leak current uniformly per unit length.
+ *
+ * SCREENING ONLY — not a BEM/FEM solution. Leakage is assumed uniform along the
+ * conductors (real grids leak more near the perimeter), soil is homogeneous, and
+ * the absolute level is normalised separately by buildHazardMap so that the mean
+ * conductor potential equals GPR = Ig × Rg.
  *
  * @param {{x: number, y: number}} point   Surface evaluation point
  * @param {Array<{x1,y1,z1,x2,y2,z2}>} conductors  Grid conductor segments
@@ -399,31 +446,38 @@ export function buildPolygonGeometry(vertices, meshSpacing, depth, rodLocations 
  * @returns {number} Estimated surface potential (V)
  */
 export function estimateSurfacePotential(point, conductors, rho, Ig, totalLength) {
-  if (!conductors || conductors.length === 0) return 0;
+  if (!conductors || conductors.length === 0 || !(totalLength > 0)) return 0;
   let V = 0;
   for (const c of conductors) {
-    const mx = (c.x1 + c.x2) / 2;
-    const my = (c.y1 + c.y2) / 2;
-    const mz = (c.z1 + c.z2) / 2; // negative (below grade)
-
     const dx = c.x2 - c.x1, dy = c.y2 - c.y1, dz = c.z2 - c.z1;
-    const segLen = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
-
-    // Current injected by this segment (proportional to length)
-    const Iseg = Ig * (segLen / totalLength);
-
-    // Distance from midpoint to surface evaluation point (image method: mirror source)
-    const dxP = point.x - mx;
-    const dyP = point.y - my;
-    const r  = Math.sqrt(dxP * dxP + dyP * dyP + mz * mz);      // direct
-    const ri = Math.sqrt(dxP * dxP + dyP * dyP + mz * mz);      // image (same for horizontal conductor at depth mz)
-
-    if (r < 0.05) continue; // avoid singularity at conductor location
-
-    // Surface potential contribution (semi-infinite half-space, method of images)
-    V += (rho * Iseg) / (2 * Math.PI * r);
+    const segLen = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    V += segmentPotential(c, point.x, point.y, 0, rho, Ig * (segLen / totalLength));
   }
   return V;
+}
+
+/**
+ * Mean potential (V) on the conductor surfaces for the same uniform-leakage model.
+ * Used to scale the map so the grid sits at GPR.
+ */
+function meanConductorPotential(conductors, rho, Ig, totalLength) {
+  let weighted = 0;
+  let lengthSum = 0;
+  for (const c of conductors) {
+    const dx = c.x2 - c.x1, dy = c.y2 - c.y1, dz = c.z2 - c.z1;
+    const segLen = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (!(segLen > 0)) continue;
+    const probe = { x: (c.x1 + c.x2) / 2, y: (c.y1 + c.y2) / 2, z: (c.z1 + c.z2) / 2 };
+    let v = 0;
+    for (const o of conductors) {
+      const ox = o.x2 - o.x1, oy = o.y2 - o.y1, oz = o.z2 - o.z1;
+      const oLen = Math.sqrt(ox * ox + oy * oy + oz * oz);
+      v += segmentPotential(o, probe.x, probe.y, probe.z + 0.005, rho, Ig * (oLen / totalLength));
+    }
+    weighted += v * segLen;
+    lengthSum += segLen;
+  }
+  return lengthSum > 0 ? weighted / lengthSum : 0;
 }
 
 /**
@@ -453,6 +507,9 @@ export function buildHazardMap(gridGeometry, rho, Ig, Rg, etouchLimit, estepLimi
   const { conductors, totalConductorLength, bounds } = gridGeometry;
   const { minX, maxX, minY, maxY } = bounds;
   const GPR = Ig * Rg;
+  // Normalise the uniform-leakage potential so the conductors sit at GPR = Ig × Rg.
+  const meanV = meanConductorPotential(conductors, rho, Ig, totalConductorLength);
+  const scale = meanV > 0 ? GPR / meanV : 1;
 
   // Pre-compute surface potential for all grid points
   const xs = [];
@@ -464,13 +521,13 @@ export function buildHazardMap(gridGeometry, rho, Ig, Rg, etouchLimit, estepLimi
 
   for (const y of ys) {
     for (const x of xs) {
-      const surfaceV = estimateSurfacePotential({ x, y }, conductors, rho, Ig, totalConductorLength);
+      const surfaceV = scale * estimateSurfacePotential({ x, y }, conductors, rho, Ig, totalConductorLength);
 
       // Touch voltage: person stands at grid edge, touches energised structure = GPR
       const touchV = Math.max(0, GPR - surfaceV);
 
       // Step voltage: 1-metre step in x direction
-      const surfaceV1m = estimateSurfacePotential({ x: x + 1, y }, conductors, rho, Ig, totalConductorLength);
+      const surfaceV1m = scale * estimateSurfacePotential({ x: x + 1, y }, conductors, rho, Ig, totalConductorLength);
       const stepV = Math.abs(surfaceV - surfaceV1m);
 
       const riskClass = classifyRiskPoint(touchV, stepV, etouchLimit, estepLimit);

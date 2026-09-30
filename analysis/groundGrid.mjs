@@ -26,6 +26,28 @@
  *   ANSI/IEEE Std 80-2013 (Revision of IEEE Std 80-2000)
  */
 
+import { wennerApparentResistivity } from './groundSoilModel.mjs';
+
+/**
+ * Effective uniform resistivity for a fitted two-layer soil.
+ *
+ * Using the top-layer resistivity alone understates grid resistance and GPR when the
+ * lower layer is more resistive (rock or dry sand under topsoil), which is the usual
+ * case. The current flows through soil to a depth comparable to the grid size, so the
+ * Wenner apparent resistivity at spacing a = √A is also considered and the larger
+ * value is used: conservative for Rg, GPR and the voltage checks. Screening-level
+ * only; IEEE 80-2013 §13.4 describes the full two-layer treatment.
+ *
+ * @param {{rho1: number, rho2: number, h: number}} soilModel
+ * @param {number} area  Grid area (m²)
+ * @returns {number} Effective resistivity (Ω·m)
+ */
+export function twoLayerEffectiveRho(soilModel, area) {
+  const { rho1, rho2, h } = soilModel;
+  if (!(rho1 > 0) || !(rho2 > 0) || !(h > 0) || !(area > 0)) return rho1;
+  return Math.max(rho1, wennerApparentResistivity(rho1, rho2, h, Math.sqrt(area)));
+}
+
 /**
  * Compute the surface layer reduction factor Cs (IEEE 80-2013 Eq. 27).
  *
@@ -304,9 +326,8 @@ export function analyzeGroundGrid(params) {
 /**
  * Run IEEE 80 grid analysis using a fitted two-layer soil model.
  *
- * Per IEEE 80-2013 §12.4, when a two-layer soil model is available the top-layer
- * resistivity rho1 is used as the effective uniform resistivity for mesh/step
- * voltage calculations (conservative for most cases where rho1 ≥ rho2).
+ * When a two-layer soil model is available the effective uniform resistivity is the
+ * larger of rho1 and the Wenner apparent resistivity at a = √A (see twoLayerEffectiveRho).
  *
  * @param {object} params          Same as analyzeGroundGrid()
  * @param {{rho1: number, rho2: number, h: number}|null} soilModel
@@ -318,7 +339,7 @@ export function analyzeGroundGridWithSoil(params, soilModel) {
   let usedTwoLayer = false;
 
   if (soilModel && soilModel.rho1 > 0) {
-    effectiveRho = soilModel.rho1;
+    effectiveRho = twoLayerEffectiveRho(soilModel, params.gridLx * params.gridLy);
     usedTwoLayer = true;
   }
 
@@ -416,7 +437,7 @@ export function analyzeIrregularGrid(params, soilModel = null) {
   const Ks  = stepFactor(D, h, nEff);
   const Ki  = irregularityFactor(nEff);
 
-  const effectiveRho = (soilModel && soilModel.rho1 > 0) ? soilModel.rho1 : params.rho;
+  const effectiveRho = (soilModel && soilModel.rho1 > 0) ? twoLayerEffectiveRho(soilModel, area) : params.rho;
   const Rg  = gridResistance(effectiveRho, effectiveLength, area, h);
   const GPR = Ig * Rg;
   const Em  = (effectiveRho * Ig * Km * Ki) / Lm;
