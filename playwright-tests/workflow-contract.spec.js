@@ -353,7 +353,8 @@ test('Underground Ductbank checklist loads the sample before opening its route t
   await expect(page.locator('#cableTable tbody tr').first().locator('input').nth(0)).toHaveValue('UG-CBL-001');
 
   await gotoWorkflowPage(page, server, 'iec60287.html?scope=circuit%3AUG-CBL-001');
-  await expect(page.locator('#size-mm2')).toHaveValue('300');
+  // 500 kcmil is 253 mm2: the link uses the actual area instead of rounding up to 300 mm2
+  await expect(page.locator('#size-mm2')).toHaveValue('253');
   await expect(page.locator('#voltage-class')).toHaveValue('8.7/15kV');
   await expect(page.locator('#install-method')).toHaveValue('conduit');
   await expect(page.locator('#burial-depth-mm')).toHaveValue('1050');

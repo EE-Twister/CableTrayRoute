@@ -140,7 +140,8 @@ test.describe('shared project data integration', () => {
 
   test('common study and deliverable fields use shared site conditions', async ({ page }) => {
     await seedProject(page, 'heattracesizing.html');
-    await expect(page.locator('#ambient-temp-c')).toHaveValue('-20');
+    // The Heat Trace page defaults to imperial units, so the linked -20 °C minimum ambient shows as -4 °F
+    await expect(page.locator('#ambient-temp-c')).toHaveValue('-4');
     await expect(page.getByLabel('Linked source: Minimum ambient')).toBeVisible();
 
     await page.goto(pageUrl('busdust.html'));
@@ -169,7 +170,8 @@ test.describe('shared project data integration', () => {
 
     await page.goto(pageUrl('iec60287.html'));
     await expect(page.getByRole('combobox', { name: 'Cable project scope' })).toContainText('CBL-MCC-PMP-101');
-    await expect(page.locator('#size-mm2')).toHaveValue('25');
+    // #4 AWG is 21.2 mm2: the link uses the actual area instead of rounding up to 25 mm2
+    await expect(page.locator('#size-mm2')).toHaveValue('21.2');
     await expect(page.locator('#material')).toHaveValue('Cu');
     await expect(page.locator('#insulation')).toHaveValue('PVC');
     await expect(page.locator('#install-method')).toHaveValue('tray');
