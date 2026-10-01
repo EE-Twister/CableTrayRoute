@@ -1436,7 +1436,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Writes**
 - `cableSchedule`
-  - app.mjs:2952 setCables()
+  - app.mjs:2954 setCables()
 - `settings.conduitFillData`
   - app.mjs:1417 setItem(conduitFillData)
   - app.mjs:1451 setItem(conduitFillData)
