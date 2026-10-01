@@ -68,6 +68,16 @@ test.describe('Optimal Route', () => {
 
   test('renders the professional desktop route viewer without panel overlap', async ({ page }) => {
     test.setTimeout(60000);
+    // The three.js viewer needs WebGL; GPU-less runners fall back to the 2D plot instead.
+    const hasWebGL = await page.evaluate(() => {
+      try {
+        const probe = document.createElement('canvas');
+        return Boolean(probe.getContext('webgl2') || probe.getContext('webgl'));
+      } catch {
+        return false;
+      }
+    });
+    test.skip(!hasWebGL, 'The professional 3D viewer requires WebGL, which this browser cannot provide.');
     await page.click('#load-sample-network-btn');
     await expect(page.locator('#pull-check-options')).toBeHidden();
     await expect(page.locator('#pull-checks-details')).toBeHidden();
