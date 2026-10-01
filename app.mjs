@@ -2918,10 +2918,12 @@ const renderBatchResults = async (results) => {
                             showManualPathError(index, result.message, result.error && result.error.tray_id);
                         }
                         cable.route_segments = result.success ? result.route_segments : [];
-                        let vd = 0;
+                        // calculateVoltageDrop returns null when the cable lacks the data
+                        // (load, voltage, supported size); that must not abort the batch.
+                        let vd = null;
                         if (result.success) {
                             vd = calculateVoltageDrop(cable, result.total_length, cable.phase);
-                            cable.voltage_drop_pct = vd;
+                            if (Number.isFinite(vd)) cable.voltage_drop_pct = vd;
                         }
                         const pullCheck = result.success && state.pullChecksEnabled
                             ? buildCablePullPlan(result.route_segments || [], cable, {
@@ -2940,7 +2942,7 @@ const renderBatchResults = async (results) => {
                             segments_count: result.success ? result.route_segments.length : 0,
                             tray_segments: result.success ? result.tray_segments : [],
                             route_segments: result.success ? result.route_segments : [],
-                            voltage_drop_pct: result.success ? vd.toFixed(2) : 'N/A',
+                            voltage_drop_pct: Number.isFinite(vd) ? vd.toFixed(2) : 'N/A',
                             ...(pullCheck ? { pull_check: pullCheck } : {}),
                             exclusions: result.exclusions || [],
                         };
