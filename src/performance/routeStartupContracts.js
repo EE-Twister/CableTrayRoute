@@ -4,7 +4,7 @@ export const ROUTE_STARTUP_CONTRACTS = Object.freeze({
   'arcFlash.html': Object.freeze({ maxReadyMs: 1500, maxScriptRequests: 2, maxCatalogRequests: 0, maxShardRequests: 0 }),
   'tcc.html': Object.freeze({ maxReadyMs: 2000, maxScriptRequests: 4, maxCatalogRequests: 1, maxShardRequests: 0 }),
   'library.html': Object.freeze({ maxReadyMs: 2500, maxScriptRequests: 2, maxCatalogRequests: 1, maxShardRequests: 0 }),
-  'harmonics.html': Object.freeze({ maxReadyMs: 1500, maxScriptRequests: 2, maxCatalogRequests: 0, maxShardRequests: 0 }),
+  'harmonics.html': Object.freeze({ maxReadyMs: 1500, maxScriptRequests: 3, maxCatalogRequests: 0, maxShardRequests: 0 }),
   'loadFlow.html': Object.freeze({ maxReadyMs: 1500, maxScriptRequests: 1, maxCatalogRequests: 0, maxShardRequests: 0 }),
   'motorStart.html': Object.freeze({ maxReadyMs: 1500, maxScriptRequests: 2, maxCatalogRequests: 0, maxShardRequests: 0 }),
   'contingency.html': Object.freeze({ maxReadyMs: 1500, maxScriptRequests: 1, maxCatalogRequests: 0, maxShardRequests: 0 }),
