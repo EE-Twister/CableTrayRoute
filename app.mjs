@@ -3658,6 +3658,8 @@ const renderBatchResults = async (results) => {
             renderProfessionalViewer(trays, routes);
             return;
         }
+        // The route list does not depend on the 3D viewer, so keep it populated in the 2D fallback.
+        renderRouteViewerList(state.latestRouteData);
         if (!globalThis.Plotly || !elements.plot3d) {
             console.warn('Plotly is not loaded');
             return;
