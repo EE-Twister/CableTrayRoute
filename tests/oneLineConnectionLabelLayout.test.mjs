@@ -34,6 +34,37 @@ class FakeLabel {
   }
 }
 
+// Mimics an SVG text element inside a zoomed canvas: user units map to screen pixels by `scale`.
+class ScaledLabel extends FakeLabel {
+  constructor({ scale, withMatrix, ...rest }) {
+    super(rest);
+    this.scale = scale;
+    this.withMatrix = withMatrix;
+    this.writes = 0;
+    if (!withMatrix) this.getScreenCTM = undefined;
+  }
+
+  setAttribute(name, value) {
+    if (name === 'y') this.writes += 1;
+    super.setAttribute(name, value);
+  }
+
+  getScreenCTM() {
+    return { a: this.scale, b: 0, c: 0, d: this.scale };
+  }
+
+  getBoundingClientRect() {
+    return {
+      left: this.x * this.scale,
+      top: this.y * this.scale,
+      right: (this.x + this.width) * this.scale,
+      bottom: (this.y + this.height) * this.scale,
+      width: this.width * this.scale,
+      height: this.height * this.scale
+    };
+  }
+}
+
 describe('One-Line rendered connection label layout', () => {
   it('builds deterministic symmetric search offsets', () => {
     assert.deepEqual(symmetricOffsets(10, 30), [0, -10, 10, -20, 20, -30, 30]);
@@ -60,5 +91,44 @@ describe('One-Line rendered connection label layout', () => {
 
     assert.equal(first.y, -18);
     assert.equal(second.y, 18);
+  });
+  it('places labels identically with and without a screen matrix at any zoom', () => {
+    const run = (withMatrix, scale) => {
+      const obstacles = [new ScaledLabel({ x: 0, y: 0, width: 200, height: 16, scale, withMatrix })];
+      const labels = Array.from({ length: 6 }, (_, i) => new ScaledLabel({ x: 10 + i * 3, y: 0, scale, withMatrix }));
+      resolveRenderedConnectionLabelCollisions({
+        connectionLabels: labels,
+        obstacleLabels: obstacles,
+        padding: 2,
+        offsets: symmetricOffsets(18, 180)
+      });
+      return labels.map(label => label.y);
+    };
+    for (const scale of [1, 0.5, 2.5]) {
+      assert.deepEqual(run(true, scale), run(false, scale), `scale ${scale}`);
+    }
+  });
+
+  it('writes each label position at most once when the screen matrix is available', () => {
+    const labels = Array.from({ length: 5 }, () => new ScaledLabel({ x: 10, y: 0, scale: 1, withMatrix: true }));
+    resolveRenderedConnectionLabelCollisions({
+      connectionLabels: labels,
+      obstacleLabels: [new ScaledLabel({ x: 0, y: 0, width: 200, height: 16, scale: 1, withMatrix: true })],
+      padding: 0,
+      offsets: symmetricOffsets(18, 180)
+    });
+    labels.forEach(label => assert.ok(label.writes <= 1, `wrote ${label.writes} times`));
+  });
+
+  it('scales to a thousand labels without comparing every pair', () => {
+    const labels = Array.from({ length: 1000 }, (_, i) => new ScaledLabel({
+      x: (i % 16) * 100,
+      y: Math.floor(i / 16) * 40,
+      scale: 1,
+      withMatrix: true
+    }));
+    const started = Date.now();
+    resolveRenderedConnectionLabelCollisions({ connectionLabels: labels, obstacleLabels: [], padding: 2 });
+    assert.ok(Date.now() - started < 1000);
   });
 });

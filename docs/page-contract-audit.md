@@ -355,28 +355,28 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - None
 
 **Direct Browser Storage**
-- oneline.js:2000 sessionStorage.setItem(<dynamic>) - session-handoff: Temporary custom component editor prefill; not durable project state.
+- oneline.js:2012 sessionStorage.setItem(<dynamic>) - session-handoff: Temporary custom component editor prefill; not durable project state.
 
 **Detected Reads**
 - `cableSchedule`
   - analysis/shortCircuit.mjs:1184 getCables()
-  - oneline.js:11133 getCables()
-  - oneline.js:12618 getCables()
-  - oneline.js:12793 getCables()
-  - oneline.js:3458 getCables()
+  - oneline.js:11145 getCables()
+  - oneline.js:12634 getCables()
+  - oneline.js:12809 getCables()
+  - oneline.js:3470 getCables()
   - ... 3 more
 - `equipment`
   - analysis/motorStart.js:53 getEquipment()
-  - oneline.js:12618 getEquipment()
-  - oneline.js:12790 getEquipment()
-  - oneline.js:8236 getEquipment()
+  - oneline.js:12634 getEquipment()
+  - oneline.js:12806 getEquipment()
+  - oneline.js:8248 getEquipment()
   - reports/exportAll.mjs:293 getEquipment()
   - ... 1 more
 - `loadList`
   - analysis/motorStart.js:54 getLoads()
-  - oneline.js:12618 getLoads()
-  - oneline.js:12792 getLoads()
-  - oneline.js:8237 getLoads()
+  - oneline.js:12634 getLoads()
+  - oneline.js:12808 getLoads()
+  - oneline.js:8249 getLoads()
   - src/one-line/propertyDetailView.mjs:589 getLoads()
 - `oneLineDiagram`
   - analysis/arcFlash.mjs:460 getOneLine()
@@ -386,8 +386,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - analysis/loadFlow.js:1219 getOneLine()
   - ... 21 more
 - `panelSchedule`
-  - oneline.js:12618 getPanels()
-  - oneline.js:12791 getPanels()
+  - oneline.js:12634 getPanels()
+  - oneline.js:12807 getPanels()
   - reports/exportAll.mjs:294 getPanels()
   - src/one-line/propertyDetailView.mjs:597 getPanels()
 - `settings.activeSampleWorkflow`
@@ -395,31 +395,31 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.diagramDatablockConfig`
   - src/one-line/eventBindingController.mjs:2131 getItem(diagramDatablockConfig)
 - `settings.diagramScale`
-  - oneline.js:2334 getItem(diagramScale)
+  - oneline.js:2346 getItem(diagramScale)
 - `settings.diagramTitleBlock`
   - src/one-line/eventBindingController.mjs:2078 getItem(diagramTitleBlock)
 - `settings.gistToken`
-  - oneline.js:12987 getItem(gistToken)
+  - oneline.js:13003 getItem(gistToken)
 - `settings.labelCounters`
-  - oneline.js:4641 getItem(labelCounters)
+  - oneline.js:4653 getItem(labelCounters)
   - src/one-line/eventBindingController.mjs:329 getItem(labelCounters)
 - `settings.labelPrefixes`
-  - oneline.js:4640 getItem(labelPrefixes)
+  - oneline.js:4652 getItem(labelPrefixes)
 - `settings.liveTelemetryConfig`
-  - oneline.js:2416 getItem(liveTelemetryConfig)
+  - oneline.js:2428 getItem(liveTelemetryConfig)
 - `settings.manufacturerDefaults`
-  - oneline.js:1906 getItem(manufacturerDefaults)
+  - oneline.js:1918 getItem(manufacturerDefaults)
 - `settings.onelineTemplates`
-  - oneline.js:5616 migrateLegacyItem(..., onelineTemplates)
+  - oneline.js:5628 migrateLegacyItem(..., onelineTemplates)
 - `settings.studyProvenance`
-  - oneline.js:10116 getStudyProvenance()
-  - oneline.js:3738 getStudyProvenance()
-  - oneline.js:3756 getStudyProvenance()
-  - oneline.js:4129 getStudyProvenance()
-  - oneline.js:9976 getStudyProvenance()
+  - oneline.js:10128 getStudyProvenance()
+  - oneline.js:3750 getStudyProvenance()
+  - oneline.js:3768 getStudyProvenance()
+  - oneline.js:4141 getStudyProvenance()
+  - oneline.js:9988 getStudyProvenance()
   - ... 1 more
 - `settings.studySettings`
-  - oneline.js:2379 getItem(studySettings)
+  - oneline.js:2391 getItem(studySettings)
 - `settings.tccSettings`
   - analysis/arcFlash.mjs:364 getItem(tccSettings)
   - analysis/shortCircuit.mjs:775 getItem(tccSettings)
@@ -428,7 +428,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - analysis/harmonics.js:568 getStudies()
   - analysis/motorStart.js:265 getStudies()
   - analysis/motorStart.js:55 getStudies()
-  - oneline.js:12348 getStudies()
+  - oneline.js:12364 getStudies()
   - ... 16 more
 - `studyResults.arcFlash`
   - reports/exportAll.mjs:297 getStudies().arcFlash
@@ -443,64 +443,64 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - validation/rules.js:672 studies.reliability
   - validation/rules.js:674 studies?.reliability
 - `studyResults.transformerTapOptimization`
-  - oneline.js:2671 getStudies().transformerTapOptimization
+  - oneline.js:2683 getStudies().transformerTapOptimization
 
 **Detected Writes**
 - `cableSchedule`
-  - oneline.js:12809 setCables()
-  - oneline.js:3360 setCables()
-  - oneline.js:3468 setCables()
+  - oneline.js:12825 setCables()
+  - oneline.js:3372 setCables()
+  - oneline.js:3480 setCables()
 - `conduitSchedule`
-  - oneline.js:8145 addRaceway()
-  - oneline.js:8732 addRaceway()
+  - oneline.js:8157 addRaceway()
+  - oneline.js:8744 addRaceway()
 - `equipment`
-  - oneline.js:12806 setEquipment()
-  - oneline.js:3362 setEquipment()
+  - oneline.js:12822 setEquipment()
+  - oneline.js:3374 setEquipment()
 - `loadList`
-  - oneline.js:12808 setLoads()
-  - oneline.js:3356 setLoads()
+  - oneline.js:12824 setLoads()
+  - oneline.js:3368 setLoads()
 - `oneLineDiagram`
-  - oneline.js:4444 setOneLine()
+  - oneline.js:4456 setOneLine()
   - src/one-line/studyExecutionController.mjs:123 setOneLine()
   - src/one-line/studyExecutionController.mjs:142 setOneLine()
   - src/one-line/studyExecutionController.mjs:184 setOneLine()
 - `panelSchedule`
-  - oneline.js:12807 setPanels()
-  - oneline.js:3358 setPanels()
+  - oneline.js:12823 setPanels()
+  - oneline.js:3370 setPanels()
 - `settings.activeSampleWorkflow`
   - src/one-line/eventBindingController.mjs:2150 setItem(activeSampleWorkflow)
 - `settings.diagramDatablockConfig`
-  - oneline.js:10286 setItem(diagramDatablockConfig)
+  - oneline.js:10298 setItem(diagramDatablockConfig)
 - `settings.diagramScale`
-  - oneline.js:10357 setItem(diagramScale)
-  - oneline.js:12956 setItem(diagramScale)
+  - oneline.js:10369 setItem(diagramScale)
+  - oneline.js:12972 setItem(diagramScale)
 - `settings.diagramTitleBlock`
   - src/one-line/eventBindingController.mjs:2113 setItem(diagramTitleBlock)
 - `settings.gistToken`
-  - oneline.js:12991 setItem(gistToken)
+  - oneline.js:13007 setItem(gistToken)
 - `settings.labelCounters`
-  - oneline.js:4650 setItem(labelCounters)
+  - oneline.js:4662 setItem(labelCounters)
 - `settings.labelPrefixes`
-  - oneline.js:4770 setItem(labelPrefixes)
+  - oneline.js:4782 setItem(labelPrefixes)
 - `settings.liveTelemetryConfig`
-  - oneline.js:2576 setItem(liveTelemetryConfig)
+  - oneline.js:2588 setItem(liveTelemetryConfig)
 - `settings.manufacturerDefaults`
-  - oneline.js:4839 setItem(manufacturerDefaults)
+  - oneline.js:4851 setItem(manufacturerDefaults)
 - `settings.oneLineScheduleReconcilePending`
-  - oneline.js:12626 setItem(oneLineScheduleReconcilePending)
+  - oneline.js:12642 setItem(oneLineScheduleReconcilePending)
 - `settings.onelineTemplates`
-  - oneline.js:5616 migrateLegacyItem(..., onelineTemplates)
-  - oneline.js:5624 setItem(onelineTemplates)
+  - oneline.js:5628 migrateLegacyItem(..., onelineTemplates)
+  - oneline.js:5636 setItem(onelineTemplates)
 - `settings.scenarios`
   - src/one-line/diagramFileController.mjs:151 switchScenario()
 - `settings.studySettings`
-  - oneline.js:2691 setItem(studySettings)
+  - oneline.js:2703 setItem(studySettings)
 - `studyResults`
   - analysis/harmonics.js:537 setStudies()
   - analysis/harmonics.js:570 setStudies()
   - analysis/motorStart.js:267 setStudies()
-  - oneline.js:4456 setStudies()
-  - oneline.js:4483 setStudies()
+  - oneline.js:4468 setStudies()
+  - oneline.js:4495 setStudies()
   - ... 6 more
 - `studyResults.duty`
   - validation/rules.js:666 studies.duty
@@ -519,10 +519,10 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `studyResults.shortCircuit`
   - src/one-line/studyExecutionController.mjs:144 studies.shortCircuit
 - `studyResults.transformerTapOptimization`
-  - oneline.js:4481 studies.transformerTapOptimization
+  - oneline.js:4493 studies.transformerTapOptimization
 - `traySchedule`
-  - oneline.js:8145 addRaceway()
-  - oneline.js:8732 addRaceway()
+  - oneline.js:8157 addRaceway()
+  - oneline.js:8744 addRaceway()
 
 ### Demand Schedule (`demandschedule.html`)
 
