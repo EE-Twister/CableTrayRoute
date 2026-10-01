@@ -367,7 +367,8 @@ test('Underground Ductbank checklist loads the sample before opening its route t
   expect(monitor.errors).toEqual([]);
   await expect(page.locator('#results')).toContainText('IEC 60287 Ampacity Results');
   await expect(page.locator('#results')).toContainText('In conduit (buried)');
-  await expect(page.locator('#results')).toContainText('0.0600 mΩ/m');
+  // R20 of the 253 mm2 conductor (it was 0.0600 mOhm/m when the size was rounded up to 300 mm2)
+  await expect(page.locator('#results')).toContainText('0.0710 mΩ/m');
   await expect(page.locator('#results')).not.toContainText('NaN');
 });
 
