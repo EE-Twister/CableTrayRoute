@@ -69,18 +69,21 @@ async function installLibraryApiMock(page, { initialState, latestState = null, c
 }
 
 test.describe('Component Library structured workflows', () => {
-  test('shows governed protective-device inventory with readiness filters', async ({ page }) => {
+  test('shows governed protective-device inventory with readiness filters', async ({ page, browserName }) => {
     const startupScripts = [];
     page.on('request', request => {
       if (request.resourceType() === 'script') startupScripts.push(new URL(request.url()).pathname);
     });
     await page.goto(pageUrl);
 
-    expect(startupScripts).toHaveLength(2);
-    expect(startupScripts.some(pathname => pathname.endsWith('/dist/vendor/xlsx.full.min.js'))).toBe(true);
-    expect(startupScripts.some(pathname => /\/dist\/library(?:\.[0-9a-f]{8,})?\.js$/.test(pathname))).toBe(true);
-    expect(startupScripts.some(pathname => pathname.includes('/src/components/navigation.js'))).toBe(false);
-    expect(startupScripts.some(pathname => pathname.endsWith('/dataStore.mjs'))).toBe(false);
+    // Firefox does not report file:// subresource requests, so the script list is only observable in Chromium.
+    if (browserName === 'chromium') {
+      expect(startupScripts).toHaveLength(2);
+      expect(startupScripts.some(pathname => pathname.endsWith('/dist/vendor/xlsx.full.min.js'))).toBe(true);
+      expect(startupScripts.some(pathname => /\/dist\/library(?:\.[0-9a-f]{8,})?\.js$/.test(pathname))).toBe(true);
+      expect(startupScripts.some(pathname => pathname.includes('/src/components/navigation.js'))).toBe(false);
+      expect(startupScripts.some(pathname => pathname.endsWith('/dataStore.mjs'))).toBe(false);
+    }
 
     await expect(page.locator('#protective-library-summary')).toContainText('5218 bundled devices');
     await expect(page.locator('#protective-library-summary')).toContainText('Showing the first 200 of 5218 matches');
