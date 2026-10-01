@@ -3580,9 +3580,27 @@ const renderBatchResults = async (results) => {
         });
     };
 
+    // Probe before loading the viewer: three.js logs console errors when it cannot create a
+    // context, and browsers without WebGL should fall back to the 2D plot quietly.
+    const isWebGLAvailable = () => {
+        try {
+            const probe = document.createElement('canvas');
+            const gl = probe.getContext('webgl2') || probe.getContext('webgl');
+            gl?.getExtension('WEBGL_lose_context')?.loseContext();
+            return Boolean(gl);
+        } catch {
+            return false;
+        }
+    };
+
     const ensureRouteViewer = () => {
         if (state.routeViewer) return Promise.resolve(state.routeViewer);
         if (state.routeViewerLoad) return state.routeViewerLoad;
+        if (!isWebGLAvailable()) {
+            state.routeViewerFailed = true;
+            console.warn('WebGL is not available; the professional 3D viewer is falling back to Plotly.');
+            return Promise.reject(new Error('WebGL is not available in this browser.'));
+        }
         state.routeViewerLoad = import('./dist/routeViewer3D.js?v=28').then(({ createRouteViewer3D }) => {
             state.routeViewer = createRouteViewer3D({
                 container: elements.plot3d,
