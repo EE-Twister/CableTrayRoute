@@ -29,7 +29,7 @@ test('One-Line Data Manager filters, edits, batch-updates, persists, and exports
     }));
   });
 
-  await page.goto(pageUrl('datamanager.html'));
+  await page.goto(pageUrl('datamanager.html?e2e=1'));
   await expect(page.getByRole('heading', { name: 'One-Line Data Manager' })).toBeVisible();
   await expect(page.locator('#dm-table-body tr')).toHaveCount(2);
 

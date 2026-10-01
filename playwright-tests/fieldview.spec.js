@@ -7,7 +7,7 @@ const root = path.join(__dirname, '..');
 const pageUrl = file => 'file://' + path.join(root, file);
 
 test('field view captures a cable observation into the project queue', async ({ page }) => {
-  await page.goto(pageUrl('fieldview.html'));
+  await page.goto(pageUrl('fieldview.html?e2e=1'));
   await page.evaluate(() => {
     localStorage.clear();
     sessionStorage.clear();
@@ -20,7 +20,7 @@ test('field view captures a cable observation into the project queue', async ({ 
     }]));
   });
 
-  await page.goto(pageUrl('fieldview.html#cable=C-101'));
+  await page.goto(pageUrl('fieldview.html?e2e=1#cable=C-101'));
   await expect(page.getByRole('heading', { name: 'Field observation / punch item' })).toBeVisible();
   await page.selectOption('[data-field-observation="type"]', 'punch');
   await page.fill('[data-field-observation="summary"]', 'Missing cable identification tag');

@@ -446,10 +446,12 @@ test('focused palette and report gates reduce overload and expose blocked action
   await gotoWorkflowPage(page, server, 'oneline.html');
   await page.waitForSelector('#oneline-ready-beacon');
   await expect(page.locator('#palette')).toBeVisible();
+  // A first visit shows the full palette; the Common filter narrows it to the everyday symbols
+  await expect(page.locator('[data-palette-filter="all"]')).toHaveAttribute('aria-pressed', 'true');
+  const allCount = await page.locator('#component-buttons [data-testid="palette-button"]:visible').count();
+  await page.locator('[data-palette-filter="common"]').click();
   await expect(page.locator('[data-palette-filter="common"]')).toHaveAttribute('aria-pressed', 'true');
   const commonCount = await page.locator('#component-buttons [data-testid="palette-button"]:visible').count();
-  await page.locator('[data-palette-filter="all"]').click();
-  const allCount = await page.locator('#component-buttons [data-testid="palette-button"]:visible').count();
   expect(commonCount).toBeGreaterThan(0);
   expect(commonCount).toBeLessThan(allCount);
 
