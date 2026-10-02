@@ -104,3 +104,17 @@ assert.ok(!stack.includes('title="None: 0"'), 'zero segments are not drawn');
 assert.ok(stack.includes('None 0'), 'zero counts remain in the caption');
 assert.strictEqual(stackedBarHtml([{ label: 'x', count: 0 }]), '');
 console.log('stackedBar tests passed');
+
+import { classifyStatusText, summarizeStatusColumn } from '../src/components/resultViz.mjs';
+assert.strictEqual(classifyStatusText('✓ Pass'), 'pass');
+assert.strictEqual(classifyStatusText('FAIL'), 'fail');
+assert.strictEqual(classifyStatusText('Warning'), 'warn');
+assert.strictEqual(classifyStatusText('MCC-1'), null);
+assert.strictEqual(classifyStatusText(''), null);
+const grid = [['A', '1.2', 'PASS'], ['B', '3.4', 'FAIL'], ['C', '2.2', 'Warning'], ['D', '0.1', 'PASS']];
+const col = summarizeStatusColumn(grid);
+assert.strictEqual(col.column, 2);
+assert.deepStrictEqual([col.pass, col.warn, col.fail], [2, 1, 1]);
+assert.strictEqual(summarizeStatusColumn([['A', '1'], ['B', '2'], ['C', '3']]), null);
+assert.strictEqual(summarizeStatusColumn([['A', 'PASS']]), null, 'too few rows');
+console.log('autoSummary tests passed');

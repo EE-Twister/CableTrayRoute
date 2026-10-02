@@ -207,3 +207,43 @@ export function stackedBarHtml(segments, { ariaLabel = 'Result breakdown' } = {}
     <div class="viz-stack__caption">${caption}</div>
   </div>`;
 }
+
+const PASS_WORDS = /^(pass|passed|ok|okay|compliant|within limits?|acceptable|adequate|ready|safe|stable|complete|complete[d]?)$/i;
+const WARN_WORDS = /^(warn|warning|warnings|review|marginal|caution|check|incomplete|partial|needs? review|near limit)$/i;
+const FAIL_WORDS = /^(fail|failed|error|errors|non-?compliant|exceeds?|exceeded|unsafe|unstable|violation|overloaded|over limit|blocked)$/i;
+
+/** Map a cell's text to pass/warn/fail, or null when it is not a status word. */
+export function classifyStatusText(value) {
+  const text = String(value ?? '').replace(/^[^A-Za-z]+/, '').trim();
+  if (!text || text.length > 24) return null;
+  if (PASS_WORDS.test(text)) return 'pass';
+  if (FAIL_WORDS.test(text)) return 'fail';
+  if (WARN_WORDS.test(text)) return 'warn';
+  return null;
+}
+
+/**
+ * Find the column of a results grid that is mostly status words and count outcomes.
+ * rows: string[][] of body cell text. Returns null when no status column exists.
+ */
+export function summarizeStatusColumn(rows, { minRows = 3, minShare = 0.7 } = {}) {
+  const grid = (rows || []).filter(row => Array.isArray(row) && row.length);
+  if (grid.length < minRows) return null;
+  const width = Math.max(...grid.map(row => row.length));
+  let best = null;
+  for (let col = 0; col < width; col += 1) {
+    const counts = { pass: 0, warn: 0, fail: 0 };
+    let classified = 0;
+    grid.forEach(row => {
+      const status = classifyStatusText(row[col]);
+      if (status) {
+        counts[status] += 1;
+        classified += 1;
+      }
+    });
+    if (classified / grid.length >= minShare && (!best || classified > best.classified)) {
+      best = { column: col, classified, ...counts };
+    }
+  }
+  return best;
+}

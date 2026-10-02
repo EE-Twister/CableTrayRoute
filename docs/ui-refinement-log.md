@@ -134,3 +134,7 @@
 - Short Circuit bars show a tick at the interrupting rating entered on the One-Line component (`interruptRatingKA`), a margin note, and an "Over entered rating" KPI. Without a rating they stay informational.
 - Arc Flash bars include a tick at 40 cal/cm².
 - IEC 60909 gains a fault-current bar chart. Design Rule Checker and Equipment Evaluation gain a stacked outcome bar (`stackedBarHtml`).
+
+### Automatic status summaries
+
+`src/components/resultAutoSummary.js` is loaded through the shared navigation module, so it reaches every page that uses the shared shell. It watches for results tables (`results-table`, `data-table`, `study-results-table`) with a column that is mostly status words (pass, fail, warning, compliant and similar). It adds a pass / review / fail bar above the table and keeps it current as rows change. Pages with their own chart or stacked bar keep it. Add `data-no-auto-summary` to a container to opt out. Covered by `playwright-tests/resultAutoSummary.spec.js`.

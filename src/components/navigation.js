@@ -1,6 +1,7 @@
 import { getAuthRole, getProjectState } from '../../projectStorage.js';
 import { mountProfileControl } from '../authProfileControl.js';
 import { observeMojibake, repairMojibakeDocument } from '../textEncoding.js';
+import './resultAutoSummary.js';
 
 export const NAV_ROUTES = [
   { href: 'index.html', label: 'Home', section: 'Home', icon: 'icons/route.svg' },
