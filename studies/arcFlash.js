@@ -3,6 +3,7 @@ import { getOneLine, getStudies, setStudies } from '../dataStore.mjs';
 import { getProjectState } from '../projectStorage.js';
 import { generateArcFlashReport } from '../reports/arcFlashReport.mjs';
 import { fingerprintStudySource } from '../analysis/studyResultReadiness.mjs';
+import { arcFlashBarRows, barChartHtml, kpiStripHtml, ppeCategoryForEnergy, statusLegendHtml } from '../src/components/resultViz.mjs';
 import {
   arcFlashReadinessLabel,
   arcFlashResultEntries,
@@ -26,6 +27,28 @@ export async function runArcFlashStudy() {
   studies.arcFlash = results;
   setStudies(studies);
   return results;
+}
+
+function renderArcFlashChart(entries) {
+  const chart = document.getElementById('arcflash-chart');
+  if (!chart) return;
+  const rows = arcFlashBarRows(entries);
+  if (!rows.length) {
+    chart.innerHTML = '';
+    return;
+  }
+  const worst = rows.reduce((best, row) => (row.value > best.value ? row : best), rows[0]);
+  const worstCategory = ppeCategoryForEnergy(worst.value);
+  const dangerous = rows.filter(row => row.value > 40).length;
+  chart.innerHTML = `${kpiStripHtml([
+    { label: 'Highest incident energy', value: `${worst.value.toFixed(1)} cal/cm²`, hint: worst.label, status: worstCategory.status },
+    { label: 'Worst PPE category', value: worstCategory.label.replace(/ cal\/cm².*/, ''), status: worstCategory.status },
+    { label: 'Over 40 cal/cm²', value: String(dangerous), status: dangerous ? 'fail' : 'pass' }
+  ])}
+  <h3 class="study-chart__title">Incident energy by equipment</h3>
+  ${barChartHtml(rows, { unit: 'cal/cm²', ariaLabel: 'Incident energy by equipment' })}
+  ${statusLegendHtml()}
+  <p class="field-hint">PPE categories follow NFPA 70E thresholds: 1.2, 4, 8, 25 and 40 cal/cm². Confirm against your site arc-flash program.</p>`;
 }
 
 function renderResults(results, scope = 'project') {
@@ -77,6 +100,7 @@ function renderResults(results, scope = 'project') {
   const readiness = summarizeArcFlashResults(results, scope);
   summary.textContent = readiness.summary;
   summary.hidden = false;
+  renderArcFlashChart(entries);
   table.hidden = entries.length === 0;
   details.hidden = false;
   output.textContent = JSON.stringify(Object.fromEntries(entries), null, 2);

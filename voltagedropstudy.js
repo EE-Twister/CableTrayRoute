@@ -1,3 +1,4 @@
+import { barChartHtml, statusBadgeHtml, statusLegendHtml, voltageDropBarRows } from './src/components/resultViz.mjs';
 import { runVoltageDropStudy } from './analysis/voltageDropStudy.mjs';
 import {
   getCables,
@@ -126,16 +127,20 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>${esc(result.inputSource?.current || 'missing')}</td>
             <td class="num">${result.voltageV > 0 ? result.voltageV.toFixed(0) : '—'}</td>
             <td class="num">${result.evaluated ? result.dropPct.toFixed(2) : '—'}</td>
-            <td class="status-cell status-${result.status}">${result.status.toUpperCase()}</td>
+            <td class="status-cell status-${result.status}">${statusBadgeHtml(result.status === 'not-evaluated' ? 'na' : result.status)}</td>
             <td>${result.pathTags.map(esc).join(' → ') || '—'}</td>
             <td class="num">${result.pathEvaluated ? result.combinedDropPct.toFixed(2) : '—'}</td>
             <td class="num">${result.combinedLimitPct.toFixed(1)}</td>
-            <td class="status-cell status-${result.combinedStatus}">${result.combinedStatus.toUpperCase()}</td>
+            <td class="status-cell status-${result.combinedStatus}">${statusBadgeHtml(result.combinedStatus === 'not-evaluated' ? 'na' : result.combinedStatus)}</td>
             <td>${recommendationHtml}</td>
           </tr>`;
       }).join('');
 
     resultsEl.innerHTML = `
+      <h3 class="study-chart__title">Voltage drop vs. limit (worst first)</h3>
+      ${barChartHtml(voltageDropBarRows(results), { unit: '%', ariaLabel: 'Voltage drop per cable against its limit' })}
+      ${statusLegendHtml()}
+      <p class="field-hint">The vertical tick on each bar marks that cable's allowed drop. Full details are in the table below.</p>
       <div class="table-scroll">
         <table class="results-table" aria-label="Voltage drop recommendation results">
           <thead><tr>

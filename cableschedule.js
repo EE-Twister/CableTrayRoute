@@ -3,6 +3,7 @@ import './site.js';
 import * as dataStore from './dataStore.mjs';
 import { createTable, STORAGE_KEYS } from './tableUtils.mjs';
 import { openModal, showAlertModal } from './src/components/modal.js';
+import { mountScheduleSummary } from './src/components/scheduleSummaryMount.js';
 import { confirmProjectEntityDeletion } from './src/components/projectDeletionReview.js';
 import { start as startTour } from './tour.js';
 import {
@@ -3253,6 +3254,8 @@ async function initCableSchedule() {
     tourBtn.addEventListener('click', () => startTour(CABLE_TOUR_STEPS, 'cableSchedule'));
   }
 }
+
+document.addEventListener('DOMContentLoaded', () => mountScheduleSummary('cables'));
 
 bootstrapPage({
   readyEvent: 'cableschedule-ready',

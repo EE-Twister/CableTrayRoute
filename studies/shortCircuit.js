@@ -2,6 +2,7 @@ import { runShortCircuit } from '../analysis/shortCircuit.mjs';
 import { getOneLine, getCables, getStudies, setStudies, getProjectInputFingerprint } from '../dataStore.mjs';
 import { getProjectState } from '../projectStorage.js';
 import { downloadPDF } from '../reports/reporting.mjs';
+import { barChartHtml, kpiStripHtml, shortCircuitBarRows, statusLegendHtml } from '../src/components/resultViz.mjs';
 import { loadReferencedProtectiveDevices } from '../src/protectiveDevices/calculationCatalog.mjs';
 
 function projectComponents() {
@@ -173,6 +174,26 @@ export function exportShortCircuitReport(results = {}) {
   return true;
 }
 
+function renderShortCircuitChart(entries, assumedCount) {
+  const chart = document.getElementById('shortcircuit-chart');
+  if (!chart) return;
+  const rows = shortCircuitBarRows(entries);
+  if (!rows.length) {
+    chart.innerHTML = '';
+    return;
+  }
+  const highest = rows.reduce((best, row) => (row.value > best.value ? row : best), rows[0]);
+  chart.innerHTML = `${kpiStripHtml([
+    { label: 'Highest 3-phase fault', value: `${highest.value.toFixed(1)} kA`, hint: highest.label, status: highest.status },
+    { label: 'Locations calculated', value: String(rows.length), status: 'info' },
+    { label: 'Need input review', value: String(assumedCount), status: assumedCount ? 'warn' : 'pass' }
+  ])}
+  <h3 class="study-chart__title">3-phase fault current by location</h3>
+  ${barChartHtml(rows, { unit: 'kA', ariaLabel: '3-phase fault current by location' })}
+  ${statusLegendHtml()}
+  <p class="field-hint">Bars are colored by severity (under 22 kA, 22–65 kA, 65 kA and above). Each note shows the smallest standard interrupting rating that covers the fault current.</p>`;
+}
+
 function renderResults(results, scope = 'project') {
   const entries = resultEntries(results, scope);
   const savedSummary = summaryResult(results);
@@ -235,6 +256,7 @@ function renderResults(results, scope = 'project') {
         </tr>`).join('')
       : '<tr><td colspan="4">The previous run contains a summary only. Run the study again to begin bus-by-bus comparisons.</td></tr>';
   }
+  renderShortCircuitChart(entries, assumedCount);
   table.hidden = entries.length === 0;
   details.hidden = entries.length === 0;
   if (!entries.length) {

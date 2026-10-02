@@ -111,3 +111,11 @@
 - Improved form control consistency by standardizing control height, spacing, and focus-visible outlines for text/number inputs, selects, and textareas.
 - Improved modal readability and action layout by adding description styling, spacing, responsive stacked actions on small screens, and stronger modal elevation.
 - Improved keyboard accessibility by adding explicit focus-visible styling to modal close controls.
+
+## Study result visualizations (shared components)
+
+- `src/components/resultViz.mjs` provides bar charts, KPI cards and status badges. It is used by Short Circuit, Arc Flash and Voltage Drop.
+- Short Circuit shows 3-phase fault current by location. Each bar notes the smallest standard interrupting rating that covers the fault.
+- Arc Flash shows incident energy by equipment, colored by PPE category (thresholds at 1.2, 4, 8, 25 and 40 cal/cm²).
+- `src/components/scheduleSummary.mjs` provides the summary strips on the Cable Schedule and Raceway Schedule pages.
+- Styles are in `src/styles/result-viz.css`.
