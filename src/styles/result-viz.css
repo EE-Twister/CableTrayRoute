@@ -45,3 +45,9 @@
 #compartmentConfig::before { content: "Step 2 · " attr(data-step-label); }
 .tray-cable-entry-card::before { content: "Step 3 · " attr(data-step-label); }
 @media print { .tray-step::before { display: none; } }
+
+/* Cross-schedule highlighting */
+.cross-link-bar { margin: 0.5rem 0; padding: 0.5rem 0.9rem; border-left: 4px solid var(--primary-color, #1769e0); border-radius: 0.25rem; background: var(--surface-subtle, #f4f7fb); font-size: 0.9rem; }
+.cross-link-bar[hidden] { display: none; }
+tr.xhl-row > td { background: rgba(255, 193, 7, 0.28) !important; }
+tr.xhl-row { outline: 2px solid #e0a800; outline-offset: -2px; }

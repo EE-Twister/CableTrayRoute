@@ -4,6 +4,7 @@ import * as dataStore from './dataStore.mjs';
 import { createTable, STORAGE_KEYS } from './tableUtils.mjs';
 import { openModal, showAlertModal } from './src/components/modal.js';
 import { mountScheduleSummary } from './src/components/scheduleSummaryMount.js';
+import { mountCrossHighlight } from './src/components/crossHighlightMount.js';
 import { confirmProjectEntityDeletion } from './src/components/projectDeletionReview.js';
 import { start as startTour } from './tour.js';
 import {
@@ -3255,7 +3256,10 @@ async function initCableSchedule() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => mountScheduleSummary('cables'));
+document.addEventListener('DOMContentLoaded', () => {
+  mountScheduleSummary('cables');
+  mountCrossHighlight({ kind: 'cables', tableIds: ['cableScheduleTable'], keys: ['tag'] });
+});
 
 bootstrapPage({
   readyEvent: 'cableschedule-ready',

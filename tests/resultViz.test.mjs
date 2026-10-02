@@ -67,3 +67,17 @@ assert.strictEqual(lf[1].status, 'pass');
 const ranged = barChartHtml([{ label: 'a', value: 1.0 }], { min: 0.9, max: 1.1 });
 assert.ok(ranged.includes('width:50.00%'), 'min offsets the bar scale');
 console.log('loadFlow viz tests passed');
+
+import { cablesForRaceway, highlightQuery, parseHighlightParam, racewaysForCable } from '../src/components/crossHighlight.mjs';
+const routes = [
+  { cable: 'C-1', status: 'Routed', breakdown: [{ tray_id: 'T-1', type: 'tray', length: 10 }, { tray_id: 'Field Route', type: 'field', length: 5 }, { tray_id: 'T-2', type: 'tray', length: 4 }] },
+  { cable: 'C-2', status: 'Routed', breakdown: [{ tray_id: 'T-2', type: 'tray', length: 8 }] },
+  { cable: 'C-3', status: 'Failed', breakdown: [] },
+];
+assert.deepStrictEqual(racewaysForCable(routes, 'c-1'), ['T-1', 'T-2']);
+assert.deepStrictEqual(cablesForRaceway(routes, 't-2'), ['C-1', 'C-2']);
+assert.deepStrictEqual(cablesForRaceway(routes, 'T-9'), []);
+assert.deepStrictEqual(racewaysForCable(routes, 'C-3'), []);
+assert.deepStrictEqual(racewaysForCable(null, 'C-1'), []);
+assert.deepStrictEqual(parseHighlightParam(`?${highlightQuery(['T-1', 'T-2'], 'C-1')}`), ['T-1', 'T-2']);
+console.log('crossHighlight tests passed');

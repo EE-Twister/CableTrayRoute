@@ -126,3 +126,4 @@
 - Home workflow cards show a ✓ or ○ icon beside their status, plus a solid or dashed bottom rule.
 - Tray Fill shows Step 1 to 3 labels on the Tray, Compartments and Cables sections. The static illustration card was removed, since the page draws a live cross-section.
 - The "About this study" panels on Cable Thermal Environment, Design Coach and Equipment Evaluation now start collapsed.
+- Cable Schedule and Raceway Schedule cross-highlight each other (`src/components/crossHighlight.mjs`, `crossHighlightMount.js`), using the saved route results and a `?highlight=` URL parameter.
