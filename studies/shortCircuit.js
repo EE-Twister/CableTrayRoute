@@ -2,7 +2,7 @@ import { runShortCircuit } from '../analysis/shortCircuit.mjs';
 import { getOneLine, getCables, getStudies, setStudies, getProjectInputFingerprint } from '../dataStore.mjs';
 import { getProjectState } from '../projectStorage.js';
 import { downloadPDF } from '../reports/reporting.mjs';
-import { barChartHtml, kpiStripHtml, shortCircuitBarRows, statusLegendHtml } from '../src/components/resultViz.mjs';
+import { barChartHtml, kpiStripHtml, shortCircuitBarRows } from '../src/components/resultViz.mjs';
 import { loadReferencedProtectiveDevices } from '../src/protectiveDevices/calculationCatalog.mjs';
 
 function projectComponents() {
@@ -190,8 +190,7 @@ function renderShortCircuitChart(entries, assumedCount) {
   ])}
   <h3 class="study-chart__title">3-phase fault current by location</h3>
   ${barChartHtml(rows, { unit: 'kA', ariaLabel: '3-phase fault current by location' })}
-  ${statusLegendHtml()}
-  <p class="field-hint">Bars are colored by severity (under 22 kA, 22–65 kA, 65 kA and above). Each note shows the smallest standard interrupting rating that covers the fault current.</p>`;
+  <p class="field-hint">Bars are colored by magnitude (under 22 kA, 22–65 kA, 65 kA and above); high values are not failures, they set the equipment rating you need. Each note shows the smallest standard interrupting rating that covers the fault current.</p>`;
 }
 
 function renderResults(results, scope = 'project') {

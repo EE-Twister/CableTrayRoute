@@ -58,3 +58,12 @@ assert.strictEqual(cableSummaryHtml([]), '');
 assert.ok(cableSummaryHtml([{ length: 1, operating_voltage: 480 }]).includes('viz-kpi'));
 assert.strictEqual(racewaySummaryHtml({}), '');
 console.log('scheduleSummary tests passed');
+
+import { loadFlowVoltageRows } from '../src/components/resultViz.mjs';
+const lf = loadFlowVoltageRows([{ id: 'B1', Vm: 0.93 }, { id: 'B2', Vm: 1.0 }, { id: 'B3' }]);
+assert.strictEqual(lf.length, 2);
+assert.strictEqual(lf[0].status, 'fail');
+assert.strictEqual(lf[1].status, 'pass');
+const ranged = barChartHtml([{ label: 'a', value: 1.0 }], { min: 0.9, max: 1.1 });
+assert.ok(ranged.includes('width:50.00%'), 'min offsets the bar scale');
+console.log('loadFlow viz tests passed');

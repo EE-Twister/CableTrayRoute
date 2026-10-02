@@ -119,3 +119,10 @@
 - Arc Flash shows incident energy by equipment, colored by PPE category (thresholds at 1.2, 4, 8, 25 and 40 cal/cm²).
 - `src/components/scheduleSummary.mjs` provides the summary strips on the Cable Schedule and Raceway Schedule pages.
 - Styles are in `src/styles/result-viz.css`.
+
+### Follow-up changes
+
+- Load Flow results now begin with a per-unit voltage profile (0.90–1.10 pu scale, with the 0.95 / 1.05 limit tick) above the bus table.
+- Home workflow cards show a ✓ or ○ icon beside their status, plus a solid or dashed bottom rule.
+- Tray Fill shows Step 1 to 3 labels on the Tray, Compartments and Cables sections. The static illustration card was removed, since the page draws a live cross-section.
+- The "About this study" panels on Cable Thermal Environment, Design Coach and Equipment Evaluation now start collapsed.

@@ -62,7 +62,7 @@ export function ppeCategoryForEnergy(calCm2) {
  * rows: [{ label, value, status?, valueLabel?, note?, limit?, marker? }]
  * Each row may carry its own `limit` (drawn as a tick); `max` fixes the scale.
  */
-export function barChartHtml(rows, { unit = '', max = null, ariaLabel = 'Bar chart', sort = 'desc' } = {}) {
+export function barChartHtml(rows, { unit = '', max = null, min = 0, ariaLabel = 'Bar chart', sort = 'desc' } = {}) {
   const usable = (rows || []).filter(row => finite(row.value) !== null);
   if (!usable.length) return '';
   const ordered = usable.slice();
@@ -70,11 +70,12 @@ export function barChartHtml(rows, { unit = '', max = null, ariaLabel = 'Bar cha
   const scale = Math.max(
     finite(max) || 0,
     ...ordered.map(row => Math.max(row.value, finite(row.limit) || 0)),
-    Number.EPSILON
+    min + Number.EPSILON
   );
+  const span = scale - min;
   const items = ordered.map(row => {
-    const pct = Math.min(100, Math.max(0, (row.value / scale) * 100));
-    const limitPct = finite(row.limit) !== null ? Math.min(100, (row.limit / scale) * 100) : null;
+    const pct = Math.min(100, Math.max(0, ((row.value - min) / span) * 100));
+    const limitPct = finite(row.limit) !== null ? Math.min(100, Math.max(0, ((row.limit - min) / span) * 100)) : null;
     const status = STATUS_META[row.status] ? row.status : 'info';
     const valueLabel = row.valueLabel ?? `${row.value.toFixed(2)}${unit ? ` ${unit}` : ''}`;
     const marker = limitPct === null
@@ -84,7 +85,7 @@ export function barChartHtml(rows, { unit = '', max = null, ariaLabel = 'Bar cha
     return `<li class="viz-bar viz-bar--${status}">
       <span class="viz-bar__label">${escapeText(row.label)}</span>
       <span class="viz-bar__track"><span class="viz-bar__fill" style="width:${pct.toFixed(2)}%"></span>${marker}</span>
-      <span class="viz-bar__value">${escapeText(valueLabel)}${row.status ? ` ${statusBadgeHtml(status)}` : ''}</span>
+      <span class="viz-bar__value">${escapeText(valueLabel)}${row.status && !row.noBadge ? ` ${statusBadgeHtml(status)}` : ''}</span>
       ${note}
     </li>`;
   }).join('');
@@ -119,6 +120,7 @@ export function shortCircuitBarRows(entries) {
       label: result.equipmentTag || id,
       value: ka,
       status: ka >= 65 ? 'fail' : ka >= 22 ? 'warn' : 'pass',
+      noBadge: true,
       note: aic ? `Equipment needs ≥ ${aic} kA interrupting rating` : 'Exceeds standard ratings',
     };
   }).filter(Boolean);
@@ -150,4 +152,20 @@ export function voltageDropBarRows(results) {
     valueLabel: `${(finite(result.dropPct) ?? 0).toFixed(2)} %`,
     note: finite(result.limitPct) !== null ? `Limit ${result.limitPct}%` : '',
   }));
+}
+
+/** Load-flow bus results -> per-unit voltage rows (ANSI C84.1 style 0.95-1.05 band). */
+export function loadFlowVoltageRows(buses, labelFor = bus => bus.displayLabel || bus.id) {
+  return (buses || []).map(bus => {
+    const vm = finite(bus?.Vm);
+    if (vm === null) return null;
+    const off = Math.abs(vm - 1);
+    return {
+      label: labelFor(bus),
+      value: vm,
+      limit: vm < 1 ? 0.95 : 1.05,
+      status: off > 0.05 ? 'fail' : off > 0.03 ? 'warn' : 'pass',
+      valueLabel: `${vm.toFixed(3)} pu`,
+    };
+  }).filter(Boolean);
 }
