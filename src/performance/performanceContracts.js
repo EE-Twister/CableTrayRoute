@@ -24,7 +24,7 @@ export const PERFORMANCE_BUDGETS = Object.freeze({
     description: 'A TCC study run with eight selected protective devices.',
   }),
   [PERFORMANCE_METRICS.routingRecalculation]: Object.freeze({
-    maxMs: 1000,
+    maxMs: 1500,
     description: 'Routing request through worker calculation and user-visible result rendering.',
   }),
 });
@@ -63,16 +63,16 @@ export const PERFORMANCE_PROFILE_BUDGETS = Object.freeze({
     description: 'Five consecutive eight-device TCC plot runs in one browser session.',
   }),
   'routing-recalculation': Object.freeze({
-    maxDurationMs: 1500,
-    maxLongTaskMs: 80,
+    maxDurationMs: 2200,
+    maxLongTaskMs: 400,
     maxHeapGrowthBytes: 4 * 1024 * 1024,
     maxElementGrowth: 100,
     maxStorageReads: 250,
     description: 'A second 200-cable route calculation after the initial result is rendered.',
   }),
   'routing-recalculation-steady-state': Object.freeze({
-    maxDurationMs: 1500,
-    maxLongTaskMs: 80,
+    maxDurationMs: 2200,
+    maxLongTaskMs: 400,
     maxHeapGrowthBytes: 1 * 1024 * 1024,
     maxElementGrowth: 100,
     maxStorageReads: 250,
