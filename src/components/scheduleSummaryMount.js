@@ -18,6 +18,8 @@ export function mountScheduleSummary(kind) {
           trays: dataStore.getTrays(),
           conduits: dataStore.getConduits(),
           ductbanks: dataStore.getDuctbanks(),
+          cables: dataStore.getCables(),
+          routeSource: dataStore.getItem('latestRouteResults', null),
         });
     } catch (error) {
       console.error('Schedule summary unavailable', error);

@@ -127,3 +127,10 @@
 - Tray Fill shows Step 1 to 3 labels on the Tray, Compartments and Cables sections. The static illustration card was removed, since the page draws a live cross-section.
 - The "About this study" panels on Cable Thermal Environment, Design Coach and Equipment Evaluation now start collapsed.
 - Cable Schedule and Raceway Schedule cross-highlight each other (`src/components/crossHighlight.mjs`, `crossHighlightMount.js`), using the saved route results and a `?highlight=` URL parameter.
+
+### Third round
+
+- The Raceway Schedule summary now includes a tray utilization chart. Trays are scored against the NEC 392.22(A) allowance, using cables assigned to the tray or routed through it. A tick marks 100%.
+- Short Circuit bars show a tick at the interrupting rating entered on the One-Line component (`interruptRatingKA`), a margin note, and an "Over entered rating" KPI. Without a rating they stay informational.
+- Arc Flash bars include a tick at 40 cal/cm².
+- IEC 60909 gains a fault-current bar chart. Design Rule Checker and Equipment Evaluation gain a stacked outcome bar (`stackedBarHtml`).

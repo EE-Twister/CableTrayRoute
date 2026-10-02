@@ -48,7 +48,7 @@ function renderArcFlashChart(entries) {
   <h3 class="study-chart__title">Incident energy by equipment</h3>
   ${barChartHtml(rows, { unit: 'cal/cm²', ariaLabel: 'Incident energy by equipment' })}
   ${statusLegendHtml()}
-  <p class="field-hint">PPE categories follow NFPA 70E thresholds: 1.2, 4, 8, 25 and 40 cal/cm². Confirm against your site arc-flash program.</p>`;
+  <p class="field-hint">PPE categories follow NFPA 70E thresholds: 1.2, 4, 8, 25 and 40 cal/cm². The tick marks 40 cal/cm², above which energized work is generally not permitted. Confirm against your site arc-flash program.</p>`;
 }
 
 function renderResults(results, scope = 'project') {

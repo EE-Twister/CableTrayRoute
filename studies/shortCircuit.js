@@ -2,7 +2,7 @@ import { runShortCircuit } from '../analysis/shortCircuit.mjs';
 import { getOneLine, getCables, getStudies, setStudies, getProjectInputFingerprint } from '../dataStore.mjs';
 import { getProjectState } from '../projectStorage.js';
 import { downloadPDF } from '../reports/reporting.mjs';
-import { barChartHtml, kpiStripHtml, shortCircuitBarRows } from '../src/components/resultViz.mjs';
+import { barChartHtml, kpiStripHtml, shortCircuitBarRows, statusLegendHtml } from '../src/components/resultViz.mjs';
 import { loadReferencedProtectiveDevices } from '../src/protectiveDevices/calculationCatalog.mjs';
 
 function projectComponents() {
@@ -177,20 +177,29 @@ export function exportShortCircuitReport(results = {}) {
 function renderShortCircuitChart(entries, assumedCount) {
   const chart = document.getElementById('shortcircuit-chart');
   if (!chart) return;
-  const rows = shortCircuitBarRows(entries);
+  const ratings = {};
+  projectComponents().forEach(component => {
+    const rating = Number(component?.props?.interruptRatingKA);
+    if (component?.id && Number.isFinite(rating) && rating > 0) ratings[component.id] = rating;
+  });
+  const rows = shortCircuitBarRows(entries, ratings);
   if (!rows.length) {
     chart.innerHTML = '';
     return;
   }
   const highest = rows.reduce((best, row) => (row.value > best.value ? row : best), rows[0]);
+  const overRated = rows.filter(row => row.limit && row.value > row.limit).length;
+  const rated = rows.filter(row => row.limit).length;
   chart.innerHTML = `${kpiStripHtml([
     { label: 'Highest 3-phase fault', value: `${highest.value.toFixed(1)} kA`, hint: highest.label, status: highest.status },
     { label: 'Locations calculated', value: String(rows.length), status: 'info' },
-    { label: 'Need input review', value: String(assumedCount), status: assumedCount ? 'warn' : 'pass' }
+    { label: 'Need input review', value: String(assumedCount), status: assumedCount ? 'warn' : 'pass' },
+    ...(rated ? [{ label: 'Over entered rating', value: String(overRated), status: overRated ? 'fail' : 'pass', hint: `${rated} of ${rows.length} have a rating` }] : [])
   ])}
   <h3 class="study-chart__title">3-phase fault current by location</h3>
   ${barChartHtml(rows, { unit: 'kA', ariaLabel: '3-phase fault current by location' })}
-  <p class="field-hint">Bars are colored by magnitude (under 22 kA, 22–65 kA, 65 kA and above); high values are not failures, they set the equipment rating you need. Each note shows the smallest standard interrupting rating that covers the fault current.</p>`;
+  ${rated ? statusLegendHtml() : ''}
+  <p class="field-hint">Bars are colored by magnitude (under 22 kA, 22–65 kA, 65 kA and above); a tick marks the interrupting rating entered on the One-Line, where there is one. Without a rating, high values are not failures: they set the equipment rating you need. Each note shows the smallest standard interrupting rating that covers the fault current.</p>`;
 }
 
 function renderResults(results, scope = 'project') {

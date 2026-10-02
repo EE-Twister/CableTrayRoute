@@ -1,4 +1,6 @@
-import { kpiStripHtml } from './resultViz.mjs';
+import { evaluateTrayFill, cablesAssignedToTray } from '../../analysis/trayFill.mjs';
+import { buildTrayCableMapFromRouteResults } from '../../analysis/routeResults.mjs';
+import { barChartHtml, kpiStripHtml, statusLegendHtml } from './resultViz.mjs';
 
 const toNumber = value => {
   if (value === null || value === undefined || value === '') return null;
@@ -34,12 +36,59 @@ export function cableSummaryHtml(cables) {
   ]);
 }
 
-export function racewaySummaryHtml({ trays = [], conduits = [], ductbanks = [] } = {}) {
+/**
+ * Tray utilization rows from NEC 392.22(A) results. Cables come from explicit
+ * assignments plus the saved route results.
+ */
+export function trayUtilizationRows(trays = [], cables = [], routeSource = null) {
+  const routed = buildTrayCableMapFromRouteResults(routeSource, cables);
+  const rows = [];
+  let unassigned = 0;
+  (Array.isArray(trays) ? trays : []).forEach(tray => {
+    const id = String(tray?.tray_id ?? tray?.id ?? '').trim();
+    if (!id) return;
+    const byTag = new Map();
+    [...cablesAssignedToTray(tray, cables), ...(routed[id] || [])].forEach(cable => {
+      const key = String(cable?.tag ?? cable?.name ?? byTag.size);
+      if (!byTag.has(key)) byTag.set(key, cable);
+    });
+    if (!byTag.size) {
+      unassigned += 1;
+      return;
+    }
+    const result = evaluateTrayFill(tray, [...byTag.values()]);
+    const pct = Number(result?.utilizationPercent);
+    if (!Number.isFinite(pct)) {
+      unassigned += 1;
+      return;
+    }
+    rows.push({
+      label: id,
+      value: pct,
+      limit: 100,
+      status: result.status === 'fail' ? 'fail' : pct > 80 ? 'warn' : 'pass',
+      valueLabel: `${pct.toFixed(0)}% of allowance`,
+      note: `${byTag.size} cable(s)`,
+    });
+  });
+  return { rows, unassigned };
+}
+
+export function trayUtilizationHtml(trays, cables, routeSource) {
+  const { rows, unassigned } = trayUtilizationRows(trays, cables, routeSource);
+  if (!rows.length) return '';
+  return `<h3 class="study-chart__title">Tray utilization (NEC 392.22 allowance)</h3>
+    ${barChartHtml(rows, { unit: '%', max: 100, ariaLabel: 'Tray utilization against the NEC 392.22 allowance' })}
+    ${statusLegendHtml()}
+    <p class="field-hint">The tick marks 100% of the allowance. ${unassigned ? `${unassigned} tray(s) have no cables assigned or incomplete tray data and are not shown.` : ''}</p>`;
+}
+
+export function racewaySummaryHtml({ trays = [], conduits = [], ductbanks = [], cables = [], routeSource = null } = {}) {
   const total = trays.length + conduits.length + ductbanks.length;
   if (!total) return '';
   return kpiStripHtml([
     { label: 'Cable trays', value: String(trays.length), status: 'info' },
     { label: 'Conduits', value: String(conduits.length), status: 'info' },
     { label: 'Ductbanks', value: String(ductbanks.length), status: 'info' },
-  ]);
+  ]) + trayUtilizationHtml(trays, cables, routeSource);
 }

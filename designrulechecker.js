@@ -4,6 +4,7 @@
  * Runs NEC/IEEE design validation rules against the project's cable and
  * raceway data and displays findings grouped by severity.
  */
+import { stackedBarHtml } from './src/components/resultViz.mjs';
 import { showAlertModal } from './src/components/modal.js';
 import { runDRC, formatDrcReport, DRC_SEVERITY } from './analysis/designRuleChecker.mjs';
 import { getTrays, getConduits, getCables, getItem, getDrcAcceptedFindings, setDrcAcceptedFindings } from './dataStore.mjs';
@@ -206,7 +207,12 @@ document.addEventListener('DOMContentLoaded', () => {
         &mdash; ${summary.errors} error${summary.errors !== 1 ? 's' : ''},
                 ${summary.warnings} warning${summary.warnings !== 1 ? 's' : ''},
                 ${summary.info} info${acceptedText}
-      </div>`;
+      </div>
+      ${stackedBarHtml([
+        { label: 'Errors', count: summary.errors, status: 'fail' },
+        { label: 'Warnings', count: summary.warnings, status: 'warn' },
+        { label: 'Info', count: summary.info, status: 'info' },
+      ], { ariaLabel: 'Findings by severity' })}`;
   }
 
   function renderFindings(findings) {

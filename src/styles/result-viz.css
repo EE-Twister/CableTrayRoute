@@ -51,3 +51,8 @@
 .cross-link-bar[hidden] { display: none; }
 tr.xhl-row > td { background: rgba(255, 193, 7, 0.28) !important; }
 tr.xhl-row { outline: 2px solid #e0a800; outline-offset: -2px; }
+
+.viz-stack { margin: 0.5rem 0; }
+.viz-stack__bar { display: flex; height: 1rem; border-radius: 999px; overflow: hidden; background: var(--border-color); }
+.viz-stack__seg { display: block; height: 100%; background: var(--viz-bar); }
+.viz-stack__caption { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }

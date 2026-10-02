@@ -81,3 +81,26 @@ assert.deepStrictEqual(racewaysForCable(routes, 'C-3'), []);
 assert.deepStrictEqual(racewaysForCable(null, 'C-1'), []);
 assert.deepStrictEqual(parseHighlightParam(`?${highlightQuery(['T-1', 'T-2'], 'C-1')}`), ['T-1', 'T-2']);
 console.log('crossHighlight tests passed');
+
+import { trayUtilizationRows } from '../src/components/scheduleSummary.mjs';
+const trays = [{ tray_id: 'T-1', inside_width: 12, tray_depth: 4, tray_type: 'ladder' }, { tray_id: 'T-2', inside_width: 12, tray_depth: 4, tray_type: 'ladder' }];
+const cabs = Array.from({ length: 3 }, (_, i) => ({ tag: `C${i}`, conductors: 3, conductor_size: '#4/0', diameter: 1.5, route_preference: 'T-1' }));
+const util = trayUtilizationRows(trays, cabs, null);
+assert.strictEqual(util.unassigned, 1, 'tray without cables is counted, not charted');
+assert.strictEqual(util.rows.length, 1);
+assert.strictEqual(util.rows[0].label, 'T-1');
+console.log('trayUtilization tests passed');
+
+const rated = shortCircuitBarRows([['id1', { equipmentTag: 'SWBD', threePhaseKA: 30 }], ['id2', { equipmentTag: 'PNL', threePhaseKA: 20 }]], { id1: 25, id2: 65 });
+assert.strictEqual(rated.find(r => r.label === 'SWBD').status, 'fail');
+assert.strictEqual(rated.find(r => r.label === 'PNL').status, 'pass');
+assert.strictEqual(rated.find(r => r.label === 'SWBD').limit, 25);
+console.log('rated shortCircuit tests passed');
+
+import { stackedBarHtml } from '../src/components/resultViz.mjs';
+const stack = stackedBarHtml([{ label: 'Pass', count: 3, status: 'pass' }, { label: 'Fail', count: 1, status: 'fail' }, { label: 'None', count: 0, status: 'warn' }]);
+assert.ok(stack.includes('width:75.00%') && stack.includes('width:25.00%'));
+assert.ok(!stack.includes('title="None: 0"'), 'zero segments are not drawn');
+assert.ok(stack.includes('None 0'), 'zero counts remain in the caption');
+assert.strictEqual(stackedBarHtml([{ label: 'x', count: 0 }]), '');
+console.log('stackedBar tests passed');

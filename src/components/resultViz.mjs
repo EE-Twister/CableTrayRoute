@@ -111,17 +111,30 @@ export function statusLegendHtml(keys = ['pass', 'warn', 'fail']) {
 }
 
 /** Short-circuit rows -> bar chart rows (value coloured by required AIC step). */
-export function shortCircuitBarRows(entries) {
+export function shortCircuitBarRows(entries, ratings = {}) {
   return (entries || []).map(([id, result]) => {
     const ka = finite(result?.threePhaseKA);
     if (ka === null) return null;
     const aic = nextStandardAicKa(ka);
+    const rating = finite(ratings?.[id]);
+    if (rating !== null && rating > 0) {
+      const over = ka > rating;
+      return {
+        label: result.equipmentTag || id,
+        value: ka,
+        limit: rating,
+        status: over ? 'fail' : ka > rating * 0.8 ? 'warn' : 'pass',
+        note: over
+          ? `Fault exceeds the ${rating} kA interrupting rating entered for this equipment`
+          : `Within the ${rating} kA interrupting rating (${(rating - ka).toFixed(1)} kA margin)`,
+      };
+    }
     return {
       label: result.equipmentTag || id,
       value: ka,
       status: ka >= 65 ? 'fail' : ka >= 22 ? 'warn' : 'pass',
       noBadge: true,
-      note: aic ? `Equipment needs ≥ ${aic} kA interrupting rating` : 'Exceeds standard ratings',
+      note: aic ? `No rating entered. Equipment needs ≥ ${aic} kA interrupting rating` : 'Exceeds standard ratings',
     };
   }).filter(Boolean);
 }
@@ -135,6 +148,7 @@ export function arcFlashBarRows(entries) {
     return {
       label: result.equipmentTag || id,
       value: energy,
+      limit: 40,
       status: category.status,
       valueLabel: `${energy.toFixed(2)} cal/cm² · ${category.label}`,
       note: finite(result.boundary) !== null ? `Arc-flash boundary ${Math.round(result.boundary)} mm` : '',
@@ -168,4 +182,28 @@ export function loadFlowVoltageRows(buses, labelFor = bus => bus.displayLabel ||
       valueLabel: `${vm.toFixed(3)} pu`,
     };
   }).filter(Boolean);
+}
+
+/**
+ * Proportional stacked bar for outcome counts.
+ * segments: [{ label, count, status }]; zero-count segments are omitted from the bar
+ * but still listed in the caption so every number stays readable as text.
+ */
+export function stackedBarHtml(segments, { ariaLabel = 'Result breakdown' } = {}) {
+  const list = (segments || []).map(seg => ({ ...seg, count: Math.max(0, finite(seg.count) ?? 0) }));
+  const total = list.reduce((sum, seg) => sum + seg.count, 0);
+  if (!total) return '';
+  const parts = list.filter(seg => seg.count > 0).map(seg => {
+    const status = STATUS_META[seg.status] ? seg.status : 'info';
+    const pct = (seg.count / total) * 100;
+    return `<span class="viz-stack__seg viz-bar--${status}" style="width:${pct.toFixed(2)}%" title="${escapeText(seg.label)}: ${seg.count}"></span>`;
+  }).join('');
+  const caption = list.map(seg => {
+    const status = STATUS_META[seg.status] ? seg.status : 'info';
+    return `<span class="viz-stack__key viz-badge viz-badge--${status}"><span class="viz-badge__icon" aria-hidden="true">${STATUS_META[status].icon}</span>${escapeText(seg.label)} ${seg.count}</span>`;
+  }).join(' ');
+  return `<div class="viz-stack" role="img" aria-label="${escapeText(ariaLabel)}: ${list.map(seg => `${seg.label} ${seg.count}`).join(', ')}">
+    <div class="viz-stack__bar">${parts}</div>
+    <div class="viz-stack__caption">${caption}</div>
+  </div>`;
 }
