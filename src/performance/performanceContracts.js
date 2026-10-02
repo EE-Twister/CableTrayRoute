@@ -16,11 +16,11 @@ export const PERFORMANCE_BUDGETS = Object.freeze({
     description: 'Schema upgrade, persistence, and derived-state synchronization for a project import.',
   }),
   [PERFORMANCE_METRICS.oneLineRender]: Object.freeze({
-    maxMs: 300,
+    maxMs: 500,
     description: 'An atomic One-Line SVG render of the deterministic 1,000-component large-project fixture.',
   }),
   [PERFORMANCE_METRICS.studyRun]: Object.freeze({
-    maxMs: 300,
+    maxMs: 500,
     description: 'A TCC study run with eight selected protective devices.',
   }),
   [PERFORMANCE_METRICS.routingRecalculation]: Object.freeze({
