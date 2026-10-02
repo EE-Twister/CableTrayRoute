@@ -6,7 +6,7 @@
     "build": "node scripts/validateProtectiveDevices.mjs && node scripts/buildProtectiveDeviceCatalog.mjs && node scripts/buildFastJsonPatch.cjs && rollup -c rollup.config.cjs && node scripts/checkBundleBudgets.mjs && node scripts/copyAssets.cjs && node scripts/rewriteHtmlForManifest.cjs && node scripts/generateValidationManifest.cjs && node scripts/auditHtmlAssetReferences.mjs --fix",
     "sample:engineering-report": "npm run build && node scripts/captureEngineeringReportVisuals.mjs && python scripts/generateEngineeringSamplePackage.py",
     "sample:engineering-report:setup": "python -m pip install -r scripts/engineering-report-requirements.txt",
-    "build:cloudflare": "node scripts/generateSupabaseConfig.mjs && npm run build",
+    "build:cloudflare": "node scripts/generateSupabaseConfig.mjs && npm run build && node scripts/pruneOversizedPagesAssets.mjs",
     "build:manifest": "node scripts/generateValidationManifest.cjs",
     "test": "npm run test:full",
     "e2e": "npm run e2e:full",
