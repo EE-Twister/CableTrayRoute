@@ -103,6 +103,10 @@ test.describe('Manufacturer catalog browser', () => {
   });
 
   test.beforeEach(async ({ page }) => {
+    // The site scrolls smoothly by default; Firefox then animates Playwright's scroll-into-view
+    // and the row action buttons never settle inside the viewport. The stylesheet turns smooth
+    // scrolling off for reduced motion, which keeps these clicks deterministic.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.addInitScript(() => {
       localStorage.clear();
       sessionStorage.clear();
