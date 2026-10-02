@@ -178,6 +178,8 @@ Add these Cloudflare Pages environment variables:
 
 The build command writes `supabase-config.json` from those variables. The anon key is public by design; Row-Level Security protects project data. Browser project list, summary, load, and delete requests also include the signed-in `user_id` as an explicit REST filter, while Supabase RLS remains the enforcement layer for account ownership.
 
+Cloudflare Pages rejects any single file over 25 MiB and this project deploys from `/`, so `build:cloudflare` finishes with `scripts/pruneOversizedPagesAssets.mjs`. When `CF_PAGES=1` (set automatically by Pages) it deletes oversized files such as the legacy `data/protectiveDevices.json` fallback catalog from the build checkout; the app loads the sharded catalog under `data/protectiveDeviceCatalog/` instead. The script does nothing outside Pages unless run with `--force`.
+
 Generated build output under `dist/` is ignored by Git. Cloudflare Pages runs the build command during deployment, so feature work should not commit generated `dist` artifacts. Use `npm run check:dist-review` before opening review if you want to verify the working tree is free of generated build noise.
 
 ## Local Development

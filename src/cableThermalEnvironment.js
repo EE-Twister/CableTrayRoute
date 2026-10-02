@@ -12,6 +12,7 @@ import {
   INSTALLATION_KEYS,
 } from '../analysis/cableThermalEnvironment.mjs';
 import { getStudies, setStudies } from '../dataStore.mjs';
+import { showAlertModal } from './components/modal.js';
 import { initStudyBasisPanel } from './components/studyBasis.js';
 import { initStudyApprovalPanel } from './components/studyApproval.js';
 
@@ -79,7 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
       setStudies(studies);
       renderAll(study);
     } catch (err) {
-      alert(`Cable Thermal Environment error: ${err.message}`);
+      showAlertModal('Cable Thermal Environment', err.message);
     }
   });
 
@@ -104,6 +105,14 @@ document.addEventListener('DOMContentLoaded', () => {
 // ---------------------------------------------------------------------------
 // Form ↔ inputs
 // ---------------------------------------------------------------------------
+
+/** {key: value} when the field holds a number, {} when it is blank (use the default). */
+function optionalNumber(id, key) {
+  const raw = document.getElementById(id)?.value;
+  if (raw == null || String(raw).trim() === '') return {};
+  const value = Number(raw);
+  return Number.isFinite(value) ? { [key]: value } : {};
+}
 
 function readForm() {
   const hourlyRaw = (document.getElementById('ct-profile-hourly').value || '').trim();
@@ -139,6 +148,8 @@ function readForm() {
         included:       document.getElementById('ct-inst-duct').checked,
         ductCount:      Number(document.getElementById('ct-duct-count').value),
         spacingMm:      Number(document.getElementById('ct-duct-spacing').value),
+        ...optionalNumber('ct-duct-rows', 'rows'),
+        ...optionalNumber('ct-duct-cols', 'cols'),
         conduitOD_mm:   Number(document.getElementById('ct-conduit-od').value),
         burialDepthMm:  Number(document.getElementById('ct-burial-depth').value),
       },
@@ -146,6 +157,7 @@ function readForm() {
         included:        document.getElementById('ct-inst-burial').checked,
         burialDepthMm:   Number(document.getElementById('ct-burial-depth').value),
         soilResistivity: Number(document.getElementById('ct-soil-rho').value),
+        ...optionalNumber('ct-burial-spacing', 'spacingMm'),
       },
     },
     loadProfile: hourly && hourly.length > 0 ? {
@@ -180,6 +192,9 @@ function hydrateForm(norm) {
   set('ct-conduit-od',     norm.installations?.conduit?.conduitOD_mm);
   set('ct-duct-count',     norm.installations?.['duct-bank']?.ductCount);
   set('ct-duct-spacing',   norm.installations?.['duct-bank']?.spacingMm);
+  set('ct-duct-rows',      norm.installations?.['duct-bank']?.rows);
+  set('ct-duct-cols',      norm.installations?.['duct-bank']?.cols);
+  set('ct-burial-spacing', norm.installations?.['direct-burial']?.spacingMm);
   if (norm.loadProfile?.hourly) {
     set('ct-profile-hourly', norm.loadProfile.hourly.join(','));
     set('ct-profile-basis',  norm.loadProfile.basis);
@@ -205,7 +220,7 @@ function renderKpis(study) {
   if (best) {
     setText('kpi-base',    `${formatNumber(best.baseAmpacity_A)} A`);
     setText('kpi-derated', `${formatNumber(best.deratedAmpacity_A)} A`);
-    setText('kpi-limit',   best.waterfall?.limitingFactor || '—');
+    setText('kpi-limit',   best.waterfall?.limitingFactor || 'None');
     setText('kpi-temp',    best.maxConductorTempC != null ? `${formatNumber(best.maxConductorTempC)} °C` : '—');
   } else {
     setText('kpi-base', '—'); setText('kpi-derated', '—'); setText('kpi-limit', '—'); setText('kpi-temp', '—');
@@ -239,7 +254,7 @@ function renderComparison(study) {
       <td>${escapeHtml(c.label)}</td>
       <td>${formatNumber(c.baseAmpacity_A)}</td>
       <td><strong>${formatNumber(c.deratedAmpacity_A)}</strong></td>
-      <td>${escapeHtml(c.waterfall?.limitingFactor || '—')}</td>
+      <td>${escapeHtml(c.error ? `Not evaluated: ${c.error}` : (c.waterfall?.limitingFactor || 'None (no derating)'))}</td>
       <td>${formatNumber(c.maxConductorTempC)}</td>
       <td>${margin}</td>
     `;

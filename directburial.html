@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Direct Burial Circuit Sizing — find how many parallel circuits fit in a direct-buried row at a given cover depth and the lowest-cost conductor size and spacing." />
+  <title>Direct Burial Circuit Sizing — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Direct Burial Circuit Sizing — CableTrayRoute">
+  <meta property="og:description" content="How many parallel direct-buried circuits fit at a given cover depth, and the cheapest conductor size and spacing.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="directburial.html">
+  <link rel="canonical" href="https://cabletrayroute.com/directburial.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/directburial.js" defer></script>
+  <style>
+    .db-kpi-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; list-style: none; margin: 0 0 1.25rem; padding: 0; }
+    .db-kpi-card { flex: 1 1 160px; border-radius: 6px; padding: 0.75rem 1rem; background: var(--surface-2, #f4f4f4); border-left: 4px solid var(--color-border, #ccc); min-width: 130px; }
+    .db-kpi-label { display: block; font-size: 0.78rem; color: var(--color-muted, #666); margin-bottom: 0.25rem; }
+    .db-kpi-value { display: block; font-size: 1.4rem; font-weight: 700; line-height: 1.2; word-break: break-word; }
+    .db-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
+    .db-table-wrap { overflow-x: auto; }
+    .db-results { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    .db-results th, .db-results td { padding: 0.4rem 0.6rem; text-align: right; border-bottom: 1px solid var(--color-border, #ddd); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .db-results th:first-child, .db-results td:first-child { text-align: left; }
+    .db-results th { background: var(--surface-2, #f4f4f4); font-weight: 600; }
+    .db-results td.db-ok { background: rgba(46, 125, 50, 0.14); }
+    .db-results td.db-fail { color: var(--color-muted, #666); }
+    .db-results tr.db-best td { outline: 2px solid #2e7d32; outline-offset: -2px; font-weight: 600; }
+    .db-notes { margin: 0.75rem 0 0; padding-left: 1.25rem; font-size: 0.875rem; }
+    .db-fieldset { border: 1px solid var(--color-border, #ddd); border-radius: 6px; margin: 0.75rem 0; padding: 0.5rem 0.75rem; }
+    .db-fieldset label { display: inline-block; margin-right: 0.9rem; }
+    .db-empty { text-align: center; padding: 2rem; color: var(--color-muted, #666); }
+    @media (max-width: 600px) { .db-controls { flex-direction: column; align-items: stretch; } }
+  </style>
+</head>
+<body class="directburial-page" data-report-title="Direct Burial Circuit Sizing">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Studies</li>
+          <li>Cable</li>
+          <li aria-current="page">Direct Burial Circuits</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Direct Burial Circuit Sizing</h1>
+        <p>Find how many circuits of a given current can be direct buried side by side at a chosen cover depth, and which conductor size and circuit spacing gives the lowest installed cost per foot.</p>
+      </header>
+
+      <details class="method-panel">
+        <summary>About This Study</summary>
+        <p>Each cable is modelled with the IEC 60287 thermal circuit. Mutual heating from every neighbouring cable is added to the external thermal resistance with the image method, and each circuit is rated at its hottest position (a centre circuit of the row). Costs combine the cable price allowances from the Cost Estimate page with an editable trench excavation and backfill allowance, so the result is a screening comparison, not a quotation.</p>
+        <p>This does not replace NEC 310.14 / Annex B or a full Neher-McGrath study. Confirm the final design against the governing code tables.</p>
+      </details>
+
+      <section class="card" aria-label="Direct burial summary" aria-live="polite">
+        <ul class="db-kpi-grid" role="list">
+          <li class="db-kpi-card"><span class="db-kpi-label">Target ampacity per circuit</span><span class="db-kpi-value" id="kpi-target">—</span></li>
+          <li class="db-kpi-card"><span class="db-kpi-label">Recommended conductor</span><span class="db-kpi-value" id="kpi-size">—</span></li>
+          <li class="db-kpi-card"><span class="db-kpi-label">Spacing / trench width</span><span class="db-kpi-value" id="kpi-spacing">—</span></li>
+          <li class="db-kpi-card"><span class="db-kpi-label">Max circuits (recommended)</span><span class="db-kpi-value" id="kpi-max">—</span></li>
+          <li class="db-kpi-card"><span class="db-kpi-label">Installed cost ($/ft)</span><span class="db-kpi-value" id="kpi-cost">—</span></li>
+        </ul>
+        <ul class="db-notes" id="db-notes"></ul>
+      </section>
+
+      <section class="card">
+        <form id="db-form" autocomplete="off">
+          <details open>
+            <summary><strong>Circuit requirement</strong></summary>
+            <div class="field-row">
+              <label for="db-current">Current per circuit (A)</label>
+              <input id="db-current" type="number" min="1" step="1" value="102" required>
+            </div>
+            <div class="field-row">
+              <label for="db-continuous">Continuous-load multiplier</label>
+              <input id="db-continuous" type="number" min="1" max="2" step="0.05" value="1">
+            </div>
+            <div class="field-row">
+              <label for="db-margin">Model margin (%)</label>
+              <input id="db-margin" type="number" min="0" max="50" step="1" value="10">
+              <p class="field-hint">Added to the target ampacity. Spot checks show the thermal model reading roughly 5-15% above published tabulated ratings, so 10% or more is recommended.</p>
+            </div>
+            <div class="field-row">
+              <label for="db-circuits">Circuits needed (blank = find the maximum)</label>
+              <input id="db-circuits" type="number" min="1" max="60" step="1" value="6">
+            </div>
+            <div class="field-row">
+              <label for="db-cover">Cover to top of cable (in)</label>
+              <input id="db-cover" type="number" min="6" max="120" step="1" value="24">
+            </div>
+          </details>
+
+          <details open>
+            <summary><strong>Cable and soil</strong></summary>
+            <div class="field-row">
+              <label for="db-material">Conductor material</label>
+              <select id="db-material"><option value="Cu" selected>Copper</option><option value="Al">Aluminum</option></select>
+            </div>
+            <div class="field-row">
+              <label for="db-insulation">Insulation</label>
+              <select id="db-insulation">
+                <option value="XLPE" selected>XLPE / XHHW-2 (90 °C)</option>
+                <option value="EPR">EPR (90 °C)</option>
+                <option value="PVC">PVC (70 °C)</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label for="db-arrangement">Circuit arrangement</label>
+              <select id="db-arrangement">
+                <option value="trefoil" selected>3 single-conductor cables, trefoil</option>
+                <option value="flat">3 single-conductor cables, flat</option>
+                <option value="three-core">One 3-conductor cable</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label for="db-rho">Soil thermal resistivity (K·m/W)</label>
+              <input id="db-rho" type="number" min="0.3" max="5" step="0.1" value="1.0">
+            </div>
+            <div class="field-row">
+              <label for="db-soil-temp">Earth ambient temperature (°C)</label>
+              <input id="db-soil-temp" type="number" min="-10" max="50" step="1" value="20">
+            </div>
+            <div class="field-row">
+              <label for="db-frequency">Frequency (Hz)</label>
+              <select id="db-frequency"><option value="60" selected>60</option><option value="50">50</option></select>
+            </div>
+          </details>
+
+          <details open>
+            <summary><strong>Candidates</strong></summary>
+            <fieldset class="db-fieldset" id="db-sizes">
+              <legend>Conductor sizes</legend>
+            </fieldset>
+            <fieldset class="db-fieldset" id="db-spacings">
+              <legend>Clear spacing between circuits (in)</legend>
+            </fieldset>
+          </details>
+
+          <details>
+            <summary><strong>Cost allowances</strong></summary>
+            <div class="field-row">
+              <label for="db-trench-cost">Trench excavate and backfill ($/yd³)</label>
+              <input id="db-trench-cost" type="number" min="0" step="1" value="75">
+            </div>
+            <div class="field-row">
+              <label for="db-al-factor">Aluminum price as fraction of copper</label>
+              <input id="db-al-factor" type="number" min="0.1" max="1.5" step="0.05" value="0.5">
+            </div>
+            <p class="field-hint">Cable prices come from the Cost Estimate allowances. Replace these with supplier and contractor quotes before relying on the totals.</p>
+          </details>
+
+          <div class="db-controls">
+            <button type="submit" id="db-run-btn" class="primary-btn">Calculate</button>
+            <button type="button" id="db-export-btn" class="btn">Export CSV</button>
+            <button type="button" id="db-reset-btn" class="btn">Reset</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card" aria-label="Results">
+        <h2>Circuits allowed by size and spacing</h2>
+        <p id="db-summary" class="field-hint"></p>
+        <div class="db-table-wrap">
+          <table class="db-results" id="db-results">
+            <thead>
+              <tr>
+                <th scope="col">Size</th>
+                <th scope="col">Spacing (in)</th>
+                <th scope="col">1-circuit A</th>
+                <th scope="col">Max circuits</th>
+                <th scope="col">A at evaluated count</th>
+                <th scope="col">Trench (in)</th>
+                <th scope="col">Cable $/ft</th>
+                <th scope="col">Trench $/ft</th>
+                <th scope="col">Total $/ft</th>
+                <th scope="col">$/circuit-ft</th>
+              </tr>
+            </thead>
+            <tbody id="db-results-body"><tr><td colspan="10" class="db-empty">Press Calculate to see results.</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+</body>
+</html>

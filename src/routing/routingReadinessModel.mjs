@@ -1,4 +1,5 @@
 import { buildRoutingReadinessDiagnostics } from '../../analysis/scheduleWorkflow.mjs';
+import { getTrayNecAdvisories } from './trayNecAdvisory.mjs';
 
 export function getRoutingCounts(state = {}) {
     const raceways = Array.isArray(state.trayData) ? state.trayData : [];
@@ -59,6 +60,7 @@ export function buildRoutingReadiness(state = {}, { fillLimitPercent = 40 } = {}
     const missingGeometry = counts.routableSegments.filter(row => !hasValidRouteGeometry(row));
     const groupWarnings = getRacewayGroupWarnings(counts.routableSegments, counts.cables);
     const overLimit = getTrayFillWarnings(counts.trays, fillLimitPercent);
+    const necAdvisories = getTrayNecAdvisories(counts.trays, fillLimitPercent);
     const geometryWarnings = [
         ...(state.geometryWarnings?.ductbanks || []),
         ...(state.geometryWarnings?.conduits || [])
@@ -84,6 +86,7 @@ export function buildRoutingReadiness(state = {}, { fillLimitPercent = 40 } = {}
     }
     if (groupWarnings.length) warnings.push(`No matching raceway group for ${groupWarnings.join(', ')}.`);
     if (overLimit.length) warnings.push(`${overLimit.length} tray(s) already exceed the selected fill limit.`);
+    if (necAdvisories.length) warnings.push(`${necAdvisories.length} tray(s) allow more fill than NEC Table 392.22(A)(1) (${necAdvisories.slice(0, 3).map(a => `${a.tray_id}: ${a.planningArea.toFixed(1)} vs ${a.necArea.toFixed(1)} in²`).join('; ')}${necAdvisories.length > 3 ? '; …' : ''}). The router uses a cross-section percentage; confirm on the Tray Fill page.`);
     if (geometryWarnings.length) warnings.push(`${geometryWarnings.length} ductbank/conduit geometry warning(s) were found.`);
     return {
         ...counts,
@@ -92,6 +95,7 @@ export function buildRoutingReadiness(state = {}, { fillLimitPercent = 40 } = {}
         missingGeometry,
         groupWarnings,
         overLimit,
+        necAdvisories,
         geometryWarnings,
         blocking,
         warnings,

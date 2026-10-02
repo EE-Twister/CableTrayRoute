@@ -5,10 +5,11 @@ import {
   normalizeConduitRunLayout,
   normalizePullBoxPosition
 } from './analysis/conduitBendVisualModel.mjs';
-import { sizePullBox, STANDARD_BOX_SIZES } from './analysis/pullBoxSizing.mjs';
+import { sizePullBox, STANDARD_BOX_SIZES, parseTradeSizeList } from './analysis/pullBoxSizing.mjs';
 import { getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { csvCell } from './utils/csv.mjs';
 import { renderIsometricSvg } from './src/utils/isometricSvg.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -260,8 +261,8 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
       <div class="pb-angle-section" hidden>
         <p class="hint">Enter trade sizes of all conduits entering each wall (comma-separated).</p>
-        <label>Wall A conduit sizes (in): <input type="text" class="pb-walla" placeholder="e.g. 2, 1.5, 1" value="${escapeHtml(sanitizeTradeSizeList(wallA).join(', '))}"></label>
-        <label>Wall B conduit sizes (in): <input type="text" class="pb-wallb" placeholder="e.g. 2, 1.5"    value="${escapeHtml(sanitizeTradeSizeList(wallB).join(', '))}"></label>
+        <label>Wall A conduit sizes (in): <input type="text" class="pb-walla" placeholder="e.g. 2, 1-1/2, 1" value="${escapeHtml(sanitizeTradeSizeList(wallA).join(', '))}"></label>
+        <label>Wall B conduit sizes (in): <input type="text" class="pb-wallb" placeholder="e.g. 2, 1-1/2" value="${escapeHtml(sanitizeTradeSizeList(wallB).join(', '))}"></label>
       </div>
     `;
 
@@ -364,12 +365,14 @@ document.addEventListener('DOMContentLoaded', () => {
           wallBName: card.querySelector('.pb-wallb-name').value.trim(),
         };
       }
-      const parseWall = el => el.value.split(/[\s,]+/).map(parseFloat).filter(v => v > 0);
+      const wallALists = parseTradeSizeList(card.querySelector('.pb-walla').value);
+      const wallBLists = parseTradeSizeList(card.querySelector('.pb-wallb').value);
       return {
         label:    card.querySelector('.pb-label').value.trim(),
         pullType: card.querySelector('.pb-type').value,
-        wallA:    parseWall(card.querySelector('.pb-walla')),
-        wallB:    parseWall(card.querySelector('.pb-wallb')),
+        wallA:    wallALists.sizes,
+        wallB:    wallBLists.sizes,
+        invalidSizes: [...wallALists.invalid, ...wallBLists.invalid],
         position: readPullBoxPosition(card),
         wallAName: card.querySelector('.pb-walla-name').value.trim(),
         wallBName: card.querySelector('.pb-wallb-name').value.trim(),
@@ -409,7 +412,7 @@ document.addEventListener('DOMContentLoaded', () => {
     el.hidden = false;
     el.innerHTML = `
       <div class="warning-panel" style="border-left:4px solid var(--color-error,#c00);padding:.75rem 1rem;margin:1rem 0;background:var(--color-bg-warn,#fff3f3)">
-        <strong>NEC 358.24 Violations</strong>
+        <strong>NEC 358.26 Violations</strong>
         <ul>
           ${fail.map(r => `<li>${escapeHtml(r.label)}: ${escapeHtml(r.nec358_24Message)}</li>`).join('')}
         </ul>
@@ -620,7 +623,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!saved || !saved.runs) return;
 
     const rows = [['Run', 'Trade Size (in)', 'Bend #', 'Type', 'Dimension (in)',
-                   'Degrees', 'Mark Spacing (in)', 'Shrink (in)', 'Total Degrees', 'NEC 358.24', 'Notes']];
+                   'Degrees', 'Mark Spacing (in)', 'Shrink (in)', 'Total Degrees', 'NEC 358.26', 'Notes']];
 
     for (const run of saved.runs) {
       if (run.bends.length === 0) {
@@ -638,7 +641,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csv = rows.map(r => r.map(csvCell).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
     const a    = Object.assign(document.createElement('a'), { href: url, download: 'conduit-bend-schedule.csv' });

@@ -105,7 +105,7 @@ describe('pvArrayOutput()', () => {
 describe('interpolateVoltVar()', () => {
   const curveB = VOLT_VAR_CURVES.B;
 
-  it('returns capacitive Q at low voltage (below 0.90 pu)', () => {
+  it('returns capacitive Q at low voltage (below 0.92 pu)', () => {
     const q = interpolateVoltVar(0.85, curveB);
     approx(q, 0.44, 0.001, 'Q at 0.85 pu: ');
   });
@@ -115,15 +115,28 @@ describe('interpolateVoltVar()', () => {
     approx(interpolateVoltVar(0.99, curveB), 0, 0.001, 'Q at 0.99 pu: ');
   });
 
-  it('returns inductive Q at high voltage (above 1.10 pu)', () => {
+  it('returns inductive Q at high voltage (above 1.08 pu)', () => {
     const q = interpolateVoltVar(1.15, curveB);
     approx(q, -0.44, 0.001, 'Q at 1.15 pu: ');
   });
 
   it('interpolates linearly between breakpoints', () => {
-    // Between [0.90, 0.44] and [0.98, 0.0]: at 0.94 pu → t=0.5 → Q=0.22
-    const q = interpolateVoltVar(0.94, curveB);
-    approx(q, 0.22, 0.02, 'Q at 0.94 pu: ');
+    // Between [0.92, 0.44] and [0.98, 0.0]: at 0.95 pu → t=0.5 → Q=0.22
+    const q = interpolateVoltVar(0.95, curveB);
+    approx(q, 0.22, 0.001, 'Q at 0.95 pu: ');
+  });
+
+  it('Category B reaches full 0.44 pu support at 0.92 pu (IEEE 1547-2018 Table 8)', () => {
+    approx(interpolateVoltVar(0.92, curveB), 0.44, 1e-9, 'Cat B Q at 0.92: ');
+    approx(interpolateVoltVar(1.08, curveB), -0.44, 1e-9, 'Cat B Q at 1.08: ');
+  });
+
+  it('Category A is the 25 % curve with no deadband: 0.90 -> +0.25, 1.00 -> 0, 1.10 -> -0.25', () => {
+    const curveA = VOLT_VAR_CURVES.A;
+    approx(interpolateVoltVar(0.90, curveA), 0.25, 1e-9, 'Cat A Q at 0.90: ');
+    approx(interpolateVoltVar(0.95, curveA), 0.125, 1e-9, 'Cat A Q at 0.95: ');
+    approx(interpolateVoltVar(1.00, curveA), 0, 1e-9, 'Cat A Q at 1.00: ');
+    approx(interpolateVoltVar(1.10, curveA), -0.25, 1e-9, 'Cat A Q at 1.10: ');
   });
 });
 
@@ -194,6 +207,14 @@ describe('ibrFaultContribution()', () => {
     assert.strictEqual(r.tripped, true);
   });
 
+  it('the fault contribution is current-limited: pu and amperes do not depend on pre-fault voltage', () => {
+    const lo = ibrFaultContribution({ sRated_kVA: 200, vLL_kV: 0.48, limitFactor: 1.2, vBus_pu: 0.5 });
+    const hi = ibrFaultContribution({ sRated_kVA: 200, vLL_kV: 0.48, limitFactor: 1.2, vBus_pu: 1.0 });
+    assert.strictEqual(lo.Ifault_pu, 1.2);
+    assert.strictEqual(lo.Ifault_A, hi.Ifault_A);
+    approx(lo.Ifault_A, 1.2 * lo.Irated_A, 1e-9, 'Ifault_A = 1.2 x Irated: ');
+  });
+
   it('Ifault_pu = limitFactor at nominal voltage (1.0 pu)', () => {
     const r = ibrFaultContribution({ sRated_kVA: 200, vLL_kV: 0.48, limitFactor: 1.2, vBus_pu: 1.0 });
     approx(r.Ifault_pu, 1.2, 0.001, 'Ifault_pu at 1.0 pu: ');
@@ -244,9 +265,17 @@ describe('bessDispatch()', () => {
     assert.ok(r.qAC_kvar > 0, 'Should inject Q at low voltage in volt_var mode');
   });
 
-  it('discharge applies round-trip efficiency', () => {
-    const r = bessDispatch({ sRated_kW: 100, sRated_kVA: 100, soc_pct: 80, mode: 'discharge', roundTripEff: 0.9 });
-    approx(r.pAC_kW, 90, 0.001, 'pAC_kW with 90% efficiency: ');
+  it('discharge applies the one-way efficiency sqrt(round trip) = sqrt(0.81) = 0.9', () => {
+    const r = bessDispatch({ sRated_kW: 100, sRated_kVA: 100, soc_pct: 80, mode: 'discharge', roundTripEff: 0.81 });
+    approx(r.pAC_kW, 90, 0.001, 'pAC_kW with 90% one-way efficiency: ');
+  });
+
+  it('a charge leg followed by a discharge leg loses exactly the round-trip efficiency', () => {
+    const charge = bessDispatch({ sRated_kW: 100, sRated_kVA: 100, soc_pct: 50, mode: 'charge', roundTripEff: 0.81 });
+    const discharge = bessDispatch({ sRated_kW: 100, sRated_kVA: 100, soc_pct: 50, mode: 'discharge', roundTripEff: 0.81 });
+    // energy stored per kW delivered to the battery terminals = 100 kW; AC drawn = 100/0.9, AC returned = 100*0.9
+    approx(-charge.pAC_kW, 100 / 0.9, 1e-9, 'AC drawn while charging: ');
+    approx(discharge.pAC_kW / (-charge.pAC_kW), 0.81, 1e-9, 'AC out / AC in = round trip: ');
   });
 
   it('throws on invalid soc_pct', () => {

@@ -7,6 +7,7 @@ import { computeImpedanceFromPerKm } from '../utils/cableImpedance.js';
 import { table9Impedance } from '../src/necTable9.mjs';
 import {
   computeIEC60909Bus,
+  doubleLineGroundEarthCurrent,
   cFactor as iecCFactor,
   generatorCorrectionKG,
   transformerCorrectionKT
@@ -924,6 +925,27 @@ function resolveUpstreamImpedance(comp, comps, compMap, cache, cableResolver, co
   return null;
 }
 
+/**
+ * Squared turns ratio (V_out / V_in)^2 used to refer an impedance chain that
+ * sits on a transformer's input side to the winding feeding the child bus.
+ * Ohms measured at the primary voltage must be multiplied by this factor
+ * before they are added to secondary-side impedance. Returns 1 when either
+ * winding voltage is unknown so behaviour is unchanged for incomplete data.
+ */
+function transformerReferralFactor(xfmr, outPort, inPort) {
+  const outKV = toKV(getTransformerVoltageForPort(xfmr, outPort));
+  const inKV = toKV(getTransformerVoltageForPort(xfmr, inPort));
+  if (!Number.isFinite(outKV) || !Number.isFinite(inKV) || outKV <= 0 || inKV <= 0) return 1;
+  return (outKV / inKV) ** 2;
+}
+
+/** Winding port of a transformer through which it is fed by its own parent. */
+function transformerInputPort(xfmr, comps, compMap, visited) {
+  const feed = findParentInfo(xfmr, comps, compMap, new Set(visited));
+  if (!feed?.connection) return 0;
+  return normalizePortIndex(feed.reversed ? feed.connection.sourcePort : feed.connection.targetPort);
+}
+
 function computeImpedance(comp, comps, compMap, cache, visited = new Set(), cableResolver = null, corrections = null) {
   if (!comp?.id) return { r: 0, x: 0 };
   if (cache.has(comp.id)) return cache.get(comp.id);
@@ -944,7 +966,13 @@ function computeImpedance(comp, comps, compMap, cache, visited = new Set(), cabl
         total = add(total, getTransformerImpedance(upstream, portIndex, corrections));
       }
     }
-    total = add(total, computeImpedance(upstream, comps, compMap, cache, visited, cableResolver, corrections));
+    let upstreamZ = computeImpedance(upstream, comps, compMap, cache, visited, cableResolver, corrections);
+    if (upstream.type === 'transformer' && connection) {
+      const outPort = normalizePortIndex(reversed ? connection.targetPort : connection.sourcePort);
+      const inPort = transformerInputPort(upstream, comps, compMap, visited);
+      upstreamZ = scaleImpedance(upstreamZ, transformerReferralFactor(upstream, outPort, inPort));
+    }
+    total = add(total, upstreamZ);
   }
   visited.delete(comp.id);
   cache.set(comp.id, total);
@@ -1001,6 +1029,14 @@ function buildImpedancePath(comp, comps, compMap, cableResolver, corrections = n
   const requiredInputs = [];
   const visited = new Set();
   let current = comp;
+  // Cumulative factor referring segments found further upstream (above each
+  // transformer crossed so far) to the study bus voltage.
+  let referral = 1;
+  const referred = segment => (referral === 1 ? segment : {
+    ...segment,
+    rOhm: (segment.rOhm || 0) * referral,
+    xOhm: (segment.xOhm || 0) * referral
+  });
 
   while (current?.id && !visited.has(current.id)) {
     visited.add(current.id);
@@ -1009,7 +1045,7 @@ function buildImpedancePath(comp, comps, compMap, cableResolver, corrections = n
     const { component: upstream, connection, reversed } = parent;
     if (connection) {
       const resolved = cableResolver?.resolve(connection, upstream, current);
-      if (resolved?.segment) segments.unshift(resolved.segment);
+      if (resolved?.segment) segments.unshift(referred(resolved.segment));
       (resolved?.assumptions || []).forEach(message => {
         if (message && !assumptions.includes(message)) assumptions.push(message);
       });
@@ -1020,15 +1056,18 @@ function buildImpedancePath(comp, comps, compMap, cableResolver, corrections = n
         const portIndex = normalizePortIndex(reversed ? connection?.targetPort : connection?.sourcePort);
         const impedance = getTransformerImpedance(upstream, portIndex, corrections);
         if (hasImpedance(impedance)) {
-          segments.unshift({
+          segments.unshift(referred({
             type: 'transformer',
             tag: componentIdentity(upstream),
             source: 'One-Line transformer data',
             method: 'percent-impedance',
             rOhm: impedance.r,
             xOhm: impedance.x
-          });
+          }));
         }
+        const outPort = normalizePortIndex(reversed ? connection?.targetPort : connection?.sourcePort);
+        const inPort = transformerInputPort(upstream, comps, compMap, visited);
+        referral *= transformerReferralFactor(upstream, outPort, inPort);
       }
     }
     current = upstream;
@@ -1037,14 +1076,14 @@ function buildImpedancePath(comp, comps, compMap, cableResolver, corrections = n
   if (current && isSourceComponent(current)) {
     const impedance = getSourceImpedance(current, corrections);
     if (hasImpedance(impedance)) {
-      segments.unshift({
+      segments.unshift(referred({
         type: 'source',
         tag: componentIdentity(current),
         source: 'One-Line source data',
         method: 'thevenin',
         rOhm: impedance.r,
         xOhm: impedance.x
-      });
+      }));
     }
   }
 
@@ -1295,8 +1334,8 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       const I3 = V / mag(z1);
       const ILG = (3 * V) / mag(add(add(z1, z2), z0));
       const ILL = (Math.sqrt(3) * V) / mag(add(z1, z2));
-      const Z2Z0 = parallel(z2, z0);
-      const IDLG = (3 * V) / mag(add(z1, Z2Z0));
+      // Double-line-to-ground is reported as the earth current 3·I0
+      const IDLG = doubleLineGroundEarthCurrent(V, z1, z2, z0);
 
       const xr = Math.abs(comp.xr_ratio || 0);
       const asym = I3 * Math.SQRT2 * (1 + Math.exp(-Math.PI / Math.max(xr, 0.01)));

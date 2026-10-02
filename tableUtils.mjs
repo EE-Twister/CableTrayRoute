@@ -1,5 +1,5 @@
 import { getItem, setItem, STORAGE_KEYS } from './dataStore.mjs';
-import { showAlertModal } from './src/components/modal.js';
+import { showAlertModal, trapFocus } from './src/components/modal.js';
 import { readAppSetting, writeAppSetting } from './projectStorage.js';
 
 const TABLE_VIEW_SETTING_PREFIX = 'ctr:table:view:';

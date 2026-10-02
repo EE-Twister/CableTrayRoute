@@ -2,7 +2,7 @@
  * Tests for analysis/conduitBendSchedule.mjs and analysis/pullBoxSizing.mjs
  *
  * Covers: bend geometry for all four types, cumulative-degree accumulation,
- * NEC 358.24 violation detection, pull-box sizing (straight and angle),
+ * NEC 358.26 violation detection, pull-box sizing (straight and angle),
  * runConduitBendSchedule integration, and input-validation paths.
  */
 import assert from 'assert';
@@ -19,6 +19,8 @@ import {
   straightPullMinLength,
   anglePullMinDimension,
   selectStandardBox,
+  parseTradeSize,
+  parseTradeSizeList,
   sizePullBox,
 } from '../analysis/pullBoxSizing.mjs';
 import {
@@ -239,7 +241,7 @@ describe('runConduitBendSchedule() integration', () => {
     assert.ok(r.runs[0].totalDegrees > 0);
   });
 
-  it('detects NEC 358.24 violation on a run with > 360°', () => {
+  it('detects NEC 358.26 violation on a run with > 360°', () => {
     const r = runConduitBendSchedule([{
       label: 'Overcrowded',
       tradeSize: 1,
@@ -477,5 +479,65 @@ describe('sizePullBox()', () => {
   it('returns standardBox with adequate flag', () => {
     const r = sizePullBox({ label: 'PB-4', pullType: 'straight', largestTradeSize: 1 });
     assert.ok('adequate' in r.standardBox);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('pull box review regressions', () => {
+  it('parseTradeSize reads fractions and mixed numbers (parseFloat read 1-1/2 as 1)', () => {
+    assert.strictEqual(parseTradeSize('1-1/2'), 1.5);
+    assert.strictEqual(parseTradeSize('2 1/2'), 2.5);
+    assert.strictEqual(parseTradeSize('3/4'), 0.75);
+    assert.strictEqual(parseTradeSize('2"'), 2);
+    assert.ok(Number.isNaN(parseTradeSize('abc')));
+    assert.ok(Number.isNaN(parseTradeSize('0')));
+  });
+
+  it('parseTradeSizeList keeps 2-1/2 whole and reports unknown tokens', () => {
+    assert.deepStrictEqual(parseTradeSizeList('2, 1-1/2; 3/4').sizes, [2, 1.5, 0.75]);
+    assert.deepStrictEqual(parseTradeSizeList('2 1/2, 1').sizes, [2.5, 1]);
+    assert.deepStrictEqual(parseTradeSizeList('2, x').invalid, ['x']);
+  });
+
+  it('a 2-1/2" + 2" wall needs 6 x 2.5 + 2 = 17" (not 6 x 2 + 1)', () => {
+    assert.strictEqual(anglePullMinDimension([parseTradeSize('2-1/2'), 2]).minDimension, 17);
+  });
+
+  it('selectStandardBox defaults the width to the length when omitted', () => {
+    const box = selectStandardBox(12);
+    assert.strictEqual(box.adequate, true);
+    assert.strictEqual(box.length, 12);
+  });
+
+  it('selectStandardBox uses a box turned on its side (24 x 30 -> 30 x 24)', () => {
+    const box = selectStandardBox(24, 30);
+    assert.deepStrictEqual([box.length, box.width, box.adequate], [24, 30, true]);
+  });
+
+  it('rejects empty or zero inputs instead of returning a 4 x 4 box', () => {
+    assert.throws(() => sizePullBox({ pullType: 'straight', largestTradeSize: NaN }), /trade size/);
+    assert.throws(() => sizePullBox({ pullType: 'angle', wallA: [], wallB: [] }), /at least one conduit/);
+    assert.throws(() => sizePullBox({ pullType: 'angle', wallA: [2], wallB: [], invalidSizes: ['x'] }), /Unrecognised/);
+  });
+});
+
+describe('bend schedule review regressions', () => {
+  it('reports degrees from the angle actually used (60° request snaps to 45°/45° = 90°)', () => {
+    const g = bendGeometry('offset', 6, { angle: 60 });
+    assert.strictEqual(g.degrees, 90);
+    assert.strictEqual(g.markSpacing, 8.48); // 6 x 1.414
+  });
+  it('a kick reports the snapped angle', () => {
+    assert.strictEqual(bendGeometry('kick', 4, { angle: 28 }).degrees, 30);
+  });
+  it('a run with an invalid bend cannot pass NEC 358.26', () => {
+    const r = runConduitBendSchedule([{ label: 'R', bends: [
+      { type: '90', dimension: 12 }, { type: '90', dimension: 12 },
+      { type: '90', dimension: 'abc' }, { type: '90', dimension: 12 },
+    ] }]);
+    assert.strictEqual(r.runs[0].totalDegrees, 270);
+    assert.strictEqual(r.runs[0].nec358_24Pass, false);
+    assert.match(r.runs[0].nec358_24Message, /cannot be verified/);
+    assert.strictEqual(r.summary.allPass, false);
   });
 });

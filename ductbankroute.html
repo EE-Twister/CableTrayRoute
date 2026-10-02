@@ -505,7 +505,7 @@
  <button type="button" id="addHeatSource" class="btn toolbar-btn" style="display:none;">Add Heat Source</button>
  <label style="margin-left:8px;">Grid Resolution
   <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="gridHelp">?
-   <span id="gridHelp" class="tooltip">Number of nodes used for the thermal solver.</span>
+   <span id="gridHelp" class="tooltip">Sets the resolution of the displayed heat map. The solver itself sizes its cells from the smallest conduit, so temperatures do not depend on this setting.</span>
   </span>
   <select id="gridRes" style="margin-left:4px;">
    <option value="20" selected>20×20</option>
@@ -515,7 +515,7 @@
  </label>
 <label style="margin-left:8px;">Duct Thermal Resistance (&#176;C·m/W)
   <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="ductResHelp">?
-   <span id="ductResHelp" class="tooltip">Thermal resistance of the conduit itself. Leave 0 when using the preset table. Typical range 0–0.2 &#176;C·m/W.</span>
+   <span id="ductResHelp" class="tooltip">Extra thermal resistance added to every conduit on top of the duct-wall preset table and the cable-to-duct air gap (both applied automatically). Leave 0 unless you have manufacturer data. Typical range 0–0.2 &#176;C·m/W.</span>
   </span>
   <input type="number" id="ductThermRes" value="0.0" placeholder="0.05" min="0" step="0.01" style="width:60px;">
 </label>

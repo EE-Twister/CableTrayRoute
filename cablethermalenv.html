@@ -246,8 +246,20 @@
               <input id="ct-duct-count" type="number" min="2" max="36" step="1" value="6">
             </div>
             <div class="field-row">
-              <label for="ct-duct-spacing">Duct bank spacing (mm)</label>
-              <input id="ct-duct-spacing" type="number" min="50" max="500" step="10" value="200">
+              <label for="ct-duct-spacing">Duct bank clear spacing between ducts (mm)</label>
+              <input id="ct-duct-spacing" type="number" min="0" max="1000" step="10" value="200">
+            </div>
+            <div class="field-row">
+              <label for="ct-duct-rows">Duct bank rows (blank = automatic)</label>
+              <input id="ct-duct-rows" type="number" min="1" max="20" step="1" placeholder="auto">
+            </div>
+            <div class="field-row">
+              <label for="ct-duct-cols">Duct bank columns (blank = automatic)</label>
+              <input id="ct-duct-cols" type="number" min="1" max="20" step="1" placeholder="auto">
+            </div>
+            <div class="field-row">
+              <label for="ct-burial-spacing">Direct burial clear spacing between cables (mm, blank = one cable diameter)</label>
+              <input id="ct-burial-spacing" type="number" min="0" max="2000" step="10" placeholder="auto">
             </div>
           </details>
 

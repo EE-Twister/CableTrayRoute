@@ -403,3 +403,81 @@ describe('runLightingStudy integration', () => {
     assert.ok(r.warnings.some(w => /LLF|loss factor/i.test(w)));
   });
 });
+
+// ---------------------------------------------------------------------------
+// Review regressions
+// ---------------------------------------------------------------------------
+import {
+  luminousFluxFromCandela,
+  egressComplianceCheck as egressCheck2,
+  NFPA_EGRESS_MAX_MIN_RATIO,
+} from '../analysis/lighting.mjs';
+
+describe('point-by-point height is measured above the workplane', () => {
+  it('10x10 ft room, one 1000 cd downlight at 9 ft AFF over a 2.5 ft workplane', () => {
+    const r = runLightingStudy({
+      roomLengthFt: 10, roomWidthFt: 10, mountingHeightFt: 9, workplaneHeightFt: 2.5,
+      numFixtures: 1, lumensPerFixture: 3000,
+      fixturePositions: [{ x: 5, y: 5 }], vertAngles: [0, 90], candelas: [1000, 1000],
+    });
+    // Nearest cell centres are 0.5 ft from each axis: d² = 0.5, H = 6.5 ft
+    const H = 6.5, D2 = H * H + 0.5;
+    const expected = 1000 * (H / Math.sqrt(D2)) / D2;
+    assert.ok(Math.abs(r.pointGrid.maxFc - expected) < 0.01, `max ${r.pointGrid.maxFc} vs ${expected}`);
+    // Using the 9 ft mounting height instead would give ~12.2 fc: a 48% understatement
+    assert.ok(r.pointGrid.maxFc > 20);
+  });
+
+  it('warns when the grid and lumen method use different fixture counts', () => {
+    const r = runLightingStudy({
+      roomLengthFt: 10, roomWidthFt: 10, mountingHeightFt: 9, numFixtures: 4, lumensPerFixture: 3000,
+      fixturePositions: [{ x: 5, y: 5 }], vertAngles: [0, 90], candelas: [1000, 1000],
+    });
+    assert.ok(r.warnings.some(w => /fixture position/.test(w)));
+  });
+});
+
+describe('absolute photometry and blank fields', () => {
+  it('lumens per lamp of -1 is replaced by the integrated candela flux', () => {
+    assert.ok(approxPct(luminousFluxFromCandela([0, 90], [[1000, 1000]]), 2 * Math.PI * 1000, 0.01));
+    const ies = MINIMAL_IES.replace('1 3000.0 1.0 10 1 1 1', '1 -1 1.0 10 1 1 1');
+    const p = parseIES(ies);
+    assert.ok(p.totalLumens > 0, `totalLumens ${p.totalLumens}`);
+    // Independent zonal sum of the 10-point table (0-90 degrees)
+    const cd = [2520, 2500, 2450, 2380, 2280, 2100, 1800, 1400, 900, 200];
+    let phi = 0;
+    for (let i = 0; i < 9; i++) {
+      phi += (cd[i] + cd[i + 1]) / 2 * 2 * Math.PI * (Math.cos(i * 10 * Math.PI / 180) - Math.cos((i + 1) * 10 * Math.PI / 180));
+    }
+    assert.ok(approxPct(p.totalLumens, phi, 0.01));
+  });
+
+  it('blank (NaN) workplane, LLF and reflectances use the defaults instead of throwing', () => {
+    const r = runLightingStudy({
+      roomLengthFt: 20, roomWidthFt: 20, mountingHeightFt: 9, numFixtures: 6, lumensPerFixture: 3000,
+      workplaneHeightFt: NaN, llf: NaN, ceilingReflPct: NaN, wallReflPct: NaN,
+    });
+    assert.strictEqual(r.valid, true);
+    assert.strictEqual(r.lumenMethod.llf, 0.8);
+  });
+});
+
+describe('NFPA 101 uniformity and workplane notes', () => {
+  it('max-to-min above 40:1 fails even when avg and min pass', () => {
+    const ok = egressCheck2({ avgFc: 3, minFc: 0.2, maxFc: 7 });
+    assert.strictEqual(ok.pass, true);
+    const bad = egressCheck2({ avgFc: 3, minFc: 0.1, maxFc: 5 });
+    assert.strictEqual(bad.pass, false);
+    assert.ok(bad.violations.some(v => v.includes(`${NFPA_EGRESS_MAX_MIN_RATIO}:1`)));
+  });
+
+  it('warns that egress illuminance is measured at the floor when the workplane is raised', () => {
+    const r = runLightingStudy({ roomLengthFt: 20, roomWidthFt: 20, mountingHeightFt: 9, numFixtures: 6, lumensPerFixture: 3000 });
+    assert.ok(r.warnings.some(w => /measured at the floor/.test(w)));
+  });
+
+  it('flags an RCR beyond the CU table', () => {
+    const r = runLightingStudy({ roomLengthFt: 4, roomWidthFt: 4, mountingHeightFt: 12, numFixtures: 1, lumensPerFixture: 3000 });
+    assert.ok(r.warnings.some(w => /beyond the CU table/.test(w)));
+  });
+});

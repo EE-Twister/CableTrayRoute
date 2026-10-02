@@ -19,11 +19,11 @@ export const ENTRYPOINT_BUDGETS = Object.freeze({
   'oneline.js': 13175,
   'analysis/tcc.js': 4306,
   'app.mjs': 4453,
-  'ductbankroute.js': 5230,
+  'ductbankroute.js': 5305,
   'cableschedule.js': 3266,
-  'cathodicprotection.js': 2764,
+  'cathodicprotection.js': 2765,
   'src/panelSchedule.js': 2725,
-  'site.js': 2825
+  'site.js': 2829
 });
 
 export const REQUIRED_BOUNDARIES = Object.freeze({
@@ -143,13 +143,13 @@ export const EXTRACTED_MODULE_BUDGETS = Object.freeze({
   'analysis/tcc/catalogPresentationModel.mjs': 219,
   'analysis/tcc/catalogSelectionModel.mjs': 43,
   'analysis/tcc/chartInteractionModel.mjs': 71,
-  'analysis/tcc/chartRenderer.mjs': 1342,
+  'analysis/tcc/chartRenderer.mjs': 1345,
   'analysis/tcc/componentBrowserModal.mjs': 578,
   'analysis/tcc/componentDetailModel.mjs': 208,
   'analysis/tcc/coordinationOrderView.mjs': 98,
   'analysis/tcc/customCurveBuilderView.mjs': 1629,
   'analysis/tcc/customCurveModel.mjs': 247,
-  'analysis/tcc/deviceDetailView.mjs': 411,
+  'analysis/tcc/deviceDetailView.mjs': 412,
   'analysis/tcc/deviceSelectionModal.mjs': 563,
   'analysis/tcc/equipmentConstraintModel.mjs': 167,
   'analysis/tcc/equipmentOverlayModel.mjs': 582,
@@ -166,7 +166,7 @@ export const EXTRACTED_MODULE_BUDGETS = Object.freeze({
   'src/routing/routeReviewView.mjs': 78,
   'src/routing/routeDetailView.mjs': 58,
   'src/routing/racewaySizingModel.mjs': 80,
-  'src/routing/routingReadinessModel.mjs': 100,
+  'src/routing/routingReadinessModel.mjs': 105,
   'src/routing/routingProjectAdapter.mjs': 332,
   'src/routing/routingSamples.mjs': 155,
   'src/routing/routeVisualizationModel.mjs': 134,
@@ -186,9 +186,9 @@ export const EXTRACTED_MODULE_BUDGETS = Object.freeze({
   'src/cable-schedule/templateModel.js': 155,
   'src/cable-schedule/tagModel.js': 60,
   'src/cable-schedule/scheduleConfig.js': 206,
-  'src/ductbank-route/thermalPrimitives.js': 71,
-  'src/ductbank-route/ampacityModel.js': 239,
-  'src/studies/cp/analysisEngine.js': 652
+  'src/ductbank-route/thermalPrimitives.js': 74,
+  'src/ductbank-route/ampacityModel.js': 275,
+  'src/studies/cp/analysisEngine.js': 654
 });
 
 export const DOM_FREE_MODULES = Object.freeze([

@@ -28,7 +28,7 @@ The largest browser entry points are orchestration layers. New domain, state, an
 | `app.mjs` | Shared HTML escaping and safe-link validation | `src/htmlSafety.mjs` |
 | `app.mjs` | Raceway sizing and containment recommendations | `src/routing/racewaySizingModel.mjs` |
 | `app.mjs` | Project adaptation, readiness, sample construction, and route-scene models | `src/routing/routingProjectAdapter.mjs`, `src/routing/routingReadinessModel.mjs`, `src/routing/routingSamples.mjs`, `src/routing/routeVisualizationModel.mjs` |
-| `app.mjs` | Plotly scene, pull-review, and manual-entry views | `src/routing/plotlyRouteScene.mjs`, `src/routing/pullReviewView.mjs`, `src/routing/manualEntryView.mjs` |
+| `app.mjs` | Plotly scene, pull-review, and manual-entry views | `src/routing/plotlyRouteScene.mjs`, `src/routing/routeGraphTheme.mjs`, `src/routing/pullReviewView.mjs`, `src/routing/manualEntryView.mjs` |
 | `ductbankroute.js` | Ductbank interchange adapter | `src/ductbankProjectAdapter.mjs` |
 | `ductbankroute.js` | Thermal constants and pure calculation primitives | `src/ductbank-route/thermalPrimitives.js` |
 | `ductbankroute.js` | Injected ductbank ampacity and conductor-temperature model | `src/ductbank-route/ampacityModel.js` |

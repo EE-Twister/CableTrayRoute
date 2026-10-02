@@ -62,7 +62,7 @@ describe('architecture boundaries', () => {
     assert.ok(Object.isFrozen(EXTRACTED_MODULE_BUDGETS));
     assert.equal(EXTRACTED_MODULE_BUDGETS['src/one-line/eventBindingController.mjs'], 2155);
     assert.equal(EXTRACTED_MODULE_BUDGETS['src/one-line/propertyDetailView.mjs'], 2332);
-    assert.equal(EXTRACTED_MODULE_BUDGETS['analysis/tcc/chartRenderer.mjs'], 1342);
+    assert.equal(EXTRACTED_MODULE_BUDGETS['analysis/tcc/chartRenderer.mjs'], 1345);
     assert.equal(EXTRACTED_MODULE_BUDGETS['analysis/tcc/customCurveBuilderView.mjs'], 1629);
     assert.equal(EXTRACTED_MODULE_BUDGETS['src/panel-schedule/breakerLayoutModel.js'], 360);
   });

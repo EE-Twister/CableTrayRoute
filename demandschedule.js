@@ -32,9 +32,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const mode = modeSelect ? modeSelect.value : 'nec';
     const profile = profileSelect ? profileSelect.value : 'commercial';
+    const lightingOccupancy = document.getElementById('lighting-occupancy-select')?.value || 'general';
     let result;
     try {
-      result = buildDemandSchedule(loads, { mode, profile });
+      result = buildDemandSchedule(loads, { mode, profile, lightingOccupancy });
     } catch (err) {
       showAlertModal('Calculation Error', err.message);
       return;

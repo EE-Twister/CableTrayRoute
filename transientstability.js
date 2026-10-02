@@ -212,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <p>Swing equation: M = 2H/ωs = 2×${inp.H}/(2π×${inp.f}) = ${(2*inp.H/(2*Math.PI*inp.f)).toFixed(5)} s²/rad</p>
           <p>Initial rotor angle: δ₀ = arcsin(Pm/Pmax_pre) = arcsin(${inp.Pm}/${inp.Pmax_pre}) = ${(delta0 * 180 / Math.PI).toFixed(2)}°</p>
           <p>Integration by 4th-order Runge-Kutta, dt = 1 ms. Fault inception at t=0.</p>
-          <p>Instability criterion: δ ≥ 180° (pole slip).</p>
+          <p>Instability criterion: after clearing, the swing energy ½Mω² − Pm·δ − Pmax_post·cos δ exceeds its value at the post-fault unstable equilibrium δu = 180° − arcsin(Pm/Pmax_post) (or δ ≥ 180°). Classical model: constant Pm and E′, no damping, so this is a first-swing result.</p>
         </details>
       </div>`;
   }

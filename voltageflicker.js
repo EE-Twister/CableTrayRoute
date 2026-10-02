@@ -1,6 +1,8 @@
+import { showModal } from './src/components/modal.js';
 import {
   runVoltageFlickerStudy,
   PST_LIMIT,
+  PLT_LIMIT,
   PST_PASS_THRESHOLD,
 } from './analysis/voltageFlicker.mjs';
 import { getStudies, setStudies, getLoads, getEquipment, getCables } from './dataStore.mjs';
@@ -168,6 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
       nominalVoltageKv: flt('nominal-kv'),
       systemKva: flt('system-kva'),
       xrRatio: flt('xr-ratio'),
+      loadPowerFactor: flt('load-pf'),
       loadSteps,
       pstSeriesForPlt,
     };
@@ -215,6 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const set = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
     set('system-kva', inputs.systemKva);
     set('xr-ratio', inputs.xrRatio);
+    set('load-pf', inputs.loadPowerFactor);
     set('nominal-kv', inputs.nominalVoltageKv);
     if (Array.isArray(inputs.pstSeriesForPlt) && inputs.pstSeriesForPlt.length > 0) {
       set('pst-series', inputs.pstSeriesForPlt.join(', '));
@@ -264,7 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="result-card">
               <div class="result-card-label">Plt (2-hour)</div>
               <div class="result-card-value ${riskClass(pltRisk)}">${plt.toFixed(3)}</div>
-              <div class="result-card-sub"><span class="${riskClass(pltRisk)}">${riskLabel(pltRisk)}</span> — ${pltSource === 'measured' ? 'from measured series' : 'conservative estimate'}</div>
+              <div class="result-card-sub"><span class="${riskClass(pltRisk)}">${riskLabel(pltRisk)}</span> — ${pltSource === 'measured' ? 'from measured series' : 'conservative estimate'} (limit = ${PLT_LIMIT})</div>
             </div>
           </div>
         </div>

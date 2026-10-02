@@ -15,7 +15,7 @@ function getFocusableElements(container) {
   });
 }
 
-function trapFocus(event, container) {
+export function trapFocus(event, container) {
   if (event.key !== 'Tab') return;
   const focusable = getFocusableElements(container);
   if (!focusable.length) {
@@ -362,6 +362,40 @@ export function showAlertModal(title, message, options = {}) {
     secondaryText: null,
     variant: options.variant,
     closeLabel: options.closeLabel || 'Close dialog'
+  });
+}
+
+const UNSAFE_MODAL_TAGS = 'script, style, iframe, object, embed, link, meta';
+
+function sanitizeModalHtml(html) {
+  const template = document.createElement('template');
+  template.innerHTML = String(html ?? '');
+  template.content.querySelectorAll(UNSAFE_MODAL_TAGS).forEach(node => node.remove());
+  template.content.querySelectorAll('*').forEach(node => {
+    [...node.attributes].forEach(attr => {
+      const name = attr.name.toLowerCase();
+      if (name.startsWith('on') || /^\s*javascript:/i.test(attr.value)) {
+        node.removeAttribute(attr.name);
+      }
+    });
+  });
+  return template.content;
+}
+
+/**
+ * Show an informational dialog whose body is a small HTML fragment
+ * (paragraphs, lists, emphasis). Scripts, event handlers, and javascript: URLs
+ * are stripped, so callers may include formatted result text.
+ */
+export function showModal(title, html, variant) {
+  return openModal({
+    title,
+    primaryText: 'Close',
+    secondaryText: null,
+    variant,
+    render: body => {
+      body.appendChild(sanitizeModalHtml(html));
+    }
   });
 }
 

@@ -17,9 +17,8 @@ import {
   getFieldObservationQueue, getFieldObservations,
   getProcurementRegister,
 } from '../dataStore.mjs';
-import { trayFillPercent } from '../analysis/designRuleChecker.mjs';
 import { buildLifecyclePackage, summarizePackage } from '../analysis/lifecyclePackage.mjs';
-import { runDesignCoach } from '../analysis/designCoach.mjs';
+import { extractTrayFillRecs, runDesignCoach } from '../analysis/designCoach.mjs';
 import { evaluateEquipment, summariseEvaluation } from '../analysis/equipmentEvaluation.mjs';
 import { buildGuidedWorkflowRunner, buildWorkflowCoreDiagnostics } from '../analysis/projectWorkflowCore.mjs';
 import { buildMinimalDesignAutomation } from '../analysis/workflowAutomation.mjs';
@@ -142,10 +141,8 @@ function getWorkflowMetrics() {
 }
 
 function getTrayViolationsCount() {
-  return getTrays().filter(tray => {
-    const pct = trayFillPercent(tray);
-    return pct !== null && pct > 80;
-  }).length;
+  // Same NEC 392.22(A) judgement the Design Coach reports, so the KPI and the coach agree.
+  return extractTrayFillRecs(getTrays(), getCables() || []).length;
 }
 
 function getStudiesCompletedCount() {

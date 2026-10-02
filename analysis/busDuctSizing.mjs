@@ -31,27 +31,30 @@ export const STANDARD_BUSWAY_RATINGS = Object.freeze([
 ]);
 
 /**
- * Indicative busway resistance and reactance per foot at 60 Hz.
+ * Indicative busway resistance and reactance per foot (per phase conductor) at 60 Hz.
  *
- * Values represent typical mid-range figures for plug-in (feeder) busway.
- * - resistance (mΩ/ft): AC resistance including skin-effect at rated current
- * - reactance  (mΩ/ft): 60 Hz inductive reactance (phase-to-phase spacing ~4–6 in)
- *
- * Source: representative data interpolated from GE Spectra/Siemens BT/Eaton
- * Speed-D published performance tables.
+ * Resistance follows the conductor cross-section: copper at about 1000 A/in² hot and
+ * aluminum at about 700 A/in² with skin-effect and joint allowances gives roughly
+ *   R_Cu ≈ 20 / I_rating  mΩ/ft     R_Al ≈ 30 / I_rating  mΩ/ft
+ * (2000 A copper ≈ 0.010 mΩ/ft, about 1% drop per 100 ft at full load). Reactance falls slowly
+ * with rating because larger ducts use closer, interleaved phase spacing:
+ *   X ≈ 0.012 × (800 / I_rating)^0.35  mΩ/ft.
+ * An earlier table was about ten times higher (a 2000 A copper duct had the resistance of
+ * 4/0 AWG cable), which made ordinary runs fail the 3% check. These remain generic
+ * order-of-magnitude values: use the manufacturer's published impedance for final design.
  */
 export const BUSWAY_LIBRARY = Object.freeze({
   //  rating    Cu_R    Cu_X    Al_R    Al_X   weight_lb_per_ft
-  800:  { Cu: { r: 0.210, x: 0.060 }, Al: { r: 0.320, x: 0.065 }, weightLbPerFt: 6.5  },
-  1000: { Cu: { r: 0.175, x: 0.055 }, Al: { r: 0.265, x: 0.060 }, weightLbPerFt: 7.8  },
-  1200: { Cu: { r: 0.150, x: 0.050 }, Al: { r: 0.230, x: 0.055 }, weightLbPerFt: 9.2  },
-  1350: { Cu: { r: 0.135, x: 0.048 }, Al: { r: 0.205, x: 0.052 }, weightLbPerFt: 10.1 },
-  1600: { Cu: { r: 0.115, x: 0.045 }, Al: { r: 0.175, x: 0.050 }, weightLbPerFt: 11.8 },
-  2000: { Cu: { r: 0.095, x: 0.042 }, Al: { r: 0.145, x: 0.046 }, weightLbPerFt: 14.0 },
-  2500: { Cu: { r: 0.078, x: 0.040 }, Al: { r: 0.118, x: 0.043 }, weightLbPerFt: 17.2 },
-  3000: { Cu: { r: 0.065, x: 0.038 }, Al: { r: 0.098, x: 0.041 }, weightLbPerFt: 20.5 },
-  4000: { Cu: { r: 0.050, x: 0.036 }, Al: { r: 0.075, x: 0.039 }, weightLbPerFt: 26.0 },
-  5000: { Cu: { r: 0.040, x: 0.034 }, Al: { r: 0.060, x: 0.037 }, weightLbPerFt: 32.0 },
+  800: { Cu: { r: 0.025, x: 0.012 }, Al: { r: 0.0375, x: 0.0126 }, weightLbPerFt: 6.5 },
+  1000: { Cu: { r: 0.02, x: 0.0111 }, Al: { r: 0.03, x: 0.01165 }, weightLbPerFt: 7.8 },
+  1200: { Cu: { r: 0.01667, x: 0.01041 }, Al: { r: 0.025, x: 0.01093 }, weightLbPerFt: 9.2 },
+  1350: { Cu: { r: 0.01481, x: 0.00999 }, Al: { r: 0.02222, x: 0.01049 }, weightLbPerFt: 10.1 },
+  1600: { Cu: { r: 0.0125, x: 0.00942 }, Al: { r: 0.01875, x: 0.00989 }, weightLbPerFt: 11.8 },
+  2000: { Cu: { r: 0.01, x: 0.00871 }, Al: { r: 0.015, x: 0.00914 }, weightLbPerFt: 14.0 },
+  2500: { Cu: { r: 0.008, x: 0.00805 }, Al: { r: 0.012, x: 0.00846 }, weightLbPerFt: 17.2 },
+  3000: { Cu: { r: 0.00667, x: 0.00756 }, Al: { r: 0.01, x: 0.00793 }, weightLbPerFt: 20.5 },
+  4000: { Cu: { r: 0.005, x: 0.00683 }, Al: { r: 0.0075, x: 0.00717 }, weightLbPerFt: 26.0 },
+  5000: { Cu: { r: 0.004, x: 0.00632 }, Al: { r: 0.006, x: 0.00663 }, weightLbPerFt: 32.0 },
 });
 
 // ---------------------------------------------------------------------------
@@ -292,38 +295,44 @@ export function voltageDropBusDuct(params) {
 // ---------------------------------------------------------------------------
 
 /**
- * IEEE 605-2008 §5.2 — Electromagnetic force on a bus conductor during a
- * three-phase fault.
+ * Peak-to-RMS ratio of the first-cycle asymmetrical fault current for a symmetrical fault level.
+ * Uses the short-circuit test peak factors of UL 857 / NEMA BU 1.1 busway (test power factor
+ * 0.50, 0.30, 0.20 → 1.7, 2.0, 2.2), which correspond to κ·√2 with κ = 1.02 + 0.98·e^(−3R/X).
  *
- * The maximum force per unit length on any conductor in a flat three-phase bus
- * arrangement occurs on the outer conductors:
+ * @param {number} faultCurrentKA  Symmetrical RMS fault current (kA)
+ * @returns {number}
+ */
+export function peakFactorForFault(faultCurrentKA) {
+  const I = parseFloat(faultCurrentKA) || 0;
+  if (I <= 10) return 1.7;
+  if (I <= 20) return 2.0;
+  return 2.2;
+}
+
+/**
+ * IEEE 605-2008 §5.2 / IEC 60865-1 — maximum electromagnetic force on a bus conductor during
+ * a three-phase fault. The force follows the PEAK (first-cycle, asymmetrical) current, not the
+ * symmetrical RMS value:
  *
- *   F/L = (√3 / 2) × μ₀/2π × I_peak² / d
- *       ≈ 5.396 × 10⁻⁷ × I_peak² / d   (SI units — N/m, A, m)
+ *   F/L = (√3 / 2) × (μ₀ / 2π) × I_peak² / d
+ *   with μ₀/2π = 2×10⁻⁷ N/A², which in lbf/ft with d in inches is 5.4×10⁻⁷ × I_peak² / d_in,
+ *   so F/L [lbf/ft] = 0.866 × 5.4×10⁻⁷ × I_peak² / d_in
  *
- * Converting to lbf/ft with I in amps (RMS symmetrical) and d in inches,
- * the industry standard simplified form is:
- *
- *   F/L [lbf/ft] = 5.4 × 10⁻⁷ × I_A² / d_in
- *
- * In terms of kA (since fault studies report I in kA):
- *
- *   F/L [lbf/ft] = 5.4 × 10⁻⁷ × (I_kA × 1000)² / d_in
- *               = 0.54 × I_kA² / d_in
- *
- * Source: GE Bus Bar Design Guide; IEEE 605-2008 §5.2; Eaton Bus Duct
- * Catalog application note on short-circuit stress.
+ * I_peak = peakFactor × I_rms. Using I_rms directly (as an earlier version did) understates
+ * the force by the square of the peak factor, about 5×.
  *
  * @param {number} faultCurrentKA  Symmetrical RMS fault current (kA)
  * @param {number} conductorSpacingIn  Centre-to-centre conductor spacing (in)
+ * @param {number} [peakFactor]  I_peak / I_rms; default from peakFactorForFault()
  * @returns {number}  Maximum electromagnetic force per foot of bus (lbf/ft)
  */
-export function busStressForcePerFt(faultCurrentKA, conductorSpacingIn) {
+export function busStressForcePerFt(faultCurrentKA, conductorSpacingIn, peakFactor) {
   const I = parseFloat(faultCurrentKA)    || 0;
   const d = parseFloat(conductorSpacingIn)|| 0;
   if (d <= 0) return 0;
-  // F/L [lbf/ft] = 5.4×10⁻⁷ × (I_kA×1000)² / d_in = 0.54 × I_kA² / d_in
-  return round4(0.54 * I * I / d);
+  const kp = Number.isFinite(peakFactor) && peakFactor > 0 ? peakFactor : peakFactorForFault(I);
+  const peakA = I * 1000 * kp;
+  return round4((Math.sqrt(3) / 2) * 5.4e-7 * peakA * peakA / d);
 }
 
 /**
@@ -532,7 +541,8 @@ export function runBusDuctStudy(inputs) {
 
   const selectedBuswayResult = {
     rating: finalRating,
-    adequate: finalRating <= STANDARD_BUSWAY_RATINGS[STANDARD_BUSWAY_RATINGS.length - 1],
+    // Adequate only if a standard rating exists that carries the derated load
+    adequate: utilization <= 100,
     material: mat,
     rMohmPerFt: finalLibEntry[mat]?.r ?? finalLibEntry.Al.r,
     xMohmPerFt: finalLibEntry[mat]?.x ?? finalLibEntry.Al.x,

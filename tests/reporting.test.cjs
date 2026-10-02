@@ -54,6 +54,26 @@ function it(name, fn){
       assert(csv.includes('-5'));
       assert(!csv.includes("'-5"));
     });
+
+    it('quotes cells containing line breaks so a row does not split', () => {
+      const csv = toCSV(['note', 'tag'], [{ note: 'line one\nline two', tag: 'A' }]);
+      assert.strictEqual(csv, 'note,tag\n"line one\nline two",A');
+      assert.strictEqual(csv.split('\n').length, 3, 'the multi-line cell spans lines inside its quotes');
+    });
+
+    it('leaves a negative number stored as text alone but still neutralises formulas', () => {
+      const csv = toCSV(['v'], [{ v: '-5' }, { v: '-0.25e-3' }, { v: '=1+1' }, { v: '-cmd|calc' }, { v: '\t=2' }]);
+      const lines = csv.split('\n');
+      assert.strictEqual(lines[1], '-5');
+      assert.strictEqual(lines[2], '-0.25e-3');
+      assert.strictEqual(lines[3], "'=1+1");
+      assert.strictEqual(lines[4], "'-cmd|calc");
+      assert.ok(lines[5].startsWith("'\t="), 'tab-prefixed formula is neutralised');
+    });
+
+    it('quotes headers that contain commas', () => {
+      assert.strictEqual(toCSV(['Load, kW'], [{ 'Load, kW': 5 }]), '"Load, kW"\n5');
+    });
   });
 
   describe('label templates', () => {

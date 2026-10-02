@@ -8,7 +8,7 @@ This document defines handoff-level inputs, outputs, readiness rules, and downst
 
 Standard readiness vocabulary: Ready, Missing inputs, Downstream handoff.
 
-Coverage: 80 contracts for 80 navigation routes.
+Coverage: 81 contracts for 81 navigation routes.
 
 ## Workflow
 
@@ -1535,6 +1535,31 @@ Coverage: 80 contracts for 80 navigation routes.
 
 **Downstream Pages**
 - `designcoach.html`
+- `projectreport.html`
+
+**Notes**
+- None.
+
+#### Direct Burial Circuits (`directburial.html`)
+
+- Section: Studies
+- Group: Cable
+- Workflow step: studies
+
+**Standalone Inputs**
+- Required circuit current, cover depth, soil thermal resistivity and temperature, conductor material and arrangement, candidate sizes and circuit spacings, and cost allowances.
+
+**Project Inputs**
+- No project inputs are required.
+
+**Outputs**
+- `export-only` (export): Direct-burial size, spacing, circuit-count and cost comparison CSV. Consumers: `projectreport.html`.
+
+**Readiness**
+- Ready when: Ready when required current, cover depth, and soil properties are valid and at least one conductor size and spacing is selected.
+- Blockers: Missing or non-positive current, cover, or soil resistivity, or no candidate sizes or spacings.
+
+**Downstream Pages**
 - `projectreport.html`
 
 **Notes**

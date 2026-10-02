@@ -1,14 +1,15 @@
 /**
  * Conduit Bend & Pull-Box Sizing Schedule — Gap #93
  *
- * Pure calculation helpers for conduit bend geometry and NEC 358.24
+ * Pure calculation helpers for conduit bend geometry and NEC 358.26
  * cumulative-bend validation. No DOM access; persistence is handled by the
  * page JS layer (conduitbend.js).
  *
  * NEC references:
- *   358.24  Maximum bends — EMT (also applies via reference to IMC 342.24,
- *           RMC 344.24, LFMC 350.24): no more than 360° of bends between
- *           pull points.
+ *   358.26  Bends — Number in One Run — EMT (also IMC 342.26, RMC 344.26,
+ *           LFMC 350.26): no more than 360° of bends between pull points.
+ *           (358.24 is "Bends — How Made"; the identifiers nec358_24* are kept
+ *           for saved-project compatibility.)
  *
  * Geometry source: Tom Henry's Conduit Bending Manual; Mike Holt's
  * Illustrated Guide to the NEC; NECA Manual of Labor Units (standard
@@ -111,10 +112,11 @@ export function bendGeometry(type, dimension, opts = {}) {
       const entry       = _closestOffsetAngle(angle);
       const markSpacing = round2(h * entry.multiplier);
       const shrink      = round2(h * entry.shrinkPerIn);
+      const usedAngle   = entry.angle;
       return {
         type:        'offset',
         dimension:   h,
-        degrees:     round2(angle * 2),
+        degrees:     usedAngle * 2,
         markSpacing,
         rise:        h,
         run:         markSpacing,
@@ -127,11 +129,11 @@ export function bendGeometry(type, dimension, opts = {}) {
     case 'kick': {
       const entry       = _closestOffsetAngle(angle);
       const markSpacing = round2(h * entry.multiplier);
-      const runDist     = round2(markSpacing * Math.cos(_toRad(angle)));
+      const runDist     = round2(markSpacing * Math.cos(_toRad(entry.angle)));
       return {
         type:        'kick',
         dimension:   h,
-        degrees:     angle,
+        degrees:     entry.angle,
         markSpacing,
         rise:        h,
         run:         runDist,
@@ -166,7 +168,7 @@ export function bendGeometry(type, dimension, opts = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Cumulative degrees and NEC 358.24 check
+// Cumulative degrees and NEC 358.26 check
 // ---------------------------------------------------------------------------
 
 /**
@@ -181,7 +183,7 @@ export function cumulativeDegrees(bends) {
 }
 
 /**
- * Validate an array of conduit segments against NEC 358.24 (≤ 360° between pull points).
+ * Validate an array of conduit segments against NEC 358.26 (≤ 360° between pull points).
  *
  * @param {Array<{label?: string, bends: Array<{degrees: number}>}>} segments
  * @returns {Array<{segmentLabel: string, totalDegrees: number, pass: boolean, message: string}>}
@@ -197,8 +199,8 @@ export function nec358_24Check(segments) {
       totalDegrees: total,
       pass,
       message: pass
-        ? `${total}° total — passes NEC 358.24 (≤ 360° between pull points)`
-        : `${total}° total — exceeds NEC 358.24 limit of 360°. Add a pull point or reduce bends.`,
+        ? `${total}° total — passes NEC 358.26 (≤ 360° between pull points)`
+        : `${total}° total — exceeds NEC 358.26 limit of 360°. Add a pull point or reduce bends.`,
     };
   });
 }
@@ -232,7 +234,7 @@ export function nec358_24Check(segments) {
  */
 
 /**
- * Process conduit runs: compute bend geometry and check NEC 358.24.
+ * Process conduit runs: compute bend geometry and check NEC 358.26.
  *
  * @param {ConduitRunInput[]} conduitRuns
  * @returns {{ runs: ConduitRunResult[], violations: object[], summary: object }}
@@ -263,16 +265,19 @@ export function runConduitBendSchedule(conduitRuns) {
     }
 
     const enriched = [];
+    let invalidBends = 0;
     for (const [j, b] of bendInputs.entries()) {
       const bType = String(b.type || '').toLowerCase();
       const dim   = parseFloat(b.dimension);
 
       if (!BEND_TYPES.includes(bType)) {
         violations.push({ runLabel: label, bendIndex: j, message: `Unknown bend type "${b.type}"` });
+        invalidBends++;
         continue;
       }
       if (!Number.isFinite(dim) || dim < 0) {
         violations.push({ runLabel: label, bendIndex: j, message: `Invalid dimension "${b.dimension}" for bend ${j + 1} of "${label}"` });
+        invalidBends++;
         continue;
       }
 
@@ -283,12 +288,15 @@ export function runConduitBendSchedule(conduitRuns) {
     }
 
     const totalDeg = cumulativeDegrees(enriched);
-    const pass     = totalDeg <= NEC_MAX_DEGREES;
-    const necMsg   = pass
-      ? `${totalDeg}° total — passes NEC 358.24`
-      : `${totalDeg}° total — exceeds 360° NEC 358.24 limit; add a pull point`;
+    // An invalid bend is left out of the total, so the run cannot be certified.
+    const pass     = totalDeg <= NEC_MAX_DEGREES && invalidBends === 0;
+    const necMsg   = invalidBends > 0
+      ? `${totalDeg}° counted — ${invalidBends} bend(s) have invalid input and are excluded, so NEC 358.26 cannot be verified`
+      : pass
+        ? `${totalDeg}° total — passes NEC 358.26`
+        : `${totalDeg}° total — exceeds 360° NEC 358.26 limit; add a pull point`;
 
-    if (!pass) violations.push({ runLabel: label, message: necMsg });
+    if (!pass && invalidBends === 0) violations.push({ runLabel: label, message: necMsg });
 
     runs.push({
       label,
@@ -339,7 +347,7 @@ function _closestOffsetAngle(angle) {
   const nearest   = available.reduce((prev, cur) =>
     Math.abs(cur - angle) < Math.abs(prev - angle) ? cur : prev
   );
-  return OFFSET_TABLE[nearest];
+  return { ...OFFSET_TABLE[nearest], angle: nearest };
 }
 
 function _emptyResult() {

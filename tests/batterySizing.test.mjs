@@ -578,4 +578,22 @@ describe('STANDARD_BANK_KWH array', () => {
   });
 });
 
+
+describe('blank (NaN) optional inputs are rejected instead of producing a 1000 kWh bank', () => {
+  const base = { averageLoadKw: 20, peakLoadKw: 30, runtimeHours: 4, chemistry: 'lithium-ion' };
+  it('NaN design margin throws', () => {
+    assert.throws(() => runBatterySizingAnalysis({ ...base, designMarginPct: NaN }), /designMarginPct/);
+  });
+  it('NaN ambient temperature throws', () => {
+    assert.throws(() => runBatterySizingAnalysis({ ...base, ambientTempC: NaN }), /ambientTempC/);
+  });
+  it('NaN UPS power factor throws', () => {
+    assert.throws(() => runBatterySizingAnalysis({ ...base, upsPowerFactor: NaN }), /upsPowerFactor/);
+  });
+  it('warns when the peak load is below the average load', () => {
+    const r = runBatterySizingAnalysis({ ...base, peakLoadKw: 10 });
+    assert.ok(r.warnings.some(w => /lower than the average load/.test(w)));
+  });
+});
+
 console.log('\n  batterySizing tests complete.\n');

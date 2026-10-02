@@ -143,6 +143,75 @@ function buildJunctionMap(trays) {
 }
 
 /**
+ * Distance from point p to segment a-b, and the fractional position along it.
+ */
+function pointToSegment(p, a, b) {
+  const ab = vec3(a, b);
+  const len2 = dot3(ab, ab);
+  if (len2 === 0) return { distance: dist3(p, a), t: 0, length: 0 };
+  const t = Math.max(0, Math.min(1, dot3(vec3(a, p), ab) / len2));
+  const closest = [a[0] + ab[0] * t, a[1] + ab[1] * t, a[2] + ab[2] * t];
+  return { distance: dist3(p, closest), t, length: Math.sqrt(len2) };
+}
+
+/**
+ * Find branch junctions: tray ends that land on the INTERIOR of another tray (a
+ * side branch off a continuous run). Such a point has no matching endpoint on the
+ * run, so endpoint matching alone would miss the tee or cross it needs — or, when
+ * two branches meet from opposite sides, mistake them for a straight splice.
+ *
+ * Every endpoint group (including lone endpoints) whose point lies on another
+ * tray's interior becomes one fitting: a tee with one branch end, a cross with two.
+ *
+ * @param {Array<Object>} trays
+ * @param {Array<Array>} junctionGroups  endpoint groups from buildJunctionMap
+ * @returns {{ fittings: Array, absorbed: Set<Array> }} absorbed = junctionGroups
+ *   already accounted for here, to be skipped by the ordinary classifier
+ */
+export function findBranchJunctions(trays, junctionGroups = []) {
+  const grouped = new Set(junctionGroups.flatMap(group => group.map(e => `${e.trayIndex}:${e.whichEnd}`)));
+  const groups = [...junctionGroups];
+  trays.forEach((tray, trayIndex) => {
+    const { start, end } = trayEndpoints(tray);
+    [['start', start], ['end', end]].forEach(([whichEnd, point]) => {
+      if (!grouped.has(`${trayIndex}:${whichEnd}`)) groups.push([{ trayIndex, whichEnd, point }]);
+    });
+  });
+
+  const fittings = [];
+  const absorbed = new Set();
+  groups.forEach(group => {
+    const point = group[0].point;
+    const groupTrays = new Set(group.map(e => e.trayIndex));
+    for (let runIdx = 0; runIdx < trays.length; runIdx++) {
+      if (groupTrays.has(runIdx)) continue;
+      const run = trayEndpoints(trays[runIdx]);
+      const hit = pointToSegment(point, run.start, run.end);
+      // Interior only: the run's own ends are handled by ordinary endpoint matching
+      const endMargin = hit.length > 0 ? COINCIDENCE_TOL / hit.length : 0;
+      if (!(hit.distance <= COINCIDENCE_TOL && hit.t > endMargin && hit.t < 1 - endMargin)) continue;
+
+      const members = [runIdx, ...groupTrays];
+      const widths = members.map(idx => trayWidth(trays[idx]));
+      const materials = members.map(idx => trayMaterial(trays[idx]));
+      const uniqueMaterials = [...new Set(materials)];
+      const branchCount = group.length;
+      fittings.push({
+        type: branchCount === 1 ? 'tee' : branchCount === 2 ? 'cross' : `junction_${members.length}`,
+        tray_ids: members.map(idx => trays[idx].tray_id || `tray_${idx}`),
+        widths,
+        materials,
+        material: uniqueMaterials.length === 1 ? uniqueMaterials[0] : 'Mixed',
+        basis: 'branch-on-run',
+      });
+      if (junctionGroups.includes(group)) absorbed.add(group);
+      return;
+    }
+  });
+  return { fittings, absorbed };
+}
+
+/**
  * Classify a junction based on how many trays meet and their angles.
  *
  * Returns one of:
@@ -315,7 +384,11 @@ export function buildTrayHardwareBOM(trays, options = {}) {
 
   // 1. Detect junctions → fittings
   const junctionGroups = buildJunctionMap(trayList);
-  const fittings = junctionGroups.map(group => classifyJunction(group, trayList));
+  const branch = findBranchJunctions(trayList, junctionGroups);
+  const fittings = [
+    ...junctionGroups.filter(group => !branch.absorbed.has(group)).map(group => classifyJunction(group, trayList)),
+    ...branch.fittings,
+  ];
 
   // 2. Supports & sections per tray segment
   const supports = [];

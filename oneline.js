@@ -167,6 +167,7 @@ import { getAuthRole, getProjectState, readAppSetting, writeAppSetting } from '.
 const ONE_LINE_READINESS_COPY = getContractReadinessCopy('oneline.html');
 
 let componentMeta = {};
+let componentMetaTypeIndex = null;
 
 document.querySelectorAll('.oneline-canvas-scroll > .prop-modal').forEach(modal => {
   document.body.appendChild(modal);
@@ -856,14 +857,23 @@ function resolveComponentMetaKey(comp) {
   const directCandidate = candidates.find(candidate => componentMeta[candidate]);
   if (directCandidate) return directCandidate;
   if (type && subtype) {
-    const match = Object.entries(componentMeta).find(([, meta]) => (
-      meta
-      && String(meta.type || '').toLowerCase() === String(type).toLowerCase()
-      && String(meta.subtype || '').toLowerCase() === String(subtype).toLowerCase()
-    ));
-    if (match) return match[0];
+    const match = componentMetaKeyByTypeAndSubtype(type, subtype);
+    if (match) return match;
   }
   return subtype;
+}
+
+// Case-insensitive type/subtype lookup; the first matching key wins, as a linear scan would.
+function componentMetaKeyByTypeAndSubtype(type, subtype) {
+  if (!componentMetaTypeIndex) {
+    componentMetaTypeIndex = new Map();
+    Object.entries(componentMeta).forEach(([key, meta]) => {
+      if (!meta) return;
+      const indexKey = `${String(meta.type || '').toLowerCase()}|${String(meta.subtype || '').toLowerCase()}`;
+      if (!componentMetaTypeIndex.has(indexKey)) componentMetaTypeIndex.set(indexKey, key);
+    });
+  }
+  return componentMetaTypeIndex.get(`${String(type).toLowerCase()}|${String(subtype).toLowerCase()}`);
 }
 
 function resolveComponentMeta(comp) {
@@ -1769,6 +1779,7 @@ function ensureCapacitorReactorPropertyMetadata() {
 // === REPLACE THE ENTIRE FUNCTION ===
 async function loadComponentLibrary({ renderPalette = true } = {}) {
   componentMeta = {};
+  componentMetaTypeIndex = null;
   propSchemas = {};
   subtypeCategory = {};
   componentTypes = {};
@@ -1855,6 +1866,7 @@ async function loadComponentLibrary({ renderPalette = true } = {}) {
     if (Number.isFinite(resolvedWidth)) meta.width = resolvedWidth;
     if (Number.isFinite(resolvedHeight)) meta.height = resolvedHeight;
     componentMeta[key] = meta;
+    componentMetaTypeIndex = null;
     subtypeCategory[key] = category;
     if (!componentTypes[category]) componentTypes[category] = [];
     if (!componentTypes[category].includes(key)) componentTypes[category].push(key);
@@ -3757,17 +3769,6 @@ function withStudyProvenance(state, studyKey) {
   if (provenance.status === 'stale') {
     return { key: 'stale', label: `${state.label} · stale result`, color: '#7c3aed', provenance };
   }
-  if (profile === 'transferSwitch') {
-    return {
-      width: 72,
-      height: 72,
-      ports: [
-        { x: 18, y: 0 },
-        { x: 54, y: 0 },
-        { x: 36, y: 72 }
-      ]
-    };
-  }
   if (provenance.status === 'unknown') {
     return { key: 'unknown', label: `${state.label} · freshness unknown`, color: '#64748b', provenance };
   }
@@ -4704,72 +4705,6 @@ function editPrefixes() {
       closeModal();
     }
   };
-
-  function renderCategoryButtons() {
-    categoryListEl.innerHTML = '';
-    categoryButtonMap.clear();
-    categoryOrder.forEach(categoryKey => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'prop-category-option';
-      button.textContent = getCategoryLabel(categoryKey);
-      button.dataset.category = categoryKey;
-      button.setAttribute('aria-pressed', 'false');
-      button.addEventListener('click', () => {
-        if (activeCategory === categoryKey) return;
-        activeCategory = categoryKey;
-        const nextDevice = categoryEntries.get(activeCategory)?.[0] || null;
-        renderDeviceButtons();
-        updateCategoryStates();
-        if (nextDevice) {
-          setActiveComponent(nextDevice);
-        } else {
-          selected = null;
-          selection = [];
-          selectedConnection = null;
-          renderPropertiesFor(null);
-          updateButtonStates();
-        }
-      });
-      categoryButtonMap.set(categoryKey, button);
-      categoryListEl.appendChild(button);
-    });
-  }
-
-  function renderDeviceButtons() {
-    componentListEl.innerHTML = '';
-    buttonMap.clear();
-    const devices = categoryEntries.get(activeCategory) || [];
-    const headingLabel = activeCategory ? `Device Tags – ${getCategoryLabel(activeCategory)}` : 'Device Tags';
-    componentHeading.textContent = headingLabel;
-    devices.forEach(device => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'prop-component-option';
-      button.dataset.componentId = device.id;
-      button.textContent = getComponentListLabel(device);
-      button.setAttribute('aria-pressed', 'false');
-      button.addEventListener('click', () => setActiveComponent(device));
-      button.addEventListener('keydown', event => {
-        if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-        event.preventDefault();
-        const list = categoryEntries.get(activeCategory) || [];
-        const currentIndex = list.findIndex(item => item.id === device.id);
-        if (currentIndex === -1) return;
-        const offset = event.key === 'ArrowUp' ? -1 : 1;
-        let nextIndex = currentIndex + offset;
-        if (nextIndex < 0) nextIndex = 0;
-        if (nextIndex >= list.length) nextIndex = list.length - 1;
-        const nextDevice = list[nextIndex];
-        if (!nextDevice) return;
-        setActiveComponent(nextDevice);
-        const nextButton = buttonMap.get(nextDevice.id);
-        nextButton?.focus();
-      });
-      buttonMap.set(device.id, button);
-      componentListEl.appendChild(button);
-    });
-  }
 
   const header = document.createElement('div');
   header.className = 'modal-header';
@@ -11903,7 +11838,7 @@ const oneLineEventState = createEventStateAdapter({
   checkpoints: { get: () => checkpoints, set: value => { checkpoints = value; } },
   clickSelectTimer: { get: () => clickSelectTimer, set: value => { clickSelectTimer = value; } },
   clipboard: { get: () => clipboard, set: value => { clipboard = value; } },
-  componentMeta: { get: () => componentMeta, set: value => { componentMeta = value; } },
+  componentMeta: { get: () => componentMeta, set: value => { componentMeta = value; componentMetaTypeIndex = null; } },
   components: { get: () => components, set: value => { components = value; } },
   connectMode: { get: () => connectMode, set: value => { connectMode = value; } },
   connectSource: { get: () => connectSource, set: value => { connectSource = value; } },
@@ -12336,10 +12271,14 @@ function resolveConnectionVoltageVolts(component, connection, role) {
 
 function resetValidationIssueMarkers(svg) {
   if (!svg) return;
+  const componentsById = new Map();
+  components.forEach(c => {
+    if (!componentsById.has(c.id)) componentsById.set(c.id, c);
+  });
   svg.querySelectorAll('g.component').forEach(g => {
     g.classList.remove('invalid');
     g.querySelectorAll('.issue-badge').forEach(b => b.remove());
-    const comp = components.find(c => c.id === g.dataset.id);
+    const comp = componentsById.get(g.dataset.id);
     if (!comp) return;
     const tip = [];
     if (comp.label) tip.push(`Label: ${comp.label}`);

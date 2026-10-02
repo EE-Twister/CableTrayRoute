@@ -57,8 +57,11 @@ export const ZONE_TYPES = {
  * Compute the CT ratio mismatch between two current transformer ratios and a
  * relay tap setting. Returns the mismatch percentage and recommended tap.
  *
- * For a two-winding transformer zone:
- *   nominal_tap = CT1_ratio / CT2_ratio  (secondary amperes must match)
+ * The tap multiplies the terminal-1 secondary current so that it equals the terminal-2
+ * secondary current at through-load. With rated winding currents I1/I2 = V2/V1:
+ *   i1_sec = I1 / n1,  i2_sec = I2 / n2          (n = CT primary / secondary)
+ *   nominal_tap = i2_sec / i1_sec = (V1 / V2) × (CT1_ratio / CT2_ratio)
+ * For a bus zone (V1 = V2) this reduces to CT1_ratio / CT2_ratio.
  *   mismatch%   = |tap_set − nominal_tap| / nominal_tap × 100
  *
  * IEEE C37.91 allows up to 5% mismatch without additional compensation.
@@ -66,14 +69,17 @@ export const ZONE_TYPES = {
  * @param {number} ct1Ratio    CT1 primary:secondary ratio (e.g., 600 for 600:5)
  * @param {number} ct2Ratio    CT2 primary:secondary ratio (e.g., 100 for 100:5)
  * @param {number} tapSetting  Relay tap setting (dimensionless)
+ * @param {number} [voltage1Kv=1] Terminal 1 (winding) voltage; only the ratio V1/V2 matters
+ * @param {number} [voltage2Kv=1] Terminal 2 (winding) voltage
  * @returns {{ nominalTap: number, mismatchPct: number, acceptable: boolean }}
  */
-export function ctRatioMismatch(ct1Ratio, ct2Ratio, tapSetting) {
-  if (ct1Ratio <= 0) throw new Error('ct1Ratio must be greater than zero.');
-  if (ct2Ratio <= 0) throw new Error('ct2Ratio must be greater than zero.');
-  if (tapSetting <= 0) throw new Error('tapSetting must be greater than zero.');
+export function ctRatioMismatch(ct1Ratio, ct2Ratio, tapSetting, voltage1Kv = 1, voltage2Kv = 1) {
+  if (!(ct1Ratio > 0)) throw new Error('ct1Ratio must be greater than zero.');
+  if (!(ct2Ratio > 0)) throw new Error('ct2Ratio must be greater than zero.');
+  if (!(tapSetting > 0)) throw new Error('tapSetting must be greater than zero.');
+  if (!(voltage1Kv > 0) || !(voltage2Kv > 0)) throw new Error('Terminal voltages must be greater than zero.');
 
-  const nominalTap = ct1Ratio / ct2Ratio;
+  const nominalTap = (voltage1Kv / voltage2Kv) * (ct1Ratio / ct2Ratio);
   const mismatchPct = Math.abs(tapSetting - nominalTap) / nominalTap * 100;
 
   return {
@@ -96,8 +102,8 @@ export function ctRatioMismatch(ct1Ratio, ct2Ratio, tapSetting) {
 export function dualSlopeCharacteristic(slope1, slope2, minPickupPu, breakpointPu) {
   if (slope1 <= 0 || slope1 >= 1) throw new Error('slope1 must be between 0 and 1 (exclusive).');
   if (slope2 <= slope1) throw new Error('slope2 must be greater than slope1.');
-  if (minPickupPu <= 0) throw new Error('minPickupPu must be greater than zero.');
-  if (breakpointPu <= 0) throw new Error('breakpointPu must be greater than zero.');
+  if (!(minPickupPu > 0)) throw new Error('minPickupPu must be greater than zero.');
+  if (!(breakpointPu > 0)) throw new Error('breakpointPu must be greater than zero.');
 
   // Pivot I_rst at breakpoint: threshold there is max(minPickup, slope1×breakpoint)
   const thresholdAtBreak = Math.max(minPickupPu, slope1 * breakpointPu);
@@ -125,9 +131,12 @@ export function dualSlopeCharacteristic(slope1, slope2, minPickupPu, breakpointP
  * Convert measured line currents from both CT windings to operating and restraint
  * currents in per-unit of CT secondary (normalised to tap).
  *
- * For a two-terminal zone (bus or transformer):
- *   i1_pu = ia / (ct1Ratio / ctSecondary)  then normalised by tapSetting
- *   i2_pu = ib / (ct2Ratio / ctSecondary)
+ * For a two-terminal zone (bus or transformer), in per-unit of the CT secondary rating:
+ *   i1_pu = tapSetting × (ia / (ct1Ratio / ctSecondary)) / ctSecondary
+ *   i2_pu = (ib / (ct2Ratio / ctSecondary)) / ctSecondary
+ * The tap compensates terminal 1 for the CT ratio and winding-voltage mismatch, so a
+ * healthy through-current gives i1_pu + i2_pu = 0. (Dividing both terminals by the same
+ * tap cannot compensate anything.)
  *
  * Using the INTO-zone sign convention (positive = current flowing INTO the zone):
  *   I_op  = |i1_pu + i2_pu|   (algebraic sum — zero for balanced through-current)
@@ -142,16 +151,16 @@ export function dualSlopeCharacteristic(slope1, slope2, minPickupPu, breakpointP
  * @returns {{ i1Pu: number, i2Pu: number, iOp: number, iRst: number }}
  */
 export function calcOperatingRestraintCurrents(ia, ib, ct1Ratio, ct2Ratio, tapSetting, ctSecondary = 5) {
-  if (ct1Ratio <= 0) throw new Error('ct1Ratio must be greater than zero.');
-  if (ct2Ratio <= 0) throw new Error('ct2Ratio must be greater than zero.');
-  if (tapSetting <= 0) throw new Error('tapSetting must be greater than zero.');
-  if (ctSecondary <= 0) throw new Error('ctSecondary must be greater than zero.');
+  if (!(ct1Ratio > 0)) throw new Error('ct1Ratio must be greater than zero.');
+  if (!(ct2Ratio > 0)) throw new Error('ct2Ratio must be greater than zero.');
+  if (!(tapSetting > 0)) throw new Error('tapSetting must be greater than zero.');
+  if (!(ctSecondary > 0)) throw new Error('ctSecondary must be greater than zero.');
 
   // Convert to CT secondary amperes, then to per-unit of tap
   const i1Sec = ia / (ct1Ratio / ctSecondary);
   const i2Sec = ib / (ct2Ratio / ctSecondary);
-  const i1Pu = i1Sec / tapSetting;
-  const i2Pu = i2Sec / tapSetting;
+  const i1Pu = (i1Sec * tapSetting) / ctSecondary;
+  const i2Pu = i2Sec / ctSecondary;
 
   const iOp  = Math.abs(i1Pu + i2Pu);
   const iRst = (Math.abs(i1Pu) + Math.abs(i2Pu)) / 2;
@@ -217,9 +226,11 @@ export function checkHarmonicRestraint(fundamentalA, secondHarmPct, fifthHarmPct
  * @param {number}  minPickupPu    Minimum pickup (pu)
  * @param {number}  breakpointPu   Breakpoint I_rst (pu)
  * @param {boolean} harmonicBlock  True when harmonic restraint is active
+ * @param {number|null} [unrestrainedPu=null] Unrestrained (high-set, 87U) pickup in pu; trips
+ *   regardless of harmonic restraint and of the slope characteristic. Null disables it.
  * @returns {{ trip: boolean, threshold: number, marginPu: number, marginPct: number, restrainReason: string|null }}
  */
-export function evalTrip(iOp, iRst, slope1, slope2, minPickupPu, breakpointPu, harmonicBlock) {
+export function evalTrip(iOp, iRst, slope1, slope2, minPickupPu, breakpointPu, harmonicBlock, unrestrainedPu = null) {
   if (iOp < 0) throw new Error('iOp must be ≥ 0.');
   if (iRst < 0) throw new Error('iRst must be ≥ 0.');
 
@@ -234,14 +245,16 @@ export function evalTrip(iOp, iRst, slope1, slope2, minPickupPu, breakpointPu, h
   const marginPu  = threshold - iOp;          // positive → security margin; negative → into trip zone
   const marginPct = threshold > 0 ? (marginPu / threshold) * 100 : 0;
 
-  const trip = !harmonicBlock && iOp > threshold;
+  const unrestrainedTrip = Number.isFinite(unrestrainedPu) && unrestrainedPu > 0 && iOp >= unrestrainedPu;
+  const trip = unrestrainedTrip || (!harmonicBlock && iOp > threshold);
 
   return {
     trip,
     threshold:   Math.round(threshold   * 10000) / 10000,
     marginPu:    Math.round(marginPu    * 10000) / 10000,
     marginPct:   Math.round(marginPct   * 100)   / 100,
-    restrainReason: harmonicBlock ? 'Harmonic restraint active — trip blocked' : null,
+    unrestrainedTrip,
+    restrainReason: harmonicBlock && !unrestrainedTrip ? 'Harmonic restraint active — trip blocked' : null,
   };
 }
 
@@ -287,6 +300,9 @@ export function buildDifferentialCurve(params) {
  * @param {number}  params.ibA                Current at terminal 2 (A primary, negative for out-flow)
  * @param {number}  [params.secondHarmPct=0]  2nd harmonic % of fundamental
  * @param {number}  [params.fifthHarmPct=0]   5th harmonic % of fundamental
+ * @param {number}  [params.voltage1Kv=1]     Terminal 1 voltage (kV); with voltage2Kv sets the nominal tap
+ * @param {number}  [params.voltage2Kv=1]     Terminal 2 voltage (kV); equal voltages for a bus zone
+ * @param {number}  [params.unrestrainedPu]   Unrestrained high-set pickup (pu); optional
  * @returns {object} Full result object suitable for persisting to studies.differentialProtection
  */
 export function runDifferentialStudy(params) {
@@ -305,6 +321,9 @@ export function runDifferentialStudy(params) {
     ibA,
     secondHarmPct = 0,
     fifthHarmPct  = 0,
+    voltage1Kv = 1,
+    voltage2Kv = 1,
+    unrestrainedPu = null,
   } = params;
 
   if (!ZONE_TYPES[zoneType]) {
@@ -312,13 +331,13 @@ export function runDifferentialStudy(params) {
   }
   if (slope1 <= 0 || slope1 >= 1) throw new Error('slope1 must be between 0 and 1 (exclusive).');
   if (slope2 <= slope1) throw new Error('slope2 must be greater than slope1.');
-  if (minPickupPu <= 0) throw new Error('minPickupPu must be greater than zero.');
-  if (breakpointPu <= 0) throw new Error('breakpointPu must be greater than zero.');
+  if (!(minPickupPu > 0)) throw new Error('minPickupPu must be greater than zero.');
+  if (!(breakpointPu > 0)) throw new Error('breakpointPu must be greater than zero.');
 
   const warnings = [];
 
   // --- CT ratio mismatch ---
-  const ctMismatch = ctRatioMismatch(ct1Ratio, ct2Ratio, tapSetting);
+  const ctMismatch = ctRatioMismatch(ct1Ratio, ct2Ratio, tapSetting, voltage1Kv, voltage2Kv);
   if (!ctMismatch.acceptable) {
     warnings.push(
       `CT ratio mismatch ${ctMismatch.mismatchPct.toFixed(1)}% exceeds 5% limit. ` +
@@ -336,8 +355,15 @@ export function runDifferentialStudy(params) {
   const tripResult = evalTrip(
     currents.iOp, currents.iRst,
     slope1, slope2, minPickupPu, breakpointPu,
-    harmonic.restrain
+    harmonic.restrain, unrestrainedPu
   );
+
+  if (harmonic.restrain && !tripResult.unrestrainedTrip && currents.iOp > 2 * tripResult.threshold) {
+    warnings.push(
+      `Harmonic restraint is blocking a differential current of ${currents.iOp.toFixed(2)} pu (${(currents.iOp / tripResult.threshold).toFixed(1)}× the threshold). ` +
+      'A heavy internal fault with CT saturation can look like inrush; confirm the relay has an unrestrained (high-set) element.'
+    );
+  }
 
   // --- Curve for plotting ---
   const curve = buildDifferentialCurve({ slope1, slope2, minPickupPu, breakpointPu });
@@ -368,6 +394,9 @@ export function runDifferentialStudy(params) {
       ibA,
       secondHarmPct,
       fifthHarmPct,
+      voltage1Kv,
+      voltage2Kv,
+      unrestrainedPu,
     },
     ctMismatch,
     currents,

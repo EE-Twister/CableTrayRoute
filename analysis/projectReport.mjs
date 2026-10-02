@@ -21,6 +21,9 @@
 import { detectClashes, overallSeverity } from './clashDetect.mjs';
 import { buildHeatTraceReport } from './heatTraceReport.mjs';
 import { generateSpoolSheets } from './spoolSheets.mjs';
+import { buildConduitCableMap, evaluateConduitFill, recordId as conduitRecordId } from './conduitFill.mjs';
+import { cablesAssignedToTray, evaluateTrayFill } from './trayFill.mjs';
+import { parseTradeSize } from './pullBoxSizing.mjs';
 
 // ---------------------------------------------------------------------------
 // Fill helpers
@@ -115,22 +118,47 @@ function buildCableSection(cables) {
 function buildFillSection(trays, conduits, cables) {
   const trayRows = trays.map(tray => {
     const id       = tray.tray_id || tray.id || '—';
+    const widthIn  = parseFloat(tray.inside_width) || 12;
+    const assigned = cablesAssignedToTray(tray, cables);
+    // Same NEC 392.22(A) evaluation as the Tray Fill page; fall back to the crude
+    // width x depth estimate only when the tray/cable data cannot be evaluated.
+    const evaluation = evaluateTrayFill(tray, assigned);
+    if (evaluation.evaluable === true) {
+      const allowableArea = evaluation.allowable?.smallCableAreaIn2 ?? evaluation.allowable?.baseTableAreaIn2 ?? null;
+      const usedArea = evaluation.used?.smallCableAreaIn2 ?? null;
+      const usedPct = evaluation.utilizationPercent;
+      const status = usedPct > 100 ? 'over' : usedPct > 90 ? 'near' : 'ok';
+      return {
+        id, type: tray.tray_type || '—', widthIn,
+        areaIn2: allowableArea != null ? +allowableArea.toFixed(2) : 0,
+        fillIn2: usedArea != null ? +usedArea.toFixed(2) : 0,
+        usedPct: +usedPct.toFixed(1), limitPct: 100, status, basis: evaluation.clause,
+      };
+    }
     const areaIn2  = trayAreaIn2(tray);
     const fillIn2  = cableFillIn2(cables, id);
     const limitPct = fillLimitPct(tray.tray_type || '');
     const usedPct  = areaIn2 > 0 ? (fillIn2 / areaIn2) * 100 : 0;
     const status   = usedPct > limitPct ? 'over' : usedPct > limitPct * 0.9 ? 'near' : 'ok';
-    return { id, type: tray.tray_type || '—', widthIn: parseFloat(tray.inside_width) || 12, areaIn2: +areaIn2.toFixed(2), fillIn2: +fillIn2.toFixed(2), usedPct: +usedPct.toFixed(1), limitPct, status };
+    return { id, type: tray.tray_type || '—', widthIn, areaIn2: +areaIn2.toFixed(2), fillIn2: +fillIn2.toFixed(2), usedPct: +usedPct.toFixed(1), limitPct, status };
   });
 
+  // Same NEC Chapter 9 area table and 53/31/40 % limits the Conduit Fill page uses,
+  // so the report cannot disagree with the page it summarizes.
+  // The cable schedule names the assigned raceway in route_preference or raceway.
+  const conduitCableMap = buildConduitCableMap(
+    conduits,
+    cables.map(c => ({ ...c, raceway: c.raceway || c.route_preference }))
+  );
   const conduitRows = conduits.map(c => {
     const id       = c.conduit_id || c.id || '—';
-    const trade    = parseFloat(c.trade_size) || 1;
-    // NEC Table 1 inside diameter approximation
-    const idApprox = trade * 0.88;
-    const areaIn2  = Math.PI * (idApprox / 2) ** 2;
-    const fillIn2  = cableFillIn2(cables, id);
-    const limitPct = 40;
+    const evaluation = evaluateConduitFill(c, conduitCableMap.get(conduitRecordId(c)) || []);
+    const parsedTrade = parseTradeSize(c.trade_size);
+    const trade    = Number.isFinite(parsedTrade) ? parsedTrade : 1;
+    // Unknown type/size: fall back to a nominal inside-diameter approximation.
+    const areaIn2  = evaluation.internalAreaIn2 ?? Math.PI * ((trade * 0.88) / 2) ** 2;
+    const fillIn2  = evaluation.cableAreaTotalIn2 || cableFillIn2(cables, id);
+    const limitPct = (evaluation.fillLimit ?? 0.40) * 100;
     const usedPct  = areaIn2 > 0 ? (fillIn2 / areaIn2) * 100 : 0;
     const status   = usedPct > limitPct ? 'over' : usedPct > limitPct * 0.9 ? 'near' : 'ok';
     return { id, type: c.type || 'Conduit', tradeSizeIn: trade, areaIn2: +areaIn2.toFixed(2), fillIn2: +fillIn2.toFixed(2), usedPct: +usedPct.toFixed(1), limitPct, status };

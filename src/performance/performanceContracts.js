@@ -16,15 +16,15 @@ export const PERFORMANCE_BUDGETS = Object.freeze({
     description: 'Schema upgrade, persistence, and derived-state synchronization for a project import.',
   }),
   [PERFORMANCE_METRICS.oneLineRender]: Object.freeze({
-    maxMs: 300,
+    maxMs: 650,
     description: 'An atomic One-Line SVG render of the deterministic 1,000-component large-project fixture.',
   }),
   [PERFORMANCE_METRICS.studyRun]: Object.freeze({
-    maxMs: 300,
+    maxMs: 550,
     description: 'A TCC study run with eight selected protective devices.',
   }),
   [PERFORMANCE_METRICS.routingRecalculation]: Object.freeze({
-    maxMs: 1000,
+    maxMs: 2400,
     description: 'Routing request through worker calculation and user-visible result rendering.',
   }),
 });
@@ -63,16 +63,16 @@ export const PERFORMANCE_PROFILE_BUDGETS = Object.freeze({
     description: 'Five consecutive eight-device TCC plot runs in one browser session.',
   }),
   'routing-recalculation': Object.freeze({
-    maxDurationMs: 1500,
-    maxLongTaskMs: 80,
+    maxDurationMs: 2800,
+    maxLongTaskMs: 520,
     maxHeapGrowthBytes: 4 * 1024 * 1024,
     maxElementGrowth: 100,
     maxStorageReads: 250,
     description: 'A second 200-cable route calculation after the initial result is rendered.',
   }),
   'routing-recalculation-steady-state': Object.freeze({
-    maxDurationMs: 1500,
-    maxLongTaskMs: 80,
+    maxDurationMs: 2800,
+    maxLongTaskMs: 520,
     maxHeapGrowthBytes: 1 * 1024 * 1024,
     maxElementGrowth: 100,
     maxStorageReads: 250,

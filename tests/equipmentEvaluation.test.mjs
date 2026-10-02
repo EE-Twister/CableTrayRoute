@@ -83,10 +83,23 @@ describe('checkInterruptingRating()', () => {
 // ============================================================================
 describe('checkWithstand()', () => {
   it('passes when rating is sufficient at clearing time', () => {
-    // 65 kA @ 30 cycles (0.5 s); adjusted to 0.05 s clearing → 65 × sqrt(0.5/0.05) ≈ 205 kA
+    // 65 kA @ 30 cycles (0.5 s), cleared in 0.05 s: the rating is NOT scaled up to 205 kA
     const r = checkWithstand(65, 30, 50, 0.05);
     assert.strictEqual(r.status, EVAL_STATUS.PASS);
-    assert.ok(r.adjustedRatingKA > 50);
+    assert.strictEqual(r.adjustedRatingKA, 65);
+  });
+
+  it('a fault above the nameplate short-time rating fails even with a very fast clear', () => {
+    // 65 kA rated; 80 kA fault cleared in 3 cycles would "pass" if I²t scaled the rating up to 159 kA
+    const r = checkWithstand(65, 30, 80, 0.05);
+    assert.strictEqual(r.status, EVAL_STATUS.FAIL);
+  });
+
+  it('derates by I²t for clearing time longer than the rated duration', () => {
+    // 65 kA @ 0.5 s, cleared in 2 s: 65 x sqrt(0.5 / 2) = 32.5 kA
+    const r = checkWithstand(65, 30, 30, 2.0);
+    assert.strictEqual(r.adjustedRatingKA, 32.5);
+    assert.strictEqual(r.status, EVAL_STATUS.PASS);
   });
 
   it('fails when clearing time is very long and fault is high', () => {

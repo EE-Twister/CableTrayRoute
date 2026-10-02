@@ -65,14 +65,13 @@ export function getPanelPoleLimit(panel) {
 }
 
 export function getPanelPhaseSequence(panel) {
+  // The bus phases come from the system type and phase count. The "Poles" setting limits
+  // how many poles one branch device may have; it must not remove phases from the bus
+  // (a 3-phase panel limited to single-pole breakers still has phases A, B and C).
   const system = getPanelSystem(panel);
-  const poleLimit = getPanelPoleLimit(panel) || 1;
-  if (system === 'dc') {
-    return resolveDcSequence(DC_PHASE_LABELS).slice(0, Math.max(1, Math.min(2, poleLimit)));
-  }
+  if (system === 'dc') return resolveDcSequence(DC_PHASE_LABELS).slice(0, 2);
   const phases = Number.parseInt(panel?.phases, 10);
-  const sequence = Number.isFinite(phases) && phases <= 2 ? SINGLE_PHASE_LABELS : THREE_PHASE_LABELS;
-  return sequence.slice(0, Math.max(1, Math.min(sequence.length, poleLimit)));
+  return Number.isFinite(phases) && phases <= 2 ? [...SINGLE_PHASE_LABELS] : [...THREE_PHASE_LABELS];
 }
 
 export function computeBreakerSpan(startCircuit, poleCount, circuitCount) {

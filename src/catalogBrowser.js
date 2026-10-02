@@ -271,7 +271,11 @@ export function renderCatalogTable(container, products, {
       }
       if (col.key === 'actions') {
         if (isProjectRow) {
-          td.className = 'catalog-row-actions';
+          // Keep the cell a real table cell; the flex layout lives on an inner wrapper
+          // because a display:flex <td> is laid out differently by Firefox.
+          const actions = document.createElement('div');
+          actions.className = 'catalog-row-actions';
+          td.appendChild(actions);
           if (typeof onEdit === 'function') {
             const editBtn = document.createElement('button');
             editBtn.type = 'button';
@@ -282,7 +286,7 @@ export function renderCatalogTable(container, products, {
               e.stopPropagation();
               onEdit(product);
             });
-            td.appendChild(editBtn);
+            actions.appendChild(editBtn);
           }
           if (typeof onRemove === 'function') {
             const removeBtn = document.createElement('button');
@@ -299,7 +303,7 @@ export function renderCatalogTable(container, products, {
               }
               onRemove(product);
             });
-            td.appendChild(removeBtn);
+            actions.appendChild(removeBtn);
           }
         } else {
           td.textContent = '—';
@@ -671,7 +675,10 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
     baseIdentities = new Set(baseProducts.map(catalogIdentity));
     allProducts = mergeCatalogProducts(baseProducts, getCustomProducts());
   } catch (err) {
-    container.innerHTML = `<p class="catalog-error">Failed to load catalog: ${err.message}</p>`;
+    const failure = document.createElement('p');
+    failure.className = 'catalog-error';
+    failure.textContent = `Failed to load catalog: ${err.message}`;
+    container.replaceChildren(failure);
     return;
   }
 

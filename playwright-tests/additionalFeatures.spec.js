@@ -141,15 +141,18 @@ test.describe('Transient Stability Analysis', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('page loads with correct heading', async ({ page }) => {
+  test('page loads with correct heading', async ({ page, browserName }) => {
     await expect(page.locator('h1')).toContainText('Transient Stability');
-    const startupScripts = startupScriptsByPage.get(page) || [];
-    expect(startupScripts).toHaveLength(3);
-    expect(startupScripts.some(pathname => pathname.endsWith('/dist/vendor/plotly.min.js'))).toBe(true);
-    expect(startupScripts.some(pathname => /\/dist\/transientstability(?:\.[0-9a-f]{8,})?\.js$/.test(pathname))).toBe(true);
-    expect(startupScripts.some(pathname => pathname.endsWith('/dist/vendor/fast-json-patch.mjs'))).toBe(true);
-    expect(startupScripts.some(pathname => pathname.endsWith('/dirtyTracker.js'))).toBe(false);
-    expect(startupScripts.some(pathname => pathname.endsWith('/dist/projectManager.js'))).toBe(false);
+    // Firefox does not report file:// subresource requests, so the script list is only observable in Chromium.
+    if (browserName === 'chromium') {
+      const startupScripts = startupScriptsByPage.get(page) || [];
+      expect(startupScripts).toHaveLength(3);
+      expect(startupScripts.some(pathname => pathname.endsWith('/dist/vendor/plotly.min.js'))).toBe(true);
+      expect(startupScripts.some(pathname => /\/dist\/transientstability(?:\.[0-9a-f]{8,})?\.js$/.test(pathname))).toBe(true);
+      expect(startupScripts.some(pathname => pathname.endsWith('/dist/vendor/fast-json-patch.mjs'))).toBe(true);
+      expect(startupScripts.some(pathname => pathname.endsWith('/dirtyTracker.js'))).toBe(false);
+      expect(startupScripts.some(pathname => pathname.endsWith('/dist/projectManager.js'))).toBe(false);
+    }
   });
 
   test('has required input fields', async ({ page }) => {
@@ -207,13 +210,16 @@ test.describe('N-1 Contingency Analysis', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('page loads with correct heading', async ({ page }) => {
+  test('page loads with correct heading', async ({ page, browserName }) => {
     await expect(page.locator('h1')).toContainText(/Contingency|N-1/i);
-    const startupScripts = startupScriptsByPage.get(page) || [];
-    expect(startupScripts).toHaveLength(1);
-    expect(startupScripts.some(pathname => /\/dist\/contingency(?:\.[0-9a-f]{8,})?\.js$/.test(pathname))).toBe(true);
-    expect(startupScripts.some(pathname => pathname.endsWith('/dataStore.mjs'))).toBe(false);
-    expect(startupScripts.some(pathname => pathname.endsWith('/studies/contingency.js'))).toBe(false);
+    // Firefox does not report file:// subresource requests, so the script list is only observable in Chromium.
+    if (browserName === 'chromium') {
+      const startupScripts = startupScriptsByPage.get(page) || [];
+      expect(startupScripts).toHaveLength(1);
+      expect(startupScripts.some(pathname => /\/dist\/contingency(?:\.[0-9a-f]{8,})?\.js$/.test(pathname))).toBe(true);
+      expect(startupScripts.some(pathname => pathname.endsWith('/dataStore.mjs'))).toBe(false);
+      expect(startupScripts.some(pathname => pathname.endsWith('/studies/contingency.js'))).toBe(false);
+    }
   });
 
   test('contingency form is present', async ({ page }) => {

@@ -83,12 +83,15 @@ Q_max = √(S_rated² − P_out²)    [kvar]
 
 **IEEE 1547-2018 Table 8 default Volt-VAR curves:**
 
-| V (pu) | Q (pu) — Cat B | Q (pu) — Cat A |
+| Breakpoint | Cat B (V pu → Q pu) | Cat A (V pu → Q pu) |
 |---|---|---|
-| ≤ 0.90 | +0.44 | ≤ 0.92 → +0.44 |
-| 0.98 | 0.0 | 0.98 → 0.0 |
-| 1.02 | 0.0 | 1.02 → 0.0 |
-| ≥ 1.10 | −0.44 | ≥ 1.08 → −0.44 |
+| V1 | ≤ 0.92 → +0.44 | ≤ 0.90 → +0.25 |
+| V2 | 0.98 → 0.0 | 1.00 → 0.0 |
+| V3 | 1.02 → 0.0 | 1.00 → 0.0 |
+| V4 | ≥ 1.08 → −0.44 | ≥ 1.10 → −0.25 |
+
+Category B (44 % reactive capability, ±2 % deadband) is the default. Confirm the category and any
+utility-specified curve before relying on the dispatch.
 
 Positive Q = capacitive (voltage support), negative Q = inductive (voltage absorption).
 
@@ -137,7 +140,7 @@ Typical `k_limit` values:
 | `mode` | `'discharge'` | Operating mode |
 | `setpointKw` | sRated_kW | Requested active power setpoint |
 | `vBus_pu` | 1.0 | Bus voltage (for volt_var mode) |
-| `roundTripEff` | 0.92 | AC-AC round-trip efficiency |
+| `roundTripEff` | 0.92 | AC-AC round-trip efficiency; each charge or discharge leg applies its square root |
 | `minSocPct` | 10 | Minimum SOC for discharge |
 | `maxSocPct` | 95 | Maximum SOC for charge |
 

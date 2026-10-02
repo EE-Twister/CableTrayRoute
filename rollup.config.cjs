@@ -41,6 +41,7 @@ const entries = {
   voltageflicker: 'src/voltageflicker.js',
   iec60287: 'src/iec60287.js',
   cablethermalenv: 'src/cableThermalEnvironment.js',
+  directburial: 'src/directBurial.js',
   iec60909: 'src/iec60909.js',
   autosize: 'src/autosize.js',
   submittal: 'src/submittal.js',

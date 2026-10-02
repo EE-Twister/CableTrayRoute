@@ -68,9 +68,9 @@ export function parseHarmonicSpectrum(spec) {
     });
     return parsed;
   }
-  String(spec).split(/[,\s]+/).forEach(token => {
+  String(spec).replace(/%/g, '').split(/[,;\s]+/).forEach(token => {
     if (!token) return;
-    const [orderValue, percentValue] = token.split(':');
+    const [orderValue, percentValue] = token.split(/[:=]/);
     const order = Number(orderValue);
     const percent = Number(percentValue ?? orderValue);
     if (order > 1 && Number.isFinite(percent) && percent !== 0) parsed[order] = percent;

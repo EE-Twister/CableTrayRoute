@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Conduit Bend &amp; Pull-Box Schedule. Calculate bend geometry (90°, offset, kick, saddle), check NEC 358.24 cumulative bend limits, and size pull boxes per NEC 314.28." />
+  <meta name="description" content="Conduit Bend &amp; Pull-Box Schedule. Calculate bend geometry (90°, offset, kick, saddle), check NEC 358.26 cumulative bend limits, and size pull boxes per NEC 314.28." />
   <title>Conduit Bend Schedule — CableTrayRoute</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
@@ -71,12 +71,12 @@
 
       <header class="page-header">
         <h1>Conduit Bend &amp; Pull-Box Schedule</h1>
-        <p>Calculate bend geometry for 90°, offset, kick, and saddle bends. Validate NEC 358.24 cumulative bend limits and size pull boxes per NEC 314.28.</p>
+        <p>Calculate bend geometry for 90°, offset, kick, and saddle bends. Validate NEC 358.26 cumulative bend limits and size pull boxes per NEC 314.28.</p>
       </header>
 
       <details class="method-panel">
         <summary>Method &amp; Standards</summary>
-        <p>Bend geometry is calculated using standard multiplier and shrink tables (Tom Henry / Mike Holt). NEC 358.24 limits total bends to <strong>≤ 360°</strong> between pull points for EMT, RMC, IMC, and LFMC.</p>
+        <p>Bend geometry is calculated using standard multiplier and shrink tables (Tom Henry / Mike Holt). NEC 358.26 limits total bends to <strong>≤ 360°</strong> between pull points for EMT, RMC, IMC, and LFMC.</p>
         <table class="results-table" aria-label="Bend type reference">
           <thead>
             <tr><th>Bend Type</th><th>Degrees Added</th><th>Mark Spacing</th><th>Shrink</th></tr>
@@ -160,7 +160,7 @@
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
       <h2 id="help-title">Conduit Bend Schedule Help</h2>
       <p>Click <strong>+ Add Conduit Run</strong> to enter a conduit run. For each run specify the conduit trade size and add bends (90°, offset, kick, or saddle) with their dimensions.</p>
-      <p><strong>NEC 358.24:</strong> The total degrees of all bends between pull points must not exceed 360°. A red badge appears if a run violates this limit.</p>
+      <p><strong>NEC 358.26:</strong> The total degrees of all bends between pull points must not exceed 360°. A red badge appears if a run violates this limit.</p>
       <p><strong>Bend geometry:</strong>
         <em>90°</em> — enter stub-up height.
         <em>Offset</em> — enter the height to move and choose the bend angle.

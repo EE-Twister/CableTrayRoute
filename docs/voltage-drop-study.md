@@ -10,6 +10,8 @@ For each cable, the study resolves current and voltage in this order:
 2. A valid converged Load Flow result matched to the cable endpoint
 3. Load List kW/kVA, power factor, phase, and voltage matched to the cable endpoint
 
+The cable's insulation rating (for example 600 V or 5 kV) is not an operating voltage. It is used only as a last resort when no operating, Load Flow or Load List voltage exists; the result is then marked "Cable insulation rating (assumed)" and the study warns, because a 600 V rating on a 480 V circuit would understate the percent drop by 20%.
+
 The result records the current source for every cable. A missing source leaves the cable not evaluated instead of substituting an unexplained default.
 
 ## Calculations

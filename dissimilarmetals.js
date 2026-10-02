@@ -1,4 +1,5 @@
 
+import { showModal } from './src/components/modal.js';
 import { getStudies, setStudies } from './dataStore.mjs';
 import { escapeHtml } from './src/htmlUtils.mjs';
 // Worker-routed entry points for user-initiated calculate / export actions.
@@ -826,6 +827,11 @@ function renderInspectionMilestones(result) {
       <div class="corrosion-milestone-grid">${milestoneHtml}</div>
     </section>
   `;
+}
+
+function round(value, decimals) {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
 }
 
 function getCorrosionTimelineConfig(result) {

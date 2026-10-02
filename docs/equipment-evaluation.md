@@ -25,8 +25,12 @@ Applies to: Breakers, fuses, relays, disconnects, reclosers, panels (via `main_i
 Checks the short-time withstand current rating against fault current at the actual clearing time, using the constant-energy (I²t) rule:
 
 ```
-I_adjusted = ratingKA × √(ratingSeconds / clearingSeconds)
+I_adjusted = ratingKA × √(ratingSeconds / max(clearingSeconds, ratingSeconds))
 ```
+
+The rating is derated only for clearing times longer than the rated duration. A faster clear never
+raises the withstand above the nameplate value, because the equipment's peak (mechanical) capability
+limits it.
 
 - **Pass:** `fault kA ≤ I_adjusted`
 - **Fail:** Device or bus cannot withstand the fault for the clearing time — reduce clearing time or upgrade rating.

@@ -43,6 +43,7 @@ export const NAV_ROUTES = [
   { href: 'intlCableSize.html', label: 'Intl Cable Sizing', section: 'Studies', group: 'Cable', icon: 'icons/cable.svg' },
   { href: 'iec60287.html', label: 'IEC 60287 Ampacity', section: 'Studies', group: 'Cable', icon: 'icons/cable.svg' },
   { href: 'cablethermalenv.html', label: 'Cable Thermal Environment', section: 'Studies', group: 'Cable', icon: 'icons/cable.svg' },
+  { href: 'directburial.html', label: 'Direct Burial Circuits', section: 'Studies', group: 'Cable', icon: 'icons/cable.svg' },
   { href: 'tcc.html', label: 'TCC', section: 'Studies', group: 'Protection', icon: 'icons/toolbar/validate.svg' },
   { href: 'harmonics.html', label: 'Harmonics', section: 'Studies', group: 'Power Quality', icon: 'icons/toolbar/grid-size.svg' },
   { href: 'capacitorbank.html', label: 'Capacitor Bank', section: 'Studies', group: 'Power Quality', icon: 'icons/toolbar/grid-size.svg' },

@@ -42,7 +42,7 @@ The live suite currently contains 16 checks across 12 study families. The Publis
 | MSTART-001 | Motor Starting | Thevenin equivalent screening model | 100 hp direct-on-line starting current and voltage sag |
 | IEC60909-001 | IEC Short Circuit | IEC 60909-0:2016 | Version-pinned sequence-impedance current, voltage factor, peak factor, and peak current |
 | IEC60287-001 | Cable Ampacity | IEC 60287-1-1:2023 | Direct-buried 95 mmÂ² Cu XLPE steady-state rating and conductor-temperature reverse check |
-| FSCAN-001 | Frequency Scan | Parallel resonance screening equation | Source/capacitor resonance near h = 9 |
+| FSCAN-001 | Frequency Scan | Parallel resonance screening equation | Source/capacitor resonance at h = √(Xc1/Xs1) = 9.15, peak ≈ 288 Ω |
 | TRANSIENT-001 | Transient Stability | Swing equation / equal-area criterion | Analytical and numerical critical clearing time |
 | OPF-001 | Optimal Power Flow | Equal-incremental-cost dispatch | Three-unit dispatch balance, lambda, and total production cost |
 

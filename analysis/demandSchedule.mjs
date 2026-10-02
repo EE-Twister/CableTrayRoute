@@ -31,13 +31,13 @@
  * @type {Record<string, {label: string, standard: string, description: string}>}
  */
 export const NEC_CATEGORIES = {
-  lighting:        { label: 'Lighting',                standard: 'NEC 220.42', description: 'General illumination loads' },
+  lighting:        { label: 'Lighting',                standard: 'NEC 220.42', description: 'General illumination loads (100% unless an occupancy row of Table 220.42 applies)' },
   receptacle:      { label: 'Receptacles',             standard: 'NEC 220.44', description: 'Convenience receptacle circuits' },
   motor:           { label: 'Motors',                  standard: 'NEC 430.24', description: 'Electric motor loads (largest motor +25%)' },
   kitchen:         { label: 'Kitchen / Cooking',       standard: 'NEC 220.56', description: 'Commercial cooking equipment' },
   hvac:            { label: 'HVAC / Heating',          standard: 'NEC 220.60', description: 'Heating and air-conditioning (non-coincident)' },
-  ev:              { label: 'EV Charging',             standard: 'NEC 625.42', description: 'Electric vehicle supply equipment' },
-  appliance:       { label: 'Fixed Appliances',        standard: 'NEC 220.53', description: 'Fixed appliances (4+ units get 75% factor)' },
+  ev:              { label: 'EV Charging',             standard: 'NEC 625.42', description: 'Electric vehicle supply equipment (100% continuous load unless an automatic load management system is documented)' },
+  appliance:       { label: 'Fixed Appliances',        standard: 'NEC 220.53', description: 'Fixed appliances (100%; the 75% factor of 220.53 applies to dwelling units only)' },
   critical:        { label: 'Critical / UPS',          standard: 'NEC 220',    description: '100% demand — UPS, datacenter, emergency loads' },
   general:         { label: 'General / Other',         standard: 'NEC 220',    description: '100% demand — unclassified loads' },
 };
@@ -91,15 +91,6 @@ function kitchenFactor(unitCount) {
   return n < KITCHEN_FACTORS.length ? KITCHEN_FACTORS[n - 1] : KITCHEN_FACTORS[KITCHEN_FACTORS.length - 1];
 }
 
-/**
- * NEC 625.42 — EV supply equipment demand factors.
- * Position by charger ordinal (1-based).
- */
-function evFactor(ordinal) {
-  if (ordinal === 1) return 1.0;
-  if (ordinal <= 4)  return 0.75;
-  return 0.50;
-}
 
 /**
  * NEC 220.44 — Receptacle loads (non-dwelling):
@@ -113,15 +104,31 @@ function receptacleDemandKw(totalConnectedKw) {
 }
 
 /**
- * NEC 220.42 — General lighting demand factors (non-dwelling):
- *   First 50 kVA at 100%
- *   Remainder at 50%
- * (Simplified from the full Table 220.42 non-dwelling column.)
+ * NEC Table 220.42 — General lighting demand factors, non-dwelling rows. Each entry is a list of
+ * [upper limit kVA, factor] tiers applied to the portion of the load up to that limit.
+ * Occupancies not listed ("all others") are 100%; the 50% previously applied to offices and
+ * other occupancies after 50 kVA is not in the table.
  */
-function lightingDemandKw(totalConnectedKw) {
-  const threshold = 50;
-  if (totalConnectedKw <= threshold) return totalConnectedKw;
-  return threshold + (totalConnectedKw - threshold) * 0.50;
+export const LIGHTING_OCCUPANCIES = {
+  general:   { label: 'All other occupancies', tiers: [[Infinity, 1.0]] },
+  warehouse: { label: 'Warehouses (storage)',  tiers: [[12.5, 1.0], [Infinity, 0.5]] },
+  hospital:  { label: 'Hospitals',             tiers: [[50, 0.4], [Infinity, 0.2]] },
+  hotel:     { label: 'Hotels and motels',     tiers: [[20, 0.5], [100, 0.4], [Infinity, 0.3]] },
+};
+
+function lightingDemandKw(totalConnectedKw, occupancy = 'general') {
+  const tiers = (LIGHTING_OCCUPANCIES[occupancy] || LIGHTING_OCCUPANCIES.general).tiers;
+  let remaining = totalConnectedKw;
+  let previousLimit = 0;
+  let demand = 0;
+  for (const [limit, factor] of tiers) {
+    const span = Math.min(remaining, limit - previousLimit);
+    if (span <= 0) break;
+    demand += span * factor;
+    remaining -= span;
+    previousLimit = limit;
+  }
+  return demand;
 }
 
 // ---------------------------------------------------------------------------
@@ -262,6 +269,7 @@ export function buildDemandSchedule(loads, options = {}) {
   const mode = options.mode || options.standard || 'nec';
   const profile = normalizeDemandProfile(options.profile || options.demandProfile);
   const profileInfo = DEMAND_PROFILES[profile];
+  const lightingOccupancy = Object.hasOwn(LIGHTING_OCCUPANCIES, options.lightingOccupancy) ? options.lightingOccupancy : 'general';
 
   if (!Array.isArray(loads) || loads.length === 0) {
     return _emptyResult(mode, profile);
@@ -331,22 +339,25 @@ export function buildDemandSchedule(loads, options = {}) {
 
   // Pre-compute category-level demand kW totals & factors
   // Motor: each row is one uniquely tagged load, so use its connected kW.
+  // Only ONE motor carries the +25% (NEC 430.24), even when several have the same rating.
+  // Compare on the same connected-kW basis used for demand, not the raw nameplate kW.
   const motorEntries = byCategory['motor'];
-  const largestMotorKw = motorEntries.length
-    ? Math.max(...motorEntries.map(e => parseFloat(e.load.kw) || 0))
-    : 0;
+  let largestMotorEntry = null;
+  motorEntries.forEach(entry => {
+    if (!largestMotorEntry || entry.connKw > largestMotorEntry.connKw) largestMotorEntry = entry;
+  });
 
   // Receptacle total connected kW
   const receptacleTotal = byCategory['receptacle'].reduce((s, e) => s + e.connKw, 0);
   // Lighting total
   const lightingTotal   = byCategory['lighting'].reduce((s, e) => s + e.connKw, 0);
-  // Kitchen: count of units
-  const kitchenUnitCount = byCategory['kitchen'].length;
-  // Appliance count
-  const applianceCount   = byCategory['appliance'].length;
-
-  // EV charger ordinal counter (reset per source group for simplicity)
-  let evOrdinal = 0;
+  // Kitchen: count of units, and the Table 220.56 floor of the two largest pieces
+  const kitchenEntries = byCategory['kitchen'];
+  const kitchenUnitCount = kitchenEntries.length;
+  const kitchenTotal = kitchenEntries.reduce((s, e) => s + e.connKw, 0);
+  const kitchenTwoLargest = kitchenEntries.map(e => e.connKw).sort((a, b) => b - a).slice(0, 2).reduce((s, v) => s + v, 0);
+  const kitchenDemand = Math.max(kitchenTotal * kitchenFactor(kitchenUnitCount), kitchenTwoLargest);
+  const kitchenCategoryFactor = kitchenTotal > 0 ? Math.min(1, kitchenDemand / kitchenTotal) : 1;
 
   let totalConnKw   = 0;
   let totalConnKva  = 0;
@@ -373,12 +384,12 @@ export function buildDemandSchedule(loads, options = {}) {
       switch (category) {
       case 'lighting': {
         // Compute the proportional factor this row contributes to the category total
-        const categoryDemand  = lightingDemandKw(lightingTotal);
+        const categoryDemand  = lightingDemandKw(lightingTotal, lightingOccupancy);
         const categoryFactor  = lightingTotal > 0 ? categoryDemand / lightingTotal : 1;
         df   = categoryFactor;
-        note = lightingTotal > 50
-          ? 'First 50 kVA @ 100%, remainder @ 50% (NEC 220.42)'
-          : '100% demand (NEC 220.42, ≤50 kVA)';
+        note = lightingOccupancy === 'general'
+          ? '100% demand (NEC Table 220.42, all other occupancies)'
+          : `${LIGHTING_OCCUPANCIES[lightingOccupancy].label} tiers of NEC Table 220.42 (${Math.round(categoryFactor * 1000) / 10}% overall)`;
         break;
       }
       case 'receptacle': {
@@ -390,7 +401,7 @@ export function buildDemandSchedule(loads, options = {}) {
         break;
       }
       case 'motor': {
-        const isLargest = connKw === largestMotorKw && largestMotorKw > 0;
+        const isLargest = e === largestMotorEntry && connKw > 0;
         // All motors at 100%, largest gets +25%
         df   = isLargest ? 1.25 : 1.0;
         note = isLargest
@@ -399,8 +410,10 @@ export function buildDemandSchedule(loads, options = {}) {
         break;
       }
       case 'kitchen': {
-        df   = kitchenFactor(kitchenUnitCount);
-        note = `${Math.round(df * 100)}% per NEC Table 220.56 (${Math.round(kitchenUnitCount)} unit${kitchenUnitCount !== 1 ? 's' : ''})`;
+        df   = kitchenCategoryFactor;
+        note = kitchenCategoryFactor > kitchenFactor(kitchenUnitCount) + 1e-9
+          ? `${Math.round(df * 1000) / 10}%: Table 220.56 factor ${Math.round(kitchenFactor(kitchenUnitCount) * 100)}% would fall below the two largest pieces, which set the minimum`
+          : `${Math.round(df * 100)}% per NEC Table 220.56 (${Math.round(kitchenUnitCount)} unit${kitchenUnitCount !== 1 ? 's' : ''})`;
         break;
       }
       case 'hvac': {
@@ -411,16 +424,15 @@ export function buildDemandSchedule(loads, options = {}) {
         break;
       }
       case 'ev': {
-        evOrdinal++;
-        df   = evFactor(evOrdinal);
-        note = `${Math.round(df * 100)}% demand per NEC 625.42 (charger #${evOrdinal})`;
+        // NEC 625.42 treats EVSE as a continuous load; there is no ordinal demand-factor table.
+        // A lower demand needs a documented automatic load management system.
+        df   = 1.0;
+        note = '100% demand (NEC 625.42 continuous load); reduce only with a documented automatic load management system';
         break;
       }
       case 'appliance': {
-        df   = applianceCount >= 4 ? 0.75 : 1.0;
-        note = applianceCount >= 4
-          ? `75% demand per NEC 220.53 (${Math.round(applianceCount)} appliances ≥ 4)`
-          : `100% demand per NEC 220.53 (${Math.round(applianceCount)} appliance${applianceCount !== 1 ? 's' : ''} < 4)`;
+        df   = 1.0;
+        note = '100% demand: the 75% factor of NEC 220.53 applies to dwelling-unit appliances only';
         break;
       }
       case 'critical':

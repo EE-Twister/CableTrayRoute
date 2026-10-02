@@ -1491,7 +1491,7 @@ body[data-report-title="Time-Current Curves"] .page-header #project-share-btn {
 .is-selected-device .selected-device-role,
 .is-selected-device .component-selection-role {
     background: rgba(13, 110, 253, 0.14);
-    color: #0b5ed7;
+    color: color-mix(in srgb, #0b5ed7 75%, var(--color-text, #0f172a));
 }
 
 .is-downstream .tcc-context-chip-label,

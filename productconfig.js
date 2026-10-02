@@ -1,3 +1,4 @@
+import { showAlertModal } from './src/components/modal.js';
 import {
   configure,
   NEMA_LOAD_CLASSES,

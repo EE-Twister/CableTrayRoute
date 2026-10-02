@@ -1,3 +1,4 @@
+import { showModal } from './src/components/modal.js';
 import {
   calcAmpacity,
   defaultInsulThickMm,
@@ -88,6 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     Object.entries(fields).forEach(([fieldName, id]) => {
       const element = document.getElementById(id);
+      if (fieldName === 'sizeMm2') ensureSizeOption(projectInputModel.inputs.sizeMm2);
       const binding = projectInputModel.bindings[fieldName];
       bindProjectField(element, binding, projectOverrides, fieldName);
       if (applyLinkedValue(element, projectInputModel.inputs[fieldName], projectOverrides, fieldName, binding, { force })) {
@@ -125,6 +127,20 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Show/hide burial / conduit fields based on installation method ---
   installMethodSel.addEventListener('change', updateInstallFields);
   updateInstallFields();
+
+  // The size list holds the IEC preferred sizes. A project cable such as 4/0 AWG
+  // (107 mm²) is not one of them, so add its actual area as an option instead of
+  // silently rounding it up to a larger, higher-rated size.
+  function ensureSizeOption(size) {
+    const value = Number(size);
+    if (!Number.isFinite(value) || value <= 0) return;
+    const exists = [...sizeMm2Sel.options].some(option => Number(option.value) === value);
+    if (exists) return;
+    const option = document.createElement('option');
+    option.value = String(value);
+    option.textContent = `${value} mm² (project cable)`;
+    sizeMm2Sel.insertBefore(option, sizeMm2Sel.firstChild);
+  }
 
   function updateInstallFields() {
     const method = installMethodSel.value;
@@ -223,6 +239,8 @@ document.addEventListener('DOMContentLoaded', () => {
       nCores, armoured, installMethod,
       burialDepthMm, soilResistivity, conduitOD_mm,
       ambientTempC, frequencyHz, U0_kV, nCables, groupArrangement,
+      // Project cables (AWG/kcmil) fall between the tabulated IEC sizes.
+      interpolateResistance: true,
     };
   }
 
@@ -231,6 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const el = document.getElementById(id);
       if (el && val != null) el.value = val;
     };
+    ensureSizeOption(r.sizeMm2);
     set('size-mm2', r.sizeMm2);
     set('material', r.material);
     set('insulation', r.insulation);

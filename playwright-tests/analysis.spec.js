@@ -26,13 +26,16 @@ test.describe('Load Flow', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('page loads with correct heading', async ({ page }) => {
+  test('page loads with correct heading', async ({ page, browserName }) => {
     await expect(page.locator('h1')).toContainText('Load Flow');
-    const startupScripts = startupScriptsByPage.get(page) || [];
-    expect(startupScripts).toHaveLength(1);
-    expect(startupScripts.some(pathname => /\/dist\/loadFlow(?:\.[0-9a-f]{8,})?\.js$/.test(pathname))).toBe(true);
-    expect(startupScripts.some(pathname => pathname.endsWith('/dataStore.mjs'))).toBe(false);
-    expect(startupScripts.some(pathname => pathname.endsWith('/studies/loadFlow.js'))).toBe(false);
+    // Firefox does not report file:// subresource requests, so the script list is only observable in Chromium.
+    if (browserName === 'chromium') {
+      const startupScripts = startupScriptsByPage.get(page) || [];
+      expect(startupScripts).toHaveLength(1);
+      expect(startupScripts.some(pathname => /\/dist\/loadFlow(?:\.[0-9a-f]{8,})?\.js$/.test(pathname))).toBe(true);
+      expect(startupScripts.some(pathname => pathname.endsWith('/dataStore.mjs'))).toBe(false);
+      expect(startupScripts.some(pathname => pathname.endsWith('/studies/loadFlow.js'))).toBe(false);
+    }
   });
 
   test('has form with Run Study button', async ({ page }) => {

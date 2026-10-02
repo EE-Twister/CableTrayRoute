@@ -420,7 +420,8 @@ export const BENCHMARKS = [
     standardRef: 'Thevenin equivalent motor-starting screening model',
     description:
       'A 100 hp, 480 V motor at 0.90 power factor and efficiency uses 6× locked-rotor current ' +
-      'behind 0.01 + j0.02 ohm source impedance. The live engine must reproduce starting current and sag.',
+      'behind 0.01 + j0.02 ohm per-phase source impedance. The live engine must reproduce starting current ' +
+      'and the line-to-line sag: sqrt(3) x 665 A x 0.02236 ohm / 480 V = 5.36 %.',
     run() {
       const result = calculateMotorStartCase({
         id: 'M1',
@@ -450,7 +451,7 @@ export const BENCHMARKS = [
     checks: [
       { key: 'ready', description: 'Input case accepted', expectedVal: true, tolerance: 0, type: 'boolean' },
       { key: 'inrush_ka', description: 'Starting current (kA)', expectedVal: 0.665, tolerance: 0.001 },
-      { key: 'voltage_sag_pct', description: 'Voltage sag (%)', expectedVal: 3.10, tolerance: 0.01 }
+      { key: 'voltage_sag_pct', description: 'Voltage sag (%)', expectedVal: 5.36, tolerance: 0.01 }
     ]
   },
 
@@ -604,9 +605,11 @@ export const BENCHMARKS = [
     studyType: 'Frequency Scan',
     standardRef: 'Parallel resonance h ≈ √(Ssc / Qc), frequency-domain screening',
     description:
-      'A 4.16 kV bus with 50 MVA short-circuit strength and a 600 kvar capacitor bank has an ' +
-      'analytical resonance near harmonic order √(50,000/600) = 9.13. The half-order scan must ' +
-      'identify the nearest peak at h = 9.',
+      'A 4.16 kV bus with 50 MVA short-circuit strength (X/R = 10) and a 600 kvar capacitor bank ' +
+      'resonates where the source reactance equals the capacitor reactance, h = √(Xc1 / Xs1) = ' +
+      '√(28.843 / 0.34439) = 9.151 (≈ √(Ssc / Qc) = 9.13 for a purely reactive source). The scan ' +
+      'refines its half-order grid peak to that order; the undamped peak impedance is ≈ (h·Xs1)² / Rs ' +
+      '= 288.4 Ω.',
     run() {
       const result = runFrequencyScan({
         baseFreqHz: 60,
@@ -626,9 +629,9 @@ export const BENCHMARKS = [
       };
     },
     checks: [
-      { key: 'resonance_order', description: 'Detected parallel-resonance order', expectedVal: 9, tolerance: 0 },
-      { key: 'resonance_frequency_hz', description: 'Detected resonance frequency (Hz)', expectedVal: 540, tolerance: 0 },
-      { key: 'peak_impedance_ohm', description: 'Peak impedance (ohm)', expectedVal: 89.7481, tolerance: 0.01 },
+      { key: 'resonance_order', description: 'Detected parallel-resonance order', expectedVal: 9.151, tolerance: 0.01 },
+      { key: 'resonance_frequency_hz', description: 'Detected resonance frequency (Hz)', expectedVal: 549.1, tolerance: 1 },
+      { key: 'peak_impedance_ohm', description: 'Peak impedance (ohm)', expectedVal: 288.4, tolerance: 0.5 },
     ],
   },
 
@@ -639,8 +642,8 @@ export const BENCHMARKS = [
     standardRef: 'Classical swing equation and equal-area criterion',
     description:
       'A one-machine infinite-bus case with H = 5 s is checked using both the equal-area estimate ' +
-      'and the independent numerical bisection search. The numerical CCT must be 0.3434 s and remain ' +
-      'within 0.03 s of the analytical estimate.',
+      'and the independent numerical bisection search. The numerical CCT must be 0.3434 s and the ' +
+      'equal-area estimate, which integrates the faulted swing, must agree within 1 ms.',
     run() {
       const inputs = {
         H: 5,
@@ -665,7 +668,7 @@ export const BENCHMARKS = [
       };
     },
     checks: [
-      { key: 'eac_cct_s', description: 'Equal-area CCT estimate (s)', expectedVal: 0.3192, tolerance: 0.001 },
+      { key: 'eac_cct_s', description: 'Equal-area CCT estimate (s)', expectedVal: 0.3433, tolerance: 0.001 },
       { key: 'numerical_cct_s', description: 'Numerical CCT (s)', expectedVal: 0.3434, tolerance: 0.001 },
       { key: 'converged', description: 'Numerical CCT search converges', expectedVal: true, tolerance: 0, type: 'boolean' },
     ],

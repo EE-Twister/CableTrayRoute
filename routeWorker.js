@@ -51,7 +51,10 @@ const calcPullTension = globalThis.calcPullTension || function(routeSegments = [
             const swp = calcSidewallPressure(radius, tension);
             if (swp > maxSidewall) maxSidewall = swp;
         } else {
-            tension += weight * muEff * (seg.length || 0);
+            const L = seg.length || 0;
+            const sinPhi = L > 0 ? Math.max(-1, Math.min(1, (Number(seg.rise) || 0) / L)) : 0;
+            tension += weight * L * (muEff * Math.sqrt(1 - sinPhi * sinPhi) + sinPhi);
+            if (tension < 0) tension = 0;
         }
         if (tension > maxTension) maxTension = tension;
     }
@@ -474,8 +477,10 @@ class CableRoutingSystem {
 
     prepareBaseGraph() {
         const graph = { nodes: {}, edges: {} };
-        const addNode = (id, point, type = 'generic') => {
-            graph.nodes[id] = { point, type };
+        const addNode = (id, point, type = 'generic', owner = null) => {
+            // owner is the tray a node belongs to; replaces parsing the node id, which
+            // broke for tray ids containing '_' (TR_1 and TR_2 looked like one tray).
+            graph.nodes[id] = { point, type, owner };
             graph.edges[id] = {};
         };
         const addEdge = (id1, id2, weight, type, trayId = null) => {
@@ -510,8 +515,8 @@ class CableRoutingSystem {
         trays.forEach(tray => {
             const startId = `${tray.tray_id}_start`;
             const endId = `${tray.tray_id}_end`;
-            addNode(startId, [tray.start_x, tray.start_y, tray.start_z], 'tray_endpoint');
-            addNode(endId, [tray.end_x, tray.end_y, tray.end_z], 'tray_endpoint');
+            addNode(startId, [tray.start_x, tray.start_y, tray.start_z], 'tray_endpoint', tray.tray_id);
+            addNode(endId, [tray.end_x, tray.end_y, tray.end_z], 'tray_endpoint', tray.tray_id);
             const trayLength = this.distance(graph.nodes[startId].point, graph.nodes[endId].point);
             addEdge(startId, endId, trayLength, 'tray', tray.tray_id);
         });
@@ -533,7 +538,7 @@ class CableRoutingSystem {
                     const proj = this.projectPointOnSegment(ep.point, a, b);
                     if (this.distance(ep.point, proj) < 0.1) {
                         const projId = `${ep.id}_on_${trayB.tray_id}`;
-                        addNode(projId, proj, 'projection');
+                        addNode(projId, proj, 'projection', trayA.tray_id);
                         addEdge(ep.id, projId, 0.1, 'tray_connection', trayB.tray_id);
                         addEdge(projId, startB, this.distance(proj, a), 'tray', trayB.tray_id);
                         addEdge(projId, endB, this.distance(proj, b), 'tray', trayB.tray_id);
@@ -553,8 +558,9 @@ class CableRoutingSystem {
                 const p1 = graph.nodes[id1].point;
                 const p2 = graph.nodes[id2].point;
 
-                const isSameTray = id1.startsWith(id2.split('_')[0]) && id2.startsWith(id1.split('_')[0]);
-                if (graph.edges[id1][id2] || (id1.includes('_') && isSameTray)) continue;
+                const owner1 = graph.nodes[id1].owner;
+                const isSameTray = owner1 != null && owner1 === graph.nodes[id2].owner;
+                if (graph.edges[id1][id2] || isSameTray) continue;
 
                 const dist = this.manhattanDistance(p1, p2);
                 if (dist > this.maxFieldEdge) continue;
@@ -881,8 +887,10 @@ class CableRoutingSystem {
             }
         }
 
-        const addNode = (id, point, type = 'generic') => {
-            graph.nodes[id] = { point, type };
+        const addNode = (id, point, type = 'generic', owner = null) => {
+            // owner is the tray a node belongs to; replaces parsing the node id, which
+            // broke for tray ids containing '_' (TR_1 and TR_2 looked like one tray).
+            graph.nodes[id] = { point, type, owner };
             graph.edges[id] = {};
         };
         const addEdge = (id1, id2, weight, type, trayId = null) => {
@@ -924,7 +932,7 @@ class CableRoutingSystem {
             const distToProjStart = this.manhattanDistance(startPoint, projStart);
             if (distToProjStart <= this.proximityThreshold) {
                 const projId = `proj_start_on_${tray.tray_id}`;
-                addNode(projId, projStart, 'projection');
+                addNode(projId, projStart, 'projection', tray.tray_id);
                 const penStart = this._isSharedSegment({ start: startPoint, end: projStart }) ? this.fieldPenalty * this.sharedPenalty : this.fieldPenalty;
                 addEdge('start', projId, distToProjStart * penStart, 'field');
                 addEdge(projId, startId, this.distance(projStart, a), 'tray', tray.tray_id);
@@ -938,7 +946,7 @@ class CableRoutingSystem {
             const distToProjEnd = this.manhattanDistance(endPoint, projEnd);
             if (distToProjEnd <= this.proximityThreshold) {
                 const projId = `proj_end_on_${tray.tray_id}`;
-                addNode(projId, projEnd, 'projection');
+                addNode(projId, projEnd, 'projection', tray.tray_id);
                 const penEnd = this._isSharedSegment({ start: endPoint, end: projEnd }) ? this.fieldPenalty * this.sharedPenalty : this.fieldPenalty;
                 addEdge('end', projId, distToProjEnd * penEnd, 'field');
                 addEdge(projId, startId, this.distance(projEnd, a), 'tray', tray.tray_id);
@@ -1005,9 +1013,8 @@ class CableRoutingSystem {
             
             let tray_id = edge.trayId;
             if (!tray_id) { // Infer tray_id if not on edge
-                const node_id = u.includes('_') ? u : v;
-                const inferred = node_id.split('_')[0];
-                tray_id = (inferred && this.trays.has(inferred)) ? inferred : null;
+                const inferred = graph.nodes[u].owner ?? graph.nodes[v].owner ?? null;
+                tray_id = (inferred != null && this.trays.has(inferred)) ? inferred : null;
             }
             if (type === 'tray') traySegments.add(tray_id);
 
@@ -1058,7 +1065,7 @@ function gatherPullSegments(segs) {
     const pullSegs = [];
     const vec = s => [s.end[0]-s.start[0], s.end[1]-s.start[1], s.end[2]-s.start[2]];
     let prev = vec(segs[0]);
-    pullSegs.push({ type: 'straight', length: segs[0].length });
+    pullSegs.push({ type: 'straight', length: segs[0].length, rise: segs[0].end[2] - segs[0].start[2] });
     for (let i = 1; i < segs.length; i++) {
         const seg = segs[i];
         const curr = vec(seg);
@@ -1074,7 +1081,7 @@ function gatherPullSegments(segs) {
                 pullSegs.push({ type: 'bend', radius, angle, length: radius * angle });
             }
         }
-        pullSegs.push({ type: 'straight', length: seg.length });
+        pullSegs.push({ type: 'straight', length: seg.length, rise: seg.end[2] - seg.start[2] });
         prev = curr;
     }
     return pullSegs;

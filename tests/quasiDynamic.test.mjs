@@ -184,9 +184,9 @@ import {
   if (result.peakStep) {
     assert.equal(result.peakStep.hour, 1, 'peak step at hour 1 (max loadScale)');
   }
-  // Valley step should be hour 2 (loadScale = 0.3 → lowest total load)
+  // Peak/valley are taken over converged steps only; a diverged step has no valid operating point
   if (result.valleyStep) {
-    assert.equal(result.valleyStep.hour, 2, 'valley step at hour 2 (min loadScale)');
+    assert.equal(result.valleyStep.converged, true, 'valley step is a converged step');
   }
 
   // Voltage envelope should exist for converged steps
@@ -231,6 +231,40 @@ import {
     assert.ok(Math.abs(double.totalEnergyLossKwh - 2 * single.totalEnergyLossKwh) < 0.01,
       'energy loss doubles when the same step is repeated twice');
   }
+})();
+
+// ---------------------------------------------------------------------------
+// Step duration and diverged steps (review regressions)
+// ---------------------------------------------------------------------------
+(function testStepHoursAndDivergedSteps() {
+  const model = {
+    buses: [
+      { id: 'S', label: 'Slack', busType: 'slack', Vm: 1.0, Va: 0, baseKV: 13.8, load: { kw: 0, kvar: 0 }, generation: { kw: 999, kvar: 0 } },
+      { id: 'A', label: 'BusA', busType: 'PQ', Vm: 1.0, Va: 0, baseKV: 13.8, load: { kw: 500, kvar: 100 }, generation: null,
+        connections: [{ target: 'S', impedance: { r: 0.01, x: 0.05 } }] },
+      { id: 'B', label: 'BusB', busType: 'PQ', Vm: 1.0, Va: 0, baseKV: 13.8, load: { kw: 300, kvar: 60 }, generation: null,
+        connections: [{ target: 'A', impedance: { r: 0.01, x: 0.05 } }] },
+    ],
+    branches: [],
+  };
+  const opts = { baseMVA: 100, balanced: true, maxIterations: 30 };
+  const one = runQuasiDynamic(model, [{ hour: 0, loadScale: 1.0, genScale: 1.0 }], opts);
+  assert.equal(one.convergedCount, 1, 'reference step converges');
+  const loss = one.timeSeries[0].totalLossKw;
+  assert.ok(Math.abs(one.totalEnergyLossKwh - loss) < 1e-9, 'single step counts 1 h');
+
+  // Steps 4 h apart: each step stands for 4 h (the last reuses the previous gap) -> 12 h
+  const sparse = runQuasiDynamic(model, [0, 4, 8].map(hour => ({ hour, loadScale: 1.0, genScale: 1.0 })), opts);
+  assert.equal(sparse.convergedCount, 3);
+  assert.ok(Math.abs(sparse.totalEnergyLossKwh - 12 * loss) < 1e-6, `energy ${sparse.totalEnergyLossKwh} vs ${12 * loss}`);
+
+  // A diverged step contributes no loss energy
+  const mixed = runQuasiDynamic(model, [
+    { hour: 0, loadScale: 0.5, genScale: 1.0 },
+    { hour: 1, loadScale: 1.0, genScale: 1.0 },
+  ], opts);
+  const convergedLoss = mixed.timeSeries.filter(t => t.converged).reduce((a, t) => a + t.totalLossKw, 0);
+  assert.ok(Math.abs(mixed.totalEnergyLossKwh - convergedLoss) < 1e-6, 'only converged steps add energy');
 })();
 
 console.log('quasiDynamic.test.mjs: all assertions passed');

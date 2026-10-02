@@ -95,8 +95,16 @@ describe('kappaIEC — peak factor κ (IEC 60909-0 §4.3.1.1 Eq. 14)', () => {
 // ---------------------------------------------------------------------------
 
 describe('thermalMFactor — DC component heating (IEC 60909-0 §4.8.1)', () => {
-  it('m = 0 at κ boundary (κ = 1.02)', () => {
-    assert.strictEqual(thermalMFactor(1.02, 1.0, 50), 0);
+  it('m is tiny at κ = 1.02 (DC component all but gone)', () => {
+    assert.ok(thermalMFactor(1.02, 1.0, 50) < 0.01);
+  });
+  it('matches the IEC 60909-0 closed form: κ = 1.8, f = 50 Hz', () => {
+    // m = (e^(4 f Tk ln(κ-1)) - 1) / (2 f Tk ln(κ-1)); ln(0.8) = -0.223144
+    within(thermalMFactor(1.8, 1.0, 50), 0.04482, 0.0001, 'm(Tk=1) ');
+    within(thermalMFactor(1.8, 0.1, 50), 0.4430, 0.001, 'm(Tk=0.1) ');
+  });
+  it('m → 2 when the DC component does not decay (κ = 2)', () => {
+    assert.strictEqual(thermalMFactor(2, 1.0, 50), 2);
   });
   it('m > 0 for typical κ (1.809) and 1 s fault', () => {
     assert.ok(thermalMFactor(1.809, 1.0, 50) > 0);
@@ -526,5 +534,20 @@ describe('runIEC60909Batch — near-to-generator pass-through', () => {
     };
     const fast = runIEC60909Batch([{ ...bus, minTimeDelayS: 0.02 }], { minTimeDelayS: 0.25 });
     within(fast['B'].mu, muFactor(4, 0.02), 0.0005, 'μ override ');
+  });
+});
+
+describe('double-line-to-ground reports the earth current (IEC 60909-0 Eq. 33)', () => {
+  it('with Z1 = Z2 = Z0 the earth current equals the three-phase current', () => {
+    const z = { r: 0.01, x: 0.1 };
+    const r = computeIEC60909Bus({ z1: z, z2: z, z0: z, prefaultKV: 0.48, cMode: 'max' });
+    within(r.doubleLineGroundKA, r.threePhaseKA, 0.01, 'I"kE2E ');
+  });
+  it('matches 3·I1·|Z2/(Z2+Z0)| for unequal sequence impedances', () => {
+    // Z1 = Z2 = j0.1, Z0 = j0.3  ->  Ia1 = V/(j0.1 + j0.075), 3·Ia0 = 3·Ia1·0.1/0.4
+    const V = (0.48 * 1.1) / Math.sqrt(3);
+    const expected = 3 * (V / 0.175) * (0.1 / 0.4);
+    const r = computeIEC60909Bus({ z1: { r: 0, x: 0.1 }, z2: { r: 0, x: 0.1 }, z0: { r: 0, x: 0.3 }, prefaultKV: 0.48, cMode: 'max' });
+    within(r.doubleLineGroundKA, expected, 0.01, 'I"kE2E ');
   });
 });

@@ -1,3 +1,4 @@
+import { showModal } from './src/components/modal.js';
 import {
   HEAT_TRACE_CABLE_TYPES,
   HEAT_TRACE_COMPONENT_ALLOWANCE_TYPES,
@@ -192,6 +193,17 @@ document.addEventListener('DOMContentLoaded', () => {
     renderWorkspaceCharts(liveResult);
     captureSensitivityBaseline(liveResult);
   } else {
+    if (activeUnitSystem === 'imperial') {
+      // The HTML defaults and the project-metadata ambient binding are in degrees C,
+      // but the page opens in imperial units where these two fields are degrees F.
+      // Left alone they mixed units (ambient 40 F and maintain 40 F), so the very
+      // first Run failed with "maintain must be greater than ambient".
+      ['ambient-temp-c', 'maintain-temp-c'].forEach(id => {
+        const field = document.getElementById(id);
+        const celsius = parseFloat(field?.value);
+        if (field && Number.isFinite(celsius)) field.value = roundForDisplay(cToF(celsius), id);
+      });
+    }
     applyUnitSystem(activeUnitSystem, { convertExistingValues: false });
     const liveResult = getLiveAnalysisResult();
     renderResults(liveResult);
@@ -1257,34 +1269,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const lengthUnit = result.unitSystem === 'metric' ? 'm' : 'ft';
     const temperatureUnit = result.unitSystem === 'metric' ? '°C' : '°F';
-    const totalLength = result.unitSystem === 'metric'
-      ? imperialToMetric.lineLengthFt(result.lineLengthFt)
-      : result.lineLengthFt;
     const maintainTemp = result.unitSystem === 'metric' ? result.maintainTempC : cToF(result.maintainTempC);
     const ambientTemp = result.unitSystem === 'metric' ? result.ambientTempC : cToF(result.ambientTempC);
-    const temperatureSpan = Math.max(0.5, maintainTemp - ambientTemp);
-    const windFactor = Math.min(1.6, 1 + (result.windSpeedMph / 28));
-    const externalRatio = result.thermalResistance.totalKmPerW > 0
-      ? (result.thermalResistance.externalKmPerW / result.thermalResistance.totalKmPerW)
-      : 0.4;
-
-    const sampleCount = 11;
-    const surfacePoints = [];
-    const maintainPoints = [];
-    const ambientPoints = [];
-    for (let idx = 0; idx < sampleCount; idx += 1) {
-      const progress = idx / (sampleCount - 1);
-      const distance = totalLength * progress;
-      const decay = 0.08 + (0.3 * progress * windFactor * externalRatio);
-      const surfaceTemp = maintainTemp - (temperatureSpan * Math.min(0.85, decay));
-      surfacePoints.push({ x: distance, y: surfaceTemp });
-      maintainPoints.push({ x: distance, y: maintainTemp });
-      ambientPoints.push({ x: distance, y: ambientTemp });
-    }
+    // The engine's steady-state temperature the installed trace can hold:
+    // ambient + installed output x thermal resistance, limited to the set point.
+    const toDisplayTemp = tempC => (result.unitSystem === 'metric' ? tempC : cToF(tempC));
+    const toDisplayLength = lengthFt => (result.unitSystem === 'metric' ? imperialToMetric.lineLengthFt(lengthFt) : lengthFt);
+    const achievablePoints = (result.profile || []).map(point => ({
+      x: toDisplayLength(point.distanceFt),
+      y: toDisplayTemp(point.expectedPipeTempC),
+    }));
+    const maintainPoints = achievablePoints.map(point => ({ x: point.x, y: maintainTemp }));
+    const ambientPoints = achievablePoints.map(point => ({ x: point.x, y: ambientTemp }));
 
     const chartSeries = [
-      { label: `Pipe Surface Temperature`, color: '#1d6cff', points: surfacePoints },
-      { label: `Fluid Temperature (Maintained)`, color: '#8aa7d6', dash: '7 7', points: maintainPoints },
+      { label: `Achievable Pipe Temperature (Steady State)`, color: '#1d6cff', points: achievablePoints },
+      { label: `Set Point (Maintained)`, color: '#8aa7d6', dash: '7 7', points: maintainPoints },
       { label: `Ambient Temperature`, color: '#98a2b3', dash: '7 7', points: ambientPoints },
     ];
     renderLineChartSvg(temperatureProfileChart, {
@@ -1324,7 +1324,7 @@ document.addEventListener('DOMContentLoaded', () => {
         color: '#86aef4',
       },
       {
-        label: `Radiation / Margin (${outputUnit})`,
+        label: `Design margin and pipe-material allowance (${outputUnit})`,
         value: Math.max(0, requiredOutput - preMarginOutput),
         color: '#fed36f',
       },

@@ -8,6 +8,7 @@ import {
 import { getCables, getTrays, getConduits, getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { parseTradeSize } from './analysis/pullBoxSizing.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -131,13 +132,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let altBom = null;
+    const altHintEl = document.getElementById('alt-hint');
     if (altToggleEl.checked && altJsonEl.value.trim()) {
       try {
         altBom = JSON.parse(altJsonEl.value.trim());
+        if (altHintEl) altHintEl.textContent = 'When enabled, the study will compute a second embodied footprint from a manually entered BOM JSON and show a delta comparison card.';
       } catch {
         altBom = null;
+        if (altHintEl) altHintEl.textContent = 'The alternative BOM is not valid JSON, so no comparison was calculated. Fix the JSON and calculate again.';
       }
     }
+    const altLossesRaw = document.getElementById('alt-losses-kw')?.value.trim();
+    const altLossesKw = altLossesRaw ? parseFloat(altLossesRaw) : null;
 
     return {
       gridRegion:          gridRegionEl.value,
@@ -150,6 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
       lossesSource,
       lossesKw,
       altBom,
+      altLossesKw: Number.isFinite(altLossesKw) ? altLossesKw : null,
     };
   }
 
@@ -169,6 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateCustomGridVisibility();
     lossesKwEl.disabled = inp.lossesSource !== 'manual';
 
+    if (inp.altLossesKw != null) set('alt-losses-kw', inp.altLossesKw);
     if (inp.altBom) {
       altToggleEl.checked = true;
       altEditorEl.hidden  = false;
@@ -194,6 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (Array.isArray(inputs.altBom) && inputs.altBom.length > 0) {
       opts.alternative = inputs.altBom;
+      if (inputs.altLossesKw != null) opts.alternativeLossesKw = inputs.altLossesKw;
     }
     return opts;
   }
@@ -254,7 +263,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     for (const c of conduits) {
-      const tradeSizeIn = parseFloat(c.trade_size || c.diameter || 0) || 0;
+      // '3/4' and '1-1/2' must read as 0.75 and 1.5, not 3 and 1
+      const parsedTradeSize = parseTradeSize(c.trade_size || c.diameter || 0);
+      const tradeSizeIn = Number.isFinite(parsedTradeSize) ? parsedTradeSize : 0;
       const lengthFt    = parseFloat(c.length_ft || 0) || 0;
       const lengthM     = lengthFt * 0.3048;
       const material    = normaliseConduitType(c.conduit_type || c.material || 'emt');
@@ -335,7 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <h3>Operating CO₂e (Scope 2)</h3>
           <table class="results-table" aria-label="Operating losses summary">
             <tbody>
-              <tr><td>Annual conductor losses</td><td><strong>${result.operating.annualKwh.toFixed(0).toLocaleString()} kWh/yr</strong></td></tr>
+              <tr><td>Annual conductor losses</td><td><strong>${Math.round(result.operating.annualKwh).toLocaleString()} kWh/yr</strong></td></tr>
               <tr><td>Grid emission factor</td><td>${safeGridFactorKgPerKwh} kg CO₂e/kWh (${escapeHtml(provenance.label || result.gridRegion)})</td></tr>
               <tr><td>Project life</td><td>${safeProjectLifeYears} years</td></tr>
               <tr><td>Lifetime energy consumption</td><td>${(result.operating.lifetimeKwh / 1000).toFixed(1)} MWh</td></tr>
@@ -365,7 +376,13 @@ document.addEventListener('DOMContentLoaded', () => {
                   <td>Embodied CO₂e</td>
                   <td>${fmtKg(result.embodied.totalKg)} kg</td>
                   <td>${fmtKg(ac.embodiedKg)} kg</td>
-                  <td></td>
+                  <td>${ac.embodiedKg - result.embodied.totalKg >= 0 ? '+' : ''}${fmtKg(ac.embodiedKg - result.embodied.totalKg)} kg</td>
+                </tr>
+                <tr>
+                  <td>Operating CO₂e (Scope 2)</td>
+                  <td>${fmtKg(result.operating ? result.operating.lifetimeKgCO2e : 0)} kg</td>
+                  <td>${fmtKg(ac.operatingKg || 0)} kg${ac.lossesBasis === 'same-as-primary' && result.operating ? ' (same losses assumed)' : ''}</td>
+                  <td>${(ac.operatingKg || 0) - (result.operating ? result.operating.lifetimeKgCO2e : 0) >= 0 ? '+' : ''}${fmtKg((ac.operatingKg || 0) - (result.operating ? result.operating.lifetimeKgCO2e : 0))} kg</td>
                 </tr>
               </tbody>
             </table>

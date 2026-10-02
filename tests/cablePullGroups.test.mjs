@@ -112,3 +112,46 @@ const options = {
 }
 
 console.log('cable pull group suggestions verified');
+
+// Review regressions: voltage classes and bundle stiffness
+{
+  const volt = (name, volts) => ({ ...cable(name, 'POWER'), operating_voltage: volts });
+  const cables = [volt('P-LV-1', 480), volt('P-LV-2', 480), volt('P-MV-1', 13800), volt('P-MV-2', 13800)];
+  const analysis = buildPullGroupSuggestions(cables.map(item => result(item.name)), cables, options);
+  assert.equal(analysis.suggestions.length, 2, 'LV and MV cables form separate groups');
+  analysis.suggestions.forEach(group => {
+    const tiers = new Set(group.cableNames.map(n => (n.includes('MV') ? 'MV' : 'LV')));
+    assert.equal(tiers.size, 1, `${group.cableNames} mixes voltage classes`);
+  });
+  const lone = buildPullGroupSuggestions(
+    [result('P-LV-1'), result('P-MV-1')],
+    [volt('P-LV-1', 480), volt('P-MV-1', 13800)],
+    options
+  );
+  assert.equal(lone.suggestions.length, 0);
+  assert.match(lone.separate[0].reason, /voltage class/i);
+  assert.ok(lone.blockedPairs.some(pair => /voltage classes/.test(pair.reason)));
+}
+
+{
+  const bendRoute = [
+    { start: [0, 0, 0], end: [50, 0, 0], length: 50, type: 'tray', tray_id: 'T1' },
+    { start: [50, 0, 0], end: [50, 50, 0], length: 50, type: 'tray', tray_id: 'T2' }
+  ];
+  const big = (name, extra = {}) => ({ ...cable(name), conductor_size: '500 kcmil', diameter: 1.1, weight: 1.5, ...extra });
+  const single = big('S-1');
+  const noStiff = name => ({ ...cable(name), diameter: 1.1, weight: 1.5 });
+  const tension = (cables, names) => buildPullGroupSuggestions(
+    names.map(n => result(n, bendRoute)), cables, { ...options, maxPullGroupSize: 4 }
+  );
+  const withK = tension([big('G-1'), big('G-2')], ['G-1', 'G-2']).suggestions[0];
+  const withoutK = tension([noStiff('G-1'), noStiff('G-2')], ['G-1', 'G-2']).suggestions[0];
+  const d = withK.plan.sections[0].maxTension - withoutK.plan.sections[0].maxTension;
+  // Two identical 500 kcmil cables: stiffness doubles. One cable's stiffness is half of that.
+  const one = buildPullGroupSuggestions([result('O-1', bendRoute), result('O-2', bendRoute)],
+    [big('O-1'), noStiff('O-2')], options);
+  assert.ok(d > 0, `bundle stiffness tension ${d}`);
+  const halfBundle = one.suggestions[0]?.plan.sections[0].maxTension
+    - tension([noStiff('O-1'), noStiff('O-2')], ['O-1', 'O-2']).suggestions[0].plan.sections[0].maxTension;
+  assert.ok(Math.abs(d - 2 * halfBundle) / d < 0.05, `stiffness adds per cable: ${d} vs 2 x ${halfBundle}`);
+}

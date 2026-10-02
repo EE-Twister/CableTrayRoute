@@ -129,7 +129,9 @@ import {
     ROUTE_PLOT_CONFIG as plotConfig,
     ROUTE_VIEW_PRESETS
 } from './src/routing/routeVisualizationModel.mjs';
+import { getRouteGraphTheme } from './src/routing/routeGraphTheme.mjs';
 import { buildPlotlyRouteScene } from './src/routing/plotlyRouteScene.mjs';
+import { CONDUIT_INTERNAL_AREA_IN2 } from './analysis/conduitFill.mjs';
 import {
     bindPullReviewActions,
     buildPullReviewMarkup
@@ -181,20 +183,7 @@ async function ensureConductorProps() {
 // start loading early
 ensureConductorProps().catch(e => console.warn('Failed to preload conductor properties:', e));
 
-const CONDUIT_SPECS = {
-    "EMT": {"1/2":0.304,"3/4":0.533,"1":0.864,"1-1/4":1.496,"1-1/2":2.036,"2":3.356,"2-1/2":5.858,"3":8.846,"3-1/2":11.545,"4":14.753},
-    "ENT": {"1/2":0.285,"3/4":0.508,"1":0.832,"1-1/4":1.453,"1-1/2":1.986,"2":3.291},
-    "FMC": {"3/8":0.116,"1/2":0.317,"3/4":0.533,"1":0.817,"1-1/4":1.277,"1-1/2":1.858,"2":3.269,"2-1/2":4.909,"3":7.069,"3-1/2":9.621,"4":12.566},
-    "IMC": {"1/2":0.342,"3/4":0.586,"1":0.959,"1-1/4":1.647,"1-1/2":2.225,"2":3.63,"2-1/2":5.135,"3":7.922,"3-1/2":10.584,"4":13.631},
-    "LFNC-A": {"3/8":0.192,"1/2":0.312,"3/4":0.535,"1":0.854,"1-1/4":1.502,"1-1/2":2.018,"2":3.343},
-    "LFNC-B": {"3/8":0.192,"1/2":0.314,"3/4":0.541,"1":0.873,"1-1/4":1.528,"1-1/2":1.981,"2":3.246},
-    "LFMC": {"3/8":0.192,"1/2":0.314,"3/4":0.541,"1":0.873,"1-1/4":1.277,"1-1/2":1.858,"2":3.269,"2-1/2":4.881,"3":7.475,"3-1/2":9.731,"4":12.692},
-    "RMC": {"1/2":0.314,"3/4":0.549,"1":0.887,"1-1/4":1.526,"1-1/2":2.071,"2":3.408,"2-1/2":4.866,"3":7.499,"3-1/2":10.01,"4":12.882,"5":20.212,"6":29.158},
-    "PVC Sch 80": {"1/2":0.217,"3/4":0.409,"1":0.688,"1-1/4":1.237,"1-1/2":1.711,"2":2.874,"2-1/2":4.119,"3":6.442,"3-1/2":8.688,"4":11.258,"5":17.855,"6":25.598},
-    "PVC Sch 40": {"1/2":0.285,"3/4":0.508,"1":0.832,"1-1/4":1.453,"1-1/2":1.986,"2":3.291,"2-1/2":4.695,"3":7.268,"3-1/2":9.737,"4":12.554,"5":19.761,"6":28.567},
-    "PVC Type A": {"1/2":0.385,"3/4":0.65,"1":1.084,"1-1/4":1.767,"1-1/2":2.324,"2":3.647,"2-1/2":5.453,"3":8.194,"3-1/2":10.694,"4":13.723},
-    "PVC Type EB": {"2":3.874,"3":8.709,"3-1/2":11.365,"4":14.448,"5":22.195,"6":31.53}
-};
+const CONDUIT_SPECS = CONDUIT_INTERNAL_AREA_IN2;
 
 const CONTAINMENT_RULES = {
     thresholds: { conduit: 3, channel: 6 } // 1-3 cables conduit, 4-6 channel, >6 tray
@@ -2929,10 +2918,12 @@ const renderBatchResults = async (results) => {
                             showManualPathError(index, result.message, result.error && result.error.tray_id);
                         }
                         cable.route_segments = result.success ? result.route_segments : [];
-                        let vd = 0;
+                        // calculateVoltageDrop returns null when the cable lacks the data
+                        // (load, voltage, supported size); that must not abort the batch.
+                        let vd = null;
                         if (result.success) {
                             vd = calculateVoltageDrop(cable, result.total_length, cable.phase);
-                            cable.voltage_drop_pct = vd;
+                            if (Number.isFinite(vd)) cable.voltage_drop_pct = vd;
                         }
                         const pullCheck = result.success && state.pullChecksEnabled
                             ? buildCablePullPlan(result.route_segments || [], cable, {
@@ -2951,7 +2942,7 @@ const renderBatchResults = async (results) => {
                             segments_count: result.success ? result.route_segments.length : 0,
                             tray_segments: result.success ? result.tray_segments : [],
                             route_segments: result.success ? result.route_segments : [],
-                            voltage_drop_pct: result.success ? vd.toFixed(2) : 'N/A',
+                            voltage_drop_pct: Number.isFinite(vd) ? vd.toFixed(2) : 'N/A',
                             ...(pullCheck ? { pull_check: pullCheck } : {}),
                             exclusions: result.exclusions || [],
                         };
@@ -3589,9 +3580,27 @@ const renderBatchResults = async (results) => {
         });
     };
 
+    // Probe before loading the viewer: three.js logs console errors when it cannot create a
+    // context, and browsers without WebGL should fall back to the 2D plot quietly.
+    const isWebGLAvailable = () => {
+        try {
+            const probe = document.createElement('canvas');
+            const gl = probe.getContext('webgl2') || probe.getContext('webgl');
+            gl?.getExtension('WEBGL_lose_context')?.loseContext();
+            return Boolean(gl);
+        } catch {
+            return false;
+        }
+    };
+
     const ensureRouteViewer = () => {
         if (state.routeViewer) return Promise.resolve(state.routeViewer);
         if (state.routeViewerLoad) return state.routeViewerLoad;
+        if (!isWebGLAvailable()) {
+            state.routeViewerFailed = true;
+            console.warn('WebGL is not available; the professional 3D viewer is falling back to Plotly.');
+            return Promise.reject(new Error('WebGL is not available in this browser.'));
+        }
         state.routeViewerLoad = import('./dist/routeViewer3D.js?v=28').then(({ createRouteViewer3D }) => {
             state.routeViewer = createRouteViewer3D({
                 container: elements.plot3d,
@@ -3649,12 +3658,14 @@ const renderBatchResults = async (results) => {
             renderProfessionalViewer(trays, routes);
             return;
         }
+        // The route list does not depend on the 3D viewer, so keep it populated in the 2D fallback.
+        renderRouteViewerList(state.latestRouteData);
         if (!globalThis.Plotly || !elements.plot3d) {
             console.warn('Plotly is not loaded');
             return;
         }
-        const theme = graphTheme();
-        const view = currentViewDefinition();
+        const theme = getRouteGraphTheme(document.body.classList.contains('dark-mode'));
+        const view = ROUTE_VIEW_PRESETS[state.plotView] || ROUTE_VIEW_PRESETS.isometric;
         state.selectedRouteIndex = null;
         updatePlotSelectionCard();
         updatePlotSummary(trays, routes);
@@ -3955,7 +3966,7 @@ const renderBatchResults = async (results) => {
                 text: [cable.start_tag || 'Start', cable.end_tag || 'End'],
                 mode: 'markers+text', type: 'scatter3d', textposition: 'top center',
                 marker: { color: [ROUTE_COLORS.start, ROUTE_COLORS.end], size: 9, line: { color: '#ffffff', width: 2 } },
-                textfont: { size: 11, color: graphTheme().text }, showlegend: false,
+                textfont: { size: 11, color: getRouteGraphTheme(document.body.classList.contains('dark-mode')).text }, showlegend: false,
                 hovertemplate: '<b>%{text}</b><extra></extra>'
             });
         }
@@ -4032,7 +4043,7 @@ const renderBatchResults = async (results) => {
         if (!globalThis.Plotly) return;
         if (!window.current3DPlot) return;
         state.plotView = ROUTE_VIEW_PRESETS[viewName] ? viewName : 'isometric';
-        const view = currentViewDefinition();
+        const view = ROUTE_VIEW_PRESETS[state.plotView] || ROUTE_VIEW_PRESETS.isometric;
         const camera = { ...structuredClone(view.camera), projection: { type: view.projection } };
         const hiddenAxis = state.plotView === 'plan' ? 'z' : state.plotView === 'front' ? 'y' : state.plotView === 'right' ? 'x' : null;
         const axisTitles = { x: 'X', y: 'Y', z: 'Elevation' };

@@ -149,3 +149,22 @@ describe('generateSpoolSheets — summary totals', () => {
     assert.strictEqual(r.summary.spoolCount, r.spools.length);
   });
 });
+
+describe('spool quantity review regressions', () => {
+  const short = (id, sx) => tray(id, sx, 0, 10, sx + 5, 0, 10);
+  it('rounds straight sections up per segment (three 5 ft segments need 3, not ceil(15/12) = 2)', () => {
+    const result = generateSpoolSheets([short('A', 0), short('B', 5), short('C', 10)], [], {});
+    const spool = (result.spools ?? result.sheets ?? result)[0];
+    assert.strictEqual(spool.totalLengthFt, 15);
+    assert.strictEqual(spool.straightSections, 3);
+  });
+  it('assigns cables by raceway_ids as well as route_preference', () => {
+    const result = generateSpoolSheets([short('A', 0), short('B', 5)], [
+      { cable_tag: 'C1', raceway_ids: ['B'] },
+      { cable_tag: 'C2', route_preference: 'A' },
+      { cable_tag: 'C3', route_preference: 'ELSEWHERE' },
+    ], {});
+    const spool = (result.spools ?? result.sheets ?? result)[0];
+    assert.deepStrictEqual(spool.cables.map(c => c.cable_tag).sort(), ['C1', 'C2']);
+  });
+});

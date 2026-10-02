@@ -642,3 +642,36 @@ describe('runHazAreaStudy — integration', () => {
     assert.strictEqual(result.summary.failCount, 0);
   });
 });
+
+// ---------------------------------------------------------------------------
+describe('review regressions — group type and newer protection types', () => {
+  const gasZone1 = { id: 'g', standard: 'IEC', iecZone: '1', gasGroup: 'IIB', tRating: 'T3' };
+  const dustZone21 = { id: 'd', standard: 'IEC', dustZone: '21', dustGroup: 'IIIB', tRating: 'T4' };
+  const equip = over => ({ id: 'e', label: 'Dev', exProtection: 'ia', tRating: 'T6', certNumber: 'X', ...over });
+
+  it('a dust-rated device (IIIC) does not pass in a gas area', () => {
+    const r = checkEquipmentCompatibility(equip({ exGroup: 'IIIC' }), gasZone1);
+    assert.ok(!r.pass);
+    assert.ok(r.failures.some(f => /dust-rated/.test(f)));
+  });
+  it('a gas-rated device (IIC) does not pass in a dust area', () => {
+    const r = checkEquipmentCompatibility(equip({ exGroup: 'IIC' }), dustZone21);
+    assert.ok(!r.pass);
+    assert.ok(r.failures.some(f => /gas-rated/.test(f)));
+  });
+  it('mining Group I equipment is rejected in surface areas', () => {
+    assert.ok(!checkEquipmentCompatibility(equip({ exGroup: 'I' }), gasZone1).pass);
+  });
+  it('IEC dust sub-groups: IIIA does not cover IIIB, IIIC does', () => {
+    assert.ok(!checkEquipmentCompatibility(equip({ exGroup: 'IIIA' }), dustZone21).pass);
+    assert.ok(checkEquipmentCompatibility(equip({ exGroup: 'IIIC' }), dustZone21).pass);
+  });
+  it('a correctly grouped gas device still passes (IIC covers IIB)', () => {
+    assert.ok(checkEquipmentCompatibility(equip({ exGroup: 'IIC' }), gasZone1).pass);
+  });
+  it('Ex py is accepted in Zone 1 and Ex pz only in Zone 2', () => {
+    assert.ok(checkEquipmentCompatibility(equip({ exProtection: 'py' }), gasZone1).pass);
+    assert.ok(!checkEquipmentCompatibility(equip({ exProtection: 'pz' }), gasZone1).pass);
+    assert.ok(checkEquipmentCompatibility(equip({ exProtection: 'pz' }), { ...gasZone1, iecZone: '2' }).pass);
+  });
+});

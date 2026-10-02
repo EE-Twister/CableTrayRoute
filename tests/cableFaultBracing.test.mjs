@@ -372,3 +372,20 @@ describe('calcCableFaultBracing — error handling', () => {
     assert.throws(() => calcCableFaultBracing({ ...good, safetyFactor: 0.5 }), /safety/i);
   });
 });
+
+describe('flat vs trefoil coefficient (IEC 61914 / 60865-1)', () => {
+  it('flat uses 0.75 x mu0/2pi = 1.5e-7; trefoil uses sqrt(3) x 1e-7', () => {
+    const i = 50000;
+    const d = 0.05;
+    assert.ok(Math.abs(calcEmfForcePerMeter(i, d, 'three-phase', 'flat') - 1.5e-7 * i * i / d) < 1e-6);
+    assert.ok(Math.abs(calcEmfForcePerMeter(i, d, 'three-phase', 'trefoil') - Math.sqrt(3) * 1e-7 * i * i / d) < 1e-6);
+  });
+  it('the arrangement now changes the required cleat strength, and does not touch Math', () => {
+    const base = { faultCurrent_kA: 30, xrRatio: 10, systemType: 'three-phase', spacing_mm: 60, cleatSpacing_mm: 500 };
+    const t = calcCableFaultBracing({ ...base, arrangement: 'trefoil' });
+    const f = calcCableFaultBracing({ ...base, arrangement: 'flat' });
+    assert.ok(f.requiredStrength_kN < t.requiredStrength_kN);
+    assert.ok(Math.abs(f.cleatLoad_N / t.cleatLoad_N - 1.5 / Math.sqrt(3)) < 0.001);
+    assert.strictEqual(Math.SQRT3, undefined);
+  });
+});

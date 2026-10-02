@@ -195,6 +195,7 @@ function extractViolations(result, opts) {
         type: 'voltage',
         element: label,
         value: `${Number.isFinite(vm) ? vm.toFixed(4) : '?'} pu (${status})`,
+        magnitude: Number.isFinite(vm) ? vm : null,
       });
     }
   }
@@ -207,11 +208,26 @@ function extractViolations(result, opts) {
         type: 'overload',
         element: label,
         value: `${pct.toFixed(1)}%`,
+        magnitude: pct,
       });
     }
   }
 
   return violations;
+}
+
+/**
+ * A violation already present in the base case (same element and type) and not materially worse
+ * is not caused by the outage. Voltage must worsen by more than 0.01 pu and loading by more than
+ * 5 percentage points to count as a new consequence of the contingency.
+ */
+export function isPreExisting(violation, baseViolations) {
+  const match = baseViolations.find(b => b.type === violation.type && b.element === violation.element);
+  if (!match) return false;
+  if (violation.type === 'convergence') return true;
+  if (!Number.isFinite(violation.magnitude) || !Number.isFinite(match.magnitude)) return true;
+  if (violation.type === 'voltage') return Math.abs(violation.magnitude - 1) - Math.abs(match.magnitude - 1) <= 0.01;
+  return violation.magnitude - match.magnitude <= 5;
 }
 
 /**
@@ -252,6 +268,8 @@ export function runContingency(inputModel = null, userOpts = {}) {
   // Run base-case load flow
   const baseResult = runLoadFlow(cloneData(baseModel), { baseMVA: opts.baseMVA });
 
+  const baseViolations = extractViolations(baseResult, opts);
+
   // Enumerate all removable branches
   const branches = collectBranches(baseModel);
 
@@ -270,7 +288,11 @@ export function runContingency(inputModel = null, userOpts = {}) {
       result = { converged: false, buses: [], lines: [] };
     }
 
-    const violations = extractViolations(result, opts);
+    // Violations the base case already has are reported separately so they do not make every
+    // outage look critical; `violations` holds only what the outage adds or worsens.
+    const allViolations = extractViolations(result, opts);
+    const preExistingViolations = allViolations.filter(v => isPreExisting(v, baseViolations));
+    const violations = allViolations.filter(v => !isPreExisting(v, baseViolations));
 
     // --- Transient stability check (opt-in) ---
     let transientStability = { checked: false, stable: null, deltaMax_deg: null, cct_s: null };
@@ -295,6 +317,7 @@ export function runContingency(inputModel = null, userOpts = {}) {
       branchType: branch.type,
       converged: result.converged ?? false,
       violations,
+      preExistingViolations,
       critical: violations.length > 0,
       transientStability,
     });
@@ -308,6 +331,7 @@ export function runContingency(inputModel = null, userOpts = {}) {
 
   return {
     baseCase: baseResult,
+    baseCaseViolations: baseViolations,
     contingencies,
     summary: {
       totalBranches: branches.length,

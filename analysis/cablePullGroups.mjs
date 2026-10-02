@@ -75,6 +75,21 @@ const cableClass = cable => {
   return 'UNCLASSIFIED';
 };
 
+// Cables of different voltage classes must not share a pull or raceway (NEC 300.3(C)); the tier
+// keeps a 480 V cable and a 13.8 kV cable apart even when both are classed 'power'.
+const voltageTier = cable => {
+  for (const value of [cable?.operating_voltage, cable?.voltage, cable?.cable_rating]) {
+    const volts = Number.parseFloat(value);
+    if (Number.isFinite(volts) && volts > 0) {
+      const v = volts < 100 ? volts * 1000 : volts; // tolerate kV entries
+      if (v <= 1000) return 'LV';
+      if (v <= 35000) return 'MV';
+      return 'HV';
+    }
+  }
+  return 'V-UNKNOWN';
+};
+
 const cableName = (cable, fallback) => String(cable?.name || cable?.tag || fallback || 'Cable').trim();
 
 const cableProperties = (cable, options) => ({
@@ -93,7 +108,11 @@ const cableProperties = (cable, options) => ({
     cable?.max_sidewall_pressure,
     options.allowableSidewallPressure
   ),
-  coeffFriction: finitePositive(cable?.coeffFriction, cable?.mu, options.coeffFriction) || 0.35
+  coeffFriction: finitePositive(cable?.coeffFriction, cable?.mu, options.coeffFriction) || 0.35,
+  sizeKcmil: finitePositive(
+    cable?.sizeKcmil,
+    /kcmil/i.test(String(cable?.conductor_size || '')) ? Number.parseFloat(cable.conductor_size) : null
+  ) || 0
 });
 
 const hashString = value => {
@@ -150,6 +169,13 @@ const buildBundleCable = (entries, options) => {
     max_tension: Number.isFinite(groupTensionLimit) ? groupTensionLimit : null,
     max_sidewall_pressure: Number.isFinite(groupSidewallLimit) ? groupSidewallLimit : null,
     coeffFriction: Math.max(...properties.map(item => item.coeffFriction)),
+    // Conductor stiffness adds tension at each bend in proportion to kcmil x OD^2, so the bundle
+    // carries the sum of its members' terms (an equivalent size at the equivalent diameter).
+    sizeKcmil: equivalentDiameter > EPSILON
+      ? properties.reduce((sum, item) => sum + (item.sizeKcmil || 0) * Math.pow(item.diameter || 0, 2), 0)
+        / Math.pow(equivalentDiameter, 2)
+      : 0,
+    outerDiameterIn: equivalentDiameter,
     start_tag: first.start_tag || first.from || 'Group start',
     end_tag: first.end_tag || first.to || 'Group end',
     allowed_cable_group: entries[0].className,
@@ -243,6 +269,7 @@ export function buildPullGroupSuggestions(routeResults = [], cables = [], option
         cable,
         name: cableName(cable, route?.cable || `Cable ${routeIndex + 1}`),
         className: cableClass(cable),
+        voltageTier: voltageTier(cable),
         signature: canonicalRouteSignature(routeSegments),
         routeLengthFt: routeSegments.reduce((sum, segment) => sum + segmentLength(segment), 0)
       };
@@ -251,7 +278,7 @@ export function buildPullGroupSuggestions(routeResults = [], cables = [], option
 
   const buckets = new Map();
   entries.forEach(entry => {
-    const key = `${entry.signature}::${entry.className}`;
+    const key = `${entry.signature}::${entry.className}::${entry.voltageTier}`;
     if (!buckets.has(key)) buckets.set(key, []);
     buckets.get(key).push(entry);
   });
@@ -280,8 +307,14 @@ export function buildPullGroupSuggestions(routeResults = [], cables = [], option
       const closest = peers
         .map(candidate => ({ candidate, sharedPct: sharedRoutePercent(entry, candidate) }))
         .sort((left, right) => right.sharedPct - left.sharedPct)[0];
+      const exactPathDifferentVoltage = peers.find(candidate => (
+        candidate.signature === entry.signature && candidate.className === entry.className
+        && candidate.voltageTier !== entry.voltageTier
+      ));
       let reason = 'No other cable has the same complete route and circuit class.';
-      if (exactPathDifferentClass) {
+      if (exactPathDifferentVoltage) {
+        reason = `${exactPathDifferentVoltage.name} shares the route but is ${exactPathDifferentVoltage.voltageTier === 'V-UNKNOWN' ? 'missing a voltage' : `a ${exactPathDifferentVoltage.voltageTier} cable`} (${entry.voltageTier === 'V-UNKNOWN' ? 'this cable has no voltage' : `this is ${entry.voltageTier}`}); cables of different voltage classes are not pulled together.`;
+      } else if (exactPathDifferentClass) {
         reason = `${exactPathDifferentClass.name} shares the route but is ${exactPathDifferentClass.className}; circuit classes must match.`;
       } else if (closest?.sharedPct > 0 && closest.sharedPct < 99.5) {
         reason = `Closest match is ${closest.candidate.name} at ${closest.sharedPct.toFixed(0)}% shared route; automatic grouping requires a fully coextensive pull.`;
@@ -306,6 +339,11 @@ export function buildPullGroupSuggestions(routeResults = [], cables = [], option
           cables: [left.name, right.name],
           reason: `${left.className} and ${right.className} circuit classes cannot be combined automatically.`
         });
+      } else if (left.signature === right.signature && left.voltageTier !== right.voltageTier) {
+        blockedPairs.push({
+          cables: [left.name, right.name],
+          reason: `${left.voltageTier} and ${right.voltageTier} voltage classes cannot be combined automatically.`
+        });
       }
     }
   }
@@ -327,6 +365,7 @@ export function buildPullGroupSuggestions(routeResults = [], cables = [], option
     assumptions: {
       fullRouteMatchRequired: true,
       matchingCircuitClassRequired: true,
+      matchingVoltageClassRequired: true,
       tensionSharedByCableWeight: true,
       equivalentDiameterMethod: 'square root of summed cable diameter squared',
       defaultDecision: 'separate'

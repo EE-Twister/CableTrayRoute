@@ -1,5 +1,6 @@
 import {
   cableAreaIn2,
+  extractRacewayIds,
   parsePositiveNumber,
   physicalCableCount,
 } from './conduitFill.mjs';
@@ -396,4 +397,30 @@ export function summarizeTrayFillResult(result = {}) {
     return `${result.utilizationPercent.toFixed(1)}% of the selected ${result.clause} allowance; exceeds by ${Math.abs(result.marginPercent).toFixed(1)}%.`;
   }
   return result.issues?.[0]?.message || 'Tray fill evidence is incomplete.';
+}
+
+/**
+ * Cables assigned to a tray through route_preference, raceway or raceway_ids.
+ */
+export function cablesAssignedToTray(tray = {}, cables = []) {
+  const id = String(tray.tray_id ?? tray.id ?? '').trim();
+  if (!id) return [];
+  return (Array.isArray(cables) ? cables : []).filter(cable => {
+    const ids = [
+      ...extractRacewayIds(cable),
+      ...String(cable?.route_preference ?? '').split(/[,;|>\n]+/).map(value => value.trim()).filter(Boolean),
+    ];
+    return ids.includes(id);
+  });
+}
+
+/**
+ * Evaluate every tray against its assigned cables with the NEC 392.22(A) method.
+ * @returns {Array<{ tray: object, assigned: object[], result: object }>}
+ */
+export function evaluateProjectTrayFill(trays = [], cables = []) {
+  return (Array.isArray(trays) ? trays : []).map(tray => {
+    const assigned = cablesAssignedToTray(tray, cables);
+    return { tray, assigned, result: evaluateTrayFill(tray, assigned) };
+  });
 }

@@ -73,9 +73,11 @@ At least 3 measurements are required. 6–10 well-distributed spacings are recom
 | 15–30 %   | Fair — consider three-layer or anisotropic model |
 | > 30 %    | Poor — data may have lateral heterogeneity or outliers |
 
-The **"Use in Analysis" button** populates the IEEE 80 tab with ρ₁ (the top-layer
-resistivity that most governs surface potential gradients for shallow grids). For
-very deep grids (burial depth > h), consider using a weighted effective ρ.
+The **"Use in Analysis" button** populates the IEEE 80 tab with a conservative effective
+resistivity for the entered grid size: the larger of ρ₁ and the Wenner apparent
+resistivity at spacing a = √(grid area). Using ρ₁ alone would understate grid
+resistance and GPR whenever the lower layer is more resistive than the top layer.
+This is a screening simplification; a full two-layer IEEE 80 treatment may differ.
 
 ### Standards Reference
 
@@ -147,23 +149,26 @@ colour-coded by risk class:
 **This is a screening-level estimate, not a full finite-element or boundary-element
 solution.**
 
-Each cell's surface potential is estimated as:
+Each conductor segment is treated as a line source leaking current uniformly along its
+length in homogeneous soil. The potential of each segment (plus its image above grade)
+is integrated exactly:
 
 ```
-V(x,y) = Σ_conductors [ (ρ × Ig) / (2π × L_total) × 1/d_i ]  (normalised)
+V(x,y) = Σ_segments  ρ·I_seg / (2π·L_seg) × [asinh((L−s)/d) + asinh(s/d)]
 ```
 
-where `d_i` is the distance from (x,y) to the midpoint of conductor segment *i* and
-`L_total` is the total conductor length. The result is scaled to span from 0 to GPR.
+where `s` is the position of the point's projection along the segment and `d` its
+distance from the segment line. The sum is then scaled so the mean conductor potential
+equals GPR = Ig × Rg, which ties the map to the Sverak grid resistance.
 
 Touch voltage at a point is approximated as `GPR − V(x,y)`. Step voltage is the
 potential difference between (x,y) and (x + 1 m, y).
 
 This simplified superposition:
-- Treats the conductor system as an array of point sources
-- Does not account for mutual inductance or ground surface reflections
+- Assumes uniform leakage along the conductors (real grids leak more near the perimeter)
+- Assumes homogeneous soil
 - Does not solve the boundary-value problem on the conductor surface
-- Overestimates the hazard zone width in some configurations
+- Can over- or under-estimate the hazard zone width in some configurations
 
 **Use SES CDEGS or XGSLab for final design verification.**
 

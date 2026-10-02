@@ -1,3 +1,5 @@
+import { csvCell } from '../utils/csv.mjs';
+
 let jsPdfPromise = null;
 const dynamicImport = specifier => Function('s', 'return import(s);')(specifier);
 
@@ -46,20 +48,10 @@ async function ensureJsPDF() {
  * @param {Array<Object>} rows
  * @returns {string}
  */
-function sanitizeCsvCell(value) {
-  const raw = value ?? '';
-  let cell = String(raw);
-  if (typeof raw === 'string' && /^[\s]*[=+\-@]/.test(cell)) {
-    cell = `'${cell}`;
-  }
-  if (cell.includes(',') || cell.includes('"')) {
-    cell = '"' + cell.replace(/"/g, '""') + '"';
-  }
-  return cell;
-}
+const sanitizeCsvCell = csvCell;
 
 export function toCSV(headers = [], rows = []) {
-  const lines = [headers.join(',')];
+  const lines = [headers.map(h => sanitizeCsvCell(h)).join(',')];
   rows.forEach(r => {
     const line = headers.map(h => sanitizeCsvCell(r[h])).join(',');
     lines.push(line);

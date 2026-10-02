@@ -2,6 +2,7 @@ import { getItem, removeItem, getCables, getConduits, getDuctbanks } from './dat
 import { showAlertModal } from './src/components/modal.js';
 import { createFillGauge } from './src/components/fillGauge.js';
 import { summarizeCableWorkflow } from './analysis/scheduleWorkflow.mjs';
+import { CONDUIT_INTERNAL_AREA_IN2 } from './analysis/conduitFill.mjs';
 import { buildProjectConduitFillContext, listProjectConduits } from './src/conduitFillProjectAdapter.mjs';
 
 checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
@@ -64,20 +65,8 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
       `;
     }
 
-    const CONDUIT_SPECS = {
-      "EMT": {"1/2":0.304,"3/4":0.533,"1":0.864,"1-1/4":1.496,"1-1/2":2.036,"2":3.356,"2-1/2":5.858,"3":8.846,"3-1/2":11.545,"4":14.753},
-      "ENT": {"1/2":0.285,"3/4":0.508,"1":0.832,"1-1/4":1.453,"1-1/2":1.986,"2":3.291},
-      "FMC": {"3/8":0.116,"1/2":0.317,"3/4":0.533,"1":0.817,"1-1/4":1.277,"1-1/2":1.858,"2":3.269,"2-1/2":4.909,"3":7.069,"3-1/2":9.621,"4":12.566},
-      "IMC": {"1/2":0.342,"3/4":0.586,"1":0.959,"1-1/4":1.647,"1-1/2":2.225,"2":3.63,"2-1/2":5.135,"3":7.922,"3-1/2":10.584,"4":13.631},
-      "LFNC-A": {"3/8":0.192,"1/2":0.312,"3/4":0.535,"1":0.854,"1-1/4":1.502,"1-1/2":2.018,"2":3.343},
-      "LFNC-B": {"3/8":0.192,"1/2":0.314,"3/4":0.541,"1":0.873,"1-1/4":1.528,"1-1/2":1.981,"2":3.246},
-      "LFMC": {"3/8":0.192,"1/2":0.314,"3/4":0.541,"1":0.873,"1-1/4":1.277,"1-1/2":1.858,"2":3.269,"2-1/2":4.881,"3":7.475,"3-1/2":9.731,"4":12.692},
-      "RMC": {"1/2":0.314,"3/4":0.549,"1":0.887,"1-1/4":1.526,"1-1/2":2.071,"2":3.408,"2-1/2":4.866,"3":7.499,"3-1/2":10.01,"4":12.882,"5":20.212,"6":29.158},
-      "PVC Sch 80": {"1/2":0.217,"3/4":0.409,"1":0.688,"1-1/4":1.237,"1-1/2":1.711,"2":2.874,"2-1/2":4.119,"3":6.442,"3-1/2":8.688,"4":11.258,"5":17.855,"6":25.598},
-      "PVC Sch 40": {"1/2":0.285,"3/4":0.508,"1":0.832,"1-1/4":1.453,"1-1/2":1.986,"2":3.291,"2-1/2":4.695,"3":7.268,"3-1/2":9.737,"4":12.554,"5":19.761,"6":28.567},
-      "PVC Type A": {"1/2":0.385,"3/4":0.65,"1":1.084,"1-1/4":1.767,"1-1/2":2.324,"2":3.647,"2-1/2":5.453,"3":8.194,"3-1/2":10.694,"4":13.723},
-      "PVC Type EB": {"2":3.874,"3":8.709,"3-1/2":11.365,"4":14.448,"5":22.195,"6":31.53}
-    };
+    const MAX_CONDUCTORS = 500;
+    const CONDUIT_SPECS = CONDUIT_INTERNAL_AREA_IN2;
 
     document.addEventListener('DOMContentLoaded', () => {
       initSettings();
@@ -308,7 +297,7 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
           // OD input is in the fifth column (index 4) of each row
           const od = parseFloat(row.children[4].querySelector('input').value);
           if(!tag){ showAlertModal('Validation Error', 'Each cable requires a Tag.'); return; }
-          if(isNaN(od)){ showAlertModal('Validation Error', 'Each cable requires an OD.'); return; }
+          if(!(od > 0)){ showAlertModal('Validation Error', 'Each cable requires an OD greater than 0.'); return; }
           // Expand each row into `count` identical conductors so the fill area,
           // the 1/2/over-2 conductor fill limit (NEC Chapter 9 Table 1), the
           // circle packing, and the jam-ratio check all see the true conductor
@@ -318,6 +307,7 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
           }
         }
         if(cables.length===0){ showAlertModal('Validation Error', 'Add at least one cable.'); return; }
+        if(cables.length > MAX_CONDUCTORS){ showAlertModal('Validation Error', `Limit is ${MAX_CONDUCTORS} conductors per conduit (entered ${cables.length}).`); return; }
         const placed = packCircles(cables,R);
 
         const sumArea = cables.reduce((s,c)=> s + Math.PI*(c.r**2),0);
@@ -328,6 +318,15 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
         results += `<p><strong>Fill:</strong> ${fillPct.toFixed(1)} % (Allowed ${allowed}% )</p>`;
         if(fillPct > allowed){
           results += `<p class="warning">WARNING: Fill exceeds allowable limit.</p>`;
+        }
+        // Smallest listed size of this conduit type that passes the NEC Chapter 9 fill limit.
+        const passing = Object.keys(CONDUIT_SPECS[type])
+          .sort((a, b) => parseSize(a) - parseSize(b))
+          .find(sz => sumArea / CONDUIT_SPECS[type][sz] * 100 <= allowed);
+        if(passing){
+          if(fillPct > allowed) results += `<p><strong>Smallest passing size:</strong> ${escapeHtml(type)} ${escapeHtml(passing)}" (${(sumArea / CONDUIT_SPECS[type][passing] * 100).toFixed(1)} % of ${allowed}% allowed)</p>`;
+        } else {
+          results += `<p class="warning">No ${escapeHtml(type)} size in the table is large enough for this fill; split the conductors across multiple conduits.</p>`;
         }
 
         let jamRatioVal = null;

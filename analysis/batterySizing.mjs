@@ -92,6 +92,7 @@ export function temperatureFactor(chemistry, ambientTempC) {
       `Valid values: ${Object.keys(CHEMISTRY).join(', ')}.`
     );
   }
+  if (!Number.isFinite(ambientTempC)) throw new Error('ambientTempC must be a number.');
   const raw = 1 + chem.coeff * (ambientTempC - 25);
   // Cap at 1.0 (no credit above 25 °C) and floor at 0.5 (below −100 °C is unrealistic)
   return Math.min(1.0, Math.max(0.5, raw));
@@ -152,7 +153,7 @@ export function requiredEnergyKwh(loadProfilePeriods) {
  * }}
  */
 export function designCapacityKwh(kwhNet, chemistry, ambientTempC, designMarginPct = 10) {
-  if (kwhNet <= 0) throw new Error('kwhNet must be greater than zero.');
+  if (!(kwhNet > 0)) throw new Error('kwhNet must be greater than zero.');
   const chem = CHEMISTRY[chemistry];
   if (!chem) {
     throw new Error(
@@ -160,7 +161,7 @@ export function designCapacityKwh(kwhNet, chemistry, ambientTempC, designMarginP
       `Valid values: ${Object.keys(CHEMISTRY).join(', ')}.`
     );
   }
-  if (designMarginPct < 0) throw new Error('designMarginPct must be ≥ 0.');
+  if (!Number.isFinite(designMarginPct) || designMarginPct < 0) throw new Error('designMarginPct must be ≥ 0.');
 
   const kwhDesign = kwhNet / (chem.eta * chem.dod);
   const kTempFactor = temperatureFactor(chemistry, ambientTempC);
@@ -226,8 +227,8 @@ export function standardBankSize(kwhRequired) {
  * @returns {{ loadFraction: number, loadKw: number, runtimeHours: number }[]}
  */
 export function runtimeCurve(kwhSelected, nominalLoadKw, chemistry) {
-  if (kwhSelected <= 0) throw new Error('kwhSelected must be greater than zero.');
-  if (nominalLoadKw <= 0) throw new Error('nominalLoadKw must be greater than zero.');
+  if (!(kwhSelected > 0)) throw new Error('kwhSelected must be greater than zero.');
+  if (!(nominalLoadKw > 0)) throw new Error('nominalLoadKw must be greater than zero.');
   const chem = CHEMISTRY[chemistry];
   if (!chem) {
     throw new Error(
@@ -258,8 +259,8 @@ export function runtimeCurve(kwhSelected, nominalLoadKw, chemistry) {
  * @returns {{ kvaRequired: number, standardKva: number, powerFactor: number }}
  */
 export function upsKvaRequired(peakKw, upsPowerFactor = 0.9) {
-  if (peakKw <= 0) throw new Error('peakKw must be greater than zero.');
-  if (upsPowerFactor <= 0 || upsPowerFactor > 1) {
+  if (!(peakKw > 0)) throw new Error('peakKw must be greater than zero.');
+  if (!Number.isFinite(upsPowerFactor) || upsPowerFactor <= 0 || upsPowerFactor > 1) {
     throw new Error('upsPowerFactor must be in (0, 1].');
   }
 
@@ -723,6 +724,12 @@ export function runBatterySizingAnalysis(inputs) {
     warnings.push(
       `Required capacity (${cap.kwhFinal} kWh) is large. Consider paralleling multiple battery ` +
       'strings rather than a single oversized bank for maintainability and availability.'
+    );
+  }
+  if (peakLoadKw < averageLoadKw) {
+    warnings.push(
+      `Peak load (${peakLoadKw} kW) is lower than the average load (${averageLoadKw} kW). ` +
+      'The UPS is sized on the peak, so check that the two values are not swapped.'
     );
   }
   if (peakLoadKw > averageLoadKw * 3) {

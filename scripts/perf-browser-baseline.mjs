@@ -20,7 +20,9 @@ const args = new Set(process.argv.slice(2));
 const reportOnly = args.has('--no-enforce');
 const sampleRetainedHeap = args.has('--heap-sampling');
 const configuredChannel = process.env.CTR_PLAYWRIGHT_CHANNEL?.trim();
-const channel = configuredChannel || (process.platform === 'win32' ? 'msedge' : '');
+// The default headless shell cannot fetch file:// URLs, which the catalog pages rely on.
+// Playwright's 'chromium' channel runs the full browser, which can.
+const channel = configuredChannel || (process.platform === 'win32' ? 'msedge' : 'chromium');
 const ONE_LINE_COMPONENT_COUNT = 1000;
 
 function pageUrl(relativePath) {

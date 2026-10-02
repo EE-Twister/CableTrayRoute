@@ -475,4 +475,40 @@ describe('runDcShortCircuitStudy', () => {
   });
 });
 
+describe('review regressions: parallel strings and DC voltage rating', () => {
+  it('two identical parallel strings halve the source resistance and double the fault current', () => {
+    const one = calcDcFaultCurrent({ batteryVoltageV: 125, batteryInternalResistanceOhm: 0.04, cableResistanceOhm: 0.002 });
+    const two = calcDcFaultCurrent({ batteryVoltageV: 125, batteryInternalResistanceOhm: 0.04, cableResistanceOhm: 0.002, parallelStrings: 2 });
+    // 125 / (0.04 + 0.004) = 2840.9 A; 125 / (0.02 + 0.004) = 5208.3 A
+    assert.strictEqual(one.boltedFaultCurrentA, 2840.9);
+    assert.strictEqual(two.boltedFaultCurrentA, 5208.3);
+  });
+  it('rejects a non-integer string count', () => {
+    assert.throws(() => totalCircuitResistance({ batteryInternalResistanceOhm: 0.01, parallelStrings: 0 }), /parallelStrings/);
+    assert.throws(() => totalCircuitResistance({ batteryInternalResistanceOhm: 0.01, parallelStrings: 1.5 }), /parallelStrings/);
+  });
+  it('the study passes parallelStrings through to the arc flash and protection check', () => {
+    const r = runDcShortCircuitStudy({
+      batteryVoltageV: 125, batteryInternalResistanceOhm: 0.04, cableResistanceOhm: 0.002, parallelStrings: 2,
+      runArcFlash: true, arcDurationMs: 50,
+      devices: [{ tag: 'F1', interruptRatingA: 5000 }],
+    });
+    assert.strictEqual(r.faultCurrent.boltedFaultCurrentA, 5208.3);
+    assert.strictEqual(r.arcFlash.boltedFaultCurrentA, 5208.3);
+    assert.strictEqual(r.protectionCheck[0].pass, false); // 5208 A > 5 kA
+  });
+  it('a device whose DC voltage rating is below the system voltage fails', () => {
+    const [d] = selectDcProtection({
+      availableFaultCurrentA: 1000, systemVoltageV: 125,
+      devices: [{ tag: 'CB1', interruptRatingA: 10000, voltageRatingV: 80 }],
+    });
+    assert.strictEqual(d.pass, false);
+    assert.match(d.note, /DC voltage rating 80 V is below the 125 V/);
+  });
+  it('a device without a voltage rating is judged on interrupt rating alone', () => {
+    const [d] = selectDcProtection({ availableFaultCurrentA: 1000, systemVoltageV: 125, devices: [{ interruptRatingA: 10000 }] });
+    assert.strictEqual(d.pass, true);
+  });
+});
+
 console.log('\nAll DC short-circuit tests complete.');

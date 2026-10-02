@@ -161,7 +161,9 @@ export function calculateMotorStartCase(input = {}, criteria = {}) {
     accelerationTime = Math.min(60, input.inertia * synchronousSpeed / Math.max(ratedTorque * torqueFactor, 0.001));
   }
 
-  const voltageSagPct = startingAmps * Math.hypot(input.theveninR, input.theveninX) / input.volts * 100;
+  // Balanced three-phase: the line-to-line drop is sqrt(3) * I * Z (Z per phase),
+  // i.e. about I_start / I_short_circuit as a percentage of the line voltage.
+  const voltageSagPct = Math.sqrt(3) * startingAmps * Math.hypot(input.theveninR, input.theveninX) / input.volts * 100;
   const maxVoltageSagPct = Number(criteria.maxVoltageSagPct) || 15;
   const maxAccelerationTimeSec = Number(criteria.maxAccelerationTimeSec) || 10;
   const passes = voltageSagPct <= maxVoltageSagPct && accelerationTime <= maxAccelerationTimeSec;
@@ -231,6 +233,9 @@ export function runMotorStart() {
     const theveninR = Number(c.thevenin_r ?? c.props?.thevenin_r ?? c.theveninR ?? c.props?.theveninR) || 0;
     const theveninX = Number(c.thevenin_x ?? c.props?.thevenin_x ?? c.theveninX ?? c.props?.theveninX) || 0;
     const Zth = Math.hypot(theveninR, theveninX);
+    // Without a source impedance the sag cannot be computed; report it as not
+    // computed instead of a 0% sag that reads like a pass.
+    const missingInputs = Zth > 0 ? undefined : ['Thevenin R or X (source impedance at the motor terminals)'];
     const inertia = Number(c.inertia ?? c.props?.inertia) || 0;
     const speed   = Number(
       c.speed ?? c.props?.synchronous_speed_rpm ?? c.props?.speed
@@ -243,12 +248,13 @@ export function runMotorStart() {
 
     if (profile.type === 'vfd') {
       const limitedI = Ifl * profile.vfdCurrentLimitPu;
-      const Vdrop = limitedI * Zth;
+      const Vdrop = Math.sqrt(3) * limitedI * Zth;
       results[c.id] = {
         inrushKA: Number((limitedI / 1000).toFixed(2)),
-        voltageSagPct: Number(((Vdrop / V) * 100).toFixed(2)),
+        voltageSagPct: missingInputs ? null : Number(((Vdrop / V) * 100).toFixed(2)),
         accelTime: Number(profile.rampTimeSec.toFixed(2)),
         starterType: 'vfd',
+        ...(missingInputs ? { requiredInputs: missingInputs } : {}),
       };
       return;
     }
@@ -278,10 +284,10 @@ export function runMotorStart() {
       }
 
       let I = effectiveIlr * slip;
-      let Vdrop = I * Zth;
+      let Vdrop = Math.sqrt(3) * I * Zth;
       let Vterm = V - Vdrop;
       I = effectiveIlr * slip * (Vterm / V);
-      Vdrop = I * Zth;
+      Vdrop = Math.sqrt(3) * I * Zth;
       Vterm = V - Vdrop;
       const Tm = baseTorque * (Vterm / V) * (Vterm / V) * slip;
       const Tl = baseTorque * loadCurve(w / wSync);
@@ -294,9 +300,10 @@ export function runMotorStart() {
 
     results[c.id] = {
       inrushKA: Number((Ilr / 1000).toFixed(2)),
-      voltageSagPct: Number(((maxDrop / V) * 100).toFixed(2)),
+      voltageSagPct: missingInputs ? null : Number(((maxDrop / V) * 100).toFixed(2)),
       accelTime: Number(time.toFixed(2)),
       starterType: profile.type,
+      ...(missingInputs ? { requiredInputs: missingInputs } : {}),
     };
   });
   return results;

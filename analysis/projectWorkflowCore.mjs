@@ -327,7 +327,7 @@ export function buildComplianceMatrix(project = {}, diagnostics = buildWorkflowC
         'loads-complete',
         loads.total > 0 && loads.incomplete === 0 ? 'pass' : 'fail',
         'Load records complete',
-        loads.total > 0 && loads.incomplete === 0 ? `${loads.complete} load record(s) are complete.` : `${loads.incomplete || 0} load record(s) need source, kW, voltage, power factor, or phases.`,
+        loads.total > 0 && loads.incomplete === 0 ? `${loads.complete} load record(s) are complete.` : `${loads.incomplete || 0} load record(s) need a source and valid kW, voltage, power factor (0–1), and phases.`,
         'loadlist.html'
       )
     ]),
@@ -653,7 +653,7 @@ export function buildWorkflowCoreDiagnostics(project = {}) {
   if (loadSummary.total === 0) {
     blockers.push(makeBlocker('Load List', 'critical', 'Add load records', 'Create or import loads after equipment is established.', 'loadlist.html'));
   } else if (loadSummary.incomplete > 0) {
-    blockers.push(makeBlocker('Load List', 'critical', 'Complete load required fields', `${loadSummary.incomplete} loads need source, kW, voltage, power factor, or phases.`, 'loadlist.html'));
+    blockers.push(makeBlocker('Load List', 'critical', 'Complete load required fields', `${loadSummary.incomplete} loads need a source and valid kW, voltage, power factor (0–1), and phases.`, 'loadlist.html'));
   }
 
   if (oneLineComponents === 0) {

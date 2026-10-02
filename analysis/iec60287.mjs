@@ -77,6 +77,19 @@ const INSULATION_RESISTIVITY = {
   'Paper-HV': 6.0,
 };
 
+/**
+ * Log-log interpolation of tabulated R20 for non-preferred cross-sections
+ * (e.g. AWG/kcmil sizes expressed in mm²). Returns null outside the table.
+ */
+function interpolateR20(table, sizeMm2) {
+  const sizes = Object.keys(table).map(Number).sort((a, b) => a - b);
+  const hi = sizes.findIndex(s => s > sizeMm2);
+  if (hi <= 0) return null;
+  const [a, b] = [sizes[hi - 1], sizes[hi]];
+  const t = Math.log(sizeMm2 / a) / Math.log(b / a);
+  return Math.exp(Math.log(table[a]) + t * (Math.log(table[b]) - Math.log(table[a])));
+}
+
 // ---------------------------------------------------------------------------
 // conductorAcResistance
 // ---------------------------------------------------------------------------
@@ -95,6 +108,7 @@ const INSULATION_RESISTIVITY = {
  * @param {number} p.operatingTempC Operating conductor temperature (°C); defaults to max for insulation
  * @param {number} [p.frequencyHz=50] System frequency (Hz)
  * @param {'round'|'sector'} [p.shape='round'] Conductor shape
+ * @param {boolean} [p.interpolateResistance=false] Interpolate R20 for non-IEC cross-sections (e.g. AWG sizes)
  * @returns {{ R_ac: number, R_dc20: number, R_dcTheta: number, ys: number, yp: number }}
  *   All resistances in Ω/m.
  */
@@ -104,9 +118,10 @@ export function conductorAcResistance({
   operatingTempC = 90,
   frequencyHz = 50,
   shape = 'round',
+  interpolateResistance = false,
 }) {
   const R20_table = material === 'Al' ? R20_AL : R20_CU;
-  const R20 = R20_table[sizeMm2];
+  const R20 = R20_table[sizeMm2] ?? (interpolateResistance ? interpolateR20(R20_table, sizeMm2) : null);
   if (R20 == null) {
     throw new Error(`No R20 data for ${sizeMm2} mm² ${material}. Supported sizes: ${Object.keys(R20_table).join(', ')} mm²`);
   }
@@ -270,10 +285,19 @@ export function thermalResistances({
     const L = burialDepthMm / 1000;
     const ratio = 2 * L / D_cond;
     const T4_soil = (soilResistivity / (2 * Math.PI)) * Math.log(ratio + Math.sqrt(ratio ** 2 - 1));
-    // Air gap in conduit: simplified (IEC 60287-2-1 §2.2.3)
-    // T4_air ≈ 0.1 K·m/W for typical conduit-to-cable clearance (conservative)
-    const T4_air = 0.10;
-    T4 = T4_soil + T4_air;
+    // Air gap between cable and duct, IEC 60287-2-1 §4.2.7.2:
+    //   T4' = U / (1 + 0.1 (V + Y θm) D_e)      (D_e in mm)
+    // with the constants for non-metallic (PVC/PE) ducts in earth
+    // (U = 1.87, V = 0.312, Y = 0.0037) and θm the mean gap temperature.
+    // This is about 0.7 K·m/W for a 35 mm cable, not the 0.1 K·m/W the model
+    // previously assumed, which rated ducts above direct burial.
+    const THETA_M = 60; // °C, mean temperature of the gap medium
+    const T4_air = 1.87 / (1 + 0.1 * (0.312 + 0.0037 * THETA_M) * D_e_mm);
+    // Duct wall: cylindrical resistance of PVC/PE (ρ = 6 K·m/W), wall ~ 4.5% of OD
+    const RHO_DUCT = 6.0;
+    const D_duct_od = D_cond * 1000;
+    const T4_wall = (RHO_DUCT / (2 * Math.PI)) * Math.log(D_duct_od / (D_duct_od * (1 - 0.09)));
+    T4 = T4_soil + T4_air + T4_wall;
   } else if (installMethod === 'tray') {
     // Cable tray in air: natural convection + radiation (IEC 60287-2-1 §2.2.6)
     // Simplified: T4 = 1/(h × π × D_e) where h ≈ 8 W/(m²·K) combined convection + radiation
@@ -399,6 +423,10 @@ export function ambientTempCorrection(insulation, thetaAmbient, thetaRef = 20) {
  * @param {number} [p.U0_kV=0]            Phase-to-earth voltage (kV); for W_d calculation
  * @param {number} [p.nCables=1]           Number of cables in group
  * @param {'flat'|'trefoil'|'flat-touching'} [p.groupArrangement='flat'] Grouping arrangement
+ * @param {boolean} [p.interpolateResistance=false] Allow non-IEC cross-sections (AWG sizes) by interpolating R20
+ * @param {number} [p.externalT4Extra=0]   Additional external thermal resistance (K·m/W) added to T4,
+ *   e.g. mutual heating from neighbouring cables computed by a geometry-aware caller. When supplied,
+ *   the caller should normally leave nCables = 1 to avoid double-counting grouping effects.
  * @returns {AmpacityResult}
  */
 export function calcAmpacity({
@@ -418,6 +446,8 @@ export function calcAmpacity({
   U0_kV = 0,
   nCables = 1,
   groupArrangement = 'flat',
+  externalT4Extra = 0,
+  interpolateResistance = false,
 }) {
   // --- Validate ---
   if (!sizeMm2 || sizeMm2 <= 0) throw new Error('sizeMm2 must be a positive number');
@@ -433,17 +463,20 @@ export function calcAmpacity({
 
   // --- AC resistance at operating temperature ---
   const { R_ac, R_dc20, R_dcTheta, ys, yp } = conductorAcResistance({
-    sizeMm2, material, operatingTempC: thetaMax, frequencyHz,
+    sizeMm2, material, operatingTempC: thetaMax, frequencyHz, interpolateResistance,
   });
 
   // --- Dielectric losses ---
   const W_d = dielectricLoss({ U0_kV, sizeMm2, insulThickMm, frequencyHz });
 
   // --- Thermal resistances ---
-  const { T1, T2, T3, T4, lambdaSheath, D_e_mm, d_c_mm } = thermalResistances({
+  const {
+    T1, T2, T3, T4: T4_self, lambdaSheath, D_e_mm, d_c_mm,
+  } = thermalResistances({
     sizeMm2, insulation, insulThickMm, outerSheathMm,
     installMethod, burialDepthMm, soilResistivity, conduitOD_mm, nCores, armoured,
   });
+  const T4 = T4_self + Math.max(0, Number(externalT4Extra) || 0);
 
   const lambda1 = lambdaSheath;
   // Armour loss factor λ2 — conservative simplified model for steel-wire armour
@@ -455,8 +488,8 @@ export function calcAmpacity({
   const numerator = deltaTheta - W_d * (0.5 * T1 + n * (T2 + T3 + T4));
   const denominator = R_ac * (T1 + n * (1 + lambda1) * T2 + n * (1 + lambda1 + lambda2) * (T3 + T4));
 
-  if (denominator <= 0) throw new Error('Thermal circuit denominator ≤ 0 — check insulation thickness and installation inputs');
-  if (numerator <= 0) throw new Error('Dielectric losses exceed the temperature budget — cable voltage rating or insulation input is likely incorrect');
+  if (!(denominator > 0)) throw new Error('Thermal circuit denominator ≤ 0 — check insulation thickness and installation inputs');
+  if (!(numerator > 0)) throw new Error('Dielectric losses exceed the temperature budget — cable voltage rating or insulation input is likely incorrect');
 
   const I_base = Math.sqrt(numerator / denominator); // A (ungrouped)
 

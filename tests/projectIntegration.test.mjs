@@ -177,7 +177,8 @@ assert.ok(flickerInputs.inputs.systemKva > 18000);
 
 const cableScope = resolveProjectScope(scopeOptions.find(option => option.kind === 'circuit').value, scopedProject);
 const thermalInputs = buildCableThermalProjectInputs(cableScope, scopedProject);
-assert.equal(thermalInputs.inputs.sizeMm2, 25);
+// #4 AWG is 21.2 mm²; it must not be rounded up to the 25 mm² IEC size.
+assert.equal(thermalInputs.inputs.sizeMm2, 21.2);
 assert.equal(thermalInputs.inputs.material, 'Cu');
 assert.equal(thermalInputs.inputs.insulation, 'PVC');
 assert.equal(thermalInputs.inputs.installMethod, 'tray');
@@ -200,7 +201,8 @@ const ductbankProject = {
 };
 const ductbankScope = resolveProjectScope('circuit:ug-1', ductbankProject);
 const ductbankThermalInputs = buildCableThermalProjectInputs(ductbankScope, ductbankProject);
-assert.equal(ductbankThermalInputs.inputs.sizeMm2, 300);
+// 500 kcmil is 253 mm²; it must not be rounded up to the 300 mm² IEC size.
+assert.equal(ductbankThermalInputs.inputs.sizeMm2, 253);
 assert.equal(ductbankThermalInputs.inputs.voltageClass, '8.7/15kV');
 assert.equal(ductbankThermalInputs.inputs.installMethod, 'conduit');
 assert.equal(ductbankThermalInputs.inputs.burialDepthMm, 1050);

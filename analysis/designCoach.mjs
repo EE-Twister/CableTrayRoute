@@ -11,6 +11,7 @@
 import { NEC_AMPACITY_TABLE } from './autoSize.mjs';
 import { runVoltageDropStudy, NEC_LIMITS } from './voltageDropStudy.mjs';
 import { trayFillPercent } from './designRuleChecker.mjs';
+import { evaluateProjectTrayFill } from './trayFill.mjs';
 import { evaluateEquipment, EVAL_STATUS } from './equipmentEvaluation.mjs';
 import { extractThermalEnvRecs } from './cableThermalEnvironment.mjs';
 
@@ -43,7 +44,11 @@ const SEVERITY_RANK = { safety: 0, compliance: 1, efficiency: 2, missing_data: 3
  * @returns {string|null}
  */
 export function nextLargerConductor(currentSize) {
-  const idx = NEC_AMPACITY_TABLE.findIndex(r => r.size === currentSize);
+  // Schedules write '#4 AWG', '4 AWG', '4', '1/0', '500 MCM'; the table uses '#4 AWG', '1/0 AWG', '500 kcmil'.
+  const canon = value => String(value ?? '').toUpperCase().replace(/#/g, '').replace(/\bAWG\b/g, '')
+    .replace(/\b(MCM|KCM|KCMIL)\b/g, 'KCMIL').replace(/\s+/g, ' ').trim();
+  const wanted = canon(currentSize);
+  const idx = wanted ? NEC_AMPACITY_TABLE.findIndex(r => canon(r.size) === wanted) : -1;
   if (idx < 0 || idx >= NEC_AMPACITY_TABLE.length - 1) return null;
   return NEC_AMPACITY_TABLE[idx + 1].size;
 }
@@ -125,7 +130,7 @@ export function extractArcFlashRecs(arcFlashResults) {
         detail: `Incident energy ${ie.toFixed(1)} cal/cm² is a severe exposure that warrants engineering mitigation and a documented energized-work risk assessment. ` +
           `Options include an upstream current-limiting fuse, reduced protective-device clearing time, remote operation, or other hierarchy-of-risk-control measures.`,
         location: busId,
-        studyPage: 'arcflash.html',
+        studyPage: 'arcFlash.html',
         safe_to_apply: false,
         tradeoffs: 'Reducing clearing time may affect selectivity with downstream devices.',
       });
@@ -141,7 +146,7 @@ export function extractArcFlashRecs(arcFlashResults) {
           title: `Arc flash at ${busId} needs additional input`,
           detail: msg,
           location: busId,
-          studyPage: 'arcflash.html',
+          studyPage: 'arcFlash.html',
           safe_to_apply: false,
         });
       });
@@ -170,7 +175,7 @@ export function extractShortCircuitRecs(scResults) {
           title: `Short-circuit warning at ${busId}`,
           detail: w,
           location: busId,
-          studyPage: 'shortcircuit.html',
+          studyPage: 'shortCircuit.html',
           safe_to_apply: false,
         });
       });
@@ -185,29 +190,39 @@ export function extractShortCircuitRecs(scResults) {
  * @param {object[]} trays
  * @returns {Recommendation[]}
  */
-export function extractTrayFillRecs(trays) {
+export function extractTrayFillRecs(trays, cables = []) {
   if (!Array.isArray(trays) || !trays.length) return [];
   const recs = [];
 
-  for (const tray of trays) {
-    const pct = trayFillPercent(tray);
-    if (pct === null) continue;
+  // Trays with assigned cables are judged with the same NEC 392.22(A) evaluation as the
+  // Tray Fill study; a tray with no assignments falls back to its stored aggregate fill.
+  for (const { tray, assigned, result } of evaluateProjectTrayFill(trays, cables)) {
     const id = tray.tray_id || tray.id || 'unknown';
-
-    if (pct > 40) {
-      recs.push({
-        id: `fill:${id}`,
-        sourceStudy: 'trayFill',
-        severity: 'compliance',
-        title: `Reduce fill on tray ${id} (${pct.toFixed(0)}%)`,
-        detail: `Tray ${id} is ${pct.toFixed(1)}% full, exceeding the NEC 392.22(A) 40% fill limit. ` +
-          `Reroute cables to adjacent trays or increase tray width.`,
-        location: id,
-        studyPage: 'cabletrayfill.html',
-        safe_to_apply: false,
-        tradeoffs: 'Rerouting cables may increase cable lengths and material cost.',
-      });
+    let pct = null;
+    let detail = '';
+    if (assigned.length && result.evaluable === true) {
+      if (result.status !== 'fail') continue;
+      pct = result.utilizationPercent;
+      detail = `Tray ${id} uses ${pct.toFixed(1)}% of its NEC ${result.clause} allowance. ` +
+        `Reroute cables to adjacent trays or increase tray width.`;
+    } else {
+      const legacy = trayFillPercent(tray);
+      if (legacy === null || legacy <= 40) continue;
+      pct = legacy;
+      detail = `Tray ${id} is ${legacy.toFixed(1)}% full, exceeding the NEC 392.22(A) 40% fill limit. ` +
+        `Reroute cables to adjacent trays or increase tray width.`;
     }
+    recs.push({
+      id: `fill:${id}`,
+      sourceStudy: 'trayFill',
+      severity: 'compliance',
+      title: `Reduce fill on tray ${id} (${pct.toFixed(0)}%)`,
+      detail,
+      location: id,
+      studyPage: 'cabletrayfill.html',
+      safe_to_apply: false,
+      tradeoffs: 'Rerouting cables may increase cable lengths and material cost.',
+    });
   }
 
   return recs;
@@ -332,7 +347,7 @@ export function extractLoadFlowRecs(loadFlowResult) {
               ? `Adjust transformer tap, add shunt capacitors, or resize the feeder.`
               : `Reduce generation, lower transformer tap, or add shunt reactors.`),
           location: busLabel,
-          studyPage: 'loadflow.html',
+          studyPage: 'loadFlow.html',
           safe_to_apply: false,
         });
       }
@@ -356,7 +371,7 @@ export function extractLoadFlowRecs(loadFlowResult) {
         title: 'Load flow convergence issue',
         detail: typeof w === 'string' ? w : (w.message || JSON.stringify(w)),
         location: 'Load Flow',
-        studyPage: 'loadflow.html',
+        studyPage: 'loadFlow.html',
         safe_to_apply: false,
       });
     });
@@ -478,7 +493,7 @@ export function runDesignCoach(projectData = {}) {
     ...extractVoltageDropRecs(cables),
     ...extractArcFlashRecs(studies.arcFlash),
     ...extractShortCircuitRecs(studies.shortCircuit),
-    ...extractTrayFillRecs(trays),
+    ...extractTrayFillRecs(trays, cables),
     ...extractHarmonicsRecs(studies.harmonics),
     ...extractGroundGridRecs(studies.groundGrid),
     ...extractLoadFlowRecs(studies.loadFlow),

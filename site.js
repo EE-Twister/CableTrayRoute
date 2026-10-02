@@ -2237,7 +2237,11 @@ function initCommonProjectFieldBindings(){
   const state=getProjectState();
   const meta=normalizeProjectMeta(getProjectMeta(),state?.name||'');
   const basis=getDesignBasis()||{};
-  const minAmbient=meta.minAmbientTempC;
+  // normalizeProjectMeta falls back to the 40 C hot design ambient when no minimum is
+  // set. That is the wrong value for freeze protection, so only link a minimum the
+  // project actually specified.
+  const rawMeta=getProjectMeta()||{};
+  const minAmbient=Number.isFinite(Number(rawMeta.minAmbientTempC))&&rawMeta.minAmbientTempC!==''?meta.minAmbientTempC:null;
   const maxAmbient=meta.maxAmbientTempC;
   const ambientValue=pageName==='heattracesizing.html'?minAmbient:maxAmbient;
   const bindings=[

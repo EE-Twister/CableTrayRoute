@@ -41,7 +41,7 @@ The core form shows only inputs used by the selected coating, surface-area, curr
 | Modeled reference potential | V<sub>model</sub> | mV vs CSE | Design assumption used only to generate route profiles; it is not field acceptance evidence. |
 | Anode capacity | C<sub>a</sub> | Ah/kg | Net ampere-hour capacity basis for selected anode alloy/system. |
 | Anode utilization | u | fraction | Fraction of theoretical anode capacity considered usable. |
-| Design factor | F<sub>d</sub> | fraction | Reliability/engineering margin factor used in mass/life equations. |
+| Design factor | F<sub>d</sub> | ratio (≥ 1) | Reliability allowance. Multiplies the required anode mass and divides the credited life, so 1.10 adds 10% mass. |
 | Availability factor | F<sub>avail</sub> | fraction | System uptime factor; required current is divided by this factor. |
 | Target design life | L<sub>target</sub> | years | Converted internally to hours (`years × 8760`). |
 | Installed anode mass | M<sub>inst</sub> | kg | Used for predicted-life calculation. |
@@ -109,11 +109,11 @@ H = L<sub>target</sub> × 8760
 
 Required mass:
 
-M<sub>req</sub> = (I<sub>adj</sub> × H) / (C<sub>a</sub> × u × F<sub>d</sub>)
+M<sub>req</sub> = (I<sub>adj</sub> × H × F<sub>d</sub>) / (C<sub>a</sub> × u)
 
 ### 5) Predicted life for installed mass
 
-L<sub>pred</sub> = (M<sub>inst</sub> × C<sub>a</sub> × u × F<sub>d</sub>) / (I<sub>adj</sub> × 8760)
+L<sub>pred</sub> = (M<sub>inst</sub> × C<sub>a</sub> × u) / (I<sub>adj</sub> × 8760 × F<sub>d</sub>)
 
 ### 6) Safety margin outputs
 

@@ -75,27 +75,33 @@ export const FREQUENCY_RIDE_THROUGH = {
 };
 
 /**
- * IEEE 1547-2018 Table 2 — Maximum harmonic current distortion limits
- * expressed as % of the DER rated current at the PCC.
+ * IEEE 1547-2018 Table 2 — maximum harmonic current distortion, % of the DER rated current
+ * capability, by harmonic band (odd harmonics). Even harmonics are limited to 25% of the odd
+ * limit of the band. Total rated-current distortion (TDD) limit: 5%.
  *
- * Odd harmonics up to 35th; even harmonics are limited to 25% of the
- * corresponding odd harmonic limit. THD limit: 5%.
+ * (An earlier table listed per-harmonic values such as 3% at h = 3, 0.5% at h = 9 and 0.3% at
+ * h = 15 that do not appear in Table 2, so compliant units were reported as violations.)
  */
-export const HARMONIC_CURRENT_LIMITS_PCT = {
-  3:  3.0,
-  5:  3.0,
-  7:  3.0,
-  9:  0.5,
-  11: 1.0,
-  13: 1.0,
-  15: 0.3,
-  17: 1.5,
-  19: 1.5,
-  21: 0.3,
-  23: 0.6,
-  25: 0.6,
-  thd: 5.0,
-};
+export const HARMONIC_BANDS_PCT = [
+  { from: 3,  to: 10, limit: 4.0 },   // h < 11
+  { from: 11, to: 16, limit: 2.0 },   // 11 <= h < 17
+  { from: 17, to: 22, limit: 1.5 },   // 17 <= h < 23
+  { from: 23, to: 34, limit: 0.6 },   // 23 <= h < 35
+  { from: 35, to: 50, limit: 0.3 },   // 35 <= h <= 50
+];
+
+export const HARMONIC_CURRENT_LIMITS_PCT = { thd: 5.0 };
+
+/** Individual harmonic limit (%) for harmonic order h, or null outside 2..50. */
+export function harmonicLimitPct(order) {
+  const h = Number(order);
+  if (!Number.isInteger(h) || h < 2 || h > 50) return null;
+  const isEven = h % 2 === 0;
+  // Each harmonic, odd or even, falls in the band containing its own order.
+  const band = HARMONIC_BANDS_PCT.find(b => h >= b.from - 1 && h <= b.to) || HARMONIC_BANDS_PCT[0];
+  const base = band.limit;
+  return isEven ? 0.25 * base : base;
+}
 
 // ---------------------------------------------------------------------------
 // 1. Steady-State PCC Voltage Impact
@@ -145,12 +151,14 @@ export function checkPCCVoltage({
   const R = Number(r_pu) || 0;
   const X = Number(x_pu) || 0;
 
-  // Convert DER MW/MVAR to pu on the SC MVA base
-  const P_pu = (P / 1000) / Ssc;
-  const Q_pu = (Q / 1000) / Ssc;
+  // R and X are per-unit on a 1 MVA base, so P and Q enter in MW and MVAR. (Dividing them by the
+  // short-circuit MVA as well, as an earlier version did, applies the source strength twice
+  // and understates the rise by a factor of sc_MVA.)
+  const P_MW = P / 1000;
+  const Q_MVAR = Q / 1000;
 
   // Thevenin voltage rise (linearized)
-  const delta_v_pu = (P_pu * R + Q_pu * X) / (V0 * V0);
+  const delta_v_pu = (P_MW * R + Q_MVAR * X) / (V0 * V0);
   const v_with_der = V0 + delta_v_pu;
   const delta_v_pct = delta_v_pu * 100;
 
@@ -397,17 +405,9 @@ export function checkHarmonicsCompliance({
     const actual = Number(h.pct);
     if (!Number.isFinite(order) || !Number.isFinite(actual)) continue;
 
-    // Determine limit: use table value if order is listed; even harmonics use 25% of odd limit
-    let limit;
-    if (HARMONIC_CURRENT_LIMITS_PCT[order] !== undefined) {
-      limit = HARMONIC_CURRENT_LIMITS_PCT[order];
-    } else if (order % 2 === 0) {
-      // Even harmonics: 25% of the nearest odd harmonic limit (approximate)
-      limit = 0.25 * (HARMONIC_CURRENT_LIMITS_PCT[Math.ceil(order)] || 0.6);
-    } else {
-      // Odd harmonics > 25th: 0.3% per IEEE 1547 Table 2
-      limit = 0.3;
-    }
+    // Table 2 band limit; even harmonics are 25% of the odd limit. Orders outside 2-50 are not limited.
+    const limit = harmonicLimitPct(order);
+    if (limit === null) continue;
 
     if (actual > limit) {
       violations.push({

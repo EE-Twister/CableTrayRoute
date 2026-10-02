@@ -18,6 +18,7 @@ import {
   necAmpacityDerating,
   voltageDropBusDuct,
   busStressForcePerFt,
+  peakFactorForFault,
   maxSupportSpan,
   selectStandardBusway,
   runBusDuctStudy,
@@ -249,8 +250,8 @@ describe('busStressForcePerFt()', () => {
   });
 
   it('scales with fault current squared', () => {
-    const f1 = busStressForcePerFt(10, 6);
-    const f2 = busStressForcePerFt(20, 6);
+    const f1 = busStressForcePerFt(10, 6, 2.2);
+    const f2 = busStressForcePerFt(20, 6, 2.2);
     assert.ok(approx(f2, f1 * 4, f1 * 0.1), `Force should scale as I², got f1=${f1}, f2=${f2}`);
   });
 
@@ -260,10 +261,26 @@ describe('busStressForcePerFt()', () => {
     assert.ok(approx(f6, f12 * 2, f6 * 0.01), `Force should halve when spacing doubles`);
   });
 
-  it('IEEE 605 spot check: 65 kA, 6-in spacing ≈ 380 lbf/ft', () => {
+  it('spot check: 65 kA symmetrical, 6-in spacing, peak factor 2.2', () => {
+    // Independent SI derivation: Ip = 2.2 × 65 kA = 143 kA;
+    // F = (√3/2) × 2e-7 × Ip² / d = 0.866 × 2e-7 × (143000)² / 0.1524 m = 23 242 N/m
+    // → × 0.06852 lbf/ft per N/m = 1592.6 lbf/ft
+    const Ip = 2.2 * 65000;
+    const newtonsPerM = (Math.sqrt(3) / 2) * 2e-7 * Ip * Ip / (6 * 0.0254);
+    const expected = newtonsPerM * 0.0685218;
     const f = busStressForcePerFt(65, 6);
-    // 0.54 × 65² / 6 = 0.54 × 4225 / 6 ≈ 380.25 lbf/ft
-    assert.ok(approx(f, 380.25, 1), `Expected ~380.25 lbf/ft, got ${f}`);
+    assert.ok(approx(f, expected, expected * 0.002), `Expected ~${expected.toFixed(1)} lbf/ft, got ${f}`);
+  });
+
+  it('force follows the peak current: about 5x the old RMS-only value at 65 kA', () => {
+    const rmsOnly = 0.54 * 65 * 65 / 6; // previous formula: 380 lbf/ft
+    assert.ok(busStressForcePerFt(65, 6) / rmsOnly > 4, 'peak-current force must exceed the RMS-only value several-fold');
+  });
+
+  it('peak factors follow the UL 857 test levels', () => {
+    assert.strictEqual(peakFactorForFault(8), 1.7);
+    assert.strictEqual(peakFactorForFault(15), 2.0);
+    assert.strictEqual(peakFactorForFault(65), 2.2);
   });
 });
 
@@ -412,5 +429,28 @@ describe('runBusDuctStudy() — integration', () => {
     // so the selected rating should be 2000 or above
     assert.ok(r.selectedBusway.rating >= 2000,
       `Expected upsized selection ≥ 2000 A, got ${r.selectedBusway.rating}`);
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+describe('review regressions: impedance scale and adequacy', () => {
+  it('a 2000 A copper duct does not have 4/0 AWG cable resistance (old table: 0.095 mΩ/ft)', () => {
+    assert.ok(BUSWAY_LIBRARY[2000].Cu.r < 0.02, `R = ${BUSWAY_LIBRARY[2000].Cu.r} mΩ/ft`);
+    // Resistance must fall roughly in proportion to the rating
+    assert.ok(BUSWAY_LIBRARY[800].Cu.r / BUSWAY_LIBRARY[4000].Cu.r > 4);
+  });
+
+  it('a 2000 A copper run of 100 ft at full load drops about 1% (not ~7%)', () => {
+    const e = BUSWAY_LIBRARY[2000].Cu;
+    const r = voltageDropBusDuct({ currentA: 2000, rMohmPerFt: e.r, xMohmPerFt: e.x, lengthFt: 100, pf: 0.85, systemVoltageV: 480 });
+    assert.ok(r.vdPercent > 0.5 && r.vdPercent < 2, `vd ${r.vdPercent}%`);
+  });
+
+  it('study reports adequate=false when the load exceeds the largest standard busway', () => {
+    const r = runBusDuctStudy({ systemVoltageV: 480, material: 'Cu', currentA: 6500, lengthFt: 50, faultCurrentKA: 65 });
+    assert.strictEqual(r.selectedBusway.adequate, false);
+    const ok = runBusDuctStudy({ systemVoltageV: 480, material: 'Cu', currentA: 1500, lengthFt: 50, faultCurrentKA: 65 });
+    assert.strictEqual(ok.selectedBusway.adequate, true);
   });
 });
