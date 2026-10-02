@@ -1,0 +1,58 @@
+/* Shared study-result visualisations (bars, KPIs, status badges). */
+.viz-badge { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; line-height: 1.5; white-space: nowrap; background: var(--viz-bg); color: var(--viz-fg); border: 1px solid var(--viz-fg); }
+.viz-badge__icon { display: inline-grid; place-items: center; width: 1rem; height: 1rem; border-radius: 50%; background: var(--viz-fg); color: var(--viz-bg); font-size: 0.7rem; font-weight: 700; }
+.viz-badge--pass, .viz-bar--pass, .viz-kpi--pass { --viz-bg: var(--success-bg, #d4edda); --viz-fg: var(--success-text, #155724); --viz-bar: #28a745; }
+.viz-badge--warn, .viz-bar--warn, .viz-kpi--warn { --viz-bg: var(--warning-bg, #fff3cd); --viz-fg: var(--warning-text, #664d03); --viz-bar: #e0a800; }
+.viz-badge--fail, .viz-bar--fail, .viz-kpi--fail { --viz-bg: #f8d7da; --viz-fg: #842029; --viz-bar: #dc3545; }
+.viz-badge--info, .viz-bar--info, .viz-kpi--info { --viz-bg: #e7f0ff; --viz-fg: #0b4fb3; --viz-bar: #2563eb; }
+.viz-badge--na { --viz-bg: #eceff3; --viz-fg: #4b5563; --viz-bar: #9ca3af; }
+:root[data-theme="dark"] .viz-badge--fail, :root[data-theme="dark"] .viz-bar--fail, :root[data-theme="dark"] .viz-kpi--fail { --viz-bg: #3b1219; --viz-fg: #f87171; }
+:root[data-theme="dark"] .viz-badge--info, :root[data-theme="dark"] .viz-bar--info, :root[data-theme="dark"] .viz-kpi--info { --viz-bg: #10233f; --viz-fg: #7db4ff; }
+:root[data-theme="dark"] .viz-badge--na { --viz-bg: #2a2f36; --viz-fg: #aab2bd; }
+
+.viz-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem; margin: 0.75rem 0; }
+.viz-kpi { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.75rem 1rem; border: 1px solid var(--border-color); border-left: 4px solid var(--viz-bar, #2563eb); border-radius: 0.5rem; background: var(--surface-subtle, transparent); }
+.viz-kpi__value { font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+.viz-kpi__label { font-size: 0.85rem; font-weight: 600; }
+.viz-kpi__hint { font-size: 0.75rem; color: var(--text-muted); }
+
+.viz-bars { list-style: none; margin: 0.75rem 0; padding: 0; display: grid; gap: 0.6rem; }
+.viz-bar { display: grid; grid-template-columns: minmax(6rem, 12rem) 1fr minmax(10rem, 17rem); gap: 0.25rem 0.75rem; align-items: center; }
+.viz-bar__label { font-weight: 600; overflow-wrap: anywhere; }
+.viz-bar__track { position: relative; height: 0.9rem; border-radius: 999px; background: var(--border-color); overflow: visible; }
+.viz-bar__fill { display: block; height: 100%; border-radius: 999px; background: var(--viz-bar); min-width: 2px; }
+.viz-bar__limit { position: absolute; top: -0.25rem; bottom: -0.25rem; width: 2px; background: var(--text-color); }
+.viz-bar__value { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.viz-bar__note { grid-column: 2 / -1; font-size: 0.78rem; color: var(--text-muted); }
+.viz-legend { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.25rem 0; font-size: 0.8rem; }
+@media (max-width: 640px) {
+  .viz-bar { grid-template-columns: 1fr; }
+  .viz-bar__note { grid-column: 1; }
+}
+.study-chart:empty { display: none; }
+.study-chart__title { margin: 1rem 0 0.25rem; font-size: 1rem; }
+
+/* Home workflow cards: icon cue so status never relies on color alone. */
+.workflow-card .status.status-complete::before { content: "✓ "; font-weight: 700; }
+.workflow-card .status.status-incomplete::before { content: "○ "; }
+.workflow-card.complete { border-bottom: 3px solid var(--success-text, #155724); }
+.workflow-card:not(.complete) { border-bottom: 3px dashed var(--border-color); }
+
+/* Tray fill: numbered steps so the form reads as Tray -> Compartments -> Cables -> Result. */
+.tray-step { position: relative; }
+.tray-step::before { content: attr(data-step-label); position: absolute; top: -0.65rem; right: 1rem; padding: 0.1rem 0.6rem; border-radius: 999px; background: var(--primary-color, #1769e0); color: #fff; font-size: 0.75rem; font-weight: 600; }
+#trayParameters::before { content: "Step 1 · " attr(data-step-label); }
+#compartmentConfig::before { content: "Step 2 · " attr(data-step-label); }
+.tray-cable-entry-card::before { content: "Step 3 · " attr(data-step-label); }
+@media print { .tray-step::before { display: none; } }
+
+/* Cross-schedule highlighting */
+.cross-link-bar { margin: 0.5rem 0; padding: 0.5rem 0.9rem; border-left: 4px solid var(--primary-color, #1769e0); border-radius: 0.25rem; background: var(--surface-subtle, #f4f7fb); font-size: 0.9rem; }
+.cross-link-bar[hidden] { display: none; }
+tr.xhl-row > td { background: rgba(255, 193, 7, 0.28) !important; }
+tr.xhl-row { outline: 2px solid #e0a800; outline-offset: -2px; }
+
+.viz-stack { margin: 0.5rem 0; }
+.viz-stack__bar { display: flex; height: 1rem; border-radius: 999px; overflow: hidden; background: var(--border-color); }
+.viz-stack__seg { display: block; height: 100%; background: var(--viz-bar); }
+.viz-stack__caption { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }

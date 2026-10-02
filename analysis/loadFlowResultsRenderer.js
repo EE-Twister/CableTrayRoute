@@ -1,3 +1,5 @@
+import { barChartHtml, loadFlowVoltageRows, statusLegendHtml } from '../src/components/resultViz.mjs';
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -277,6 +279,13 @@ export function renderLoadFlowResultsHtml(res) {
   html += buildBranchConnectionsSection(res?.summary, busLabelMap);
 
   if (buses.length) {
+    const voltageRows = loadFlowVoltageRows(buses, bus => resolveBusLabel(bus.id, bus.displayLabel, busLabelMap));
+    if (voltageRows.length) {
+      html += '<h3>Voltage Profile</h3>';
+      html += barChartHtml(voltageRows, { unit: 'pu', min: 0.9, max: 1.1, sort: 'asc', ariaLabel: 'Bus voltage in per-unit' });
+      html += statusLegendHtml();
+      html += '<p class="field-hint">Bars span 0.90–1.10 pu. The tick marks the nearest 0.95 / 1.05 pu limit; buses beyond 3% off nominal are flagged for review.</p>';
+    }
     html += '<h3>Bus Voltages</h3>';
     html += '<table><thead><tr><th>Bus</th><th>Type</th><th>Phase</th><th>Vm (pu)</th><th>Voltage</th><th>Angle (deg)</th><th>Load (kW)</th><th>Generation (kW)</th></tr></thead><tbody>';
     buses.forEach(bus => {

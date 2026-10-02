@@ -19,6 +19,7 @@ import {
   getOneLine,
 } from '../dataStore.mjs';
 import { createCrossProbeLink } from './crossProbe.js';
+import { stackedBarHtml } from './components/resultViz.mjs';
 import { createProtectiveDeviceCatalogLoader } from './protectiveDevices/catalogLoader.mjs';
 import { loadReferencedProtectiveDevices } from './protectiveDevices/calculationCatalog.mjs';
 
@@ -83,6 +84,14 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('kpi-pass').textContent       = pass;
     document.getElementById('kpi-fail').textContent       = fail;
     document.getElementById('kpi-incomplete').textContent = incomplete;
+    const bar = document.getElementById('equip-kpi-bar');
+    if (bar) {
+      bar.innerHTML = stackedBarHtml([
+        { label: 'Pass', count: pass, status: 'pass' },
+        { label: 'Fail', count: fail, status: 'fail' },
+        { label: 'Incomplete', count: incomplete, status: 'warn' },
+      ], { ariaLabel: 'Equipment evaluation results' });
+    }
   }
 
   function renderTable(evals) {

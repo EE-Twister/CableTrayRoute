@@ -1,3 +1,4 @@
+import { barChartHtml, shortCircuitBarRows } from './src/components/resultViz.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
 import { runShortCircuit } from './analysis/shortCircuit.mjs';
@@ -90,6 +91,15 @@ function renderResults(res) {
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
+  }
+  const chart = document.getElementById('results-chart');
+  if (chart) {
+    const rows = shortCircuitBarRows(entries);
+    chart.innerHTML = rows.length
+      ? `<h3 class="study-chart__title">Initial symmetrical short-circuit current I″k3 by bus</h3>
+        ${barChartHtml(rows, { unit: 'kA', ariaLabel: 'Initial symmetrical short-circuit current by bus' })}
+        <p class="field-hint">Bars are colored by magnitude. Each note shows the smallest standard interrupting rating that covers the fault current.</p>`
+      : '';
   }
   resultsSection.hidden = false;
 }

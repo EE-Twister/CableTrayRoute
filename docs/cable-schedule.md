@@ -69,3 +69,11 @@ The Cable Schedule page is optimized for fast entry first, with deeper routing a
 - Each row includes a read-only **Last Modified** field.
 - **Change Log** shows recent local actions such as quick adds, imports, batch edits, typical application, sample loading, and saves.
 - Server saves use the version seen when the project was loaded. If another session saves first, the page keeps the local edits and reports a conflict so you can reload the newer server copy before retrying.
+
+## Summary strip
+
+A strip at the top of the page shows cable count, total length, and how many rows are missing a length or voltage. It also shows the voltage-class mix. It refreshes as you edit the table. The Raceway Schedule page has a matching strip that counts trays, conduits and ductbanks.
+
+## Linking to raceways
+
+Click a cable row to see which trays, conduits and ductbanks its saved route uses. A link opens the Raceway Schedule with those rows highlighted. Clicking a tray or conduit row on the Raceway Schedule lists the cables routed through it, and links back to the highlighted cables. Run Optimal Route first. The links use the saved route results, so without them the bar says that no route data exists yet.

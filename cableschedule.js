@@ -3,6 +3,7 @@ import './site.js';
 import * as dataStore from './dataStore.mjs';
 import { createTable, STORAGE_KEYS } from './tableUtils.mjs';
 import { openModal, showAlertModal } from './src/components/modal.js';
+import './src/components/cableScheduleLinksBoot.js';
 import { confirmProjectEntityDeletion } from './src/components/projectDeletionReview.js';
 import { start as startTour } from './tour.js';
 import {

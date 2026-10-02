@@ -10,6 +10,8 @@ import "../e2e-helpers.js";
 import { emitAsync } from "../utils/safeEvents.mjs";
 import * as dataStore from "../dataStore.mjs";
 import { openModal, showAlertModal } from "./components/modal.js";
+import { mountScheduleSummary } from "./components/scheduleSummaryMount.js";
+import { mountCrossHighlight } from "./components/crossHighlightMount.js";
 import { start as startTour } from "../tour.js";
 import { parseRevit } from "./importers/revit.mjs";
 import { loadProjectManufacturerCatalog } from "../analysis/projectCatalog.mjs";
@@ -510,6 +512,10 @@ function wireRacewayEmptyStates() {
 suppressResumeIfE2E();
 document.addEventListener('DOMContentLoaded', forceShowResumeIfE2E);
 document.addEventListener('DOMContentLoaded', wireRacewayEmptyStates);
+document.addEventListener('DOMContentLoaded', () => {
+  mountScheduleSummary('raceways');
+  mountCrossHighlight({ kind: 'raceways', tableIds: ['trayTable', 'conduitTable'], keys: ['tray_id', 'conduit_id'] });
+});
 
 checkPrereqs([{key:'cableSchedule',page:'cableschedule.html',label:'Cable Schedule'}]);
 

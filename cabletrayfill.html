@@ -83,19 +83,10 @@
           <p>See also: <a href="docs/load_calculation_formulas.html">Load Calculation Formulas</a>, <a href="docs/cable_fill_rules.html">Cable Fill Rules</a>, <a href="docs/routing_assumptions.html">Routing Assumptions</a>.</p>
         </details>
 
-        <section class="card page-header-graphic page-visual-showcase" aria-label="Page visual overview">
-          <div class="page-visual-copy">
-            <p class="page-visual-kicker">Workspace Preview</p>
-            <h2>Tray Capacity View</h2>
-            <p>Review tray dimensions, compartment assignments, geometric packing, and selected Article 392 evidence with a cross-section diagram.</p>
-          </div>
-          <img src="icons/graphics/fill-visual.svg" alt="Illustration for tray capacity view" loading="lazy" decoding="async">
-        </section>
-
         <section id="tray-fill-handoff" class="workflow-next-action" aria-live="polite" data-no-print></section>
 
         <!-- TRAY PARAMETERS -->
-        <fieldset id="trayParameters" class="card tray-fill-card">
+        <fieldset id="trayParameters" class="card tray-fill-card tray-step" data-step-label="Tray">
     <legend><strong>Tray Parameters</strong></legend>
     <div class="tray-param-group">
       <div class="tray-param">
@@ -136,7 +127,7 @@
   </fieldset>
 
   <!-- COMPARTMENT CONFIGURATION -->
-  <fieldset id="compartmentConfig" class="card tray-fill-card">
+  <fieldset id="compartmentConfig" class="card tray-fill-card tray-step" data-step-label="Compartments">
     <legend><strong>Compartment Configuration</strong> <button class="helpBtn" data-help="Define up to 5 physical tray compartments. Each compartment is evaluated from its own width, depth, cable arrangement, and complete cable inputs; a whole-tray average is not substituted." data-doc="docs/tutorial.html#trayfill">?</button></legend>
     <div id="compartmentRows"></div>
     <button id="addCompartmentBtn" type="button">+ Add Compartment</button>
@@ -172,7 +163,7 @@
   </section>
 
   <!-- CABLE ENTRY TABLE -->
-  <section class="card cable-schedule-card tray-cable-entry-card" aria-labelledby="cable-entry-title">
+  <section class="card cable-schedule-card tray-cable-entry-card tray-step" data-step-label="Cables" aria-labelledby="cable-entry-title">
     <div class="schedule-card-header">
       <div>
         <h2 id="cable-entry-title">Cable Entries</h2>

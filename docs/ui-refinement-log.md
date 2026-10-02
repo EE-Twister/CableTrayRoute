@@ -111,3 +111,30 @@
 - Improved form control consistency by standardizing control height, spacing, and focus-visible outlines for text/number inputs, selects, and textareas.
 - Improved modal readability and action layout by adding description styling, spacing, responsive stacked actions on small screens, and stronger modal elevation.
 - Improved keyboard accessibility by adding explicit focus-visible styling to modal close controls.
+
+## Study result visualizations (shared components)
+
+- `src/components/resultViz.mjs` provides bar charts, KPI cards and status badges. It is used by Short Circuit, Arc Flash and Voltage Drop.
+- Short Circuit shows 3-phase fault current by location. Each bar notes the smallest standard interrupting rating that covers the fault.
+- Arc Flash shows incident energy by equipment, colored by PPE category (thresholds at 1.2, 4, 8, 25 and 40 cal/cm²).
+- `src/components/scheduleSummary.mjs` provides the summary strips on the Cable Schedule and Raceway Schedule pages.
+- Styles are in `src/styles/result-viz.css`.
+
+### Follow-up changes
+
+- Load Flow results now begin with a per-unit voltage profile (0.90–1.10 pu scale, with the 0.95 / 1.05 limit tick) above the bus table.
+- Home workflow cards show a ✓ or ○ icon beside their status, plus a solid or dashed bottom rule.
+- Tray Fill shows Step 1 to 3 labels on the Tray, Compartments and Cables sections. The static illustration card was removed, since the page draws a live cross-section.
+- The "About this study" panels on Cable Thermal Environment, Design Coach and Equipment Evaluation now start collapsed.
+- Cable Schedule and Raceway Schedule cross-highlight each other (`src/components/crossHighlight.mjs`, `crossHighlightMount.js`), using the saved route results and a `?highlight=` URL parameter.
+
+### Third round
+
+- The Raceway Schedule summary now includes a tray utilization chart. Trays are scored against the NEC 392.22(A) allowance, using cables assigned to the tray or routed through it. A tick marks 100%.
+- Short Circuit bars show a tick at the interrupting rating entered on the One-Line component (`interruptRatingKA`), a margin note, and an "Over entered rating" KPI. Without a rating they stay informational.
+- Arc Flash bars include a tick at 40 cal/cm².
+- IEC 60909 gains a fault-current bar chart. Design Rule Checker and Equipment Evaluation gain a stacked outcome bar (`stackedBarHtml`).
+
+### Automatic status summaries
+
+`src/components/resultAutoSummary.js` is loaded through the shared navigation module, so it reaches every page that uses the shared shell. It watches for results tables (`results-table`, `data-table`, `study-results-table`) with a column that is mostly status words (pass, fail, warning, compliant and similar). It adds a pass / review / fail bar above the table and keeps it current as rows change. Pages with their own chart or stacked bar keep it. Add `data-no-auto-summary` to a container to opt out. Covered by `playwright-tests/resultAutoSummary.spec.js`.

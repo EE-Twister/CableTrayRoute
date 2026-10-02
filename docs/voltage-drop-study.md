@@ -47,3 +47,7 @@ Conductor recommendations are selected explicitly. **Apply Selected Recommendati
 ## Saved-result readiness
 
 A result is saved and exportable only when every cable and every assembled path is evaluable. The result stores a source fingerprint and becomes stale when its Cable Schedule, Load List, or Load Flow source changes.
+
+## Result visualizations
+
+Results open with a bar chart of each evaluated cable's voltage drop. A vertical tick on every bar marks that cable's allowed limit. Pass, review and fail states use an icon, a color and a label, so they do not rely on color alone. The full table follows the chart.

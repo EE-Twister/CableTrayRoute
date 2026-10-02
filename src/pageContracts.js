@@ -293,7 +293,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'cableschedule.html': contract({
     workflowStep: 'cableSchedule',
     standaloneInputs: ['Manual cable rows, template selection, imports, inline edits, and report options.'],
-    projectInputs: [equipment, loads, panels, oneLine, trays, conduits, ductbanks, cableTagSettings, cableChangeLog, designBasis, projectInput('settings.trayHardwareCatalogCustomProducts', 'setting', false, 'Project-owned governed cable constructions imported from the shared manufacturer catalog.')],
+    projectInputs: [equipment, loads, panels, oneLine, trays, conduits, ductbanks, cableTagSettings, cableChangeLog, designBasis, latestRouteResults, projectInput('settings.trayHardwareCatalogCustomProducts', 'setting', false, 'Project-owned governed cable constructions imported from the shared manufacturer catalog.')],
     outputs: [
       output('cableSchedule', 'schedule', 'Cable rows with tags, endpoints, conductor details, length, and raceway assignments.', ['racewayschedule.html', 'cabletrayfill.html', 'conduitfill.html', 'optimalRoute.html', 'voltagedropstudy.html']),
       output('settings.cableTemplates', 'setting', 'User-maintained cable templates.', ['cableschedule.html']),
@@ -322,6 +322,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
     projectInputs: [
       cables,
       designBasis,
+      latestRouteResults,
       bimCoordinationSnapshot,
       bimCoordinationIssues,
       projectInput('settings.trayHardwareCatalogCustomProducts', 'setting', false, 'Project-owned approved tray and conduit products available for routed segment assignment.'),
