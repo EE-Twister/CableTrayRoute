@@ -1,6 +1,6 @@
 import * as dataStore from './dataStore.mjs';
 import './tableUtils.mjs';
-import { openModal, showAlertModal } from './src/components/modal.js';
+import { openModal, showAlertModal, promptModal } from './src/components/modal.js';
 import { confirmProjectEntityDeletion } from './src/components/projectDeletionReview.js';
 import {
   applyBulkEquipmentUpdate,
@@ -700,8 +700,8 @@ if (typeof window !== 'undefined') {
     }
 
     if (savePresetBtn) {
-      savePresetBtn.addEventListener('click', () => {
-        const name = window.prompt('Preset name:');
+      savePresetBtn.addEventListener('click', async () => {
+        const name = await promptModal('Save Filter Preset', 'Preset name');
         if (!name) return;
         const normalized = name.trim();
         if (!normalized) return;

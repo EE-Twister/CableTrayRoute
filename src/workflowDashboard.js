@@ -5,7 +5,7 @@ import {
   getCableReadiness,
   countOneLineComponents
 } from './workflowStatus.js';
-import { openModal } from './components/modal.js';
+import { openModal, confirmModal } from './components/modal.js';
 import {
   getEquipment, getLoads, getCables, getTrays, getConduits, getDuctbanks, getStudies,
   getProjectInputFingerprint,
@@ -1416,10 +1416,11 @@ function renderPackageHistory(container) {
   container.appendChild(table);
 
   container.querySelectorAll('.pkg-delete-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-pkg-id');
       if (!id) return;
-      if (!window.confirm(`Delete package "${btn.getAttribute('aria-label').replace('Delete package ', '')}"?`)) return;
+      const packageName = btn.getAttribute('aria-label').replace('Delete package ', '');
+      if (!await confirmModal('Delete Package', `Delete package "${packageName}"?`, { confirmText: 'Delete', variant: 'danger' })) return;
       deleteLifecyclePackage(id);
       renderPackageHistory(container);
     });

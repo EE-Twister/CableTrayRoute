@@ -753,9 +753,10 @@ test('one-line drag recovers a named project when navigation omitted the URL has
   await expect.poll(() => page.evaluate(() => window.currentProjectId)).toBe('Second Project');
 
   await page.evaluate(() => {
-    window.confirm = () => true;
     window.__projectContextDelete = window.projectManager.deleteProject('Recovered One-Line Project');
   });
+  await expect(page.getByRole('dialog', { name: 'Delete Project' })).toBeVisible();
+  await page.getByRole('dialog', { name: 'Delete Project' }).getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Project Deleted' })).toBeVisible();
   await page.getByRole('dialog', { name: 'Project Deleted' }).getByRole('button').last().click();
   await expect.poll(() => page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('CTR_SAVED_PROJECTS_V1') || '{}')))).not.toContain('Recovered One-Line Project');

@@ -2,7 +2,7 @@ import { bootstrapPage } from './src/lifecycle/pageBootstrap.js';
 import './site.js';
 import * as dataStore from './dataStore.mjs';
 import { createTable, STORAGE_KEYS } from './tableUtils.mjs';
-import { openModal, showAlertModal } from './src/components/modal.js';
+import { openModal, showAlertModal, confirmModal, promptModal } from './src/components/modal.js';
 import './src/components/cableScheduleLinksBoot.js';
 import { confirmProjectEntityDeletion } from './src/components/projectDeletionReview.js';
 import { start as startTour } from './tour.js';
@@ -885,11 +885,11 @@ async function initCableSchedule() {
     editorSaveTypicalBtn.id = 'cable-editor-save-typical';
     editorSaveTypicalBtn.className = 'btn';
     editorSaveTypicalBtn.textContent = 'Save as Typical';
-    editorSaveTypicalBtn.addEventListener('click', () => {
+    editorSaveTypicalBtn.addEventListener('click', async () => {
       if (!activeTable) return;
       const values = getEditorFieldValues();
       const suggestion = values.tag || values.service_description || values.label || 'Cable Typical';
-      const labelInput = window.prompt ? window.prompt('Label for this cable typical', suggestion) : suggestion;
+      const labelInput = await promptModal('Save as Typical', 'Label for this cable typical', { defaultValue: suggestion });
       if (labelInput === null) return;
       const label = (labelInput || suggestion || '').trim();
       if (!label) return;
@@ -1735,11 +1735,11 @@ async function initCableSchedule() {
       this.renderList();
     }
 
-    deleteTemplate(index) {
+    async deleteTemplate(index) {
       if (index < 0 || index >= this.templates.length) return;
       const template = this.templates[index];
       const label = template?.label || template?.tag || `Cable ${index + 1}`;
-      const confirmed = window.confirm ? window.confirm(`Delete "${label}" from the cable library?`) : true;
+      const confirmed = await confirmModal('Delete Library Entry', `Delete "${label}" from the cable library?`, { confirmText: 'Delete', variant: 'danger' });
       if (!confirmed) return;
       this.templates.splice(index, 1);
       dataStore.setCableTemplates(this.templates);

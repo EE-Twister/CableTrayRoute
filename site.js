@@ -66,7 +66,7 @@ import {
   readAppSetting,
   writeAppSetting
 } from "./projectStorage.js";
-import { openModal, showAlertModal } from "./src/components/modal.js";
+import { openModal, showAlertModal, confirmModal } from "./src/components/modal.js";
 import { createDomWriteBatcher, createElementCache, createHandlerProfiler } from "./src/utils/domLifecycle.js";
 import { initCollaboration, stopCollaboration } from "./src/collabManager.js";
 import {
@@ -1471,7 +1471,7 @@ function initSettings(){
     reportBtn.innerHTML='<img src="icons/toolbar/dimension.svg" alt="" aria-hidden="true" class="control-icon"><span>Generate Technical Report</span>';
     settingsMenu.appendChild(reportBtn);
     reportBtn.addEventListener('click',async()=>{
-      const useDocx=confirm('Generate DOCX? Cancel for PDF');
+      const useDocx=await confirmModal('Technical Report Format','Generate the report as DOCX? Choose PDF to generate a PDF instead.',{confirmText:'DOCX',cancelText:'PDF'});
       await runOperationWithStatus(operationStatusHost,{
         pendingText:`Generating technical report (${useDocx?'DOCX':'PDF'})…`,
         successText:'Technical report generated.',

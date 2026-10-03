@@ -15,7 +15,7 @@ import {
   writeProjectSessionValue,
   removeProjectSessionValue
 } from '../projectStorage.js';
-import { openModal, showAlertModal, ensureFieldAssistiveText } from './components/modal.js';
+import { openModal, showAlertModal, confirmModal, ensureFieldAssistiveText } from './components/modal.js';
 import { resolveActiveProjectName } from './projectContext.js';
 import { summarizeSavedProjectRecord } from './projectSnapshot.js';
 import { mountProfileControl, signOutCurrentUser, updateAuthSessionControls } from './authProfileControl.js';
@@ -717,9 +717,9 @@ async function openProjectByName(name) {
 async function deleteProject(name) {
   const trimmed = normalizeProjectName(name);
   if (!trimmed) return false;
-  const confirmed = typeof window === 'undefined' || typeof window.confirm !== 'function'
+  const confirmed = typeof document === 'undefined'
     ? true
-    : window.confirm(`Delete "${trimmed}" from your saved projects? This cannot be undone.`);
+    : await confirmModal('Delete Project', `Delete "${trimmed}" from your saved projects? This cannot be undone.`, { confirmText: 'Delete', variant: 'danger' });
   if (!confirmed) return false;
   let cloudFailed = false;
   try {
