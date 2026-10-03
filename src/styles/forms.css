@@ -392,6 +392,100 @@ body.compact-mode #palette button .palette-icon {
     }
 }
 
+/* Table-first Cable Schedule: keep guidance compact so rows start higher. */
+body[data-report-title="Cable Schedule"] .page-header,
+body[data-report-title="Raceway Schedule"] .page-header {
+    padding-block: var(--space-2);
+}
+
+body[data-report-title="Cable Schedule"] .page-header p,
+body[data-report-title="Raceway Schedule"] .page-header p {
+    margin-top: 0;
+}
+
+body[data-report-title="Cable Schedule"] #schedule-summary .viz-kpis,
+body[data-report-title="Raceway Schedule"] #schedule-summary .viz-kpis {
+    gap: var(--space-2);
+}
+
+body[data-report-title="Cable Schedule"] #schedule-summary .viz-kpi,
+body[data-report-title="Raceway Schedule"] #schedule-summary .viz-kpi {
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-3);
+}
+
+body[data-report-title="Cable Schedule"] #schedule-summary .viz-kpi__value,
+body[data-report-title="Raceway Schedule"] #schedule-summary .viz-kpi__value {
+    font-size: 1.2rem;
+}
+
+body[data-report-title="Cable Schedule"] #schedule-summary .viz-kpi__hint,
+body[data-report-title="Raceway Schedule"] #schedule-summary .viz-kpi__hint {
+    display: none;
+}
+
+body[data-report-title="Raceway Schedule"] #schedule-summary .viz-bars {
+    gap: var(--space-1);
+    margin: var(--space-1) 0;
+}
+
+body[data-report-title="Raceway Schedule"] #schedule-summary .viz-bar__note,
+body[data-report-title="Raceway Schedule"] #schedule-summary .study-chart__title + .viz-bars + .viz-legend {
+    display: none;
+}
+
+.cable-schedule-card .workflow-next-action {
+    margin-block: var(--space-1);
+    padding-block: var(--space-2);
+}
+
+.raceway-overview .workflow-next-action {
+    margin-block: var(--space-1);
+    padding-block: var(--space-2);
+}
+
+.raceway-overview .workflow-next-action > span {
+    flex-wrap: nowrap;
+    align-items: center;
+}
+
+.raceway-overview .workflow-next-action a.btn,
+.raceway-overview .workflow-next-action a.primary-btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding-block: 0.35rem;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.cable-schedule-card .workflow-next-action > span {
+    flex-wrap: nowrap;
+    align-items: center;
+}
+
+.cable-schedule-card .workflow-next-action a.btn,
+.cable-schedule-card .workflow-next-action a.primary-btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding-block: 0.35rem;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.cable-schedule-card .table-search-container label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+}
+
 .cable-toolbar .toolbar-group-label {
     align-self: center;
     color: var(--color-text-muted);
@@ -743,6 +837,9 @@ details {
 details > summary {
     cursor: pointer;
     font-weight: bold;
+}
+
+details > summary:not(.btn) {
     color: var(--primary-color);
 }
 

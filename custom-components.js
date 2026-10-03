@@ -1,4 +1,5 @@
 import './src/components/navigation.js';
+import { confirmModal, promptModal } from './src/components/modal.js';
 import { getItem as getStoredItem, setItem as setStoredItem } from './dataStore.mjs';
 import { getProjectState, setProjectState } from './projectStorage.js';
 
@@ -884,8 +885,8 @@ function finishShapeDrag(commit = true) {
   shapeDragState = null;
 }
 
-function handleTextPlacement(point) {
-  const value = window.prompt('Icon text', '');
+async function handleTextPlacement(point) {
+  const value = await promptModal('Add Text', 'Icon text');
   if (value === null) return;
   const trimmed = value.trim();
   if (!trimmed) return;
@@ -1019,14 +1020,14 @@ function handleCanvasMouseUp() {
   }
 }
 
-function handleCanvasDoubleClick(event) {
+async function handleCanvasDoubleClick(event) {
   if (!iconCanvas || iconTool !== 'select') return;
   const target = event.target;
   if (!(target instanceof SVGElement) || target.dataset.iconShape !== '1') return;
   if (target.dataset.shapeType === 'text') {
     event.preventDefault();
     const current = target.textContent || '';
-    const next = window.prompt('Edit text', current);
+    const next = await promptModal('Edit Text', 'Icon text', { defaultValue: current });
     if (next === null) return;
     const trimmed = next.trim();
     if (!trimmed) {
@@ -1388,10 +1389,10 @@ function inferPortCounts(ports = [], width = 80, height = 40) {
   return counts;
 }
 
-function deleteComponent(index) {
+async function deleteComponent(index) {
   const comp = components[index];
   if (!comp) return;
-  const ok = window.confirm(`Delete ${comp.label || comp.subtype}?`);
+  const ok = await confirmModal('Delete Component', `Delete ${comp.label || comp.subtype}?`, { confirmText: 'Delete', variant: 'danger' });
   if (!ok) return;
   components.splice(index, 1);
   if (!persist()) return;

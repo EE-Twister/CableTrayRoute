@@ -97,6 +97,13 @@ export const NAV_ROUTES = [
   { href: 'admin.html', label: 'Admin', section: 'Support', icon: 'icons/toolbar/validate.svg', adminOnly: true }
 ];
 
+// Groups shown by default in each dropdown; everything else sits behind
+// "Show more tools". Search (command palette) still reaches every page.
+const CORE_NAV_GROUPS = {
+  Workflow: ['Planning', 'Cable', 'Raceway', 'Validation', 'Deliverables'],
+  Studies: ['Cable', 'Protection', 'Equipment Sizing', 'Power System']
+};
+
 function currentPageName() {
   const raw = window.location.pathname.split('/').pop() || 'index.html';
   return raw || 'index.html';
@@ -172,13 +179,22 @@ function buildDropdown(section, routes, currentRoute) {
     menu.dataset.cols = '2';
   }
 
+  // Specialist groups stay behind a disclosure so the menu leads with the
+  // everyday workflow. A group holding the current page is always expanded.
+  const coreGroups = CORE_NAV_GROUPS[section];
+  const isAdvancedGroup = groupName => Boolean(coreGroups) && hasGroups && !coreGroups.includes(groupName);
+  const currentGroup = currentRoute && currentRoute.section === section ? (currentRoute.group || 'General') : null;
+  const advancedItems = [];
+
   orderedGroupNames.forEach((groupName) => {
+    const advanced = isAdvancedGroup(groupName) && groupName !== currentGroup;
     if (hasGroups) {
       const heading = document.createElement('li');
       heading.className = 'nav-dropdown-group-heading';
       heading.textContent = groupName;
       heading.setAttribute('role', 'presentation');
       menu.appendChild(heading);
+      if (advanced) advancedItems.push(heading);
     }
     groupedRoutes[groupName].forEach(route => {
       const item = document.createElement('li');
@@ -187,8 +203,35 @@ function buildDropdown(section, routes, currentRoute) {
       link.setAttribute('role', 'menuitem');
       item.appendChild(link);
       menu.appendChild(item);
+      if (advanced) advancedItems.push(item);
     });
   });
+
+  if (advancedItems.length) {
+    const moreCount = advancedItems.filter(el => el.tagName === 'LI' && el.querySelector('a')).length;
+    advancedItems.forEach(el => { el.hidden = true; });
+    const moreItem = document.createElement('li');
+    moreItem.setAttribute('role', 'none');
+    moreItem.className = 'nav-dropdown-more';
+    const moreBtn = document.createElement('button');
+    moreBtn.type = 'button';
+    moreBtn.className = 'nav-dropdown-more-btn';
+    moreBtn.setAttribute('role', 'menuitem');
+    moreBtn.setAttribute('aria-expanded', 'false');
+    const setMoreLabel = expanded => {
+      moreBtn.textContent = expanded ? 'Show fewer tools' : `Show ${moreCount} more tools`;
+    };
+    setMoreLabel(false);
+    moreBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const expanded = moreBtn.getAttribute('aria-expanded') !== 'true';
+      moreBtn.setAttribute('aria-expanded', String(expanded));
+      advancedItems.forEach(el => { el.hidden = !expanded; });
+      setMoreLabel(expanded);
+    });
+    moreItem.appendChild(moreBtn);
+    menu.appendChild(moreItem);
+  }
 
   wrapper.appendChild(trigger);
   wrapper.appendChild(menu);
@@ -326,7 +369,7 @@ function buildProjectActionsControl(existingProjectDisplay) {
     } catch {
       projectName = '';
     }
-    display.textContent = `Project: ${projectName || 'Untitled'}`;
+    display.textContent = projectName || 'Untitled';
   }
 
   const syncStatus = document.createElement('span');

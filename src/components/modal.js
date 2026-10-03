@@ -365,6 +365,57 @@ export function showAlertModal(title, message, options = {}) {
   });
 }
 
+/**
+ * Promise-based replacement for window.confirm. Resolves true when the user
+ * confirms and false on cancel, Escape, or backdrop click.
+ */
+export async function confirmModal(title, message, options = {}) {
+  const result = await openModal({
+    title,
+    message,
+    primaryText: options.confirmText || 'Confirm',
+    secondaryText: options.cancelText || 'Cancel',
+    variant: options.variant,
+    closeLabel: options.closeLabel || 'Close dialog'
+  });
+  return result === true;
+}
+
+/**
+ * Promise-based replacement for window.prompt. Resolves the entered string
+ * (possibly empty) on submit, or null when cancelled.
+ */
+export function promptModal(title, label, options = {}) {
+  const { defaultValue = '', placeholder = '', confirmText = 'OK', cancelText = 'Cancel', multiline = false } = options;
+  return openModal({
+    title,
+    primaryText: confirmText,
+    secondaryText: cancelText,
+    variant: options.variant,
+    render: (body, controller) => {
+      const form = document.createElement('form');
+      form.className = 'modal-prompt-form';
+      const field = document.createElement('label');
+      field.className = 'modal-prompt-label';
+      field.textContent = label;
+      field.style.whiteSpace = 'pre-line';
+      field.style.display = 'block';
+      const input = document.createElement(multiline ? 'textarea' : 'input');
+      if (!multiline) input.type = 'text';
+      input.className = 'modal-prompt-input';
+      input.value = defaultValue;
+      input.placeholder = placeholder;
+      field.appendChild(input);
+      form.appendChild(field);
+      body.appendChild(form);
+      controller.registerForm(form);
+      controller.getValue = () => input.value;
+      return { initialFocus: input };
+    },
+    onSubmit: controller => controller.getValue()
+  });
+}
+
 const UNSAFE_MODAL_TAGS = 'script, style, iframe, object, embed, link, meta';
 
 function sanitizeModalHtml(html) {

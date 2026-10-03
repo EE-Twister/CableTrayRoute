@@ -166,3 +166,11 @@ The entire Playwright suite and Firefox project were not run. The CLI browser pa
 No jurisdiction, adopted edition, installation configuration, or intended issued use was supplied. The review therefore checks software behavior and one bounded engineering chain; it does not establish code compliance, protective-device readiness, or the correctness of every specialist calculation. Supabase deployment, live cloud accounts, full security penetration testing, and large-project performance benchmarking were outside this pass.
 
 Before qualified engineering review of voltage-drop deliverables, correct the identified calculation/normalization defects, verify primary-source table data and installation assumptions, and demonstrate identical results and provenance across the editor, study, API, and exported report.
+
+## Status update — 2026-10-03
+
+Re-checked against the current tree: defects 3–7 (shared editor voltage-drop calculation, parallel runs, metric size handling, nonmagnetic conduit, REST study inputs), the serialized project save queue, and transactional sample import are already addressed in source. Static gzip (defect 8) uses `compression` middleware; verify against real static responses in a deployed environment.
+
+Newly completed: native `window.confirm` / `window.prompt` dialogs in project deletion, workflow packages, scenarios, cable library/typicals, custom components, equipment presets, and report format selection now use the shared `confirmModal` / `promptModal` helpers in `src/components/modal.js` (focus-trapped, keyboard accessible, consistent styling).
+
+Still open: core-versus-advanced navigation split, per-step readiness checklists, and a more compact table-first schedule layout.

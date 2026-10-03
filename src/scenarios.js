@@ -1,6 +1,6 @@
 import { listScenarios, getCurrentScenario, switchScenario, cloneScenario, getOneLine, getRevisions, restoreRevision, getCablesForScenario } from '../dataStore.mjs';
 import { isValidScenarioName } from '../projectStorage.js';
-import { showAlertModal, openModal } from './components/modal.js';
+import { showAlertModal, openModal, promptModal } from './components/modal.js';
 
 function ensureDefaults() {
   const defaults = ['base', 'future', 'emergency'];
@@ -175,8 +175,8 @@ function initScenarioUI() {
   });
 
   const dupBtn = document.getElementById('scenario-duplicate-btn');
-  dupBtn?.addEventListener('click', () => {
-    const name = prompt('New scenario name');
+  dupBtn?.addEventListener('click', async () => {
+    const name = await promptModal('Duplicate Scenario', 'New scenario name');
     if (name) {
       if (!isValidScenarioName(name)) {
         showAlertModal('Invalid Scenario Name', 'Use 1-64 characters: letters, numbers, hyphen (-), or underscore (_).');
@@ -191,8 +191,8 @@ function initScenarioUI() {
   });
 
   const diffBtn = document.getElementById('scenario-diff-btn');
-  diffBtn?.addEventListener('click', () => {
-    const other = prompt('Compare with which scenario?', listScenarios().join(', '));
+  diffBtn?.addEventListener('click', async () => {
+    const other = await promptModal('Compare Scenarios', 'Compare with which scenario?', { defaultValue: listScenarios().join(', ') });
     if (other) diffScenarios(getCurrentScenario(), other);
   });
 
@@ -230,11 +230,12 @@ function initScenarioUI() {
   });
 
   const revBtn = document.getElementById('revision-btn');
-  revBtn?.addEventListener('click', () => {
+  revBtn?.addEventListener('click', async () => {
     const revs = getRevisions();
     if (!revs.length) { showAlertModal('Notice', 'No revisions available.'); return; }
     const msg = revs.map((r,i) => `${i}: ${new Date(r.time).toLocaleString()}`).join('\n');
-    const choice = prompt(`Restore which revision?\n${msg}`);
+    const choice = await promptModal('Restore Revision', `Restore which revision?\n${msg}`, { multiline: false });
+    if (choice === null || String(choice).trim() === '') return;
     const idx = Number(choice);
     if (!Number.isNaN(idx)) {
       restoreRevision(idx);
