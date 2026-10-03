@@ -192,6 +192,31 @@
     display: block;
 }
 
+.nav-dropdown-menu li[hidden] {
+    display: none;
+}
+
+.nav-dropdown-more-btn {
+    display: block;
+    width: 100%;
+    margin-top: 0.35rem;
+    padding: 0.5rem 0.75rem;
+    border: 0;
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
+    background: transparent;
+    color: var(--color-primary, #2563eb);
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+}
+
+.nav-dropdown-more-btn:hover,
+.nav-dropdown-more-btn:focus-visible {
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+
 .nav-dropdown-menu .nav-dropdown-group-heading {
     display: block;
     padding: 0.5rem 0.75rem 0.35rem;
@@ -848,14 +873,22 @@
     .project-actions-trigger {
         min-width: 4.75rem;
         min-height: 2.75rem;
-        max-width: 7.5rem;
-        justify-content: center;
+        max-width: 15rem;
+        justify-content: flex-start;
         padding: 0.25rem 0.4rem;
     }
 
-    .project-actions-trigger::after,
-    .project-display-chip {
+    .project-actions-trigger::after {
         display: none;
+    }
+
+    .project-display-chip {
+        min-width: 3rem;
+        max-width: 7rem;
+    }
+
+    .project-sync-status {
+        white-space: nowrap;
     }
 
     .nav-search-btn {

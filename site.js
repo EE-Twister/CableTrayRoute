@@ -741,7 +741,7 @@ async function updateProjectDisplay(snapshot){
     }
     if(span){
       span.classList?.add('project-display-chip');
-      span.textContent=`Project: ${name}`;
+      span.textContent=name;
       span.title=`Project hash: ${hash.slice(0,8)}`;
     }
   }catch(e){console.error('hash failed',e);}

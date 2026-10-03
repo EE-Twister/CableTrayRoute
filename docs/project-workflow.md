@@ -92,3 +92,10 @@ The handoff stays explicit:
 - Project Report shows route results, pull groups, spool counts, design-basis review gate status, report snapshots, and release packages before preview generation.
 - Report exports, print/PDF output, snapshots, and dashboard release packages are visibly disabled while required workflow, raceway-assurance, pull-constructability, or design-basis deliverable gates remain open; the readiness panel links to the first blocker.
 - No deliverable page deletes or silently overwrites schedule records.
+
+## Navigation and project status
+
+- The **Workflow** and **Studies** menus lead with the everyday groups (Workflow: Planning, Cable, Raceway, Validation, Deliverables; Studies: Cable, Protection, Equipment Sizing, Power System). Specialist groups sit behind **Show N more tools** in the same menu; the group containing the current page is always expanded, and the command palette (search button) reaches every page.
+- The project chip in the top bar always shows the project name next to its save state (for example "Untitled · Unsaved changes"), including at mid-width windows.
+- The Cable Schedule uses a compact header, single-row summary, and inline next-step buttons so the table starts higher on the page.
+- Destructive confirmations and name prompts use in-app dialogs instead of native browser popups.

@@ -53,25 +53,25 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 **Detected Reads**
 - `cableSchedule`
   - src/workflowDashboard.js:145 getCables()
-  - src/workflowDashboard.js:1466 getCables()
+  - src/workflowDashboard.js:1467 getCables()
   - src/workflowDashboard.js:156 getCables()
   - src/workflowDashboard.js:169 getCables()
   - src/workflowDashboard.js:190 getCables()
   - ... 3 more
 - `conduitSchedule`
-  - src/workflowDashboard.js:1468 getConduits()
+  - src/workflowDashboard.js:1469 getConduits()
   - src/workflowDashboard.js:192 getConduits()
   - src/workflowDashboard.js:678 getConduits()
   - src/workflowDashboard.js:804 getConduits()
   - src/workflowDashboard.js:838 getConduits()
 - `ductbankSchedule`
-  - src/workflowDashboard.js:1469 getDuctbanks()
+  - src/workflowDashboard.js:1470 getDuctbanks()
   - src/workflowDashboard.js:193 getDuctbanks()
   - src/workflowDashboard.js:679 getDuctbanks()
   - src/workflowDashboard.js:805 getDuctbanks()
   - src/workflowDashboard.js:839 getDuctbanks()
 - `equipment`
-  - src/workflowDashboard.js:1470 getEquipment()
+  - src/workflowDashboard.js:1471 getEquipment()
   - src/workflowDashboard.js:188 getEquipment()
   - src/workflowDashboard.js:672 getEquipment()
   - src/workflowDashboard.js:799 getEquipment()
@@ -83,7 +83,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - src/workflowDashboard.js:834 getLoads()
   - src/workflowDashboard.js:860 getLoads()
 - `oneLineDiagram`
-  - src/workflowDashboard.js:1482 getOneLine()
+  - src/workflowDashboard.js:1483 getOneLine()
   - src/workflowDashboard.js:168 getOneLine()
   - src/workflowDashboard.js:189 getOneLine()
   - src/workflowDashboard.js:36 getOneLine()
@@ -93,22 +93,22 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - src/workflowDashboard.js:1201 getItem(activeSampleWorkflow)
   - src/workflowDashboard.js:873 getItem(activeSampleWorkflow)
 - `settings.costEstimateArtifact`
-  - src/workflowDashboard.js:1480 getItem(costEstimateArtifact)
+  - src/workflowDashboard.js:1481 getItem(costEstimateArtifact)
   - src/workflowDashboard.js:818 getItem(costEstimateArtifact)
 - `settings.designBasis`
-  - src/workflowDashboard.js:1473 getDesignBasis()
+  - src/workflowDashboard.js:1474 getDesignBasis()
   - src/workflowDashboard.js:181 getDesignBasis()
   - src/workflowDashboard.js:186 getDesignBasis()
   - src/workflowDashboard.js:417 getDesignBasis()
   - src/workflowDashboard.js:814 getDesignBasis()
   - ... 1 more
 - `settings.designGateApprovals`
-  - src/workflowDashboard.js:1474 getDesignGateApprovals()
+  - src/workflowDashboard.js:1475 getDesignGateApprovals()
   - src/workflowDashboard.js:187 getDesignGateApprovals()
   - src/workflowDashboard.js:815 getDesignGateApprovals()
   - src/workflowDashboard.js:912 getDesignGateApprovals()
 - `settings.latestRouteResults`
-  - src/workflowDashboard.js:1478 getItem(latestRouteResults)
+  - src/workflowDashboard.js:1479 getItem(latestRouteResults)
   - src/workflowDashboard.js:196 getItem(latestRouteResults)
   - src/workflowDashboard.js:797 getItem(latestRouteResults)
   - src/workflowDashboard.js:840 getItem(latestRouteResults)
@@ -116,22 +116,22 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - src/workflowDashboard.js:1374 getLifecyclePackages()
   - src/workflowDashboard.js:811 getLifecyclePackages()
 - `settings.procurementRegister`
-  - src/workflowDashboard.js:1479 getProcurementRegister()
+  - src/workflowDashboard.js:1480 getProcurementRegister()
 - `settings.reportSnapshots`
   - src/workflowDashboard.js:808 getReportSnapshots()
 - `settings.studyApprovals`
-  - src/workflowDashboard.js:1472 getStudyApprovals()
+  - src/workflowDashboard.js:1473 getStudyApprovals()
   - src/workflowDashboard.js:195 getStudyApprovals()
   - src/workflowDashboard.js:807 getStudyApprovals()
 - `settings.tccSettings`
-  - src/workflowDashboard.js:1475 getItem(tccSettings)
+  - src/workflowDashboard.js:1476 getItem(tccSettings)
   - src/workflowDashboard.js:197 getItem(tccSettings)
   - src/workflowDashboard.js:816 getItem(tccSettings)
 - `settings.workflowDashboardFocus`
   - src/workflowDashboard.js:71 getItem(workflowDashboardFocus)
 - `studyResults`
   - src/workflowDashboard.js:1325 getStudies()
-  - src/workflowDashboard.js:1471 getStudies()
+  - src/workflowDashboard.js:1472 getStudies()
   - src/workflowDashboard.js:149 getStudies()
   - src/workflowDashboard.js:158 getStudies()
   - src/workflowDashboard.js:169 getStudies()
@@ -159,7 +159,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - analysis/equipmentEvaluation.mjs:239 studies?.shortCircuit
 - `traySchedule`
   - src/workflowDashboard.js:145 getTrays()
-  - src/workflowDashboard.js:1467 getTrays()
+  - src/workflowDashboard.js:1468 getTrays()
   - src/workflowDashboard.js:157 getTrays()
   - src/workflowDashboard.js:191 getTrays()
   - src/workflowDashboard.js:677 getTrays()
@@ -181,12 +181,12 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.latestRouteResults`
   - src/workflowDashboard.js:897 setItem(latestRouteResults)
 - `settings.lifecyclePackages`
-  - src/workflowDashboard.js:1423 deleteLifecyclePackage()
-  - src/workflowDashboard.js:1488 addLifecyclePackage()
+  - src/workflowDashboard.js:1424 deleteLifecyclePackage()
+  - src/workflowDashboard.js:1489 addLifecyclePackage()
 - `settings.oneLineScheduleReconcilePending`
   - src/workflowDashboard.js:898 setItem(oneLineScheduleReconcilePending)
 - `settings.workflowDashboardFocus`
-  - src/workflowDashboard.js:1508 setItem(workflowDashboardFocus)
+  - src/workflowDashboard.js:1509 setItem(workflowDashboardFocus)
 - `studyResults.duty`
   - validation/rules.js:666 studies.duty
 - `traySchedule`
