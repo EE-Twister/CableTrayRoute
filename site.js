@@ -886,7 +886,7 @@ const projectDisplayScheduler=createProjectDisplayScheduler();
 
 function save(snapshot,options={}){
   if(options.reason!=='initial-render'&&options.reason!=='settings-init'){
-    dispatchProjectSyncStatus({label:'Unsaved changes',state:'dirty',detail:'Project changes are saved in this browser. Use Save Project to sync or back up this project.'});
+    dispatchProjectSyncStatus({label:'Saved locally',state:'dirty',detail:'Changes are autosaved in this browser only. Use Save Project to sync or back up this project.'});
   }
   if(options.flush){
     return projectDisplayScheduler.flush(snapshot,options);

@@ -96,6 +96,6 @@ The handoff stays explicit:
 ## Navigation and project status
 
 - The **Workflow** and **Studies** menus lead with the everyday groups (Workflow: Planning, Cable, Raceway, Validation, Deliverables; Studies: Cable, Protection, Equipment Sizing, Power System). Specialist groups sit behind **Show N more tools** in the same menu; the group containing the current page is always expanded, and the command palette (search button) reaches every page.
-- The project chip in the top bar always shows the project name next to its save state (for example "Untitled · Unsaved changes"), including at mid-width windows.
+- The project chip in the top bar always shows the project name next to its save state (for example "Untitled · Saved locally", meaning changes are autosaved in this browser but not yet synced or backed up with Save Project), including at mid-width windows.
 - The Cable Schedule uses a compact header, single-row summary, and inline next-step buttons so the table starts higher on the page.
 - Destructive confirmations and name prompts use in-app dialogs instead of native browser popups.
