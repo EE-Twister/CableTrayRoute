@@ -361,16 +361,16 @@
                     <details class="advanced-entry-panel">
                         <summary>Advanced manual tray entry</summary>
                         <div class="tray-form">
-                             <input type="text" id="t-id" placeholder="Tray ID">
-                             <input type="number" id="t-sx" placeholder="Start X (ft)" step="0.1">
-                             <input type="number" id="t-sy" placeholder="Start Y (ft)" step="0.1">
-                             <input type="number" id="t-sz" placeholder="Start Z (ft)" step="0.1">
-                             <input type="number" id="t-ex" placeholder="End X (ft)" step="0.1">
-                             <input type="number" id="t-ey" placeholder="End Y (ft)" step="0.1">
-                             <input type="number" id="t-ez" placeholder="End Z (ft)" step="0.1">
-                             <input type="number" id="t-w" placeholder="Width (in)" min="0" step="0.1">
-                             <input type="number" id="t-h" placeholder="Height (in)" min="0" step="0.1">
-                             <input type="number" id="t-fill" placeholder="Current Fill (in²)" min="0" step="0.1">
+                             <input type="text" id="t-id" aria-label="Tray ID" placeholder="Tray ID">
+                             <input type="number" id="t-sx" aria-label="Start X (ft)" placeholder="Start X (ft)" step="0.1">
+                             <input type="number" id="t-sy" aria-label="Start Y (ft)" placeholder="Start Y (ft)" step="0.1">
+                             <input type="number" id="t-sz" aria-label="Start Z (ft)" placeholder="Start Z (ft)" step="0.1">
+                             <input type="number" id="t-ex" aria-label="End X (ft)" placeholder="End X (ft)" step="0.1">
+                             <input type="number" id="t-ey" aria-label="End Y (ft)" placeholder="End Y (ft)" step="0.1">
+                             <input type="number" id="t-ez" aria-label="End Z (ft)" placeholder="End Z (ft)" step="0.1">
+                             <input type="number" id="t-w" aria-label="Width (in)" placeholder="Width (in)" min="0" step="0.1">
+                             <input type="number" id="t-h" aria-label="Height (in)" placeholder="Height (in)" min="0" step="0.1">
+                             <input type="number" id="t-fill" aria-label="Current fill (in²)" placeholder="Current Fill (in²)" min="0" step="0.1">
                              <select id="t-shape" aria-label="Tray shape">
                                  <option value="STR">Straight</option>
                                  <option value="90B">90° Bend</option>
@@ -388,7 +388,7 @@
                                  <option value="OFFSET">Offset</option>
                                  <option value="SPIRAL">Spiral</option>
                              </select>
-                             <input type="text" id="t-group" placeholder="Allowed Cable Group">
+                             <input type="text" id="t-group" aria-label="Allowed cable group" placeholder="Allowed Cable Group">
                              <button id="add-tray-btn">Add Tray</button>
                              <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="add-tray-help">?</span>
                              <span id="add-tray-help" class="tooltip">Add the tray segment above to the list.</span>
@@ -396,7 +396,7 @@
                     </details>
                     <details id="manual-tray-table-details">
                         <summary id="manual-tray-summary">Tray table</summary>
-                        <input type="text" id="tray-search" class="table-search" placeholder="Filter trays">
+                        <input type="text" id="tray-search" aria-label="Filter trays" class="table-search" placeholder="Filter trays">
                         <div id="manual-tray-table-container" class="table-scroll"></div>
                     </details>
                 </div>
@@ -436,7 +436,7 @@
                     </details>
                     <details id="cable-list-details">
                         <summary id="cable-list-summary">Cables to Route Table</summary>
-                        <input type="text" id="cable-search" class="table-search" placeholder="Filter cables">
+                        <input type="text" id="cable-search" aria-label="Filter cables" class="table-search" placeholder="Filter cables">
                         <div id="cable-list-container" class="table-scroll"></div>
                     </details>
                 </div>
@@ -452,7 +452,7 @@
                     </div>
                 </div>
 
-                <div id="route-summary-panel" class="route-summary-panel"></div>
+                <div id="route-summary-panel" aria-live="polite" class="route-summary-panel"></div>
 
                 <div class="route-results-workspace">
                     <aside class="route-review-sidebar" aria-label="Route review summary">
@@ -463,7 +463,7 @@
                             </div>
                             <div id="route-viewer-route-list" class="route-viewer-route-list"></div>
                         </section>
-                        <div id="messages"></div>
+                        <div id="messages" aria-live="polite"></div>
                         <div id="metrics" class="columns route-shared-routes"></div>
                     </aside>
 
@@ -472,7 +472,7 @@
                             <div class="route-visual-heading">
                                 <span class="route-visual-kicker">Interactive route model</span>
                                 <h3>3D Route Review</h3>
-                                <p id="route-selection-status" class="field-hint">Review the recommended path inside its plant and raceway context.</p>
+                                <p id="route-selection-status" aria-live="polite" class="field-hint">Review the recommended path inside its plant and raceway context.</p>
                                 <div class="route-plot-summary" aria-label="Route model summary">
                                     <span><strong id="route-plot-route-count">0</strong> routes</span>
                                     <span><strong id="route-plot-raceway-count">0</strong> raceways</span>

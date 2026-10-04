@@ -2358,7 +2358,8 @@ body.theme-high-contrast .mcc-spec-details {
   border-color: color-mix(in srgb, var(--accent-color, #2a6fd6) 40%, var(--border-color, #7d8790));
 }
 .heattracesizing-page .heattrace-tab[role="tab"]:focus-visible {
-  outline: none;
+  outline: 2px solid var(--accent-color, #2a6fd6);
+  outline-offset: 2px;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color, #2a6fd6) 26%, transparent);
 }
 .heattracesizing-page .heattrace-tab[aria-selected="true"] {

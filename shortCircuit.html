@@ -109,17 +109,17 @@
         <div id="shortcircuit-summary" class="study-result-summary" hidden></div>
         <div id="shortcircuit-chart" class="study-chart" aria-live="polite"></div>
         <div class="table-scroll-container">
-          <table id="shortcircuit-results-table" class="study-results-table" hidden>
-            <thead><tr><th>Equipment / Bus</th><th>Method</th><th>3-phase (kA)</th><th>Line-ground (kA)</th><th>Line-line (kA)</th><th>Input quality</th></tr></thead>
+          <table id="shortcircuit-results-table" class="study-results-table" hidden aria-label="Study setup">
+            <thead><tr><th scope="col">Equipment / Bus</th><th scope="col">Method</th><th scope="col">3-phase (kA)</th><th scope="col">Line-ground (kA)</th><th scope="col">Line-line (kA)</th><th scope="col">Input quality</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
         <details id="shortcircuit-history" class="study-history" hidden>
           <summary>Compare with previous run</summary>
-          <p id="shortcircuit-history-summary" class="field-hint"></p>
+          <p id="shortcircuit-history-summary" aria-live="polite" class="field-hint"></p>
           <div class="table-scroll-container">
             <table class="study-results-table" aria-label="Short circuit run comparison">
-              <thead><tr><th>Equipment / Bus</th><th>Previous 3-phase (kA)</th><th>Current 3-phase (kA)</th><th>Change (kA)</th></tr></thead>
+              <thead><tr><th scope="col">Equipment / Bus</th><th scope="col">Previous 3-phase (kA)</th><th scope="col">Current 3-phase (kA)</th><th scope="col">Change (kA)</th></tr></thead>
               <tbody id="shortcircuit-history-tbody"></tbody>
             </table>
           </div>

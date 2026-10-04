@@ -81,7 +81,7 @@
         <div class="arcflash-readiness__copy">
           <p class="arcflash-readiness__eyebrow">Study readiness</p>
           <h2 id="arcflash-readiness-title">Run the study to establish readiness</h2>
-          <p id="arcflash-readiness-summary">Label eligibility is determined only after both arcing-current cases and their clearing-time evidence are checked.</p>
+          <p id="arcflash-readiness-summary" aria-live="polite">Label eligibility is determined only after both arcing-current cases and their clearing-time evidence are checked.</p>
         </div>
         <dl class="arcflash-readiness__metrics" aria-label="Arc flash readiness metrics">
           <div><dt>Locations</dt><dd id="arcflash-metric-locations">0</dd></div>
@@ -112,8 +112,8 @@
         <div id="arcflash-summary" class="study-result-summary" hidden></div>
         <div class="table-scroll-container">
           <div id="arcflash-chart" class="study-chart" aria-live="polite"></div>
-          <table id="arcflash-results-table" class="study-results-table" hidden>
-            <thead><tr><th>Equipment</th><th>Incident energy</th><th>Minimum arc rating</th><th>Boundary</th><th>Clearing time basis</th><th>Readiness</th></tr></thead>
+          <table id="arcflash-results-table" class="study-results-table" hidden aria-label="Study setup">
+            <thead><tr><th scope="col">Equipment</th><th scope="col">Incident energy</th><th scope="col">Minimum arc rating</th><th scope="col">Boundary</th><th scope="col">Clearing time basis</th><th scope="col">Readiness</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>

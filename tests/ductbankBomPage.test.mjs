@@ -19,7 +19,7 @@ test('ductbank route exposes a visible, assumption-driven BOM workflow',()=>{
   assert.match(script,/renderDuctbankBom\(\)/);
   assert.match(script,/data-bom-option-toggle/);
   assert.match(script,/data-bom-option-input/);
-  assert.match(html,/<th>Include<\/th>/);
+  assert.match(html,/<th(?: scope="col")?>Include<\/th>/);
   assert.match(styles,/\.ductbank-bom-summary/);
   assert.match(styles,/\.ductbank-bom-table/);
   assert.match(styles,/\.ductbank-bom-table-toggle/);
