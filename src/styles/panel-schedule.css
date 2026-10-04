@@ -1881,8 +1881,8 @@ body.dark-mode .tcc-view-option-clear:focus {
     color: #99ccff;
 }
 
-.tcc-view-option-clear:focus {
-    outline: none;
+.tcc-view-option-clear:focus-visible {
+    outline: 2px solid var(--color-primary, #2563eb); outline-offset: 2px;
 }
 
 .tcc-view-option-label {
@@ -3087,7 +3087,7 @@ body.dark-mode .tcc-view-label {
 }
 
 .view-callout-layer .view-callout-label:focus-visible {
-    outline: none;
+    outline: 2px solid var(--color-primary, #2563eb); outline-offset: 2px;
 }
 
 .view-callout-layer .view-callout-connector {

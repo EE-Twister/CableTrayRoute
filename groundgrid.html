@@ -377,7 +377,7 @@
               <div>
                 <p class="groundgrid-eyebrow">Interactive Map</p>
                 <h2 id="grid-visual-title">Ground Grid Safety Map</h2>
-                <p id="grid-preview-summary" class="field-hint">
+                <p id="grid-preview-summary" aria-live="polite" class="field-hint">
                   Visual preview updates as you edit grid dimensions and conductor counts.
                 </p>
               </div>
@@ -453,10 +453,10 @@
             <table id="soil-measurements-table" class="data-table" aria-label="Soil resistivity measurements">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Electrode spacing a (m)</th>
-                  <th>Apparent resistivity &#x3C1;<sub>a</sub> (&#x2126;&#xB7;m)</th>
-                  <th><span class="sr-only">Delete row</span></th>
+                  <th scope="col">#</th>
+                  <th scope="col">Electrode spacing a (m)</th>
+                  <th scope="col">Apparent resistivity &#x3C1;<sub>a</sub> (&#x2126;&#xB7;m)</th>
+                  <th scope="col"><span class="sr-only">Delete row</span></th>
                 </tr>
               </thead>
               <tbody id="soil-measurements-body">
@@ -525,7 +525,7 @@
               <h3>Polygon Vertices</h3>
               <table id="polygon-vertices-table" class="data-table" aria-label="Polygon grid vertices">
                 <thead>
-                  <tr><th>#</th><th>X (m)</th><th>Y (m)</th><th><span class="sr-only">Delete</span></th></tr>
+                  <tr><th scope="col">#</th><th scope="col">X (m)</th><th scope="col">Y (m)</th><th scope="col"><span class="sr-only">Delete</span></th></tr>
                 </thead>
                 <tbody id="polygon-vertices-body"></tbody>
               </table>
@@ -579,7 +579,7 @@
                    class="gg-irr-canvas">
                 <text x="200" y="200" text-anchor="middle" class="chart-placeholder">Add vertices to preview the grid</text>
               </svg>
-              <p id="irr-geometry-summary" class="field-hint"></p>
+              <p id="irr-geometry-summary" aria-live="polite" class="field-hint"></p>
 
               <div id="irr-results" class="gg-irr-results" aria-live="polite" hidden>
                 <h3>Screening Results</h3>
@@ -681,15 +681,15 @@
           <table id="risk-points-table" class="data-table" aria-label="Inspection point risk assessment">
             <thead>
               <tr>
-                <th>Label</th>
-                <th>X (m)</th>
-                <th>Y (m)</th>
-                <th>Touch V</th>
-                <th>Step V</th>
-                <th>Touch margin</th>
-                <th>Step margin</th>
-                <th>Risk</th>
-                <th><span class="sr-only">Delete</span></th>
+                <th scope="col">Label</th>
+                <th scope="col">X (m)</th>
+                <th scope="col">Y (m)</th>
+                <th scope="col">Touch V</th>
+                <th scope="col">Step V</th>
+                <th scope="col">Touch margin</th>
+                <th scope="col">Step margin</th>
+                <th scope="col">Risk</th>
+                <th scope="col"><span class="sr-only">Delete</span></th>
               </tr>
             </thead>
             <tbody id="risk-points-body">

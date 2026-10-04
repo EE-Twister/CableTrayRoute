@@ -185,13 +185,13 @@
       <table class="editor-grid" aria-label="Components Grid">
         <thead>
           <tr>
-            <th>Subtype</th>
-            <th>Label</th>
-            <th>Category</th>
-            <th>Icon</th>
-            <th>Ports</th>
-            <th>Schema</th>
-            <th>Actions</th>
+            <th scope="col">Subtype</th>
+            <th scope="col">Label</th>
+            <th scope="col">Category</th>
+            <th scope="col">Icon</th>
+            <th scope="col">Ports</th>
+            <th scope="col">Schema</th>
+            <th scope="col">Actions</th>
           </tr>
         </thead>
         <tbody id="components-grid-body"></tbody>
@@ -203,8 +203,8 @@
       <table class="editor-grid" aria-label="Categories Manager">
         <thead>
           <tr>
-            <th>Category</th>
-            <th>Actions</th>
+            <th scope="col">Category</th>
+            <th scope="col">Actions</th>
           </tr>
         </thead>
         <tbody id="categories-grid-body"></tbody>
@@ -216,9 +216,9 @@
       <table class="editor-grid" aria-label="Icons Mapping">
         <thead>
           <tr>
-            <th>Icon Key</th>
-            <th>Path</th>
-            <th>Actions</th>
+            <th scope="col">Icon Key</th>
+            <th scope="col">Path</th>
+            <th scope="col">Actions</th>
           </tr>
         </thead>
         <tbody id="icons-grid-body"></tbody>
@@ -229,8 +229,8 @@
     </div>
     <details class="advanced-json">
       <summary>Advanced JSON Editor (Power Users)</summary>
-      <textarea id="component-text" rows="10" cols="80"></textarea><br>
-      <textarea id="icon-text" rows="10" cols="80"></textarea><br>
+      <textarea id="component-text" aria-label="Component library JSON" rows="10" cols="80"></textarea><br>
+      <textarea id="icon-text" aria-label="Icon library JSON" rows="10" cols="80"></textarea><br>
     </details>
     <label for="library-import-mode">Import mode</label>
     <select id="library-import-mode">
@@ -254,7 +254,7 @@
   <section>
     <h2>Manufacturer Library</h2>
     <p>Legacy defaults for component properties. Use the governed project catalog in the schedules and BOM workflows for approved product selections, source evidence, and commercial data.</p>
-    <textarea id="manufacturer-text" rows="20" cols="80"></textarea><br>
+    <textarea id="manufacturer-text" aria-label="Manufacturer library JSON" rows="20" cols="80"></textarea><br>
     <button id="manufacturer-save">Save</button>
     <button id="manufacturer-download">Download</button>
   </section>
@@ -279,7 +279,7 @@
     <p id="protective-library-summary" class="protective-library-summary" aria-live="polite"></p>
     <div class="protective-library-table-wrap">
       <table class="protective-library-table" aria-label="Protective device library inventory">
-        <thead><tr><th>Device</th><th>Manufacturer</th><th>Type</th><th>Catalog / Trip Unit</th><th>Evidence Status</th></tr></thead>
+        <thead><tr><th scope="col">Device</th><th scope="col">Manufacturer</th><th scope="col">Type</th><th scope="col">Catalog / Trip Unit</th><th scope="col">Evidence Status</th></tr></thead>
         <tbody id="protective-library-body"></tbody>
       </table>
     </div>
@@ -637,7 +637,7 @@
         const hint = !category ? 'Required.' : duplicate ? 'Duplicate category.' : '';
         tr.innerHTML = `
           <td>
-            <input data-kind="category" data-index="${index}" value="${escapeHtml(category || '')}">
+            <input data-kind="category" aria-label="Category" data-index="${index}" value="${escapeHtml(category || '')}">
             <span class="field-hint">${escapeHtml(hint)}</span>
           </td>
           <td><button type="button" data-action="delete-category" data-index="${index}">Delete</button></td>
@@ -655,11 +655,11 @@
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>
-            <input data-kind="icon-key" data-index="${index}" value="${escapeHtml(key)}">
+            <input data-kind="icon-key" aria-label="Icon key" data-index="${index}" value="${escapeHtml(key)}">
             <span class="field-hint">${escapeHtml(keyHint)}</span>
           </td>
           <td>
-            <input data-kind="icon-path" data-index="${index}" value="${escapeHtml(path || '')}">
+            <input data-kind="icon-path" aria-label="Icon path" data-index="${index}" value="${escapeHtml(path || '')}">
             <span class="field-hint">${escapeHtml(pathHint)}</span>
           </td>
           <td><button type="button" data-action="delete-icon" data-index="${index}">Delete</button></td>
@@ -685,27 +685,27 @@
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>
-            <input data-kind="component-subtype" data-index="${index}" value="${escapeHtml(component.subtype || '')}">
+            <input data-kind="component-subtype" aria-label="Component subtype" data-index="${index}" value="${escapeHtml(component.subtype || '')}">
             <span class="field-hint">${escapeHtml(componentHint(component, 'subtype'))}</span>
           </td>
           <td>
-            <input data-kind="component-label" data-index="${index}" value="${escapeHtml(component.label || '')}">
+            <input data-kind="component-label" aria-label="Component label" data-index="${index}" value="${escapeHtml(component.label || '')}">
             <span class="field-hint">${escapeHtml(componentHint(component, 'label'))}</span>
           </td>
           <td>
-            <input data-kind="component-category" data-index="${index}" value="${escapeHtml(component.category || '')}">
+            <input data-kind="component-category" aria-label="Component category" data-index="${index}" value="${escapeHtml(component.category || '')}">
             <span class="field-hint">${escapeHtml(componentHint(component, 'category'))}</span>
           </td>
           <td>
-            <input data-kind="component-icon" data-index="${index}" value="${escapeHtml(component.icon || '')}">
+            <input data-kind="component-icon" aria-label="Component icon" data-index="${index}" value="${escapeHtml(component.icon || '')}">
             <span class="field-hint"></span>
           </td>
           <td>
-            <input data-kind="component-ports" data-index="${index}" value="${escapeHtml(Number.isFinite(component.ports) ? component.ports : '')}">
+            <input data-kind="component-ports" aria-label="Number of ports" data-index="${index}" value="${escapeHtml(Number.isFinite(component.ports) ? component.ports : '')}">
             <span class="field-hint">${escapeHtml(componentHint(component, 'ports'))}</span>
           </td>
           <td>
-            <textarea data-kind="component-schema" data-index="${index}">${escapeHtml(JSON.stringify(component.schema ?? {}, null, 2))}</textarea>
+            <textarea data-kind="component-schema" aria-label="Component schema JSON" data-index="${index}">${escapeHtml(JSON.stringify(component.schema ?? {}, null, 2))}</textarea>
             <span class="field-hint">${escapeHtml(componentHint(component, 'schema'))}</span>
           </td>
           <td><button type="button" data-action="delete-component" data-index="${index}">Delete</button></td>

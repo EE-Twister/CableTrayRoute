@@ -131,7 +131,7 @@
         <p class="text-muted">CSV or XLSX rows match the active One-Line by <strong>Component ID</strong>. Only Label, Tag, Rated Voltage (kV), Rated Current (A), Layer, and Position Locked are considered. Nothing is changed until you apply this preview.</p>
         <p id="dm-import-summary" class="field-hint" aria-live="polite"></p>
         <div class="dm-table-scroll">
-          <table class="dm-table dm-import-table">
+          <table class="dm-table dm-import-table" aria-label="Spreadsheet Update Review">
             <thead><tr><th scope="col">Component ID</th><th scope="col">Field</th><th scope="col">Current</th><th scope="col">Imported</th></tr></thead>
             <tbody id="dm-import-changes"></tbody>
           </table>
@@ -144,7 +144,7 @@
         <h2>Component Data</h2>
         <p class="text-muted">Edit labels, tags, ratings, layers, and position locks directly. Use the checkbox in the header to select displayed rows.</p>
         <div class="dm-table-scroll">
-          <table class="dm-table">
+          <table class="dm-table" aria-label="Component Data">
             <thead>
               <tr>
                 <th scope="col"><input id="dm-select-visible" type="checkbox" aria-label="Select displayed components"></th>

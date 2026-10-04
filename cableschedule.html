@@ -262,15 +262,15 @@
           </div>
           <div id="batch-edit-controls" class="control-modal-group batch-edit-controls">
             <label><input id="batch-set-raceway" type="checkbox"> Raceway(s)</label>
-            <select id="batch-raceway-input" multiple size="5"></select>
+            <select id="batch-raceway-input" aria-label="Raceway(s) for selected cables" multiple size="5"></select>
             <label><input id="batch-set-cable-type" type="checkbox"> Cable Type</label>
-            <select id="batch-cable-type-input"></select>
+            <select id="batch-cable-type-input" aria-label="Cable type for selected cables"></select>
             <label><input id="batch-set-voltage" type="checkbox"> Operating Voltage</label>
-            <input id="batch-voltage-input" type="number" min="0" step="any" placeholder="480">
+            <input id="batch-voltage-input" aria-label="Operating voltage for selected cables" type="number" min="0" step="any" placeholder="480">
             <label><input id="batch-set-from" type="checkbox"> From Tag</label>
-            <input id="batch-from-input" type="text" list="batch-equipment-list">
+            <input id="batch-from-input" aria-label="From tag for selected cables" type="text" list="batch-equipment-list">
             <label><input id="batch-set-to" type="checkbox"> To Tag</label>
-            <input id="batch-to-input" type="text" list="batch-equipment-list">
+            <input id="batch-to-input" aria-label="To tag for selected cables" type="text" list="batch-equipment-list">
             <datalist id="batch-equipment-list"></datalist>
             <button id="apply-batch-edit-btn" class="btn primary-btn" type="button" disabled>Apply to Selected</button>
           </div>
@@ -282,7 +282,7 @@
               <option value="routing-ready">Routing-ready report</option>
               <option value="missing-data">Missing-data report</option>
             </select>
-            <p id="cable-report-summary" class="field-hint"></p>
+            <p id="cable-report-summary" aria-live="polite" class="field-hint"></p>
             <div class="modal-actions compact-actions">
               <button id="report-export-btn" class="btn" type="button">Export XLSX</button>
               <button id="report-print-btn" class="btn primary-btn" type="button">Print</button>

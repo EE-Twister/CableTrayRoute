@@ -264,7 +264,7 @@
  <div class="ductbank-table-wrap table-scroll-x" tabindex="0" aria-label="Ductbank route profile stations">
   <table id="routeProfileTable" class="db-table">
    <caption class="visually-hidden">Ductbank route plan and profile stations</caption>
-   <thead><tr><th>ID</th><th>Station (ft)</th><th>Easting (ft)</th><th>Northing (ft)</th><th>Grade Elev. (ft)</th><th>Cover (in)</th><th>Action</th></tr></thead>
+   <thead><tr><th scope="col">ID</th><th scope="col">Station (ft)</th><th scope="col">Easting (ft)</th><th scope="col">Northing (ft)</th><th scope="col">Grade Elev. (ft)</th><th scope="col">Cover (in)</th><th scope="col">Action</th></tr></thead>
    <tbody></tbody>
   </table>
  </div>
@@ -272,7 +272,7 @@
  <div class="ductbank-table-wrap table-scroll-x" tabindex="0" aria-label="Ductbank route structures">
   <table id="routeStructureTable" class="db-table">
    <caption class="visually-hidden">Ductbank route structures and crossings</caption>
-   <thead><tr><th>ID</th><th>Type</th><th>Station (ft)</th><th>Note / Crossing</th><th>Action</th></tr></thead>
+   <thead><tr><th scope="col">ID</th><th scope="col">Type</th><th scope="col">Station (ft)</th><th scope="col">Note / Crossing</th><th scope="col">Action</th></tr></thead>
    <tbody></tbody>
   </table>
  </div>
@@ -322,13 +322,13 @@
   <caption class="visually-hidden">Ductbank conduit entries</caption>
   <thead>
    <tr>
-    <th data-idx="0">ID</th>
-    <th data-idx="1">Type</th>
-    <th data-idx="2">Trade Size</th>
-    <th data-idx="3">X</th>
-    <th data-idx="4">Y</th>
-    <th>Dup</th>
-    <th>Del</th>
+    <th scope="col" data-idx="0">ID</th>
+    <th scope="col" data-idx="1">Type</th>
+    <th scope="col" data-idx="2">Trade Size</th>
+    <th scope="col" data-idx="3">X</th>
+    <th scope="col" data-idx="4">Y</th>
+    <th scope="col">Dup</th>
+    <th scope="col">Del</th>
    </tr>
   </thead>
   <tbody></tbody>
@@ -399,22 +399,22 @@
   <caption class="visually-hidden">Ductbank cable entries</caption>
   <thead>
    <tr>
-    <th data-idx="0">Tag</th>
-    <th data-idx="1">Type</th>
-    <th data-idx="2">Diameter (in)</th>
-    <th data-idx="3">Cond.</th>
-    <th data-idx="4">Size</th>
-    <th data-idx="5">Insul. Thick (in)</th>
-    <th data-idx="6">Weight</th>
-    <th data-idx="7">Est. Load (A)</th>
-    <th data-idx="8">Conduit</th>
-    <th data-idx="9">Conductor Material</th>
-    <th data-idx="10">Insulation Type</th>
-    <th data-idx="11">Insul. Rating (°C)</th>
-    <th data-idx="12">Voltage Rating</th>
-    <th data-idx="13">Shielding / Jacket Type</th>
-    <th>Dup</th>
-    <th>Del</th>
+    <th scope="col" data-idx="0">Tag</th>
+    <th scope="col" data-idx="1">Type</th>
+    <th scope="col" data-idx="2">Diameter (in)</th>
+    <th scope="col" data-idx="3">Cond.</th>
+    <th scope="col" data-idx="4">Size</th>
+    <th scope="col" data-idx="5">Insul. Thick (in)</th>
+    <th scope="col" data-idx="6">Weight</th>
+    <th scope="col" data-idx="7">Est. Load (A)</th>
+    <th scope="col" data-idx="8">Conduit</th>
+    <th scope="col" data-idx="9">Conductor Material</th>
+    <th scope="col" data-idx="10">Insulation Type</th>
+    <th scope="col" data-idx="11">Insul. Rating (°C)</th>
+    <th scope="col" data-idx="12">Voltage Rating</th>
+    <th scope="col" data-idx="13">Shielding / Jacket Type</th>
+    <th scope="col">Dup</th>
+    <th scope="col">Del</th>
    </tr>
   </thead>
   <tbody></tbody>
@@ -523,15 +523,15 @@
 
 <details id="soilRef" class="ductbank-subdetails">
  <summary><strong>Typical Soil Properties</strong></summary>
- <table class="db-table" style="width:auto;">
+ <table class="db-table" style="width:auto;" aria-label="Cables">
   <thead>
-   <tr><th>Soil Type</th><th>Thermal Resistivity (°C·cm/W)</th></tr>
+   <tr><th scope="col">Soil Type</th><th scope="col">Thermal Resistivity (°C·cm/W)</th></tr>
   </thead>
   <tbody id="soilTableBody"></tbody>
  </table>
- <table class="db-table" style="margin-top:8px;width:auto;">
+ <table class="db-table" style="margin-top:8px;width:auto;" aria-label="Cables">
   <thead>
-   <tr><th>Condition</th><th>Moisture Content (%)</th></tr>
+   <tr><th scope="col">Condition</th><th scope="col">Moisture Content (%)</th></tr>
   </thead>
   <tbody>
    <tr><td>Dry</td><td>2&#8211;5</td></tr>
@@ -544,17 +544,17 @@
 
 <details id="heatSourceDetails" open class="ductbank-subdetails" style="display:none;">
  <summary><strong>Adjacent Heat Sources</strong></summary>
- <table id="heatSourceTable" class="db-table">
+ <table id="heatSourceTable" class="db-table" aria-label="Cables">
  <thead>
   <tr>
-   <th>Tag</th>
-   <th>Shape</th>
-   <th>Width (in)</th>
-   <th>Height (in)</th>
-   <th>Temp (°F)</th>
-   <th>X</th>
-   <th>Y</th>
-    <th>Del</th>
+   <th scope="col">Tag</th>
+   <th scope="col">Shape</th>
+   <th scope="col">Width (in)</th>
+   <th scope="col">Height (in)</th>
+   <th scope="col">Temp (°F)</th>
+   <th scope="col">X</th>
+   <th scope="col">Y</th>
+    <th scope="col">Del</th>
    </tr>
   </thead>
   <tbody></tbody>
@@ -661,7 +661,7 @@
  <div class="ductbank-table-wrap table-scroll-x" tabindex="0" aria-label="Ductbank bill of materials table">
   <table id="ductbankBomTable" class="db-table ductbank-bom-table">
    <caption class="visually-hidden">Calculated ductbank bill of materials</caption>
-   <thead><tr><th>Include</th><th>Category</th><th>Item</th><th>Specification / Inputs</th><th>Quantity</th><th>Unit</th><th>Basis</th></tr></thead>
+   <thead><tr><th scope="col">Include</th><th scope="col">Category</th><th scope="col">Item</th><th scope="col">Specification / Inputs</th><th scope="col">Quantity</th><th scope="col">Unit</th><th scope="col">Basis</th></tr></thead>
    <tbody id="ductbank-bom-body"></tbody>
   </table>
  </div>
