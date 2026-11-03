@@ -5,7 +5,7 @@ import { UndoRedoManager } from "./undoRedo.mjs";
 import { mountCopilot } from "./src/copilot.js";
 import { repairMojibake } from "./src/textEncoding.js";
 
-import "./src/components/navigation.js";
+import { renderProjectDisplayName } from "./src/components/navigation.js";
 import "./src/components/commandPalette.js";
 import "./units.js";
 import {
@@ -741,7 +741,7 @@ async function updateProjectDisplay(snapshot){
     }
     if(span){
       span.classList?.add('project-display-chip');
-      span.textContent=`Project: ${name}`;
+      renderProjectDisplayName(span,name);
       span.title=`Project hash: ${hash.slice(0,8)}`;
     }
   }catch(e){console.error('hash failed',e);}

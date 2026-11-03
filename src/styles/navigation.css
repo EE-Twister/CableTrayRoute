@@ -817,6 +817,16 @@
     cursor: pointer;
 }
 
+.project-actions-heading {
+    margin: 0 0 0.25rem;
+    padding: 0.35rem 0.6rem 0.45rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
 .project-actions-item:hover,
 .project-actions-item:focus-visible {
     background: color-mix(in srgb, var(--color-primary) 10%, transparent);
@@ -845,16 +855,18 @@
         padding-inline: 0.35rem;
     }
 
+    /* Keep the project name visible at laptop widths; drop the decorative
+       icon and caret instead so the trigger stays compact. */
     .project-actions-trigger {
         min-width: 4.75rem;
         min-height: 2.75rem;
-        max-width: 7.5rem;
-        justify-content: center;
-        padding: 0.25rem 0.4rem;
+        max-width: clamp(7.5rem, calc(40vw - 16rem), 15rem);
+        justify-content: flex-start;
+        padding: 0.25rem 0.45rem;
     }
 
     .project-actions-trigger::after,
-    .project-display-chip {
+    .project-actions-icon {
         display: none;
     }
 

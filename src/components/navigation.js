@@ -319,15 +319,15 @@ function buildProjectActionsControl(existingProjectDisplay) {
   const display = existingProjectDisplay || document.createElement('span');
   display.id = 'project-display';
   display.classList.add('project-display-chip');
-  if (!display.textContent.trim()) {
-    let projectName = '';
+  let projectName = display.textContent.replace(/^Project:\s*/i, '').trim();
+  if (!projectName) {
     try {
       projectName = String(getProjectState()?.name || '').trim();
     } catch {
       projectName = '';
     }
-    display.textContent = `Project: ${projectName || 'Untitled'}`;
   }
+  renderProjectDisplayName(display, projectName);
 
   const syncStatus = document.createElement('span');
   syncStatus.id = 'project-sync-status';
@@ -339,6 +339,15 @@ function buildProjectActionsControl(existingProjectDisplay) {
   const panel = document.createElement('div');
   panel.className = 'project-actions-panel';
   panel.setAttribute('role', 'menu');
+
+  // Visible project identity inside the menu, chiefly for narrow screens where
+  // the trigger collapses to an icon. Screen readers get the same text from
+  // the trigger's aria-label, so this stays out of the menu's item list.
+  const heading = document.createElement('p');
+  heading.id = 'project-actions-heading';
+  heading.className = 'project-actions-heading';
+  heading.setAttribute('aria-hidden', 'true');
+  panel.appendChild(heading);
 
   const actions = [
     { label: 'New Project', action: 'newProject' },
@@ -400,6 +409,44 @@ function buildProjectActionsControl(existingProjectDisplay) {
   return wrapper;
 }
 
+/**
+ * Render the active project name in the header chip. The visible text is the
+ * name alone so it fits beside the save status at laptop widths; the
+ * "Project:" prefix stays available to assistive technology, and the chip's
+ * textContent keeps the historical "Project: <name>" form.
+ * @param {HTMLElement} display The #project-display element.
+ * @param {string} name Project name; blank renders "Untitled".
+ */
+export function renderProjectDisplayName(display, name) {
+  if (!display) return;
+  const label = String(name || '').trim() || 'Untitled';
+  if (typeof display.replaceChildren === 'function' && typeof document !== 'undefined' && typeof document.createElement === 'function') {
+    const prefix = document.createElement('span');
+    prefix.className = 'sr-only';
+    prefix.textContent = 'Project: ';
+    const value = document.createElement('span');
+    value.className = 'project-display-name';
+    value.textContent = label;
+    display.replaceChildren(prefix, value);
+  } else {
+    display.textContent = `Project: ${label}`;
+  }
+  refreshProjectActionsLabel();
+}
+
+function refreshProjectActionsLabel() {
+  if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
+  const trigger = document.querySelector('.project-actions-trigger');
+  const status = document.getElementById('project-sync-status');
+  if (!trigger || !status) return;
+  const projectName = document.getElementById('project-display')?.textContent?.replace(/^Project:\s*/i, '').trim() || 'Untitled';
+  const accessibleStatus = status.title || status.textContent;
+  trigger.setAttribute('aria-label', `Project actions for ${projectName}. ${accessibleStatus}`);
+  trigger.title = `${projectName} — ${accessibleStatus}`;
+  const heading = document.getElementById('project-actions-heading');
+  if (heading) heading.textContent = `${projectName} · ${status.textContent}`;
+}
+
 function updateProjectSyncStatus(detail = {}) {
   const status = document.getElementById('project-sync-status');
   if (!status) return;
@@ -411,13 +458,7 @@ function updateProjectSyncStatus(detail = {}) {
   } else {
     status.removeAttribute('title');
   }
-  const trigger = document.querySelector('.project-actions-trigger');
-  if (trigger) {
-    const projectName = document.getElementById('project-display')?.textContent?.replace(/^Project:\s*/i, '').trim() || 'Untitled';
-    const accessibleStatus = detail.detail || status.textContent;
-    trigger.setAttribute('aria-label', `Project actions for ${projectName}. ${accessibleStatus}`);
-    trigger.title = `${projectName} — ${accessibleStatus}`;
-  }
+  refreshProjectActionsLabel();
 }
 
 function hasNavigationDomApi() {
