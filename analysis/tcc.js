@@ -12,6 +12,7 @@ import {
   getTrayHardwareCatalogCustomProducts
 } from '../dataStore.mjs';
 import { runShortCircuit } from './shortCircuit.mjs';
+import { saveProjectOnChange } from '../src/projectSaveState.js';
 import { scaleCurve, checkDuty, sanitizeCurve } from './tccUtils.js';
 import { checkCoordination, greedyCoordinate, greedyCoordinateGFP, generateFaultCurrents, interpolateTime } from './tccAutoCoord.mjs';
 import {
@@ -2127,6 +2128,7 @@ function refreshProjectCatalogDevices() {
 }
 
 async function init() {
+  saveProjectOnChange(['tccSettings', STORAGE_KEYS.studies, STORAGE_KEYS.oneLine]);
   try {
     const list = await protectiveDeviceCatalog.loadIndex();
     baseLibraryDevices = Array.isArray(list) ? list : [];

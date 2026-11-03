@@ -329,12 +329,22 @@ function buildProjectActionsControl(existingProjectDisplay) {
   }
   renderProjectDisplayName(display, projectName);
 
+  // Local save state of the working copy (Saved / Unsaved changes / ...).
+  // Hidden until the save-state tracker reports, so pages that do not track
+  // saves never show a stale or invented status.
   const syncStatus = document.createElement('span');
   syncStatus.id = 'project-sync-status';
   syncStatus.className = 'project-sync-status project-sync-status--local';
-  syncStatus.textContent = 'Local';
+  syncStatus.hidden = true;
 
-  trigger.append(icon, display, syncStatus);
+  // Server/cloud sync state, shown only when there is one to report, so it
+  // never overwrites what the local badge says.
+  const cloudStatus = document.createElement('span');
+  cloudStatus.id = 'project-cloud-status';
+  cloudStatus.className = 'project-sync-status project-cloud-status';
+  cloudStatus.hidden = true;
+
+  trigger.append(icon, display, syncStatus, cloudStatus);
 
   const panel = document.createElement('div');
   panel.className = 'project-actions-panel';
@@ -440,24 +450,40 @@ function refreshProjectActionsLabel() {
   const status = document.getElementById('project-sync-status');
   if (!trigger || !status) return;
   const projectName = document.getElementById('project-display')?.textContent?.replace(/^Project:\s*/i, '').trim() || 'Untitled';
-  const accessibleStatus = status.title || status.textContent;
-  trigger.setAttribute('aria-label', `Project actions for ${projectName}. ${accessibleStatus}`);
-  trigger.title = `${projectName} — ${accessibleStatus}`;
+  const cloud = document.getElementById('project-cloud-status');
+  const cloudShown = Boolean(cloud && !cloud.hidden && cloud.textContent);
+  const localText = status.hidden ? '' : `${status.textContent}. ${status.title || ''}`.trim();
+  const cloudText = cloudShown ? `Cloud: ${cloud.textContent}. ${cloud.title || ''}`.trim() : '';
+  const statusText = [localText, cloudText].filter(Boolean).join(' ');
+  trigger.setAttribute('aria-label', [`Project actions for ${projectName}.`, statusText].filter(Boolean).join(' '));
+  trigger.title = statusText ? `${projectName} — ${statusText}` : projectName;
   const heading = document.getElementById('project-actions-heading');
-  if (heading) heading.textContent = `${projectName} · ${status.textContent}`;
+  if (heading) heading.textContent = [projectName, status.hidden ? '' : status.textContent, cloudShown ? cloud.textContent : ''].filter(Boolean).join(' · ');
 }
 
-function updateProjectSyncStatus(detail = {}) {
+function renderStatusChip(element, { label, tone, detail }) {
+  element.className = `${element.id === 'project-cloud-status' ? 'project-sync-status project-cloud-status' : 'project-sync-status'} project-sync-status--${tone}`;
+  element.textContent = label;
+  if (detail) element.title = detail; else element.removeAttribute('title');
+}
+
+// Local save state from src/projectSaveState.js.
+function updateProjectSaveState(detail = {}) {
   const status = document.getElementById('project-sync-status');
   if (!status) return;
+  renderStatusChip(status, { label: detail.label || 'No project', tone: detail.tone || 'local', detail: detail.detail });
+  status.hidden = false;
+  refreshProjectActionsLabel();
+}
+
+// Server/cloud sync results from the project manager. "local" means the
+// project is not synced anywhere, which the local badge already conveys.
+function updateProjectSyncStatus(detail = {}) {
+  const cloud = document.getElementById('project-cloud-status');
+  if (!cloud) return;
   const state = detail.state || 'local';
-  status.className = `project-sync-status project-sync-status--${state}`;
-  status.textContent = detail.label || 'Local';
-  if (detail.detail) {
-    status.title = detail.detail;
-  } else {
-    status.removeAttribute('title');
-  }
+  cloud.hidden = state === 'local' || !detail.label;
+  if (!cloud.hidden) renderStatusChip(cloud, { label: detail.label, tone: state, detail: detail.detail });
   refreshProjectActionsLabel();
 }
 
@@ -718,7 +744,11 @@ function mountPersistentNavigation() {
     window.addEventListener('ctr:project-sync-status', event => {
       updateProjectSyncStatus(event.detail || {});
     });
+    window.addEventListener('ctr:project-save-state', event => {
+      updateProjectSaveState(event.detail || {});
+    });
   }
+  if (window.__ctrProjectSaveState) updateProjectSaveState(window.__ctrProjectSaveState);
 
   document.body.dataset.navMounted = 'true';
   repairMojibakeDocument(document);

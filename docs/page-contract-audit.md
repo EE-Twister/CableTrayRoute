@@ -1911,7 +1911,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Studies
 - Group: Protection
-- Source files: `analysis/arcFlash.mjs`, `analysis/chartExportUtils.mjs`, `analysis/ctMetadata.mjs`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/ieee1584.mjs`, `analysis/protectiveDeviceLibrary.mjs`, `analysis/protectiveDeviceReview.mjs`, `analysis/protectiveDeviceValidation.mjs`, `analysis/ptVtMetadata.mjs`, `analysis/shortCircuit.mjs`, `analysis/studyResultReadiness.mjs`, `analysis/tcc.js`, `analysis/tcc/annotationModel.mjs`, `analysis/tcc/catalogPresentationModel.mjs`, `analysis/tcc/catalogSelectionModel.mjs`, `analysis/tcc/chartInteractionModel.mjs`, `analysis/tcc/chartRenderer.mjs`, `analysis/tcc/componentBrowserModal.mjs`, `analysis/tcc/componentDetailModel.mjs`, `analysis/tcc/coordinationOrderView.mjs`, `analysis/tcc/customCurveBuilderView.mjs`, `analysis/tcc/customCurveEvidenceModel.mjs`, `analysis/tcc/customCurveModel.mjs`, `analysis/tcc/customCurvePointEditorModel.mjs`, `analysis/tcc/customCurveReferenceModel.mjs`, `analysis/tcc/deviceDetailView.mjs`, `analysis/tcc/deviceSelectionModal.mjs`, `analysis/tcc/equipmentConstraintModel.mjs`, `analysis/tcc/equipmentOverlayModel.mjs`, `analysis/tcc/oneLinePreviewView.mjs`, `analysis/tcc/persistenceModel.mjs`, `analysis/tcc/plotDomainModel.mjs`, `analysis/tcc/reportMarkupModel.mjs`, `analysis/tcc/selectedDeviceSummaryView.mjs`, `analysis/tcc/settingModel.mjs`, `analysis/tcc/settingsView.mjs`, `analysis/tcc/studyReadinessModel.mjs`, `analysis/tcc/studyReadinessView.mjs`, `analysis/tcc/viewModel.mjs`, `analysis/tcc/viewOptionsModal.mjs`, `analysis/tccAutoCoord.mjs`, `analysis/tccContext.mjs`, `analysis/tccUtils.js`, `analysis/timeCurrentCurve.mjs`, `componentLibrary.json`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `reports/coordinationReport.mjs`, `reports/relaySettingsExport.mjs`, `reports/reporting.mjs`, `src/crossProbe.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/protectiveDevices/calculationCatalog.mjs`, `src/protectiveDevices/catalogLoader.mjs`, `src/protectiveDevices/tccCatalogHydrator.mjs`, `src/tcc.js`, `utils/cableImpedance.js`, `utils/csv.mjs`, `utils/transformerImpedance.js`, `utils/voltage.js`
+- Source files: `analysis/arcFlash.mjs`, `analysis/chartExportUtils.mjs`, `analysis/ctMetadata.mjs`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/ieee1584.mjs`, `analysis/protectiveDeviceLibrary.mjs`, `analysis/protectiveDeviceReview.mjs`, `analysis/protectiveDeviceValidation.mjs`, `analysis/ptVtMetadata.mjs`, `analysis/shortCircuit.mjs`, `analysis/studyResultReadiness.mjs`, `analysis/tcc.js`, `analysis/tcc/annotationModel.mjs`, `analysis/tcc/catalogPresentationModel.mjs`, `analysis/tcc/catalogSelectionModel.mjs`, `analysis/tcc/chartInteractionModel.mjs`, `analysis/tcc/chartRenderer.mjs`, `analysis/tcc/componentBrowserModal.mjs`, `analysis/tcc/componentDetailModel.mjs`, `analysis/tcc/coordinationOrderView.mjs`, `analysis/tcc/customCurveBuilderView.mjs`, `analysis/tcc/customCurveEvidenceModel.mjs`, `analysis/tcc/customCurveModel.mjs`, `analysis/tcc/customCurvePointEditorModel.mjs`, `analysis/tcc/customCurveReferenceModel.mjs`, `analysis/tcc/deviceDetailView.mjs`, `analysis/tcc/deviceSelectionModal.mjs`, `analysis/tcc/equipmentConstraintModel.mjs`, `analysis/tcc/equipmentOverlayModel.mjs`, `analysis/tcc/oneLinePreviewView.mjs`, `analysis/tcc/persistenceModel.mjs`, `analysis/tcc/plotDomainModel.mjs`, `analysis/tcc/reportMarkupModel.mjs`, `analysis/tcc/selectedDeviceSummaryView.mjs`, `analysis/tcc/settingModel.mjs`, `analysis/tcc/settingsView.mjs`, `analysis/tcc/studyReadinessModel.mjs`, `analysis/tcc/studyReadinessView.mjs`, `analysis/tcc/viewModel.mjs`, `analysis/tcc/viewOptionsModal.mjs`, `analysis/tccAutoCoord.mjs`, `analysis/tccContext.mjs`, `analysis/tccUtils.js`, `analysis/timeCurrentCurve.mjs`, `componentLibrary.json`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `reports/coordinationReport.mjs`, `reports/relaySettingsExport.mjs`, `reports/reporting.mjs`, `src/crossProbe.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/projectContext.js`, `src/projectSaveState.js`, `src/protectiveDevices/calculationCatalog.mjs`, `src/protectiveDevices/catalogLoader.mjs`, `src/protectiveDevices/tccCatalogHydrator.mjs`, `src/tcc.js`, `utils/cableImpedance.js`, `utils/csv.mjs`, `utils/transformerImpedance.js`, `utils/voltage.js`
 
 **Undocumented Reads**
 - None
@@ -1934,23 +1934,23 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 **Detected Reads**
 - `cableSchedule`
   - analysis/shortCircuit.mjs:1191 getCables()
-  - analysis/tcc.js:2983 getCables()
+  - analysis/tcc.js:2985 getCables()
 - `oneLineDiagram`
   - analysis/arcFlash.mjs:460 getOneLine()
   - analysis/shortCircuit.mjs:1186 getOneLine()
-  - analysis/tcc.js:2101 getOneLine()
-  - analysis/tcc.js:2206 getOneLine()
-  - analysis/tcc.js:3504 getOneLine()
+  - analysis/tcc.js:2102 getOneLine()
+  - analysis/tcc.js:2208 getOneLine()
+  - analysis/tcc.js:3506 getOneLine()
   - ... 4 more
 - `settings.tccSettings`
   - analysis/arcFlash.mjs:364 getItem(tccSettings)
   - analysis/shortCircuit.mjs:782 getItem(tccSettings)
-  - analysis/tcc.js:771 getItem(tccSettings)
+  - analysis/tcc.js:772 getItem(tccSettings)
 - `settings.trayHardwareCatalogCustomProducts`
-  - analysis/tcc.js:2111 getTrayHardwareCatalogCustomProducts()
+  - analysis/tcc.js:2112 getTrayHardwareCatalogCustomProducts()
 - `studyResults`
-  - analysis/tcc.js:1268 getStudies()
-  - analysis/tcc.js:2105 getStudies()
+  - analysis/tcc.js:1269 getStudies()
+  - analysis/tcc.js:2106 getStudies()
   - analysis/tcc/chartRenderer.mjs:1035 getStudies()
   - analysis/tcc/chartRenderer.mjs:1043 getStudies()
   - analysis/tcc/chartRenderer.mjs:219 getStudies()
@@ -1959,26 +1959,26 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - analysis/tcc/chartRenderer.mjs:1264 studies?.arcFlash
   - analysis/tcc/chartRenderer.mjs:228 studies?.arcFlash
 - `studyResults.shortCircuit`
-  - analysis/tcc.js:1268 getStudies().shortCircuit
+  - analysis/tcc.js:1269 getStudies().shortCircuit
   - analysis/tcc/chartRenderer.mjs:1043 getStudies().shortCircuit
   - analysis/tcc/chartRenderer.mjs:221 studies.shortCircuit
 
 **Detected Writes**
 - `oneLineDiagram`
-  - analysis/tcc.js:3510 setOneLine()
-  - analysis/tcc.js:3560 setOneLine()
+  - analysis/tcc.js:3512 setOneLine()
+  - analysis/tcc.js:3562 setOneLine()
 - `settings.tccSettings`
-  - analysis/tcc.js:1243 setItem(tccSettings)
-  - analysis/tcc.js:1851 setItem(tccSettings)
-  - analysis/tcc.js:2075 setItem(tccSettings)
-  - analysis/tcc.js:2202 setItem(tccSettings)
-  - analysis/tcc.js:2627 setItem(tccSettings)
+  - analysis/tcc.js:1244 setItem(tccSettings)
+  - analysis/tcc.js:1852 setItem(tccSettings)
+  - analysis/tcc.js:2076 setItem(tccSettings)
+  - analysis/tcc.js:2204 setItem(tccSettings)
+  - analysis/tcc.js:2629 setItem(tccSettings)
   - ... 7 more
 - `studyResults`
-  - analysis/tcc.js:2107 setStudies()
+  - analysis/tcc.js:2108 setStudies()
   - analysis/tcc/chartRenderer.mjs:1038 setStudies()
 - `studyResults.shortCircuit`
-  - analysis/tcc.js:2106 studies.shortCircuit
+  - analysis/tcc.js:2107 studies.shortCircuit
 
 ### Harmonics (`harmonics.html`)
 

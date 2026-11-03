@@ -764,6 +764,10 @@
     line-height: 1.1;
 }
 
+.project-sync-status[hidden] {
+    display: none;
+}
+
 .project-sync-status--saved,
 .project-sync-status--ready {
     background: color-mix(in srgb, var(--success-bg) 80%, transparent);

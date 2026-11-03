@@ -86,6 +86,7 @@ import {
 import { createAutoSaveScheduler as createAutoSaveSchedulerModel } from "./src/autoSaveScheduler.js";
 import { recoverActiveProjectName } from "./src/projectContext.js";
 import { importProjectFileData } from "./src/projectFileImport.js";
+import { startProjectSaveStateTracking } from "./src/projectSaveState.js";
 
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
 const CHECKPOINT_KEY='CTR_CHECKPOINT';
@@ -667,23 +668,15 @@ function updateLastSavedIndicator(){
   if(typeof document==='undefined') return;
   const el=document.getElementById('last-saved-indicator');
   if(!el) return;
+  // A backup file is separate from the project's saved version shown by the
+  // header badge, so this text only reports backups.
   const savedText=formatLastSaved(lastSavedAt);
-  if(savedText){
-    el.textContent=`${savedText} • Edits auto-save in this browser.`;
-  }else{
-    el.textContent='Edits auto-save in this browser. Use Save Project for a downloadable backup.';
-  }
-}
-
-function dispatchProjectSyncStatus(detail){
-  if(typeof window==='undefined'||typeof window.dispatchEvent!=='function'||typeof CustomEvent!=='function') return;
-  window.dispatchEvent(new CustomEvent('ctr:project-sync-status',{detail}));
+  el.textContent=savedText?`Backup file: ${savedText.toLowerCase()}.`:'Save Project keeps your changes and can write a backup file.';
 }
 
 function recordSave(){
   lastSavedAt=new Date();
   updateLastSavedIndicator();
-  dispatchProjectSyncStatus({label:'Saved',state:'saved',detail:'Project backup was written.'});
   // Refresh "X ago" text every 30 seconds while the page is open
   if(lastSavedIndicatorTimer) clearInterval(lastSavedIndicatorTimer);
   lastSavedIndicatorTimer=setInterval(updateLastSavedIndicator,30000);
@@ -883,10 +876,9 @@ function createProjectDisplayScheduler(){
 
 const projectDisplayScheduler=createProjectDisplayScheduler();
 
+const projectSaveState=startProjectSaveStateTracking();
 function save(snapshot,options={}){
-  if(options.reason!=='initial-render'&&options.reason!=='settings-init'){
-    dispatchProjectSyncStatus({label:'Unsaved changes',state:'dirty',detail:'Project changes are saved in this browser. Use Save Project to sync or back up this project.'});
-  }
+  projectSaveState.schedule();
   if(options.flush){
     return projectDisplayScheduler.flush(snapshot,options);
   }

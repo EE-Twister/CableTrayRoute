@@ -2261,8 +2261,9 @@ async function initCableSchedule() {
       markSaved();
       tableData = table.getData();
       dataStore.setCables(tableData); // persist only when user saves
-      dataStore.saveProject(projectId);
+      // Log first so the saved version includes the entry (else Save shows "Unsaved changes").
       recordCableChange('Saved schedule', `${tableData.length} cable${tableData.length === 1 ? '' : 's'} saved`);
+      dataStore.saveProject(projectId);
     }
   });
   tableInstance = table;

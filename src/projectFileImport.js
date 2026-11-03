@@ -1,4 +1,4 @@
-import { getLastProjectImportError, importProject } from '../dataStore.mjs';
+import { getLastProjectImportError, importProject, saveProject } from '../dataStore.mjs';
 import { getProjectState, listSavedProjects, setProjectState } from '../projectStorage.js';
 import { importedProjectName, recoverActiveProjectName } from './projectContext.js';
 
@@ -9,6 +9,8 @@ import { importedProjectName, recoverActiveProjectName } from './projectContext.
  * Collection writes are rejected outside a named project, so a fresh browser
  * used to "import" nothing while reporting success. The destination is named
  * before importing, and the previous context is restored if the import fails.
+ * A successful import is saved as the project's saved version: the reload
+ * that follows re-opens that version, which used to discard the import.
  *
  * @param {object} projectData Parsed project file.
  * @param {{fileName?: string, hashName?: string}} [options]
@@ -36,6 +38,10 @@ export function importProjectFileData(projectData, { fileName = '', hashName = '
   try {
     ok = importProject(projectData) === true;
     if (!ok) error = getLastProjectImportError() || 'Import canceled or invalid project data.';
+    else if (!saveProject(projectName)) {
+      ok = false;
+      error = 'The project was imported but could not be saved in this browser.';
+    }
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }

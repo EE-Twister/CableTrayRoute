@@ -58,6 +58,9 @@ import {
   cloneScenarioStorage,
   writeSavedProject,
   readSavedProject,
+  listSavedProjects,
+  readAppSetting,
+  writeAppSetting,
   wasSavedProjectMigrated,
   clearConduitCache
 } from './projectStorage.js';
@@ -1248,6 +1251,60 @@ export const keys = (scenario = getCurrentScenarioNameState()) => {
   }
 };
 
+// The exact snapshot saveProject writes. Fingerprints of it decide whether the
+// working copy still matches the project's last save (see getProjectSaveState).
+function projectSaveSnapshot(scenario) {
+  return prepareProjectSnapshotForSave(exportProject(scenario), {
+    transientSettingKeys: [EXTRA_KEYS.fieldObservationQueue]
+  });
+}
+
+// No ':' in the key, so it can never be listed as a scenario-scoped project setting.
+const saveBaselineKey = (projectName, scenario) => `ctrProjectSaveBaseline|${scenario}|${projectName}`;
+
+// Record what the working copy looked like right after it was saved to, or
+// loaded from, the project's saved version. Comparing against the working
+// copy (rather than the stored record) avoids false differences from shape
+// normalization when a saved record is imported.
+function recordProjectSaveBaseline(projectName, scenario) {
+  if (!projectName) return;
+  try {
+    writeAppSetting(saveBaselineKey(projectName, scenario), hashProjectInputs(projectSaveSnapshot(scenario)));
+  } catch (e) {
+    console.warn('Failed to record project save baseline', e);
+  }
+}
+
+/**
+ * Whether the working copy matches the active project's last saved version.
+ * Opening a project link or reloading a project page restores that saved
+ * version, so "unsaved" changes are the ones those actions would discard.
+ * @param {string} [projectId] Defaults to the active project.
+ * @param {string} [scenario]
+ * @returns {{state:'unnamed'|'saved'|'unsaved', projectName:string, hasSavedVersion:boolean}}
+ */
+export function getProjectSaveState(projectId, scenario = getCurrentScenarioNameState()) {
+  let storedName = '';
+  try {
+    storedName = getProjectState()?.name || '';
+  } catch {
+    storedName = '';
+  }
+  const activeId = typeof window !== 'undefined' ? window.currentProjectId : '';
+  const projectName = resolveActiveProjectName(projectId, activeId, storedName);
+  if (!projectName) return { state: 'unnamed', projectName: '', hasSavedVersion: false };
+  const hasSavedVersion = listSavedProjects().includes(projectName);
+  let baseline = null;
+  try {
+    baseline = readAppSetting(saveBaselineKey(projectName, scenario));
+  } catch {
+    baseline = null;
+  }
+  const saved = hasSavedVersion && Boolean(baseline)
+    && baseline === hashProjectInputs(projectSaveSnapshot(scenario));
+  return { state: saved ? 'saved' : 'unsaved', projectName, hasSavedVersion };
+}
+
 export function saveProject(projectId, scenario = getCurrentScenarioNameState()) {
   if (!projectId) return false;
   try {
@@ -1260,11 +1317,10 @@ export function saveProject(projectId, scenario = getCurrentScenarioNameState())
       if (typeof window !== 'undefined') window.currentProjectId = activeProjectName;
     }
     const pendingFieldObservationQueue = getFieldObservationQueue();
-    const payload = prepareProjectSnapshotForSave(exportProject(scenario), {
-      transientSettingKeys: [EXTRA_KEYS.fieldObservationQueue]
-    });
+    const payload = projectSaveSnapshot(scenario);
     writeSavedProject(projectId, payload, { replace: true });
     if (pendingFieldObservationQueue.length) setFieldObservationQueue([]);
+    recordProjectSaveBaseline(activeProjectName || projectId, scenario);
     // Notify collaboration layer so remote clients receive the update
     if (typeof document !== 'undefined') {
       try {
@@ -1297,6 +1353,7 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
         }
         if (typeof window !== 'undefined') window.currentProjectId = activeProjectName;
       }
+      recordProjectSaveBaseline(activeProjectName || projectId, getCurrentScenarioNameState());
       return true;
     }
     const equipment = payload.equipment;
@@ -1363,6 +1420,7 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
       flushEventBatch();
     }
     if (migrated) saveProject(projectId, scenario);
+    recordProjectSaveBaseline(resolveActiveProjectName(projectId) || projectId, scenario);
     return !!rawPayload;
   } catch (e) {
     console.error('Failed to load project', e);

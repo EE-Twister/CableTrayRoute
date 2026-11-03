@@ -659,7 +659,7 @@ async function saveProject(options = {}) {
     dispatchProjectSyncStatus({ label: 'Local', state: 'local', detail: message });
   } else {
     message = `Project "${name}" successfully saved.`;
-    dispatchProjectSyncStatus({ label: 'Saved', state: 'saved', detail: message });
+    dispatchProjectSyncStatus({ label: 'Synced', state: 'saved', detail: `Project "${name}" is saved to your account.` });
   }
   await showAlertModal('Project Saved', message);
 }
