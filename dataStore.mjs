@@ -1600,6 +1600,14 @@ export function importProject(obj) {
   const data = { ...upgraded };
   delete data.meta;
   delete data.schemaVersion;
+  // Named-project collections cannot be written without an active project,
+  // so an import here would clear settings, write nothing, and still report
+  // success. Fail visibly instead; callers establish the project first.
+  if (!hasNamedProjectContext()) {
+    lastProjectImportError = 'Open or create a project before importing project data.';
+    finishMeasurement({ success: false, reason: 'no-project' });
+    return false;
+  }
   const importScenario = meta && isValidScenarioName(meta.scenario) ? meta.scenario : null;
   if (meta && Array.isArray(meta.scenarios)) {
     setScenarioListState(meta.scenarios);

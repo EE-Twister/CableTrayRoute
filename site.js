@@ -10,8 +10,6 @@ import "./src/components/commandPalette.js";
 import "./units.js";
 import {
   exportProject,
-  importProject,
-  getLastProjectImportError,
   getOneLine,
   getStudies,
   getStudyProvenance,
@@ -87,6 +85,7 @@ import {
 } from "./src/homepageSummary.js";
 import { createAutoSaveScheduler as createAutoSaveSchedulerModel } from "./src/autoSaveScheduler.js";
 import { recoverActiveProjectName } from "./src/projectContext.js";
+import { importProjectFileData } from "./src/projectFileImport.js";
 
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
 const CHECKPOINT_KEY='CTR_CHECKPOINT';
@@ -2604,13 +2603,14 @@ function initProjectIO(){
           const reader=new FileReader();
           reader.onload=ev=>{
             try{
-              const obj=JSON.parse(ev.target.result);
-              if(importProject(obj)){
+              const result=importProjectFileData(JSON.parse(ev.target.result),{fileName:file.name,hashName:currentProjectFromHash()});
+              if(result.ok){
+                if(result.createdProject) history.replaceState(null,'',`${location.pathname}${location.search}#${encodeURIComponent(result.projectName)}`);
                 resolve(true);
                 location.reload();
                 return;
               }
-              reject(new Error(getLastProjectImportError() || 'Import canceled or invalid project data.'));
+              reject(new Error(result.error));
             }catch(err){
               reject(err);
             }

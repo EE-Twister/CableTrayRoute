@@ -25,6 +25,8 @@ Unversioned projects are treated as legacy version 0 and upgraded through the or
 
 Import validation checks required collections, row object types, One-Line sheet structure, scenario metadata, and unexpected root fields. A malformed import is rejected atomically: CableTrayRoute reports the failing JSON path and leaves the current project unchanged. The former repair path that silently replaced invalid collections with empty arrays is intentionally no longer used.
 
+**Import Project** loads a `.ctr.json` file into the open project. When no project is open (for example, in a fresh browser), the import first creates one named after the file — `Plant A.ctr.json` becomes **Plant A**, or **Plant A (2)** if that name is taken — so the imported schedules, one-line, and settings are actually written. Project data can only be imported into a named project; any other attempt reports "Open or create a project before importing project data." instead of claiming success.
+
 Specialized project-scope selectors are available where a study must target a particular record:
 
 - **Bus Duct Sizing** selects a load or circuit and derives voltage, phases, load current, cable-route length, maximum ambient, and Short Circuit duty.

@@ -32,6 +32,17 @@ function it(name, fn){
       assert(csv.includes('C1,10'));
     });
 
+    it('exports positional array rows aligned with the headers', () => {
+      // Voltage drop, demand schedule, and reliability pages build array rows.
+      const csv = toCSV(['Cable', 'Drop (%)', 'Status'], [['C1', '1.250', 'pass'], ['C2', '', 'not evaluated']]);
+      assert.strictEqual(csv, 'Cable,Drop (%),Status\nC1,1.250,pass\nC2,,not evaluated');
+    });
+
+    it('sanitizes formula strings in array rows too', () => {
+      const csv = toCSV(['name'], [['=cmd()']]);
+      assert.strictEqual(csv, "name\n'=cmd()");
+    });
+
     it('exports PDF', async () => {
       const headers = ['cable', 'length'];
       const rows = [{ cable: 'C1', length: 10 }];

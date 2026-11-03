@@ -50,10 +50,20 @@ async function ensureJsPDF() {
  */
 const sanitizeCsvCell = csvCell;
 
+/**
+ * Read the cell for a header from a row. Rows may be objects keyed by header
+ * name or positional arrays aligned with `headers`; both shapes are used by
+ * study pages, and reading an array by header name silently yields blanks.
+ */
+function rowCell(row, header, index) {
+  if (Array.isArray(row)) return row[index];
+  return row?.[header];
+}
+
 export function toCSV(headers = [], rows = []) {
   const lines = [headers.map(h => sanitizeCsvCell(h)).join(',')];
   rows.forEach(r => {
-    const line = headers.map(h => sanitizeCsvCell(r[h])).join(',');
+    const line = headers.map((h, i) => sanitizeCsvCell(rowCell(r, h, i))).join(',');
     lines.push(line);
   });
   return lines.join('\n');
@@ -76,7 +86,7 @@ export async function toPDF(title = 'Report', headers = [], rows = []) {
   doc.text(headers.join(' | '), 10, y);
   y += 10;
   rows.forEach(r => {
-    const line = headers.map(h => r[h] ?? '').join(' | ');
+    const line = headers.map((h, i) => rowCell(r, h, i) ?? '').join(' | ');
     doc.text(String(line), 10, y);
     y += 10;
   });

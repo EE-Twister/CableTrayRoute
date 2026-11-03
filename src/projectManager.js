@@ -398,14 +398,17 @@ async function promptLoadProject(projects) {
 }
 
 async function selectProjectTemplate() {
+  // The selection lives outside render() so the modal's onSubmit option can
+  // return it. Resolves to a PROJECT_TEMPLATES entry, or null for Blank/Skip.
+  let chosen = null;
   return openModal({
     title: 'Choose a Project Template',
     primaryText: 'Use Template',
     secondaryText: 'Skip',
     defaultWidth: 'wide',
+    onSubmit: () => chosen,
     render(body, controller) {
       controller.setPrimaryDisabled(true);
-      let chosen = null;
 
       const grid = document.createElement('div');
       grid.className = 'template-grid';
@@ -438,8 +441,6 @@ async function selectProjectTemplate() {
       });
 
       body.appendChild(grid);
-
-      controller.onSubmit = () => controller.close(chosen);
     }
   });
 }
@@ -460,7 +461,7 @@ async function newProject() {
   applyProjectStateName(trimmed);
   try {
     const sections = createEmptyProjectSections();
-    if (template) {
+    if (template?.sections) {
       sections.cables = Array.isArray(template.sections.cables) ? [...template.sections.cables] : [];
       sections.raceways.trays = Array.isArray(template.sections.raceways?.trays) ? [...template.sections.raceways.trays] : [];
       sections.raceways.conduits = Array.isArray(template.sections.raceways?.conduits) ? [...template.sections.raceways.conduits] : [];
