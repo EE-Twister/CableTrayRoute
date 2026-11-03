@@ -134,7 +134,7 @@ export const EXTRACTED_MODULE_BUDGETS = Object.freeze({
   'src/one-line/propertyEditorModel.mjs': 254,
   'src/one-line/sheetLinks.mjs': 56,
   'src/one-line/sheetPersistenceController.mjs': 147,
-  'src/one-line/studyExecutionController.mjs': 217,
+  'src/one-line/studyExecutionController.mjs': 236,
   'src/one-line/studyInputModel.mjs': 123,
   'src/one-line/studyPanelController.mjs': 155,
   'src/protectiveDevices/catalogLoader.mjs': 129,

@@ -37,8 +37,13 @@ describe('One-Line study execution controller', () => {
       getActiveSheet: () => 0,
       getProtectiveDeviceCatalog: () => ({}),
       loadReferencedProtectiveDevices: async () => ({}),
+      getCables: () => [{ tag: 'C1' }],
+      getTccSettings: () => ({ devices: [] }),
       runLoadFlow: async () => ({}),
-      runShortCircuitOffMain: async () => ({ source: { threePhaseKA: 10 }, load: { threePhaseKA: 5 } }),
+      runShortCircuitOffMain: async (_oneLine, options) => {
+        calls.push(['worker', options]);
+        return { source: { threePhaseKA: 10 }, load: { threePhaseKA: 5 } };
+      },
       runShortCircuit: () => ({}),
       runArcFlash: async () => ({}),
       runHarmonics: () => ({}),
@@ -63,7 +68,9 @@ describe('One-Line study execution controller', () => {
     assert.equal(oneLine.sheets[0].components[0].shortCircuit.threePhaseKA, 10);
     assert.equal(oneLine.sheets[0].components[0].connections[0].faultKA, 5);
     assert.equal(studies.meta, 'shortCircuit');
-    assert.deepEqual(calls.map(call => call[0]), ['oneLine', 'studies', 'renderResults', 'render']);
+    assert.deepEqual(calls.map(call => call[0]), ['worker', 'oneLine', 'studies', 'renderResults', 'render']);
+    assert.deepEqual(calls[0][1], { method: 'IEC', deviceCatalog: {}, cables: [{ tag: 'C1' }], tccSettings: { devices: [] } },
+      'The worker has no storage, so the Cable Schedule and TCC settings must be sent with the request');
     assert.deepEqual(applyShortCircuitResultsToDiagram({ sheets: [] }, {}), { diagram: [], sheets: [] });
   });
 });

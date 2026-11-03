@@ -86,6 +86,8 @@ export function createStudyExecutionController({
   getActiveSheet,
   getProtectiveDeviceCatalog,
   loadReferencedProtectiveDevices,
+  getCables,
+  getTccSettings,
   runLoadFlow,
   runShortCircuitOffMain,
   runShortCircuit,
@@ -132,11 +134,20 @@ export function createStudyExecutionController({
     return result;
   };
 
+  // Every short-circuit run — the standalone study (in a worker, which has no
+  // storage) and the arc-flash basis (main thread) — must evaluate the same
+  // inputs, so the Cable Schedule and saved TCC settings travel explicitly.
+  const buildShortCircuitOptions = async oneLine => ({
+    method: getStudySettings().shortCircuit.method,
+    deviceCatalog: await loadReferencedProtectiveDevices(oneLine, { catalog: getProtectiveDeviceCatalog() }),
+    cables: getCables(),
+    tccSettings: getTccSettings()
+  });
+
   const runShortCircuitStudy = async () => {
     const oneLine = getOneLine();
     const revision = getSheetsRevision(oneLine);
-    const deviceCatalog = await loadReferencedProtectiveDevices(oneLine, { catalog: getProtectiveDeviceCatalog() });
-    const result = await runShortCircuitOffMain(oneLine, { method: getStudySettings().shortCircuit.method, deviceCatalog });
+    const result = await runShortCircuitOffMain(oneLine, await buildShortCircuitOptions(oneLine));
     const current = assertSheetsUnchanged(revision, 'Short circuit');
     const applied = applyShortCircuitResultsToDiagram(oneLine, result);
     setOneLine({ activeSheet: current.activeSheet, sheets: applied.sheets });
@@ -147,6 +158,27 @@ export function createStudyExecutionController({
     renderStudyResults();
     render();
     return result;
+  };
+
+  const runArcFlashStudy = async () => {
+    const oneLine = getOneLine();
+    const options = await buildShortCircuitOptions(oneLine);
+    const shortCircuit = runShortCircuit(options);
+    const arcFlash = await runArcFlash({ shortCircuit: { ...options }, deviceCatalog: options.deviceCatalog });
+    const current = getOneLine();
+    applyShortCircuitResultsToDiagram(current, shortCircuit);
+    current.sheets.flatMap(sheet => sheet.components).forEach(component => { component.arcFlash = arcFlash[component.id]; });
+    setOneLine({ activeSheet: getActiveSheet(), sheets: current.sheets });
+    const studies = getStudies();
+    Object.assign(studies, { shortCircuit, arcFlash });
+    recordProvenance(studies, 'shortCircuit');
+    recordProvenance(studies, 'arcFlash');
+    setStudies(studies);
+    generateArcFlashReport(arcFlash);
+    if (buttons.printArcFlashLabels) buttons.printArcFlashLabels.disabled = false;
+    renderStudyResults();
+    render();
+    return { shortCircuit, arcFlash };
   };
 
   const runReliabilityStudy = async () => {
@@ -172,26 +204,10 @@ export function createStudyExecutionController({
       console.error('[oneline] short circuit failed', error);
       showAlertModal('Short Circuit Error', error?.message || String(error));
     }));
-    buttons.arcFlash?.addEventListener('click', async () => {
-      const oneLine = getOneLine();
-      const deviceCatalog = await loadReferencedProtectiveDevices(oneLine, { catalog: getProtectiveDeviceCatalog() });
-      const options = { method: getStudySettings().shortCircuit.method, deviceCatalog };
-      const shortCircuit = runShortCircuit(options);
-      const arcFlash = await runArcFlash({ shortCircuit: { ...options }, deviceCatalog });
-      const current = getOneLine();
-      applyShortCircuitResultsToDiagram(current, shortCircuit);
-      current.sheets.flatMap(sheet => sheet.components).forEach(component => { component.arcFlash = arcFlash[component.id]; });
-      setOneLine({ activeSheet: getActiveSheet(), sheets: current.sheets });
-      const studies = getStudies();
-      Object.assign(studies, { shortCircuit, arcFlash });
-      recordProvenance(studies, 'shortCircuit');
-      recordProvenance(studies, 'arcFlash');
-      setStudies(studies);
-      generateArcFlashReport(arcFlash);
-      if (buttons.printArcFlashLabels) buttons.printArcFlashLabels.disabled = false;
-      renderStudyResults();
-      render();
-    });
+    buttons.arcFlash?.addEventListener('click', () => runArcFlashStudy().catch(error => {
+      console.error('[oneline] arc flash failed', error);
+      showAlertModal('Arc Flash Error', error?.message || String(error));
+    }));
     buttons.printArcFlashLabels?.addEventListener('click', () => openLabelPrintWindow(getStudies()?.arcFlash || {}));
     buttons.harmonics?.addEventListener('click', () => {
       const studies = getStudies();
@@ -213,5 +229,5 @@ export function createStudyExecutionController({
     }));
   };
 
-  return { bind, runLoadFlowStudy, runReliabilityStudy, runShortCircuitStudy };
+  return { bind, runArcFlashStudy, runLoadFlowStudy, runReliabilityStudy, runShortCircuitStudy };
 }

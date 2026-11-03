@@ -4238,6 +4238,8 @@ const studyExecutionController = createStudyExecutionController({
   getActiveSheet: () => activeSheet,
   getProtectiveDeviceCatalog: () => protectiveDeviceCatalog,
   loadReferencedProtectiveDevices,
+  getCables,
+  getTccSettings: () => getItem('tccSettings', null),
   runLoadFlow: runLoadFlowOffMain,
   runShortCircuitOffMain,
   runShortCircuit,
