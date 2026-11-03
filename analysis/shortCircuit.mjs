@@ -770,9 +770,16 @@ function findParentInfo(comp, comps, compMap, visited) {
   return null;
 }
 
-function loadTccSettings() {
+/**
+ * Resolve TCC settings for a study run. Callers holding a project snapshot
+ * (e.g. the REST API) pass `opts.tccSettings` explicitly — including `null`
+ * for "none saved" — so the run never falls back to shared storage.
+ */
+function loadTccSettings(opts = {}) {
   try {
-    const stored = getItem('tccSettings', DEFAULT_TCC_SETTINGS);
+    const stored = Object.prototype.hasOwnProperty.call(opts, 'tccSettings')
+      ? opts.tccSettings
+      : getItem('tccSettings', DEFAULT_TCC_SETTINGS);
     if (stored && typeof stored === 'object') {
       return {
         devices: Array.isArray(stored.devices) ? stored.devices : [],
@@ -1200,7 +1207,7 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
   const voltageCache = new Map();
   const protectiveLookupCache = new Map();
   const scaledDeviceCache = new Map();
-  const tccSettings = loadTccSettings();
+  const tccSettings = loadTccSettings(opts);
   const protectiveDeviceLibrary = Array.isArray(opts.deviceCatalog)
     ? opts.deviceCatalog
     : defaultProtectiveDeviceCatalog;

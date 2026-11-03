@@ -649,21 +649,34 @@ export const getPanels = () => read(KEYS.panels, []);
  * every render while preserving the individual getter APIs elsewhere.
  */
 export function getOneLineScheduleCollections() {
-  const rawEquipment = read(KEYS.equipment, []);
-  const rawPanels = read(KEYS.panels, []);
-  const rawLoads = read(KEYS.loads, []);
-  const rawCables = read(KEYS.cables, []);
+  return normalizeOneLineScheduleCollections({
+    equipment: read(KEYS.equipment, []),
+    panels: read(KEYS.panels, []),
+    loads: read(KEYS.loads, []),
+    cables: read(KEYS.cables, []),
+  });
+}
+
+/**
+ * Pure counterpart of getOneLineScheduleCollections: normalizes raw schedule
+ * arrays without touching storage, so callers holding a project snapshot
+ * (e.g. the REST API) get exactly the records the browser studies see.
+ * @param {{equipment?:GenericRecord[], panels?:GenericRecord[], loads?:GenericRecord[], cables?:GenericRecord[]}} raw
+ * @returns {Map<string, GenericRecord[]>}
+ */
+export function normalizeOneLineScheduleCollections(raw = {}) {
+  const list = value => (Array.isArray(value) ? value : []);
   const equipment = normalizeProjectEntities({
-    equipment: rawEquipment.map(ensureEquipmentFields),
+    equipment: list(raw.equipment).map(ensureEquipmentFields),
   }).equipment;
   const panels = normalizeProjectEntities({
-    panels: rawPanels.map(ensurePanelFields),
+    panels: list(raw.panels).map(ensurePanelFields),
   }).panels;
   const loads = normalizeProjectEntities({
     equipment,
-    loads: rawLoads.map(ensureLoadFields),
+    loads: list(raw.loads).map(ensureLoadFields),
   }).loads;
-  const cables = normalizeProjectEntities({ equipment, loads, cables: rawCables }).cables;
+  const cables = normalizeProjectEntities({ equipment, loads, cables: list(raw.cables) }).cables;
   return new Map([
     ['equipment', equipment],
     ['panel', panels],
@@ -833,32 +846,43 @@ export const getOneLine = (scenario = getCurrentScenarioNameState()) => {
   if (oneLineProjectViewCache.has(scenario)) {
     return cloneView(oneLineProjectViewCache.get(scenario));
   }
-  const cacheView = value => {
-    oneLineProjectViewCache.set(scenario, cloneView(value));
-    return value;
+  const view = buildOneLineView(
+    read(KEYS.oneLine, {}, scenario),
+    () => oneLineReferencesFromSchedules(getOneLineScheduleCollections())
+  );
+  oneLineProjectViewCache.set(scenario, cloneView(view));
+  return view;
+};
+
+function oneLineReferencesFromSchedules(schedules) {
+  return {
+    equipment: schedules.get('equipment'),
+    panels: schedules.get('panel'),
+    loads: schedules.get('load'),
+    cables: schedules.get('cable'),
   };
+}
+
+/**
+ * Normalize stored one-line data (legacy component array or sheet object) and
+ * join it to the project schedules. Pure: storage access is left to callers.
+ * @param {any} data Raw stored one-line value.
+ * @param {() => object} resolveReferences Lazily supplies normalized schedules.
+ * @returns {{activeSheet:number, sheets:OneLineSheet[]}}
+ */
+function buildOneLineView(data, resolveReferences) {
   const normalizeActiveSheet = value => (Number.isInteger(value) && value >= 0 ? value : 0);
-  const data = read(KEYS.oneLine, {}, scenario);
-  const projectReferences = () => {
-    const schedules = getOneLineScheduleCollections();
-    return {
-      equipment: schedules.get('equipment'),
-      panels: schedules.get('panel'),
-      loads: schedules.get('load'),
-      cables: schedules.get('cable'),
-    };
-  };
   if (Array.isArray(data)) {
-    const references = projectReferences();
+    const references = resolveReferences();
     // legacy array of components
     const normalized = normalizeOneLineReferences(
       { activeSheet: 0, sheets: [{ name: 'Sheet 1', components: data, connections: [], layers: [] }] },
       references
     );
-    return cacheView(buildOneLineProjectView(normalized, references));
+    return buildOneLineProjectView(normalized, references);
   }
   if (data && Array.isArray(data.sheets)) {
-    const references = projectReferences();
+    const references = resolveReferences();
     const normalized = normalizeOneLineReferences({
       activeSheet: normalizeActiveSheet(data.activeSheet),
       sheets: data.sheets.map(s => ({
@@ -872,10 +896,35 @@ export const getOneLine = (scenario = getCurrentScenarioNameState()) => {
         ...(Array.isArray(s.protectionZones) ? { protectionZones: s.protectionZones } : {})
       }))
     }, references);
-    return cacheView(buildOneLineProjectView(normalized, references));
+    return buildOneLineProjectView(normalized, references);
   }
-  return cacheView({ activeSheet: 0, sheets: [] });
-};
+  return { activeSheet: 0, sheets: [] };
+}
+
+/**
+ * Build request-scoped study inputs from a saved project snapshot (the shape
+ * produced by exportProject) without reading or writing storage. Server-side
+ * study endpoints use this so concurrent requests never share mutable state
+ * and see the same normalized one-line, cable schedule, and TCC settings that
+ * the browser studies use.
+ * @param {object} project Saved project data.
+ * @returns {{oneLine:{activeSheet:number, sheets:OneLineSheet[]}, cables:Cable[], tccSettings:object|null}}
+ */
+export function buildProjectAnalysisModel(project = {}) {
+  const source = project && typeof project === 'object' ? project : {};
+  const schedules = normalizeOneLineScheduleCollections({
+    equipment: source.equipment,
+    panels: source.panels,
+    loads: source.loads,
+    cables: Array.isArray(source.cables) ? source.cables : source.cableSchedule,
+  });
+  const oneLine = buildOneLineView(
+    source.oneLine ?? source.oneLineData ?? {},
+    () => oneLineReferencesFromSchedules(schedules)
+  );
+  const tccSettings = source.settings?.tccSettings ?? source.tccSettings ?? null;
+  return { oneLine, cables: schedules.get('cable'), tccSettings };
+}
 /**
  * Persist one-line sheets
  * @param {OneLineSheet[]} sheets

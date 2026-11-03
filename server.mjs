@@ -1961,35 +1961,17 @@ When answering queries:
   }
 
   /**
-   * Run an analysis function that depends on dataStore (which uses localStorage).
-   * In Node.js, localStorage is unavailable, so we install an isolated in-memory
-   * mock for the duration of the synchronous analysis call, then restore it.
-   *
-   * Because all analysis functions are synchronous (no await inside them), no
-   * concurrent request can interleave between the mock setup and restore.
-   *
+   * Build request-scoped study inputs from a saved project snapshot. Solvers
+   * receive these explicitly so concurrent requests never share mutable
+   * storage, and the API sees the same normalized one-line, Cable Schedule,
+   * and TCC settings that the browser studies use.
    * @param {object} projectData  Raw project data blob from storage.
-   * @param {function} fn  Called with ({ setOneLine, setStudies }); must be synchronous.
    */
-  async function withAnalysisStore(projectData, fn) {
-    const store = {};
-    const mockLS = {
-      getItem:    k   => (Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null),
-      setItem:    (k, v) => { store[k] = String(v); },
-      removeItem: k   => { delete store[k]; },
-      clear:      ()  => { for (const k of Object.keys(store)) delete store[k]; },
-    };
-    const prev = globalThis.localStorage;
-    globalThis.localStorage = mockLS;
-    try {
-      const { setOneLine, setStudies } = await import('./dataStore.mjs');
-      const oneLine = projectData.oneLine || projectData.oneLineData || { activeSheet: 0, sheets: [] };
-      setOneLine(oneLine);
-      setStudies({});
-      return fn();
-    } finally {
-      globalThis.localStorage = prev;
-    }
+  async function loadAnalysisModel(projectData) {
+    const { buildProjectAnalysisModel } = await import('./dataStore.mjs');
+    const model = buildProjectAnalysisModel(projectData);
+    const components = model.oneLine.sheets.flatMap(sheet => sheet.components || []);
+    return { ...model, components };
   }
 
   // GET /api/v1/projects/:project/cables
@@ -2022,7 +2004,8 @@ When answering queries:
       const data = await loadProjectData(req, res);
       if (!data) return;
       const { runShortCircuit } = await import('./analysis/shortCircuit.mjs');
-      const result = await withAnalysisStore(data, () => runShortCircuit());
+      const { components, cables, tccSettings } = await loadAnalysisModel(data);
+      const result = runShortCircuit({ buses: components, cables }, { tccSettings });
       res.json({ shortCircuit: result });
     })
   );
@@ -2050,7 +2033,8 @@ When answering queries:
           throw err;
         }
       }
-      const result = await withAnalysisStore(data, () => runMotorStart());
+      const { oneLine } = await loadAnalysisModel(data);
+      const result = runMotorStart(oneLine);
       res.json({ motorStart: result });
     })
   );
