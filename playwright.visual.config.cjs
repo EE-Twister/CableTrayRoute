@@ -24,6 +24,8 @@ module.exports = defineConfig({
     browserName: 'chromium',
     ...visualBrowserChannel,
     colorScheme: 'light',
+    locale: 'en-US',
+    timezoneId: 'UTC',
     reducedMotion: 'reduce',
     serviceWorkers: 'block',
     viewport: { width: 1440, height: 1000 },

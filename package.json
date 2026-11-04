@@ -21,7 +21,7 @@
     "e2e:critical": "playwright test --config playwright.config.cjs playwright-tests/workflow.spec.js playwright-tests/workflow-smoke.spec.js playwright-tests/cableschedule.spec.js playwright-tests/oneline.spec.js playwright-tests/nextFeatures.smoke.spec.js --grep \"create DB-01|design basis gates|dirty-state prompts|load sample cables populates table|editing a source voltage|one-line drag recovers|smoke:\"",
     "e2e:full": "playwright test --config playwright.config.cjs",
     "visual:regression": "playwright test --config playwright.visual.config.cjs",
-    "visual:regression:update": "playwright test --config playwright.visual.config.cjs --update-snapshots",
+    "visual:regression:update": "playwright test --config playwright.visual.config.cjs --update-snapshots=all",
     "perf:browser": "node scripts/perf-browser-baseline.mjs",
     "perf:browser:report": "node scripts/perf-browser-baseline.mjs --no-enforce",
     "perf:summary": "node scripts/writePerformanceSummary.mjs",

@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
 
+// Pin the wall clock so time-stamped UI (for example the Cable Schedule
+// "Last Change" metric) renders the same text on every run. Timers keep
+// running, so debounced renders still fire.
+const VISUAL_FIXED_TIME = new Date('2026-08-02T16:40:00Z');
+
 const STABLE_VISUAL_CSS = `
   *, *::before, *::after {
     animation: none !important;
@@ -19,6 +24,7 @@ const STABLE_VISUAL_CSS = `
 `;
 
 async function openStablePage(page, path, readySelector) {
+  await page.clock.setFixedTime(VISUAL_FIXED_TIME);
   await page.addInitScript(() => {
     localStorage.setItem('themePreference', JSON.stringify('light'));
     localStorage.setItem('onboarding', JSON.stringify({ completed: true, version: '2026.06' }));
@@ -39,6 +45,11 @@ async function settleVisualState(page) {
 test.describe('critical desktop visual contracts', () => {
   test('homepage command center', async ({ page }) => {
     await openStablePage(page, 'index.html?e2e=1&e2e_reset=1', 'main');
+    // "My Projects" is filled by a dynamically imported module; wait until it
+    // replaces the "Loading saved projects..." placeholder.
+    await expect(page.locator('#home-projects-panel')).toHaveAttribute('data-project-workspace-mounted', 'true');
+    await expect(page.locator('#home-projects-panel')).toHaveAttribute('aria-busy', 'false');
+    await settleVisualState(page);
     await expect(page).toHaveScreenshot('homepage-desktop.png', { fullPage: true });
   });
 
@@ -46,6 +57,10 @@ test.describe('critical desktop visual contracts', () => {
     await openStablePage(page, 'cableschedule.html?e2e=1&e2e_reset=1', '#cableScheduleTable');
     await page.locator('#load-sample-cables-btn').click();
     await expect(page.locator('#cableScheduleTable tbody tr')).toHaveCount(3);
+    // The KPI strip re-renders 400 ms after the click (scheduleSummaryMount.js);
+    // wait for the three-cable summary so the screenshot cannot race it.
+    await expect(page.locator('#schedule-summary .viz-kpis')).toBeVisible();
+    await expect(page.locator('#schedule-summary .viz-kpi').first().locator('.viz-kpi__value')).toHaveText('3');
     await settleVisualState(page);
     await expect(page).toHaveScreenshot('cable-schedule-desktop.png');
   });

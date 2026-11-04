@@ -1,0 +1,86 @@
+name: Visual Baselines
+
+# Regenerates the Windows Edge visual-regression baselines and uploads them as
+# an artifact for review. It never commits: download the
+# `visual-baselines-<sha>` artifact, review each image, and commit the ones
+# that reflect an intended UI change into playwright-tests/visual-baselines/.
+#
+# Run it from the Actions tab (or `gh workflow run visual-baselines.yml --ref
+# <branch>`). It also runs when this workflow file changes, so a branch that
+# edits it gets a fresh set of candidate baselines without a manual dispatch.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/visual-baselines.yml
+
+concurrency:
+  group: visual-baselines-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build bundles
+        run: npm run build
+
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines-dist
+          path: dist/
+          retention-days: 1
+
+  update-baselines:
+    name: Regenerate Desktop Visual Baselines
+    runs-on: windows-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: visual-baselines-dist
+          path: dist/
+
+      - name: Regenerate baselines
+        run: npm run visual:regression:update
+        env:
+          CI: true
+
+      # Prove the fresh baselines are stable: a second pass must match them.
+      - name: Verify baselines are reproducible
+        run: npm run visual:regression
+        env:
+          CI: true
+
+      - name: Upload candidate baselines
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines-${{ github.sha }}
+          path: playwright-tests/visual-baselines/
+          retention-days: 14
