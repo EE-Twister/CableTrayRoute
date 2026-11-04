@@ -31,6 +31,28 @@ test.afterAll(async () => {
 });
 
 const badge = page => page.locator('#project-sync-status');
+
+// When the badge is not "Saved", report which parts of the project differ
+// from its saved version so a CI failure says what changed after the save.
+async function expectSaved(page) {
+  try {
+    await expect(badge(page)).toHaveText('Saved');
+  } catch (error) {
+    const diff = await page.evaluate(() => {
+      const name = window.currentProjectId;
+      const saved = window.projectStorage.readSavedProject(name) || {};
+      const now = window.dataStore.exportProject();
+      const changed = Object.keys(now).filter(key => key !== 'settings' && JSON.stringify(now[key]) !== JSON.stringify(saved[key]));
+      const settingKeys = new Set([...Object.keys(now.settings || {}), ...Object.keys(saved.settings || {})]);
+      settingKeys.forEach(key => {
+        if (JSON.stringify(now.settings?.[key]) !== JSON.stringify(saved.settings?.[key])) changed.push(`settings.${key}`);
+      });
+      return { saveState: window.__ctrProjectSaveState, changed };
+    });
+    error.message += `\nProject differs from its saved version: ${JSON.stringify(diff)}`;
+    throw error;
+  }
+}
 const cloudChip = page => page.locator('#project-cloud-status');
 const scheduleReady = page => page.waitForFunction(() => window.__CableScheduleInitOK === true);
 
@@ -67,7 +89,7 @@ test('badge follows edits, saves, reloads, and project links', async ({ page }) 
   await expect(badge(page)).toHaveText('No project');
 
   await createProject(page, 'Badge Project');
-  await expect(badge(page)).toHaveText('Saved');
+  await expectSaved(page);
   await expect(cloudChip(page)).toBeHidden();
 
   await addCable(page, 'BDG-1');
@@ -76,11 +98,11 @@ test('badge follows edits, saves, reloads, and project links', async ({ page }) 
   await expect(page.locator('.project-actions-trigger')).toHaveAttribute('aria-label', /Badge Project\. Unsaved changes\./);
 
   await page.locator('#save-schedule-btn').click();
-  await expect(badge(page)).toHaveText('Saved');
+  await expectSaved(page);
 
   await page.reload();
   await scheduleReady(page);
-  await expect(badge(page)).toHaveText('Saved');
+  await expectSaved(page);
   await expect(page.locator('#cableScheduleTable tbody tr')).toHaveCount(1);
 
   // Pages that write data when opened now keep it in the saved version, so
@@ -113,7 +135,7 @@ test('server sync is reported on its own chip', async ({ page }) => {
   await page.evaluate(() => { void window.projectManager.saveProject({ skipManual: true }); });
   expect((await saved).status()).toBe(200);
   await page.getByRole('dialog', { name: 'Project Saved', exact: true }).getByRole('button').last().click();
-  await expect(badge(page)).toHaveText('Saved');
+  await expectSaved(page);
   await expect(cloudChip(page)).toBeVisible();
   await expect(cloudChip(page)).toHaveText('Synced');
   await expect(page.locator('.project-actions-trigger')).toHaveAttribute('aria-label', /Saved\..*Cloud: Synced\./);
@@ -124,7 +146,7 @@ test('importing a file into an open project keeps the import after the reload', 
   await createProject(page, 'Import Target');
   await addCable(page, 'OLD-1');
   await page.locator('#save-schedule-btn').click();
-  await expect(badge(page)).toHaveText('Saved');
+  await expectSaved(page);
 
   const exported = await page.evaluate(() => window.dataStore.exportProject());
   exported.cables = [
@@ -139,5 +161,5 @@ test('importing a file into an open project keeps the import after the reload', 
   await reloaded;
   await scheduleReady(page);
   await expect(page.locator('#cableScheduleTable tbody tr')).toHaveCount(2);
-  await expect(badge(page)).toHaveText('Saved');
+  await expectSaved(page);
 });

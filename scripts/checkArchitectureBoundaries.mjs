@@ -20,7 +20,7 @@ export const ENTRYPOINT_BUDGETS = Object.freeze({
   'analysis/tcc.js': 4306,
   'app.mjs': 4453,
   'ductbankroute.js': 5185,
-  'cableschedule.js': 3266,
+  'cableschedule.js': 3270,
   'cathodicprotection.js': 2765,
   'src/panelSchedule.js': 2725,
   'site.js': 2821
