@@ -25,11 +25,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Full unit test lane
-        run: npm test
-
+      # Several unit tests read the built dist/ bundles, so build first.
       - name: Build bundles
         run: npm run build
+
+      - name: Full unit test lane
+        run: npm test
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium firefox
