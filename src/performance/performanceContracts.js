@@ -31,8 +31,9 @@ export const PERFORMANCE_BUDGETS = Object.freeze({
 
 export const PERFORMANCE_PROFILE_BUDGETS = Object.freeze({
   'startup:oneline': Object.freeze({
-    // 750 ms until 2026-11: the Ubuntu 26.04 CI runners with Chromium 156
-    // (Playwright 1.64) measured 769-778 ms with no application change.
+    // Median of three cold loads (scripts/perf-browser-baseline.mjs). 750 ms
+    // single-load until 2026-11, when Ubuntu 26.04 CI runners with Chromium 156
+    // measured 769-857 ms for one load with no application change.
     maxDurationMs: 850,
     maxLongTaskMs: 250,
     maxHeapGrowthBytes: 16 * 1024 * 1024,
