@@ -319,6 +319,29 @@ async function measureRoutingAndImport(browser, project) {
   };
 }
 
+// One cold navigation varies by about 10 % on shared CI runners, so the
+// startup:oneline contract uses the median of several independent cold loads.
+const ONE_LINE_STARTUP_SAMPLES = 3;
+
+function median(values) {
+  const sorted = [...values].sort((left, right) => left - right);
+  return sorted[Math.floor(sorted.length / 2)];
+}
+
+// Same navigation as measureOneLine's first load, in a fresh browser context,
+// timed from navigation start to the canvas-ready beacon.
+async function measureOneLineColdStartMs(browser) {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  try {
+    await installProfiler(page);
+    await page.goto(pageUrl('oneline.html'));
+    await page.locator('#oneline-ready-beacon[data-oneline-ready="1"]').waitFor({ timeout: 30000 });
+    return await page.evaluate(() => performance.now());
+  } finally {
+    await page.close();
+  }
+}
+
 async function measureOneLine(browser) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   await installProfiler(page);
@@ -399,6 +422,12 @@ async function measureOneLine(browser) {
   ];
   const allMeasurements = await readMeasurements(page);
   await page.close();
+  // Extra cold loads run after the workload page closes so they do not compete with it.
+  const startupSamplesMs = [profiles[0].durationMs];
+  while (startupSamplesMs.length < ONE_LINE_STARTUP_SAMPLES) {
+    startupSamplesMs.push(await measureOneLineColdStartMs(browser));
+  }
+  profiles[0] = { ...profiles[0], durationMs: median(startupSamplesMs), startupSamplesMs };
   return {
     measurements: allMeasurements.filter(measurement => [
       'ctr.startup',
