@@ -319,26 +319,45 @@ function buildProjectActionsControl(existingProjectDisplay) {
   const display = existingProjectDisplay || document.createElement('span');
   display.id = 'project-display';
   display.classList.add('project-display-chip');
-  if (!display.textContent.trim()) {
-    let projectName = '';
+  let projectName = display.textContent.replace(/^Project:\s*/i, '').trim();
+  if (!projectName) {
     try {
       projectName = String(getProjectState()?.name || '').trim();
     } catch {
       projectName = '';
     }
-    display.textContent = `Project: ${projectName || 'Untitled'}`;
   }
+  renderProjectDisplayName(display, projectName);
 
+  // Local save state of the working copy (Saved / Unsaved changes / ...).
+  // Hidden until the save-state tracker reports, so pages that do not track
+  // saves never show a stale or invented status.
   const syncStatus = document.createElement('span');
   syncStatus.id = 'project-sync-status';
   syncStatus.className = 'project-sync-status project-sync-status--local';
-  syncStatus.textContent = 'Local';
+  syncStatus.hidden = true;
 
-  trigger.append(icon, display, syncStatus);
+  // Server/cloud sync state, shown only when there is one to report, so it
+  // never overwrites what the local badge says.
+  const cloudStatus = document.createElement('span');
+  cloudStatus.id = 'project-cloud-status';
+  cloudStatus.className = 'project-sync-status project-cloud-status';
+  cloudStatus.hidden = true;
+
+  trigger.append(icon, display, syncStatus, cloudStatus);
 
   const panel = document.createElement('div');
   panel.className = 'project-actions-panel';
   panel.setAttribute('role', 'menu');
+
+  // Visible project identity inside the menu, chiefly for narrow screens where
+  // the trigger collapses to an icon. Screen readers get the same text from
+  // the trigger's aria-label, so this stays out of the menu's item list.
+  const heading = document.createElement('p');
+  heading.id = 'project-actions-heading';
+  heading.className = 'project-actions-heading';
+  heading.setAttribute('aria-hidden', 'true');
+  panel.appendChild(heading);
 
   const actions = [
     { label: 'New Project', action: 'newProject' },
@@ -400,24 +419,72 @@ function buildProjectActionsControl(existingProjectDisplay) {
   return wrapper;
 }
 
-function updateProjectSyncStatus(detail = {}) {
+/**
+ * Render the active project name in the header chip. The visible text is the
+ * name alone so it fits beside the save status at laptop widths; the
+ * "Project:" prefix stays available to assistive technology, and the chip's
+ * textContent keeps the historical "Project: <name>" form.
+ * @param {HTMLElement} display The #project-display element.
+ * @param {string} name Project name; blank renders "Untitled".
+ */
+export function renderProjectDisplayName(display, name) {
+  if (!display) return;
+  const label = String(name || '').trim() || 'Untitled';
+  if (typeof display.replaceChildren === 'function' && typeof document !== 'undefined' && typeof document.createElement === 'function') {
+    const prefix = document.createElement('span');
+    prefix.className = 'sr-only';
+    prefix.textContent = 'Project: ';
+    const value = document.createElement('span');
+    value.className = 'project-display-name';
+    value.textContent = label;
+    display.replaceChildren(prefix, value);
+  } else {
+    display.textContent = `Project: ${label}`;
+  }
+  refreshProjectActionsLabel();
+}
+
+function refreshProjectActionsLabel() {
+  if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
+  const trigger = document.querySelector('.project-actions-trigger');
+  const status = document.getElementById('project-sync-status');
+  if (!trigger || !status) return;
+  const projectName = document.getElementById('project-display')?.textContent?.replace(/^Project:\s*/i, '').trim() || 'Untitled';
+  const cloud = document.getElementById('project-cloud-status');
+  const cloudShown = Boolean(cloud && !cloud.hidden && cloud.textContent);
+  const localText = status.hidden ? '' : `${status.textContent}. ${status.title || ''}`.trim();
+  const cloudText = cloudShown ? `Cloud: ${cloud.textContent}. ${cloud.title || ''}`.trim() : '';
+  const statusText = [localText, cloudText].filter(Boolean).join(' ');
+  trigger.setAttribute('aria-label', [`Project actions for ${projectName}.`, statusText].filter(Boolean).join(' '));
+  trigger.title = statusText ? `${projectName} — ${statusText}` : projectName;
+  const heading = document.getElementById('project-actions-heading');
+  if (heading) heading.textContent = [projectName, status.hidden ? '' : status.textContent, cloudShown ? cloud.textContent : ''].filter(Boolean).join(' · ');
+}
+
+function renderStatusChip(element, { label, tone, detail }) {
+  element.className = `${element.id === 'project-cloud-status' ? 'project-sync-status project-cloud-status' : 'project-sync-status'} project-sync-status--${tone}`;
+  element.textContent = label;
+  if (detail) element.title = detail; else element.removeAttribute('title');
+}
+
+// Local save state from src/projectSaveState.js.
+function updateProjectSaveState(detail = {}) {
   const status = document.getElementById('project-sync-status');
   if (!status) return;
+  renderStatusChip(status, { label: detail.label || 'No project', tone: detail.tone || 'local', detail: detail.detail });
+  status.hidden = false;
+  refreshProjectActionsLabel();
+}
+
+// Server/cloud sync results from the project manager. "local" means the
+// project is not synced anywhere, which the local badge already conveys.
+function updateProjectSyncStatus(detail = {}) {
+  const cloud = document.getElementById('project-cloud-status');
+  if (!cloud) return;
   const state = detail.state || 'local';
-  status.className = `project-sync-status project-sync-status--${state}`;
-  status.textContent = detail.label || 'Local';
-  if (detail.detail) {
-    status.title = detail.detail;
-  } else {
-    status.removeAttribute('title');
-  }
-  const trigger = document.querySelector('.project-actions-trigger');
-  if (trigger) {
-    const projectName = document.getElementById('project-display')?.textContent?.replace(/^Project:\s*/i, '').trim() || 'Untitled';
-    const accessibleStatus = detail.detail || status.textContent;
-    trigger.setAttribute('aria-label', `Project actions for ${projectName}. ${accessibleStatus}`);
-    trigger.title = `${projectName} — ${accessibleStatus}`;
-  }
+  cloud.hidden = state === 'local' || !detail.label;
+  if (!cloud.hidden) renderStatusChip(cloud, { label: detail.label, tone: state, detail: detail.detail });
+  refreshProjectActionsLabel();
 }
 
 function hasNavigationDomApi() {
@@ -677,7 +744,11 @@ function mountPersistentNavigation() {
     window.addEventListener('ctr:project-sync-status', event => {
       updateProjectSyncStatus(event.detail || {});
     });
+    window.addEventListener('ctr:project-save-state', event => {
+      updateProjectSaveState(event.detail || {});
+    });
   }
+  if (window.__ctrProjectSaveState) updateProjectSaveState(window.__ctrProjectSaveState);
 
   document.body.dataset.navMounted = 'true';
   repairMojibakeDocument(document);

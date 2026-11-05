@@ -58,6 +58,9 @@ import {
   cloneScenarioStorage,
   writeSavedProject,
   readSavedProject,
+  listSavedProjects,
+  readAppSetting,
+  writeAppSetting,
   wasSavedProjectMigrated,
   clearConduitCache
 } from './projectStorage.js';
@@ -649,21 +652,34 @@ export const getPanels = () => read(KEYS.panels, []);
  * every render while preserving the individual getter APIs elsewhere.
  */
 export function getOneLineScheduleCollections() {
-  const rawEquipment = read(KEYS.equipment, []);
-  const rawPanels = read(KEYS.panels, []);
-  const rawLoads = read(KEYS.loads, []);
-  const rawCables = read(KEYS.cables, []);
+  return normalizeOneLineScheduleCollections({
+    equipment: read(KEYS.equipment, []),
+    panels: read(KEYS.panels, []),
+    loads: read(KEYS.loads, []),
+    cables: read(KEYS.cables, []),
+  });
+}
+
+/**
+ * Pure counterpart of getOneLineScheduleCollections: normalizes raw schedule
+ * arrays without touching storage, so callers holding a project snapshot
+ * (e.g. the REST API) get exactly the records the browser studies see.
+ * @param {{equipment?:GenericRecord[], panels?:GenericRecord[], loads?:GenericRecord[], cables?:GenericRecord[]}} raw
+ * @returns {Map<string, GenericRecord[]>}
+ */
+export function normalizeOneLineScheduleCollections(raw = {}) {
+  const list = value => (Array.isArray(value) ? value : []);
   const equipment = normalizeProjectEntities({
-    equipment: rawEquipment.map(ensureEquipmentFields),
+    equipment: list(raw.equipment).map(ensureEquipmentFields),
   }).equipment;
   const panels = normalizeProjectEntities({
-    panels: rawPanels.map(ensurePanelFields),
+    panels: list(raw.panels).map(ensurePanelFields),
   }).panels;
   const loads = normalizeProjectEntities({
     equipment,
-    loads: rawLoads.map(ensureLoadFields),
+    loads: list(raw.loads).map(ensureLoadFields),
   }).loads;
-  const cables = normalizeProjectEntities({ equipment, loads, cables: rawCables }).cables;
+  const cables = normalizeProjectEntities({ equipment, loads, cables: list(raw.cables) }).cables;
   return new Map([
     ['equipment', equipment],
     ['panel', panels],
@@ -833,32 +849,43 @@ export const getOneLine = (scenario = getCurrentScenarioNameState()) => {
   if (oneLineProjectViewCache.has(scenario)) {
     return cloneView(oneLineProjectViewCache.get(scenario));
   }
-  const cacheView = value => {
-    oneLineProjectViewCache.set(scenario, cloneView(value));
-    return value;
+  const view = buildOneLineView(
+    read(KEYS.oneLine, {}, scenario),
+    () => oneLineReferencesFromSchedules(getOneLineScheduleCollections())
+  );
+  oneLineProjectViewCache.set(scenario, cloneView(view));
+  return view;
+};
+
+function oneLineReferencesFromSchedules(schedules) {
+  return {
+    equipment: schedules.get('equipment'),
+    panels: schedules.get('panel'),
+    loads: schedules.get('load'),
+    cables: schedules.get('cable'),
   };
+}
+
+/**
+ * Normalize stored one-line data (legacy component array or sheet object) and
+ * join it to the project schedules. Pure: storage access is left to callers.
+ * @param {any} data Raw stored one-line value.
+ * @param {() => object} resolveReferences Lazily supplies normalized schedules.
+ * @returns {{activeSheet:number, sheets:OneLineSheet[]}}
+ */
+function buildOneLineView(data, resolveReferences) {
   const normalizeActiveSheet = value => (Number.isInteger(value) && value >= 0 ? value : 0);
-  const data = read(KEYS.oneLine, {}, scenario);
-  const projectReferences = () => {
-    const schedules = getOneLineScheduleCollections();
-    return {
-      equipment: schedules.get('equipment'),
-      panels: schedules.get('panel'),
-      loads: schedules.get('load'),
-      cables: schedules.get('cable'),
-    };
-  };
   if (Array.isArray(data)) {
-    const references = projectReferences();
+    const references = resolveReferences();
     // legacy array of components
     const normalized = normalizeOneLineReferences(
       { activeSheet: 0, sheets: [{ name: 'Sheet 1', components: data, connections: [], layers: [] }] },
       references
     );
-    return cacheView(buildOneLineProjectView(normalized, references));
+    return buildOneLineProjectView(normalized, references);
   }
   if (data && Array.isArray(data.sheets)) {
-    const references = projectReferences();
+    const references = resolveReferences();
     const normalized = normalizeOneLineReferences({
       activeSheet: normalizeActiveSheet(data.activeSheet),
       sheets: data.sheets.map(s => ({
@@ -872,10 +899,35 @@ export const getOneLine = (scenario = getCurrentScenarioNameState()) => {
         ...(Array.isArray(s.protectionZones) ? { protectionZones: s.protectionZones } : {})
       }))
     }, references);
-    return cacheView(buildOneLineProjectView(normalized, references));
+    return buildOneLineProjectView(normalized, references);
   }
-  return cacheView({ activeSheet: 0, sheets: [] });
-};
+  return { activeSheet: 0, sheets: [] };
+}
+
+/**
+ * Build request-scoped study inputs from a saved project snapshot (the shape
+ * produced by exportProject) without reading or writing storage. Server-side
+ * study endpoints use this so concurrent requests never share mutable state
+ * and see the same normalized one-line, cable schedule, and TCC settings that
+ * the browser studies use.
+ * @param {object} project Saved project data.
+ * @returns {{oneLine:{activeSheet:number, sheets:OneLineSheet[]}, cables:Cable[], tccSettings:object|null}}
+ */
+export function buildProjectAnalysisModel(project = {}) {
+  const source = project && typeof project === 'object' ? project : {};
+  const schedules = normalizeOneLineScheduleCollections({
+    equipment: source.equipment,
+    panels: source.panels,
+    loads: source.loads,
+    cables: Array.isArray(source.cables) ? source.cables : source.cableSchedule,
+  });
+  const oneLine = buildOneLineView(
+    source.oneLine ?? source.oneLineData ?? {},
+    () => oneLineReferencesFromSchedules(schedules)
+  );
+  const tccSettings = source.settings?.tccSettings ?? source.tccSettings ?? null;
+  return { oneLine, cables: schedules.get('cable'), tccSettings };
+}
 /**
  * Persist one-line sheets
  * @param {OneLineSheet[]} sheets
@@ -1199,6 +1251,60 @@ export const keys = (scenario = getCurrentScenarioNameState()) => {
   }
 };
 
+// The exact snapshot saveProject writes. Fingerprints of it decide whether the
+// working copy still matches the project's last save (see getProjectSaveState).
+function projectSaveSnapshot(scenario) {
+  return prepareProjectSnapshotForSave(exportProject(scenario), {
+    transientSettingKeys: [EXTRA_KEYS.fieldObservationQueue]
+  });
+}
+
+// No ':' in the key, so it can never be listed as a scenario-scoped project setting.
+const saveBaselineKey = (projectName, scenario) => `ctrProjectSaveBaseline|${scenario}|${projectName}`;
+
+// Record what the working copy looked like right after it was saved to, or
+// loaded from, the project's saved version. Comparing against the working
+// copy (rather than the stored record) avoids false differences from shape
+// normalization when a saved record is imported.
+function recordProjectSaveBaseline(projectName, scenario) {
+  if (!projectName) return;
+  try {
+    writeAppSetting(saveBaselineKey(projectName, scenario), hashProjectInputs(projectSaveSnapshot(scenario)));
+  } catch (e) {
+    console.warn('Failed to record project save baseline', e);
+  }
+}
+
+/**
+ * Whether the working copy matches the active project's last saved version.
+ * Opening a project link or reloading a project page restores that saved
+ * version, so "unsaved" changes are the ones those actions would discard.
+ * @param {string} [projectId] Defaults to the active project.
+ * @param {string} [scenario]
+ * @returns {{state:'unnamed'|'saved'|'unsaved', projectName:string, hasSavedVersion:boolean}}
+ */
+export function getProjectSaveState(projectId, scenario = getCurrentScenarioNameState()) {
+  let storedName = '';
+  try {
+    storedName = getProjectState()?.name || '';
+  } catch {
+    storedName = '';
+  }
+  const activeId = typeof window !== 'undefined' ? window.currentProjectId : '';
+  const projectName = resolveActiveProjectName(projectId, activeId, storedName);
+  if (!projectName) return { state: 'unnamed', projectName: '', hasSavedVersion: false };
+  const hasSavedVersion = listSavedProjects().includes(projectName);
+  let baseline = null;
+  try {
+    baseline = readAppSetting(saveBaselineKey(projectName, scenario));
+  } catch {
+    baseline = null;
+  }
+  const saved = hasSavedVersion && Boolean(baseline)
+    && baseline === hashProjectInputs(projectSaveSnapshot(scenario));
+  return { state: saved ? 'saved' : 'unsaved', projectName, hasSavedVersion };
+}
+
 export function saveProject(projectId, scenario = getCurrentScenarioNameState()) {
   if (!projectId) return false;
   try {
@@ -1211,11 +1317,10 @@ export function saveProject(projectId, scenario = getCurrentScenarioNameState())
       if (typeof window !== 'undefined') window.currentProjectId = activeProjectName;
     }
     const pendingFieldObservationQueue = getFieldObservationQueue();
-    const payload = prepareProjectSnapshotForSave(exportProject(scenario), {
-      transientSettingKeys: [EXTRA_KEYS.fieldObservationQueue]
-    });
+    const payload = projectSaveSnapshot(scenario);
     writeSavedProject(projectId, payload, { replace: true });
     if (pendingFieldObservationQueue.length) setFieldObservationQueue([]);
+    recordProjectSaveBaseline(activeProjectName || projectId, scenario);
     // Notify collaboration layer so remote clients receive the update
     if (typeof document !== 'undefined') {
       try {
@@ -1248,6 +1353,7 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
         }
         if (typeof window !== 'undefined') window.currentProjectId = activeProjectName;
       }
+      recordProjectSaveBaseline(activeProjectName || projectId, getCurrentScenarioNameState());
       return true;
     }
     const equipment = payload.equipment;
@@ -1314,6 +1420,7 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
       flushEventBatch();
     }
     if (migrated) saveProject(projectId, scenario);
+    recordProjectSaveBaseline(resolveActiveProjectName(projectId) || projectId, scenario);
     return !!rawPayload;
   } catch (e) {
     console.error('Failed to load project', e);
@@ -1551,6 +1658,14 @@ export function importProject(obj) {
   const data = { ...upgraded };
   delete data.meta;
   delete data.schemaVersion;
+  // Named-project collections cannot be written without an active project,
+  // so an import here would clear settings, write nothing, and still report
+  // success. Fail visibly instead; callers establish the project first.
+  if (!hasNamedProjectContext()) {
+    lastProjectImportError = 'Open or create a project before importing project data.';
+    finishMeasurement({ success: false, reason: 'no-project' });
+    return false;
+  }
   const importScenario = meta && isValidScenarioName(meta.scenario) ? meta.scenario : null;
   if (meta && Array.isArray(meta.scenarios)) {
     setScenarioListState(meta.scenarios);

@@ -1,4 +1,5 @@
 import * as dataStore from './dataStore.mjs';
+import { saveProjectOnChange } from './src/projectSaveState.js';
 import { openModal } from './src/components/modal.js';
 import { findMccLineupForEquipment, mccLineupDimensions, renderMccElevationSvg, renderMccOneLineSvg } from './src/mccLineupModel.mjs';
 
@@ -2893,6 +2894,7 @@ function initialize() {
   populateSelect('equipment-voltage', VOLTAGE_OPTIONS);
   populateEquipmentPreset();
   populateMccLineupPreset();
+  saveProjectOnChange([ARRANGEMENTS_KEY]);
   loadArrangements();
   compactToolbarControls();
   createContextMenu();

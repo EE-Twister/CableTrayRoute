@@ -10,6 +10,8 @@ The Cable Schedule page is optimized for fast entry first, with deeper routing a
 - The default **Basic Entry** view shows identification, terminations, cable construction, electrical entry, and notes.
 - Cable construction now includes **EGC Size** and **EGC Material**, and electrical entry includes **OCPD Rating (A)** plus **Terminal Temp (C)** for selected NEC 110.14(C), 240.4, and 250.122 screening in the Design Rule Checker.
 - Advanced routing coordinates, manufacturer details, and calculated fields remain available through **View Preset**.
+- The workspace is laid out so the first cable rows sit above the fold on a typical laptop screen (about 1265 × 712): the summary strip is a single slim row, the next-action banner shows its actions as compact buttons, and the search field carries its own label.
+- Each column group header has a small **–/+** toggle that collapses or expands that group. Screen readers announce it as, for example, "Collapse Terminations columns" together with its expanded state.
 
 ## Voltage Drop Inputs
 

@@ -80,10 +80,17 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ### POST /api/v1/projects/:project/studies/short-circuit
 
-Runs a short-circuit study on the project's one-line diagram data.
+Runs a short-circuit study on the project's saved one-line diagram, joined to
+its Equipment, Panel, Load, and Cable Schedule records exactly as the browser
+study does. Feeder impedance between buses comes from the linked Cable Schedule
+rows, and protective-device data comes from the saved `settings.tccSettings`.
+The endpoint evaluates the supplied project data directly and does not depend
+on process-global browser storage.
 
 Computes three-phase (3LG), single-line-to-ground (SLG), line-to-line (L-L), and
-double-line-to-ground (DLG) fault currents for each bus.
+double-line-to-ground (DLG) fault currents for each bus. Each bus result's
+`impedanceProvenance.segments` lists the source of every impedance segment
+(for example `"One-Line source data"` or `"Cable Schedule"`).
 
 **Request body:** `{}` (no parameters required; uses stored project data)
 
@@ -113,7 +120,10 @@ curl -s -X POST \
 
 ### POST /api/v1/projects/:project/studies/motor-start
 
-Runs a motor starting study on the project's one-line diagram data.
+Runs a motor starting study on the project's saved one-line diagram data,
+joined to its schedules the same way as the browser study. The endpoint
+evaluates the supplied project data directly and does not depend on
+process-global browser storage.
 
 Returns inrush current, voltage sag, acceleration time, and starter type for each motor.
 Supports all starter types: `dol`, `vfd`, `soft_starter`, `wye_delta`, `autotransformer`.

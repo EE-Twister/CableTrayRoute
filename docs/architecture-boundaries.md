@@ -13,6 +13,8 @@ The largest browser entry points are orchestration layers. New domain, state, an
 | `oneline.js` | Connection routing and SVG rendering | `src/one-line/connectionRouting.mjs`, `src/one-line/connectionRenderController.mjs`, `src/one-line/componentNodeRenderController.mjs` |
 | `oneline.js` | Property, palette, telemetry, study, sheet, file, event, and history orchestration | `src/one-line/*Controller.mjs`, `src/one-line/propertyDetailView.mjs` |
 | `oneline.js` | Compact protective-device catalog loading | `src/protectiveDevices/catalogLoader.mjs` |
+| `oneline.js` | Component property copy/paste clipboard model | `src/one-line/propertyClipboardModel.mjs` |
+| `oneline.js` | Transformer port roles, winding and nominal/operating voltage resolution, and voltage formatting | `src/one-line/voltageModel.mjs` |
 | `analysis/tcc.js` | Custom-curve validation, normalization, and catalog adaptation | `analysis/tcc/customCurveModel.mjs` |
 | `analysis/tcc.js` | View options, formatting, and legend layout | `analysis/tcc/viewModel.mjs` |
 | `analysis/tcc.js` | Plot range collection and axis-domain calculation | `analysis/tcc/plotDomainModel.mjs` |
@@ -32,6 +34,7 @@ The largest browser entry points are orchestration layers. New domain, state, an
 | `ductbankroute.js` | Ductbank interchange adapter | `src/ductbankProjectAdapter.mjs` |
 | `ductbankroute.js` | Thermal constants and pure calculation primitives | `src/ductbank-route/thermalPrimitives.js` |
 | `ductbankroute.js` | Injected ductbank ampacity and conductor-temperature model | `src/ductbank-route/ampacityModel.js` |
+| `ductbankroute.js` | Input review issues (missing data, duplicates, assignment, fill, thermal, ampacity) and table filter matching | `src/ductbank-route/issueModel.js` |
 | `cableschedule.js` | Spreadsheet I/O and print rendering | `src/cable-schedule/io.js`, `src/cable-schedule/printReport.js` |
 | `cableschedule.js` | Raceway and panel selector option model | `src/cable-schedule/optionModel.js` |
 | `cableschedule.js` | Template normalization, tag parsing, and schedule configuration | `src/cable-schedule/templateModel.js`, `src/cable-schedule/tagModel.js`, `src/cable-schedule/scheduleConfig.js` |
@@ -52,10 +55,10 @@ The original line counts are immutable baselines. The current budgets equal the 
 
 | Entrypoint | Original baseline | Current budget | Reduction |
 | --- | ---: | ---: | ---: |
-| `oneline.js` | 20,852 | 13,175 | 36.8% |
+| `oneline.js` | 20,852 | 12,775 | 38.7% |
 | `analysis/tcc.js` | 11,308 | 4,306 | 61.9% |
 | `app.mjs` | 6,734 | 4,453 | 33.9% |
-| `ductbankroute.js` | 5,377 | 5,230 | 2.7% |
+| `ductbankroute.js` | 5,377 | 5,185 | 3.6% |
 | `cableschedule.js` | 3,644 | 3,266 | 10.4% |
 | `cathodicprotection.js` | 3,401 | 2,764 | 18.7% |
 | `src/panelSchedule.js` | 3,234 | 2,725 | 15.7% |

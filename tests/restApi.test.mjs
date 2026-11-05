@@ -193,6 +193,55 @@ async function runTests() {
         'Response should have voltageDrop field');
     });
 
+    // -----------------------------------------------------------------------
+    // Study endpoints must use the saved project's own data: the Cable
+    // Schedule feeder between SWBD-1 and MCC-1 limits the downstream fault.
+    const studyComponents = [
+      { id: 'source', type: 'source', subtype: 'utility_source', label: 'SWBD-1', equipmentRef: 'SWBD-1',
+        voltage: 480, thevenin_mva: 20, xr_ratio: 10, connections: [{ target: 'load_bus' }] },
+      { id: 'load_bus', type: 'equipment', label: 'MCC-1', equipmentRef: 'MCC-1', voltage: 480 },
+      { id: 'm1', type: 'motor_load', subtype: 'motor_load', hp: 100, voltage: 480 },
+    ];
+    const studyCables = [{
+      tag: 'CBL-SWBD-MCC', from: 'SWBD-1', to: 'MCC-1', conductor_size: '#4 AWG',
+      conductor_material: 'Copper', raceway_material: 'PVC', length_ft: 100,
+    }];
+    await saveProject(token, csrfToken, 'study-project', {
+      cables: studyCables,
+      oneLine: { activeSheet: 0, sheets: [{ name: 'S1', components: studyComponents }] },
+    });
+
+    await check('short-circuit study includes Cable Schedule impedance from the saved project', async () => {
+      const res = await fetch(`${base}/api/v1/projects/study-project/studies/short-circuit`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      assert.strictEqual(res.status, 200);
+      const { shortCircuit } = await res.json();
+      const { runShortCircuit } = await import('../analysis/shortCircuit.mjs');
+      const expected = runShortCircuit({ buses: studyComponents, cables: studyCables }, {});
+      assert.strictEqual(shortCircuit.load_bus.threePhaseKA, expected.load_bus.threePhaseKA);
+      assert.ok(shortCircuit.load_bus.threePhaseKA < shortCircuit.source.threePhaseKA,
+        'Feeder impedance should reduce the downstream fault current');
+      assert.deepStrictEqual(
+        shortCircuit.load_bus.impedanceProvenance.segments.map(segment => segment.source),
+        ['One-Line source data', 'Cable Schedule']
+      );
+    });
+
+    await check('motor-start study evaluates the saved project motors', async () => {
+      const res = await fetch(`${base}/api/v1/projects/study-project/studies/motor-start`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      assert.strictEqual(res.status, 200);
+      const { motorStart } = await res.json();
+      assert.deepStrictEqual(Object.keys(motorStart), ['m1']);
+      assert.ok(motorStart.m1.inrushKA > 0);
+    });
+
     await check('GET /api/v1/projects/:project/cables returns empty array for project with no cables', async () => {
       // Save a project with raceways but no cables (non-empty body so the store writes to disk)
       const saveRes = await saveProject(token, csrfToken, 'empty-cables', { raceways: [] });

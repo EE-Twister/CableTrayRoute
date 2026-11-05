@@ -241,6 +241,21 @@ body.compact-mode #palette button .palette-icon {
     padding: 12px;
 }
 
+/* Next-action banners (workflow-core.css, layout layer) hold link-buttons.
+   Without this rule they pick up the full-width, 1.1rem form-submit look of
+   .primary-btn above, which stacks the actions into an oversized block. */
+.workflow-next-action .btn,
+.workflow-next-action .primary-btn {
+    display: inline-flex;
+    align-items: center;
+    width: auto;
+    min-height: 2rem;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.875rem;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
 .secondary-btn {
     background-color: var(--secondary-color);
     color: var(--text-color);

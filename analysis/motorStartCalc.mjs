@@ -186,10 +186,12 @@ export function calculateMotorStartCase(input = {}, criteria = {}) {
 
 /**
  * Estimate voltage sag during motor starting using a simple Thevenin model.
+ * @param {{sheets?:Array}} [oneLine] Explicit one-line (e.g. from a saved
+ *   project snapshot). Defaults to the active project's stored one-line.
  * @returns {Object<string,{inrushKA:number,voltageSagPct:number,accelTime:number,starterType:string}>}
  */
-export function runMotorStart() {
-  const { sheets } = getOneLine();
+export function runMotorStart(oneLine = getOneLine()) {
+  const sheets = Array.isArray(oneLine?.sheets) ? oneLine.sheets : [];
   const comps = (Array.isArray(sheets[0]?.components)
     ? sheets.flatMap(s => s.components)
     : sheets).filter(c => c && c.type !== 'annotation' && c.type !== 'dimension');

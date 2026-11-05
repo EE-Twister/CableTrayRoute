@@ -56,3 +56,9 @@ tr.xhl-row { outline: 2px solid #e0a800; outline-offset: -2px; }
 .viz-stack__bar { display: flex; height: 1rem; border-radius: 999px; overflow: hidden; background: var(--border-color); }
 .viz-stack__seg { display: block; height: 100%; background: var(--viz-bar); }
 .viz-stack__caption { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }
+
+/* Schedule pages: keep the summary to one slim row so the editable table
+   stays near the top of the workspace. */
+#schedule-summary .viz-kpis { gap: 0.5rem; margin: 0.4rem 0; }
+#schedule-summary .viz-kpi { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 0.45rem; padding: 0.35rem 0.75rem; }
+#schedule-summary .viz-kpi__value { font-size: 1.15rem; }

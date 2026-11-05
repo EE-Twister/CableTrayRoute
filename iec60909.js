@@ -2,7 +2,7 @@ import { barChartHtml, shortCircuitBarRows } from './src/components/resultViz.mj
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
 import { runShortCircuit } from './analysis/shortCircuit.mjs';
-import { getOneLine, getStudies, setStudies } from './dataStore.mjs';
+import { getCables, getOneLine, getStudies, setStudies } from './dataStore.mjs';
 import { downloadPDF } from './reports/reporting.mjs';
 import { loadReferencedProtectiveDevices } from './src/protectiveDevices/calculationCatalog.mjs';
 
@@ -54,7 +54,9 @@ function buildModel() {
     : sheets;
   let buses = comps.filter(c => c.subtype === 'Bus');
   if (buses.length === 0) buses = comps;
-  return { buses, components: comps };
+  // Feeder impedance between buses comes from the Cable Schedule, matching
+  // the One-Line short-circuit study and the REST API.
+  return { buses, components: comps, cables: getCables() };
 }
 
 function renderResults(res) {

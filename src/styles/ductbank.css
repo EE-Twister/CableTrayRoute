@@ -172,6 +172,8 @@ body.dark-mode .db-table td {
     cursor: pointer;
     width: 28px;
     height: 28px;
+    /* The base button rule sets a 2.5rem min-height that would override the 28px height. */
+    min-height: 28px;
     border-radius: 4px;
     display: inline-flex;
     align-items: center;
@@ -211,6 +213,7 @@ body.dark-mode .filter-btn:focus-visible {
     gap: 0.25rem;
     cursor: pointer;
     padding: 0;
+    min-height: 28px;
 }
 
 .header-sort:focus-visible {

@@ -63,6 +63,8 @@ function createGuardHarness() {
     getActiveSheet: () => 0,
     getProtectiveDeviceCatalog: () => ({}),
     loadReferencedProtectiveDevices: async () => ({}),
+    getCables: () => [],
+    getTccSettings: () => null,
     runLoadFlow: async () => {
       calls.push('run-load-flow');
       return { buses: [], lines: [] };

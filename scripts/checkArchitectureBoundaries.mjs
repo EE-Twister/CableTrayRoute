@@ -16,14 +16,14 @@ export const ORIGINAL_ENTRYPOINT_BASELINES = Object.freeze({
 });
 
 export const ENTRYPOINT_BUDGETS = Object.freeze({
-  'oneline.js': 13175,
+  'oneline.js': 12775,
   'analysis/tcc.js': 4306,
   'app.mjs': 4453,
-  'ductbankroute.js': 5305,
-  'cableschedule.js': 3266,
+  'ductbankroute.js': 5185,
+  'cableschedule.js': 3270,
   'cathodicprotection.js': 2765,
   'src/panelSchedule.js': 2725,
-  'site.js': 2829
+  'site.js': 2821
 });
 
 export const REQUIRED_BOUNDARIES = Object.freeze({
@@ -40,6 +40,8 @@ export const REQUIRED_BOUNDARIES = Object.freeze({
     './src/one-line/propertyDetailView.mjs',
     './src/one-line/studyExecutionController.mjs',
     './src/one-line/eventBindingController.mjs',
+    './src/one-line/propertyClipboardModel.mjs',
+    './src/one-line/voltageModel.mjs',
     './src/protectiveDevices/catalogLoader.mjs'
   ],
   'analysis/tcc.js': [
@@ -77,7 +79,8 @@ export const REQUIRED_BOUNDARIES = Object.freeze({
   'ductbankroute.js': [
     './src/ductbankProjectAdapter.mjs',
     './src/ductbank-route/thermalPrimitives.js',
-    './src/ductbank-route/ampacityModel.js'
+    './src/ductbank-route/ampacityModel.js',
+    './src/ductbank-route/issueModel.js'
   ],
   'cableschedule.js': [
     './src/cable-schedule/io.js',
@@ -129,14 +132,16 @@ export const EXTRACTED_MODULE_BUDGETS = Object.freeze({
   'src/one-line/historyController.mjs': 66,
   'src/one-line/liveTelemetryViewController.mjs': 237,
   'src/one-line/paletteController.mjs': 329,
+  'src/one-line/propertyClipboardModel.mjs': 155,
   'src/one-line/propertyDetailView.mjs': 2332,
   'src/one-line/propertyEditorController.mjs': 252,
   'src/one-line/propertyEditorModel.mjs': 254,
   'src/one-line/sheetLinks.mjs': 56,
   'src/one-line/sheetPersistenceController.mjs': 147,
-  'src/one-line/studyExecutionController.mjs': 217,
+  'src/one-line/studyExecutionController.mjs': 236,
   'src/one-line/studyInputModel.mjs': 123,
   'src/one-line/studyPanelController.mjs': 155,
+  'src/one-line/voltageModel.mjs': 231,
   'src/protectiveDevices/catalogLoader.mjs': 129,
   'src/protectiveDevices/tccCatalogHydrator.mjs': 48,
   'analysis/tcc/annotationModel.mjs': 93,
@@ -188,6 +193,7 @@ export const EXTRACTED_MODULE_BUDGETS = Object.freeze({
   'src/cable-schedule/scheduleConfig.js': 206,
   'src/ductbank-route/thermalPrimitives.js': 74,
   'src/ductbank-route/ampacityModel.js': 275,
+  'src/ductbank-route/issueModel.js': 154,
   'src/studies/cp/analysisEngine.js': 654
 });
 
@@ -212,6 +218,7 @@ export const DOM_FREE_MODULES = Object.freeze([
   'src/studies/cp/distributionModel.js',
   'src/studies/cp/interferenceAssessment.js',
   'src/ductbank-route/ampacityModel.js',
+  'src/ductbank-route/issueModel.js',
   'src/ductbank-route/thermalPrimitives.js',
   'src/homepageSummary.js',
   'src/cable-schedule/optionModel.js',
@@ -231,10 +238,12 @@ export const DOM_FREE_MODULES = Object.freeze([
   'src/one-line/diagramModel.mjs',
   'src/one-line/harmonicProfiles.mjs',
   'src/one-line/historyController.mjs',
+  'src/one-line/propertyClipboardModel.mjs',
   'src/one-line/propertyEditorModel.mjs',
   'src/one-line/protectionZones.mjs',
   'src/one-line/sheetLinks.mjs',
   'src/one-line/studyInputModel.mjs',
+  'src/one-line/voltageModel.mjs',
   'src/routing/projectHash.mjs',
   'src/routing/racewaySizingModel.mjs',
   'src/routing/routeBreakdown.mjs',
