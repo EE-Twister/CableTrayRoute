@@ -279,6 +279,11 @@ export function calcStructuralCombinations(params) {
     h: buildingHeight_ft,
     traySpan: spanLength_ft,
     ip,
+    asce7edition: params.asce7edition,
+    hf:  params.hf,
+    rmu: params.rmu,
+    car: params.car,
+    rpo: params.rpo,
   });
   const Eh = seismicResult.lateralForce;   // horizontal seismic demand (lbs/ft)
 

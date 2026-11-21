@@ -14,7 +14,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const sd1Input           = document.getElementById('sd1');
   const riskCatSel         = document.getElementById('riskCategory');
   const ipSel              = document.getElementById('ip');
-  const trayHeightInput    = document.getElementById('trayHeight');
+  const editionSel         = document.getElementById('asce7edition');
+  const asce722Fields      = document.getElementById('asce722Fields');
+  const trayHeightInput   = document.getElementById('trayHeight');
   const buildingHeightInput= document.getElementById('buildingHeight');
   const wpPerFtInput       = document.getElementById('wpPerFt');
   const singleModeRadio    = document.getElementById('modeSingle');
@@ -31,6 +33,23 @@ document.addEventListener('DOMContentLoaded', () => {
       return null;
     }
     return parsed;
+  }
+
+  editionSel.addEventListener('change', () => {
+    asce722Fields.hidden = editionSel.value !== '7-22';
+  });
+
+  function readEditionParams() {
+    if (editionSel.value !== '7-22') return { params: { asce7edition: '7-16' } };
+    const factors = {};
+    for (const key of ['hf', 'rmu', 'car', 'rpo']) {
+      const value = parseFloat(document.getElementById(key).value);
+      if (!Number.isFinite(value) || value <= 0) {
+        return { error: 'Enter positive Hf, Rμ, CAR and Rpo values for the ASCE 7-22 equation.' };
+      }
+      factors[key] = value;
+    }
+    return { params: { asce7edition: '7-22', ...factors } };
   }
 
   // Mode toggle
@@ -108,15 +127,21 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    const edition = readEditionParams();
+    if (edition.error) {
+      showAlertModal(edition.error);
+      return;
+    }
+
     let result;
     try {
-      result = calcBraceForces({ sds, sd1, riskCategory: rc, wp, z, h, ip });
+      result = calcBraceForces({ sds, sd1, riskCategory: rc, wp, z, h, ip, ...edition.params });
     } catch (err) {
       showAlertModal(`Calculation error: ${err.message}`);
       return;
     }
 
-    renderSingleResult(result, { sds, sd1, rc, z, h, wp });
+    renderSingleResult(result, { sds, sd1, rc, z, h, wp, ip, ...edition.params });
   });
 
   function renderSingleResult(r, params) {
@@ -156,10 +181,16 @@ document.addEventListener('DOMContentLoaded', () => {
         ${r.bracingRequired ? `
         <details class="method-note">
           <summary>How this was calculated</summary>
+          ${r.edition === '7-22' ? `
+          <p class="alert warning"><strong>Unverified:</strong> the ASCE 7-22 equation below has not
+          been checked against licensed standard text. Confirm before relying on these results.</p>
+          <pre>Fp = 0.4 × SDS × Ip × (Hf / Rμ) × (CAR / Rpo) × Wp
+   = 0.4 × ${params.sds.toFixed(3)} × ${params.ip ?? 1.0} × (${params.hf} / ${params.rmu}) × (${params.car} / ${params.rpo}) × Wp
+   = ${(r.fpFactor * 100).toFixed(3)}% × Wp lbs</pre>` : `
           <p>Per the implemented ASCE 7-16 §13.3.1 method, the design seismic force is:</p>
           <pre>Fp = (0.4 × ap × SDS × Wp) / (Rp / Ip) × (1 + 2z/h)
    = (0.4 × 1.0 × ${params.sds.toFixed(3)} × Wp) / (2.5 / ${params.ip ?? 1.0}) × (1 + 2×${params.z}/${params.h})
-   = ${(r.fpFactor * 100).toFixed(3)}% × Wp lbs</pre>
+   = ${(r.fpFactor * 100).toFixed(3)}% × Wp lbs</pre>`}
           <p>Subject to: Fp_min = 0.3 × SDS × Ip × Wp, Fp_max = 1.6 × SDS × Ip × Wp</p>
           <p>Lateral force = Fp × Wp = ${r.lateralForce.toFixed(2)} lbs/ft</p>
           <p>Longitudinal force = 0.4 × Fp × Wp = ${r.longitudinalForce.toFixed(2)} lbs/ft (ASCE 7 §13.5.6.1)</p>
@@ -194,6 +225,11 @@ document.addEventListener('DOMContentLoaded', () => {
       showAlertModal('Tray attachment height z cannot exceed building height h.');
       return;
     }
+    const edition = readEditionParams();
+    if (edition.error) {
+      showAlertModal(edition.error);
+      return;
+    }
 
     // Map cables to trays (same logic as supportspan.js)
     const trayWeightMap = {};
@@ -221,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const wp = (trayWeightMap[tray.tray_id] || 0) + selfWeight;
       let result;
       try {
-        result = calcBraceForces({ sds, sd1, riskCategory: rc, wp, z, h, ip });
+        result = calcBraceForces({ sds, sd1, riskCategory: rc, wp, z, h, ip, ...edition.params });
       } catch {
         result = null;
       }
@@ -272,7 +308,9 @@ document.addEventListener('DOMContentLoaded', () => {
         </thead>
         <tbody>${tableRows}</tbody>
       </table>
-      <p class="method-note">Forces use the ASCE 7-16 §13.3.1 equation; this is not an ASCE 7-22 design. W<sub>p</sub> includes
+      <p class="method-note">${rows[0].result?.edition === '7-22'
+        ? 'Forces use the opt-in ASCE 7-22 §13.3.1 form with user-entered factors; it is unverified against licensed text.'
+        : 'Forces use the ASCE 7-16 §13.3.1 equation; this is not an ASCE 7-22 design.'} W<sub>p</sub> includes
       estimated tray self-weight. Cable weights derived from conductor size where available.</p>`;
   }
 

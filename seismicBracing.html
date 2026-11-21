@@ -188,6 +188,38 @@ Fp_max = 1.6 × SDS × Ip × Wp</pre>
             (ASCE 7-16 §13.1.3).
           </p>
         </div>
+
+        <div class="field-row">
+          <label for="asce7edition">Component force equation</label>
+          <select id="asce7edition" aria-describedby="asce7editionHint">
+            <option value="7-16" selected>ASCE 7-16 §13.3.1 (default)</option>
+            <option value="7-22">ASCE 7-22 §13.3.1 (unverified, user-entered factors)</option>
+          </select>
+          <p id="asce7editionHint" class="field-hint">
+            The ASCE 7-22 option has not been verified against licensed standard text.
+            Enter H<sub>f</sub>, R<sub>&mu;</sub>, C<sub>AR</sub> and R<sub>po</sub> from your
+            licensed copy; a qualified reviewer must confirm results.
+          </p>
+        </div>
+
+        <div id="asce722Fields" hidden>
+          <div class="field-row">
+            <label for="hf">H<sub>f</sub> — Height amplification factor</label>
+            <input type="number" id="hf" min="0" step="0.01" aria-required="true">
+          </div>
+          <div class="field-row">
+            <label for="rmu">R<sub>&mu;</sub> — Ductility reduction factor</label>
+            <input type="number" id="rmu" min="0" step="0.01" aria-required="true">
+          </div>
+          <div class="field-row">
+            <label for="car">C<sub>AR</sub> — Component amplification factor</label>
+            <input type="number" id="car" min="0" step="0.01" aria-required="true">
+          </div>
+          <div class="field-row">
+            <label for="rpo">R<sub>po</sub> — Component strength factor</label>
+            <input type="number" id="rpo" min="0" step="0.01" aria-required="true">
+          </div>
+        </div>
       </fieldset>
 
       <!-- Installation parameters -->

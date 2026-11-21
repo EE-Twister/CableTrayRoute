@@ -11,6 +11,7 @@ import {
   calcSeismicDesignCategory,
   maxBraceSpacing,
   calcComponentForceFactor,
+  calcComponentForceFactor722,
   calcBraceForces,
   evaluateTraysBracing,
 } from '../analysis/seismicBracing.mjs';
@@ -329,6 +330,65 @@ describe('calcBraceForces — wp validation', () => {
       () => calcBraceForces({ ...base, wp: Number.POSITIVE_INFINITY }),
       /wp/i
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ASCE 7-22 opt-in path (user-entered factors; equation unverified)
+// Hand calc: SDS=0.5, Ip=1, Hf=2, Rmu=1.5, CAR=1, Rpo=1.5
+//   fp = 0.4*0.5*1*(2/1.5)*(1/1.5) = 0.2*1.3333*0.6667 = 0.177778
+//   fpMin = 0.15, fpMax = 0.80
+// ---------------------------------------------------------------------------
+describe('calcComponentForceFactor722', () => {
+  const p = { sds: 0.5, ip: 1.0, hf: 2, rmu: 1.5, car: 1, rpo: 1.5 };
+
+  it('matches hand-calculated fp', () => {
+    const { fp } = calcComponentForceFactor722(p);
+    assert.ok(Math.abs(fp - 0.177778) < 1e-6, `got ${fp}`);
+  });
+
+  it('clamps to fpMin and fpMax', () => {
+    const low = calcComponentForceFactor722({ ...p, hf: 0.5 });
+    assert.strictEqual(low.fp, low.fpMin);
+    const high = calcComponentForceFactor722({ ...p, hf: 10 });
+    assert.strictEqual(high.fp, high.fpMax);
+  });
+
+  it('requires every factor (no embedded defaults)', () => {
+    for (const key of ['hf', 'rmu', 'car', 'rpo']) {
+      const bad = { ...p };
+      delete bad[key];
+      assert.throws(() => calcComponentForceFactor722(bad), new RegExp(key));
+    }
+  });
+
+  it('rejects non-positive factors', () => {
+    assert.throws(() => calcComponentForceFactor722({ ...p, rpo: 0 }), /rpo/);
+  });
+});
+
+describe('calcBraceForces — asce7edition', () => {
+  const base = { sds: 0.8, sd1: 0.4, riskCategory: 'II', wp: 20, z: 15, h: 30 };
+  const f722 = { hf: 2, rmu: 1.5, car: 1, rpo: 1.5 };
+
+  it('defaults to 7-16 and reports the edition', () => {
+    assert.strictEqual(calcBraceForces(base).edition, '7-16');
+  });
+
+  it('7-22 uses the 7-22 coefficient and flags it unverified', () => {
+    const r = calcBraceForces({ ...base, asce7edition: '7-22', ...f722 });
+    const expected = Math.round(calcComponentForceFactor722({ sds: 0.8, ...f722 }).fp * 20 * 100) / 100;
+    assert.strictEqual(r.edition, '7-22');
+    assert.strictEqual(r.lateralForce, expected);
+    assert.ok(/unverified/i.test(r.recommendation));
+  });
+
+  it('7-22 without factors throws', () => {
+    assert.throws(() => calcBraceForces({ ...base, asce7edition: '7-22' }), /hf/);
+  });
+
+  it('rejects unknown editions', () => {
+    assert.throws(() => calcBraceForces({ ...base, asce7edition: '7-10' }), /asce7edition/);
   });
 });
 

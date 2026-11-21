@@ -198,6 +198,11 @@ export function calcSeismicWindCombined(params) {
     ap,
     rp,
     ip,
+    asce7edition: params.asce7edition,
+    hf:  params.hf,
+    rmu: params.rmu,
+    car: params.car,
+    rpo: params.rpo,
   });
 
   // 2. Wind force (ASCE 7-22 Chapters 26/29)
@@ -235,7 +240,14 @@ export function calcSeismicWindCombined(params) {
     combinations,
     envelope,
     nec: {
-      seismic: {
+      seismic: seismicDetail.edition === '7-22' ? {
+        rule:        'ASCE 7-22 Chapter 13 (unverified)',
+        section:     '§13.3.1, §13.5.6',
+        description: 'Opt-in ASCE 7-22 form with user-entered factors; equation not verified ' +
+                     'against licensed text: Fp = 0.4·SDS·Ip·Wp × (Hf/Rμ) × (CAR/Rpo), ' +
+                     'subject to Fp_min = 0.3·SDS·Ip·Wp and Fp_max = 1.6·SDS·Ip·Wp. ' +
+                     'Reviewer must confirm before reliance.',
+      } : {
         rule:        'ASCE 7-16 Chapter 13',
         section:     '§13.3.1, §13.5.6',
         description: 'Seismic design force for nonstructural components ' +

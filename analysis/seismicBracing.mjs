@@ -5,8 +5,9 @@
  * IMPORTANT — edition: The component force equation implemented here is the
  * ASCE 7-16 §13.3.1 form (the equation used in ASCE 7-05/-10/-16). ASCE 7-22
  * §13.3.1 replaced it with a revised equation that introduces Hf, Rμ, Car and
- * Rpo and drops ap/Rp; that 2022 equation is NOT implemented here. Results
- * therefore reflect ASCE 7-16, which remains widely adopted by jurisdictions.
+ * Rpo and drops ap/Rp. The default remains ASCE 7-16, which is widely adopted
+ * by jurisdictions. An opt-in, UNVERIFIED 7-22 path (asce7edition: '7-22') takes
+ * user-entered Hf, Rμ, CAR and Rpo; see calcComponentForceFactor722.
  *
  * Methodology:
  *   The design seismic force for a nonstructural component (ASCE 7-16 §13.3.1):
@@ -175,9 +176,52 @@ export function calcComponentForceFactor(params) {
 }
 
 /**
+ * ASCE 7-22 §13.3.1 component seismic force coefficient (UNVERIFIED).
+ *
+ *   Fp/Wp = 0.4 × SDS × Ip × (Hf / Rμ) × (CAR / Rpo)
+ *
+ * Bounds are the unchanged 0.3·SDS·Ip and 1.6·SDS·Ip limits. The equation layout
+ * has not been checked against licensed ASCE 7-22 text. Hf, Rμ, CAR and Rpo are
+ * required user inputs with no defaults, so no unverified table value (Table
+ * 13.6-1) is embedded here. A qualified reviewer must confirm the equation and
+ * factors before results are relied on.
+ *
+ * @param {object} params
+ * @param {number} params.sds – Design spectral acceleration at short period (g)
+ * @param {number} params.hf  – Height amplification factor Hf
+ * @param {number} params.rmu – Structure ductility reduction factor Rμ
+ * @param {number} params.car – Component amplification factor CAR
+ * @param {number} params.rpo – Component strength factor Rpo
+ * @param {number} [params.ip=1.0] – Component importance factor
+ * @returns {{ fp: number, fpMin: number, fpMax: number }}
+ */
+export function calcComponentForceFactor722(params) {
+  const { sds, hf, rmu, car, rpo } = params;
+  const ip = params.ip ?? 1.0;
+
+  if (!Number.isFinite(sds) || sds < 0) throw new Error('sds must be a non-negative number');
+  for (const [name, value] of [['hf', hf], ['rmu', rmu], ['car', car], ['rpo', rpo], ['ip', ip]]) {
+    if (!Number.isFinite(value) || value <= 0) {
+      throw new Error(`${name} must be a positive number for the ASCE 7-22 equation`);
+    }
+  }
+
+  const fp    = 0.4 * sds * ip * (hf / rmu) * (car / rpo);
+  const fpMin = 0.3 * sds * ip;
+  const fpMax = 1.6 * sds * ip;
+
+  return {
+    fp:    Math.round(Math.min(Math.max(fp, fpMin), fpMax) * 1e6) / 1e6,
+    fpMin: Math.round(fpMin * 1e6) / 1e6,
+    fpMax: Math.round(fpMax * 1e6) / 1e6,
+  };
+}
+
+/**
  * Calculate seismic brace forces for a cable tray section.
  *
  * @param {object} params
+ * @param {'7-16'|'7-22'} [params.asce7edition='7-16'] – 7-22 requires hf, rmu, car, rpo
  * @param {number} params.sds          – Design spectral acceleration at short period (g)
  * @param {number} params.sd1          – Design spectral acceleration at 1-second period (g)
  * @param {'I'|'II'|'III'|'IV'} params.riskCategory
@@ -204,6 +248,10 @@ export function calcComponentForceFactor(params) {
 export function calcBraceForces(params) {
   const { sds, sd1, riskCategory, wp, z, h } = params;
   const ip = params.ip ?? 1.0;
+  const edition = params.asce7edition ?? '7-16';
+  if (edition !== '7-16' && edition !== '7-22') {
+    throw new Error("asce7edition must be '7-16' or '7-22'.");
+  }
   if (!Number.isFinite(wp) || wp <= 0) {
     throw new Error('wp must be a finite positive number (lbs/ft).');
   }
@@ -214,6 +262,7 @@ export function calcBraceForces(params) {
   if (!spacing.required) {
     return {
       sdc,
+      edition,
       fpFactor:          0,
       wpPerFt:           wp,
       lateralForce:      0,
@@ -228,8 +277,12 @@ export function calcBraceForces(params) {
     };
   }
 
-  const { fp } = calcComponentForceFactor({ sds, z, h, ap: params.ap, rp: params.rp, ip });
-  const lateralForce      = Math.round(fp * wp * 100) / 100;    // lbs/ft
+  const { fp } = edition === '7-22'
+    ? calcComponentForceFactor722({
+      sds, ip, hf: params.hf, rmu: params.rmu, car: params.car, rpo: params.rpo,
+    })
+    : calcComponentForceFactor({ sds, z, h, ap: params.ap, rp: params.rp, ip });
+  const lateralForce     = Math.round(fp * wp * 100) / 100;    // lbs/ft
   const longitudinalForce = Math.round(0.4 * fp * wp * 100) / 100;  // ASCE 7 §13.5.6.1
   // Vertical seismic load effect Ev = 0.2·SDS·D (ASCE 7 §12.4.2.2). The
   // importance factor Ip is NOT applied to Ev — it only scales the horizontal
@@ -241,10 +294,14 @@ export function calcBraceForces(params) {
     `longitudinal at ≤ ${spacing.longitudinal} ft. ` +
     `Lateral force = ${lateralForce.toFixed(2)} lbs/ft, ` +
     `longitudinal = ${longitudinalForce.toFixed(2)} lbs/ft, ` +
-    `vertical = ±${verticalForce.toFixed(2)} lbs/ft (per ASCE 7-16 §13.3.1 & §13.5.6).`;
+    `vertical = ±${verticalForce.toFixed(2)} lbs/ft (per ASCE ${edition} §13.3.1 & §13.5.6).` +
+    (edition === '7-22'
+      ? ' ASCE 7-22 equation is unverified against licensed text; reviewer must confirm.'
+      : '');
 
   return {
     sdc,
+    edition,
     fpFactor:          fp,
     wpPerFt:           wp,
     lateralForce,
