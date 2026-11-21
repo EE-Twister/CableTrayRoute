@@ -79,17 +79,29 @@ async function openSharedProject(token) {
   }
 
   if (ownName) saveLocalProject(ownName);
+  // importProject needs a named project to write into, so establish the shared
+  // copy's name first (the same order the cloud-project loader uses) and put
+  // the previous name back if the import fails.
+  const previousId = window.currentProjectId;
+  let previousState = null;
+  try {
+    previousState = getProjectState();
+    setProjectState({ ...previousState, name: localName });
+  } catch {
+    previousState = null;
+  }
+  window.currentProjectId = localName;
   const imported = importProject(fetched.data);
   if (!imported) {
+    window.currentProjectId = previousId;
+    try {
+      if (previousState) setProjectState(previousState);
+    } catch {
+      // Non-critical: the name re-syncs on the next save.
+    }
     await showAlertModal('Shared project unavailable', 'The shared project could not be opened.');
     stripTokenFromUrl();
     return null;
-  }
-  window.currentProjectId = localName;
-  try {
-    setProjectState({ ...getProjectState(), name: localName });
-  } catch {
-    // Non-critical: the name re-syncs on the next save.
   }
   saveLocalProject(localName);
   return { token, project: fetched.project, mode: fetched.mode, version: fetched.version };
