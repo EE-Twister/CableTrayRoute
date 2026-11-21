@@ -1,5 +1,6 @@
 import assert from 'assert';
 import { buildReportPackage } from '../analysis/reportPackage.mjs';
+import { buildArcFlashSection } from '../analysis/projectReport.mjs';
 import {
   buildDRCSection,
   generateProjectReport,
@@ -142,4 +143,18 @@ console.log('project report section tests passed');
   }).fill.trays[0];
   assert.strictEqual(overloaded.status, 'over');
   console.log('✓ report tray fill');
+})();
+
+(() => {
+  const section = buildArcFlashSection({
+    arcFlash: {
+      'BUS-1': { incidentEnergy: 12.341, minimumArcRatingCalCm2: 12.35, boundary: 900 },
+      'BUS-2': { incidentEnergy: 0.8, minimumArcRatingCalCm2: 0, boundary: 0 },
+    },
+  });
+  const [high, low] = section.rows;
+  assert.strictEqual(high.ppeSelection, 'Arc rating ≥ 12.35 cal/cm²');
+  assert.strictEqual(low.ppeSelection, 'Below 1.2 cal/cm² threshold');
+  assert.ok(section.rows.every(r => !('ppeCategory' in r)), 'report rows never carry a PPE category');
+  console.log('✓ report arc-flash PPE selection');
 })();

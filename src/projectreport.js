@@ -673,7 +673,7 @@ function exportXLSX(pkg, baseReport) {
 
   // Study sections
   const studySections = [
-    { key: 'arcFlash',     headers: ['id', 'incidentEnergy', 'ppeCategory', 'boundary', 'clearingTime', 'voltage'],    sheetName: 'ArcFlash' },
+    { key: 'arcFlash',     headers: ['id', 'incidentEnergy', 'ppeSelection', 'boundary', 'clearingTime', 'voltage'],    sheetName: 'ArcFlash' },
     { key: 'shortCircuit', headers: ['id', 'i3ph_kA', 'iSlg_kA', 'iLL_kA', 'iDLG_kA', 'voltage'],                    sheetName: 'ShortCircuit' },
     { key: 'loadFlow',     headers: ['id', 'voltagePu', 'voltageKv', 'angleDeg', 'loadKW', 'loadKVAR'],               sheetName: 'LoadFlow-Buses', rowKey: 'busRows' },
     { key: 'harmonics',    headers: ['id', 'ithd', 'vthd', 'limit', 'warning', 'calculationStatus'],                   sheetName: 'Harmonics' },

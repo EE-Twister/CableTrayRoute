@@ -414,7 +414,7 @@ describe('sectionToAOA', () => {
   it('returns AOA for generic section with rows', () => {
     const aoa = sectionToAOA({
       key: 'arcFlash',
-      rows: [{ id: 'BUS-1', incidentEnergy: 12.5, ppeCategory: 2 }],
+      rows: [{ id: 'BUS-1', incidentEnergy: 12.5, ppeSelection: 'Arc rating ≥ 12.50 cal/cm²' }],
     });
     assert.ok(Array.isArray(aoa));
     assert.ok(aoa[0].includes('id'));
