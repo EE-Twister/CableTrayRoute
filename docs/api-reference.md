@@ -4,27 +4,42 @@ The CableTrayRoute server exposes a public REST API under `/api/v1` for scriptin
 
 ## Authentication
 
-All `/api/v1` endpoints require a Bearer token obtained from the `/login` endpoint.
+Authenticated routes accept either credential from `POST /login`:
+
+- the HttpOnly `ctr_auth` cookie (preferred for browsers), or
+- an `Authorization: Bearer <token>` header (legacy; accepted during the deprecation window and the normal choice for scripts).
+
+Requests that change state (anything other than `GET`, `HEAD`, `OPTIONS`) must also send the session's CSRF token in an `x-csrf-token` header. The `/api/v1` study routes (`POST .../studies/*`) only compute from saved data and do not require it. The one public `/api/v1` route is `GET /api/v1/library/shared/:token`.
 
 ```bash
-# 1. Log in to get a token
+# 1. Log in to get a token and CSRF token
 curl -s -X POST http://localhost:3000/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"alice","password":"MySecret123!"}' \
-  | jq -r '.token'
-# → e3f4a1b2c9d0...
+  -d '{"username":"alice","password":"MySecret123!"}'
+# → {"token":"e3f4a1b2c9d0...","csrfToken":"9a7c...","expiresAt":1760000000000,"role":"engineer"}
 
 # 2. Use the token in subsequent requests
 export TOKEN="e3f4a1b2c9d0..."
+export CSRF="9a7c..."
 ```
 
-Tokens expire after the configured TTL (default: 1 hour). Refresh via `POST /session/refresh`.
+Tokens expire after the configured TTL (default: 1 hour, `AUTH_TOKEN_TTL_MS`) and sessions have an absolute lifetime (default 8 hours, `AUTH_SESSION_MAX_LIFETIME_MS`). Refresh via `POST /session/refresh` (see [Session and Account Endpoints](#session-and-account-endpoints)).
+
+Roles, lowest to highest: `read-only`, `reviewer`, `engineer`, `admin`. Writes to projects, snapshots, and the cloud library require `engineer`; team-library publishing and the admin routes require `admin`. See [enterprise-auth.md](enterprise-auth.md).
 
 ---
 
 ## Rate Limiting
 
-All `/api/v1` endpoints share the project rate limiter: **100 requests per 15 minutes per IP** (configurable via `PROJECT_RATE_LIMIT_MAX` and `PROJECT_RATE_LIMIT_WINDOW_MS` environment variables).
+Limits are per IP and held in memory. Responses carry `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` (epoch seconds); a rejected request returns `429 {"error":"Too many requests"}` with a `Retry-After` header (seconds).
+
+| Routes | Window | Max |
+|--------|--------|-----|
+| `/api/v1/*`, `/projects/*`, `/shared/*` | 15 min (`PROJECT_RATE_LIMIT_WINDOW_MS`) | 100 (`PROJECT_RATE_LIMIT_MAX`) |
+| `/login`, `/signup`, `/session/refresh`, `/forgot-password`, `/reset-password` | same window | 20 |
+| `/ws/ticket` | same window | the lower of 20 and the project limit |
+| `/api/errors` | same window | 50 |
+| `/api/copilot` | 60 s | 10 |
 
 ---
 
@@ -517,18 +532,138 @@ See [layer-management.md](layer-management.md) for full workflow documentation.
 
 ---
 
+## Session and Account Endpoints
+
+Unless noted, bodies are JSON, errors are `{ "error": "..." }`, and the route is rate limited as above. "Auth" means the cookie or Bearer token; "CSRF" means the `x-csrf-token` header.
+
+| Method | Path | Auth | CSRF | Body | Success |
+|--------|------|------|------|------|---------|
+| `POST` | `/signup` | no | no | `{ username, password }` | `201 { "message": "User created" }` (no session is created) |
+| `POST` | `/login` | no | no | `{ username, password }` | `200 { token, csrfToken, expiresAt, role }` and sets the `ctr_auth` cookie |
+| `POST` | `/session/refresh` | yes | yes | none | `200 { token, csrfToken, expiresAt }`, new cookie, old session deleted |
+| `POST` | `/logout` | yes | yes | none | `200 { "loggedOut": true }`, cookie cleared |
+| `POST` | `/account/signout-all` | yes | yes | none | `200 { "loggedOut": true }`, every session of the user revoked |
+| `POST` | `/forgot-password` | no | no | `{ username }` | always `200` (never reveals whether the account exists) |
+| `POST` | `/reset-password` | no | no | `{ token, newPassword }` | `200 { "message": ... }`, all sessions revoked |
+| `POST` | `/account/change-password` | yes | yes | `{ currentPassword, newPassword }` | `200 { message, token, csrfToken, expiresAt }`, new cookie (other sessions are not revoked) |
+| `GET` | `/account/sessions` | yes | n/a | none | `200 { sessions: [{ id, current, issuedAt, expiresAt }] }`, current session first |
+| `GET` | `/account/deletion-request` | yes | n/a | none | `200 { request }` (`request` is `null` when none exists) |
+| `POST` | `/account/deletion-request` | yes | yes | `{ "confirmation": "DELETE" }` | `201 { request: { username, email, status, requestedAt, updatedAt } }` |
+| `POST` | `/ws/ticket` | yes | yes | none | `200 { ticket, expiresAt }` |
+
+**Rules**
+- Usernames match `[A-Za-z0-9_-]{1,100}`. Passwords must be 8-1000 characters.
+- `/login` returns the same `401 Invalid credentials` for an unknown user, a wrong password, an invalid name, or an over-long password. It also upgrades the stored scrypt hash when needed.
+- `/session/refresh` only succeeds within 5 minutes of expiry and before the absolute lifetime; otherwise it returns `401 Session not eligible for refresh` and clears the cookie.
+- `/forgot-password` creates a reset token valid for 15 minutes. It is logged on the server console as `[password-reset]` and is never returned in the response.
+- The `ctr_auth` cookie is `HttpOnly; Path=/; SameSite=Lax`, with `Max-Age` equal to the session TTL and `Secure` added over HTTPS.
+- `/ws/ticket` returns a single-use ticket that expires after 30 seconds (at most 5 outstanding per session). Pass it as `ticket.<hex>` in the `Sec-WebSocket-Protocol` header when opening the collaboration WebSocket.
+- Error messages you may see: `400 Missing credentials`, `400 Invalid username`, `400 Password must be at least 8 characters`, `400 Password too long`, `400 Missing token or password`, `400 Invalid or expired reset token`, `400 Missing passwords`, `400 Deletion confirmation is required`, `409 User exists`, `401 Current password is incorrect`.
+
+---
+
+## Project Cloud Sync Endpoints
+
+All `/projects/*` routes require auth and CSRF (for writes) and share the project rate limiter. Project names follow the same pattern as usernames; anything else returns `400 Invalid project name`. Writes need the `engineer` role (`403 Insufficient permissions` otherwise).
+
+### GET /projects/:project
+
+Returns the latest saved version.
+
+```json
+{ "version": "1760000000000", "data": { } }
+```
+
+`404 { "error": "Not found" }` if the project does not exist. The response carries a `Server-Timing` header with read, parse, and total durations.
+
+### POST /projects/:project
+
+Saves a project. The JSON body (up to 1 MB) takes one of three shapes:
+
+| Body | Mode |
+|------|------|
+| `{ "patch": { ... }, "baseVersion": "..." }` | Merge patch (RFC 7386 style): `null` deletes a key, objects merge recursively, arrays and scalars replace. A non-object patch replaces the whole document. |
+| `{ "data": { ... }, "baseVersion": "..." }` | Replace with `data`. |
+| any other object | Replace with the whole body. No `baseVersion` is sent. |
+
+Updating an existing project requires `baseVersion` (optimistic concurrency); creating a new project does not.
+
+**Response:** `200 { "version": "...", "unchanged": false }`. `unchanged` is `true` when the saved content is identical to the current version, in which case nothing is written and the version is unchanged. `Server-Timing` reports persist, load, merge, serialize, write, and total durations.
+
+**Conflicts:** `409 { "error": "Version conflict", "currentVersion": "..." }` when `baseVersion` is stale (`currentVersion` is `null` if the project does not exist), or `409 { "error": "Base version required for project update", "currentVersion": "..." }` when it is missing for an existing project.
+
+`DELETE /projects/:project` is not implemented: a role check is registered for it but no handler.
+
+### GET /projects/:project/snapshots
+
+`200 { "snapshots": [ { id, project, mode, version, createdAt, expiresAt, revokedAt, lastAccessAt, expired } ] }`, newest first.
+
+### POST /projects/:project/snapshots
+
+Creates a share link. Body `{ "mode": "read" | "edit" }` (anything other than `"edit"` becomes `"read"`).
+
+`201 { id, project, mode, version, createdAt, expiresAt, revokedAt, token, url }`. The plain `token` and the `url` (`.../oneline.html?snapshotToken=<token>`) are returned only here. `404 Project not found` if the project does not exist.
+
+### DELETE /projects/:project/snapshots/:snapshotId
+
+Revokes a share link. `204` with an empty body, or `404 { "error": "Not found" }`.
+
+---
+
+## Shared Snapshot Endpoints
+
+Public routes addressed by a share token; they use the project rate limiter and require no login or CSRF token.
+
+| Method | Path | Behavior |
+|--------|------|----------|
+| `GET` | `/shared/:token` | `200 { snapshot: { id, project, mode, version, createdAt, expiresAt, revokedAt }, data }` |
+| `POST` | `/shared/:token` | Saves the request body as the project (replace mode) when the snapshot is in `edit` mode. `200 { version, unchanged }` |
+
+An unknown, revoked, or expired token returns `404 { "error": "Not found" }`. Saving through a `read` snapshot returns `403 { "error": "Read-only snapshot" }`. See [sharing_security.md](sharing_security.md).
+
+---
+
+## AI Copilot
+
+### POST /api/copilot
+
+Auth and CSRF required; limited to 10 requests per minute per IP. Requires `ANTHROPIC_API_KEY` on the server.
+
+**Body:** `{ "query": "string (1-2000 chars)", "projectData": { ... } }`. `projectData` is serialized and truncated to 8000 characters before it is sent to the model.
+
+**Response:** `200 { "answer": "..." }`. `400 { "error": "Invalid query" }` for an empty or over-long query. Upstream failures return `500 { "error": "Internal server error" }`.
+
+---
+
+## Client Error Reporting
+
+### POST /api/errors
+
+No auth. Limited to 50 requests per window per IP. Browsers post uncaught errors here; the server logs them to the console as `[client-error]`.
+
+**Body:** `{ type, error: { message, name, stack }, source, lineno, colno, page, userAgent, timestamp }`. Fields are coerced to strings and truncated (message 2000, stack 3000, page 200, source 300, userAgent 300). A missing or over-long message returns `400 { "error": "Invalid payload" }`. Success is `204` with no body.
+
+---
+
+## Admin and SSO Endpoints
+
+`/api/v1/admin/*` (users, roles, account-deletion requests, audit log) and `/auth/oidc/*` (single sign-on) are documented in [enterprise-auth.md](enterprise-auth.md).
+
+---
+
 ## Error Responses
 
 | Status | Meaning |
 |--------|---------|
-| 400 | Invalid project name |
-| 401 | Missing or invalid Bearer token |
-| 404 | Project or library not found |
-| 409 | Version conflict (include `currentVersion` in response) |
-| 429 | Rate limit exceeded |
-| 500 | Internal server error |
+| 400 | Invalid name, missing or invalid input, or HTTPS required |
+| 401 | Missing, expired, or invalid session (cookie or Bearer token) |
+| 403 | Invalid or missing `x-csrf-token`, insufficient role, or write to a read-only snapshot |
+| 404 | Project, library, or share link not found |
+| 409 | Version conflict (response includes `currentVersion`) |
+| 429 | Rate limit exceeded (see `Retry-After`) |
+| 500 | Internal server error. Request bodies over 1 MB and malformed JSON also end up here, because the generic error handler does not distinguish them |
 
-All errors return JSON: `{ "error": "description" }`
+All errors return JSON: `{ "error": "description" }`. Successful `204` responses have no body.
 
 ---
 

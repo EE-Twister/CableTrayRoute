@@ -8,7 +8,7 @@ CableTrayRoute supports OIDC single sign-on, role-based access control, and a ta
 
 Four roles are supported, in ascending privilege order:
 
-| Role | Can read projects | Can save/delete projects | Can access admin panel |
+| Role | Can read projects | Can save projects and manage share links | Can access admin panel |
 |---|---|---|---|
 | `read-only` | ✅ | ❌ | ❌ |
 | `reviewer` | ✅ | ❌ | ❌ |
