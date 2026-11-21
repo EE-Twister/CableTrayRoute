@@ -26,8 +26,9 @@ class MockWebSocket {
   static CLOSED  = WS_CLOSED;
   static _instances = [];
 
-  constructor(url) {
+  constructor(url, protocols) {
     this.url = url;
+    this.protocols = protocols;
     this.readyState = WS_OPEN;
     this.sent = [];
     this._listeners = {};
@@ -330,5 +331,42 @@ await describe('CollabClient — sequence numbers & conflict detection', async (
     ws._message({ type: 'patch', username: 'carol', patch: { y: 2 }, seq: 1 });
     assert.ok(detail);
     assert.strictEqual(detail.seq, 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+await describe('CollabClient — share-link ticket', async () => {
+  await itAsync('requests a ticket with the share token and passes it as a subprotocol', async () => {
+    reset();
+    const calls = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url, init) => {
+      calls.push({ url, init });
+      return { ok: true, json: async () => ({ ticket: 'ab12cd34' }) };
+    };
+    try {
+      const client = new CollabClient({ projectId: 'proj-1', username: 'guest', snapshotToken: 'share-token-1' });
+      await client.connect();
+      assert.strictEqual(calls.length, 1);
+      assert.strictEqual(calls[0].url, '/ws/ticket/shared');
+      assert.deepStrictEqual(JSON.parse(calls[0].init.body), { token: 'share-token-1' });
+      assert.ok(!('X-CSRF-Token' in (calls[0].init.headers || {})), 'no session CSRF token is sent');
+      assert.deepStrictEqual(MockWebSocket._instances.at(-1).protocols, ['ctr-collab', 'ticket.ab12cd34']);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  await itAsync('falls back to the bare protocol when the share ticket is refused', async () => {
+    reset();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: false, json: async () => ({}) });
+    try {
+      const client = new CollabClient({ projectId: 'proj-1', username: 'guest', snapshotToken: 'revoked' });
+      await client.connect();
+      assert.deepStrictEqual(MockWebSocket._instances.at(-1).protocols, ['ctr-collab']);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

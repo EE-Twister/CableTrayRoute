@@ -19,6 +19,15 @@
  *     { type:'sync',     seq }                         // sent to joining client
  *     { type:'ack',      seq }                         // sent to patch sender
  *
+ * Authorization: when `validateUpgrade` returns an object instead of `true`
+ * it is the connection's context, { username, owner, project?, canWrite }.
+ * The room is then `owner/project` taken from the context (or from the join
+ * message's projectId for ordinary sessions, always under the authenticated
+ * owner), the display name is the context's username, and patches are refused
+ * unless `canWrite` is true. A client can therefore never name another
+ * owner's room. Without a validator the room is the client-supplied
+ * projectId, which only unit tests and unauthenticated setups use.
+ *
  * @param {import('http').Server} httpServer
  * @param {object} wss - WebSocketServer instance
  */
@@ -27,16 +36,19 @@ export function attachCollaborationServer(httpServer, wss, options = {}) {
   // Cap incoming frame size so an authenticated client cannot exhaust memory
   // (or amplify a broadcast) with an oversized patch payload.
   const maxMessageBytes = Number(options.maxMessageBytes) > 0 ? Number(options.maxMessageBytes) : 64 * 1024;
-  // projectId → Set of { ws, username }
+  // Per-connection message budget; a client that exceeds it is disconnected.
+  const maxMessagesPerSecond = Number(options.maxMessagesPerSecond) > 0 ? Number(options.maxMessagesPerSecond) : 50;
+  // roomKey → Set of { ws, username, displayId, canWrite }
   const rooms = new Map();
-  // projectId → monotonically increasing sequence counter
+  // roomKey → monotonically increasing sequence counter
   const seqCounters = new Map();
 
-  function broadcastPresence(projectId) {
-    const room = rooms.get(projectId);
+  function broadcastPresence(roomKey) {
+    const room = rooms.get(roomKey);
     if (!room) return;
     const users = [...room].map(c => c.username).filter(Boolean);
-    const msg = JSON.stringify({ type: 'presence', projectId, users });
+    const displayId = room.values().next().value?.displayId;
+    const msg = JSON.stringify({ type: 'presence', projectId: displayId, users });
     for (const client of room) {
       if (client.ws.readyState === 1 /* OPEN */) {
         client.ws.send(msg);
@@ -44,8 +56,8 @@ export function attachCollaborationServer(httpServer, wss, options = {}) {
     }
   }
 
-  function broadcast(projectId, senderWs, message) {
-    const room = rooms.get(projectId);
+  function broadcast(roomKey, senderWs, message) {
+    const room = rooms.get(roomKey);
     if (!room) return;
     const msg = JSON.stringify(message);
     for (const client of room) {
@@ -61,40 +73,59 @@ export function attachCollaborationServer(httpServer, wss, options = {}) {
       socket.destroy();
       return;
     }
+    let context = null;
     if (validateUpgrade) {
-      let valid = false;
+      let result = false;
       try {
-        valid = await validateUpgrade(request);
+        result = await validateUpgrade(request);
       } catch {
-        valid = false;
+        result = false;
       }
-      if (!valid) {
+      if (!result) {
         socket.destroy();
         return;
       }
+      if (typeof result === 'object') context = result;
     }
+    request.collabContext = context;
     wss.handleUpgrade(request, socket, head, ws => {
       wss.emit('connection', ws, request);
     });
   });
 
-  wss.on('connection', (ws) => {
-    let currentProjectId = null;
+  wss.on('connection', (ws, request) => {
+    const context = request?.collabContext ?? null;
+    let currentRoomKey = null;
+    let currentDisplayId = null;
     let currentUsername = null;
+    let windowStart = Date.now();
+    let windowCount = 0;
 
     function removeFromRoom() {
-      if (!currentProjectId) return;
-      const room = rooms.get(currentProjectId);
+      if (!currentRoomKey) return;
+      const room = rooms.get(currentRoomKey);
       if (room) {
         room.forEach(c => { if (c.ws === ws) room.delete(c); });
         if (room.size === 0) {
-          rooms.delete(currentProjectId);
-          seqCounters.delete(currentProjectId);
-        } else broadcastPresence(currentProjectId);
+          rooms.delete(currentRoomKey);
+          seqCounters.delete(currentRoomKey);
+        } else broadcastPresence(currentRoomKey);
       }
     }
 
     ws.on('message', (data) => {
+      const now = Date.now();
+      if (now - windowStart >= 1000) {
+        windowStart = now;
+        windowCount = 0;
+      }
+      windowCount += 1;
+      if (windowCount > maxMessagesPerSecond) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Rate limit exceeded' }));
+        if (typeof ws.close === 'function') ws.close(1008, 'Rate limit exceeded');
+        return;
+      }
+
       const size = typeof data === 'string' ? Buffer.byteLength(data) : (data?.length ?? 0);
       if (size > maxMessageBytes) {
         ws.send(JSON.stringify({ type: 'error', message: 'Message too large' }));
@@ -117,41 +148,55 @@ export function attachCollaborationServer(httpServer, wss, options = {}) {
         removeFromRoom();
         const requestedProjectId = String(msg.projectId || '');
         if (requestedProjectId.length > 200) {
-          currentProjectId = null;
+          currentRoomKey = null;
+          currentDisplayId = null;
           currentUsername = null;
           ws.send(JSON.stringify({ type: 'error', message: 'Project ID too long' }));
           return;
         }
-        currentProjectId = requestedProjectId;
-        currentUsername = String(msg.username || 'Anonymous').slice(0, 100);
-        if (!rooms.has(currentProjectId)) rooms.set(currentProjectId, new Set());
-        if (!seqCounters.has(currentProjectId)) seqCounters.set(currentProjectId, 0);
-        rooms.get(currentProjectId).add({ ws, username: currentUsername });
+        currentDisplayId = context?.project ?? requestedProjectId;
+        currentRoomKey = context ? `${context.owner}/${currentDisplayId}` : currentDisplayId;
+        currentUsername = context
+          ? String(context.username || 'Anonymous').slice(0, 100)
+          : String(msg.username || 'Anonymous').slice(0, 100);
+        if (!rooms.has(currentRoomKey)) rooms.set(currentRoomKey, new Set());
+        if (!seqCounters.has(currentRoomKey)) seqCounters.set(currentRoomKey, 0);
+        rooms.get(currentRoomKey).add({
+          ws,
+          username: currentUsername,
+          displayId: currentDisplayId,
+          canWrite: context ? context.canWrite === true : true,
+        });
         // Send the current sequence to the joining client so it starts in sync
-        ws.send(JSON.stringify({ type: 'sync', seq: seqCounters.get(currentProjectId) }));
-        broadcastPresence(currentProjectId);
+        ws.send(JSON.stringify({ type: 'sync', seq: seqCounters.get(currentRoomKey) }));
+        broadcastPresence(currentRoomKey);
         return;
       }
 
       if (msg.type === 'leave') {
         removeFromRoom();
-        currentProjectId = null;
+        currentRoomKey = null;
+        currentDisplayId = null;
         currentUsername = null;
         return;
       }
 
       if (msg.type === 'patch') {
-        if (!currentProjectId) {
+        if (!currentRoomKey) {
           ws.send(JSON.stringify({ type: 'error', message: 'Join a project first' }));
           return;
         }
+        if (context && context.canWrite !== true) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Read-only access' }));
+          return;
+        }
         // Assign the next sequence number to this patch
-        const seq = (seqCounters.get(currentProjectId) || 0) + 1;
-        seqCounters.set(currentProjectId, seq);
+        const seq = (seqCounters.get(currentRoomKey) || 0) + 1;
+        seqCounters.set(currentRoomKey, seq);
         // Relay the patch with its sequence number to all other clients in the room
-        broadcast(currentProjectId, ws, {
+        broadcast(currentRoomKey, ws, {
           type: 'patch',
-          projectId: currentProjectId,
+          projectId: currentDisplayId,
           username: currentUsername,
           patch: msg.patch,
           seq,

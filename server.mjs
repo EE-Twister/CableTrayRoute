@@ -1571,9 +1571,43 @@ export async function createApp(options = {}) {
       wsTicketStore.set(ticket, {
         sessionToken: req.authToken,
         username: req.username,
+        owner: req.username,
+        canWrite: (ROLE_LEVELS[getUserRole(req.username)] ?? 0) >= ROLE_LEVELS.engineer,
         expiresAt,
       });
       res.json({ ticket, expiresAt });
+    })
+  );
+
+  // Public: exchange a share-link token for a collaboration ticket bound to
+  // that snapshot's owner and project. Read-only links can receive updates but
+  // not send them. The snapshot is checked again when the socket upgrades.
+  app.post(
+    '/ws/ticket/shared',
+    asyncHandler(async (req, res) => {
+      const token = req.body?.token;
+      if (typeof token !== 'string' || token.length === 0 || token.length > 200) {
+        res.status(400).json({ error: 'Invalid share token' });
+        return;
+      }
+      const snapshot = await snapshotStore.findByToken(token);
+      if (!snapshot || snapshot.revokedAt || snapshot.expiresAt <= Date.now()) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
+      pruneWsTickets();
+      const ticket = crypto.randomBytes(32).toString('hex');
+      const expiresAt = Date.now() + WS_TICKET_TTL_MS;
+      wsTicketStore.set(ticket, {
+        sessionToken: null,
+        shareToken: token,
+        username: 'Guest',
+        owner: snapshot.owner,
+        project: snapshot.project,
+        canWrite: snapshot.mode === 'edit',
+        expiresAt,
+      });
+      res.json({ ticket, expiresAt, project: snapshot.project, canWrite: snapshot.mode === 'edit' });
     })
   );
 
@@ -2715,8 +2749,19 @@ When answering queries:
       if (!entry) return false;
       wsTicketStore.delete(ticket); // single-use
       if (entry.expiresAt <= Date.now()) return false;
+      if (entry.shareToken) {
+        const snapshot = await snapshotStore.findByToken(entry.shareToken);
+        if (!snapshot || snapshot.revokedAt || snapshot.expiresAt <= Date.now()) return false;
+        return {
+          username: entry.username,
+          owner: snapshot.owner,
+          project: snapshot.project,
+          canWrite: snapshot.mode === 'edit',
+        };
+      }
       const session = await sessionStore.get(entry.sessionToken);
-      return Boolean(session);
+      if (!session) return false;
+      return { username: entry.username, owner: entry.owner, canWrite: entry.canWrite === true };
     }
 
     // Legacy path (deprecated): auth.<base64-token> + csrf.<hex>.
@@ -2744,7 +2789,12 @@ When answering queries:
     }
     const expected = Buffer.from(session.csrfToken, 'hex');
     if (provided.length !== expected.length) return false;
-    return crypto.timingSafeEqual(provided, expected);
+    if (!crypto.timingSafeEqual(provided, expected)) return false;
+    return {
+      username: session.username,
+      owner: session.username,
+      canWrite: (ROLE_LEVELS[getUserRole(session.username)] ?? 0) >= ROLE_LEVELS.engineer,
+    };
   });
 
   return app;

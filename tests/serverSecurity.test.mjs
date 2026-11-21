@@ -167,6 +167,33 @@ async function authScenario() {
       assert.strictEqual(writeAttempt.status, 403);
     });
 
+    const shareTicket = token => fetch(`${baseUrl}/ws/ticket/shared`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+
+    await check('issues collaboration tickets for share links bound to the snapshot', async () => {
+      const readTicket = await shareTicket(snapshot.read.token);
+      assert.strictEqual(readTicket.status, 200);
+      const readBody = await readTicket.json();
+      assert.match(readBody.ticket, /^[0-9a-f]{64}$/);
+      assert.strictEqual(readBody.project, 'test');
+      assert.strictEqual(readBody.canWrite, false, 'read-only links cannot send patches');
+
+      const editTicket = await shareTicket(snapshot.edit.token);
+      assert.strictEqual(editTicket.status, 200);
+      assert.strictEqual((await editTicket.json()).canWrite, true);
+
+      assert.strictEqual((await shareTicket('not-a-real-token')).status, 404);
+      const missing = await fetch(`${baseUrl}/ws/ticket/shared`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      assert.strictEqual(missing.status, 400);
+    });
+
     await check('allows editable snapshot updates and revocation', async () => {
       const writeAttempt = await fetch(`${baseUrl}/shared/${snapshot.edit.token}`, {
         method: 'POST',
@@ -186,6 +213,7 @@ async function authScenario() {
 
       const afterRevoke = await fetch(`${baseUrl}/shared/${snapshot.edit.token}`);
       assert.strictEqual(afterRevoke.status, 404);
+      assert.strictEqual((await shareTicket(snapshot.edit.token)).status, 404, 'revoked links cannot get tickets');
     });
 
     await check('allows project writes with CSRF header', async () => {

@@ -33,8 +33,24 @@ const WS_URL = (() => {
  * @returns {Promise<string[]>} subprotocols including the ticket, or just
  *   ['ctr-collab'] if no auth context is available.
  */
-async function buildWsProtocols() {
+async function buildWsProtocols(snapshotToken) {
   const protocols = ['ctr-collab'];
+  if (snapshotToken) {
+    // Share-link holders have no session; the share token is the credential.
+    try {
+      const res = await fetch('/ws/ticket/shared', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: snapshotToken }),
+      });
+      if (!res.ok) return protocols;
+      const { ticket } = await res.json();
+      if (ticket && /^[0-9a-fA-F]+$/.test(ticket)) protocols.push(`ticket.${ticket}`);
+    } catch {
+      // network failure — the server will reject the unauthenticated connection
+    }
+    return protocols;
+  }
   const auth = getAuthContextState();
   if (!auth?.csrfToken) return protocols;
   try {
@@ -68,16 +84,18 @@ export class CollabClient extends EventTarget {
   #ws = null;
   #projectId;
   #username;
+  #snapshotToken;
   #reconnectAttempt = 0;
   #intentionalClose = false;
   #pingTimer = null;
   /** Sequence number of the last patch received from the server. */
   #lastSeq = 0;
 
-  constructor({ projectId, username }) {
+  constructor({ projectId, username, snapshotToken }) {
     super();
     this.#projectId = projectId;
     this.#username = username;
+    this.#snapshotToken = snapshotToken || null;
   }
 
   get connected() {
@@ -91,7 +109,7 @@ export class CollabClient extends EventTarget {
 
     this.#intentionalClose = false;
     this.#lastSeq = 0;
-    const protocols = await buildWsProtocols();
+    const protocols = await buildWsProtocols(this.#snapshotToken);
     // A second concurrent connect() may have raced ahead while we were
     // fetching the ticket; bail if so.
     if (this.#ws && this.#ws.readyState <= WebSocket.OPEN) return;

@@ -550,6 +550,7 @@ Unless noted, bodies are JSON, errors are `{ "error": "..." }`, and the route is
 | `GET` | `/account/deletion-request` | yes | n/a | none | `200 { request }` (`request` is `null` when none exists) |
 | `POST` | `/account/deletion-request` | yes | yes | `{ "confirmation": "DELETE" }` | `201 { request: { username, email, status, requestedAt, updatedAt } }` |
 | `POST` | `/ws/ticket` | yes | yes | none | `200 { ticket, expiresAt }` |
+| `POST` | `/ws/ticket/shared` | no (share token) | no | `{ token }` | `200 { ticket, expiresAt, project, canWrite }`; `404` for an unknown, revoked, or expired link |
 
 **Rules**
 - Usernames match `[A-Za-z0-9_-]{1,100}` and cannot be `libraries`, `team-library-releases`, `__proto__`, `constructor`, or `prototype` (case-insensitive). Passwords must be 8-1000 characters.
@@ -558,6 +559,8 @@ Unless noted, bodies are JSON, errors are `{ "error": "..." }`, and the route is
 - `/forgot-password` creates a reset token valid for 15 minutes. It is logged on the server console as `[password-reset]` and is never returned in the response.
 - The `ctr_auth` cookie is `HttpOnly; Path=/; SameSite=Lax`, with `Max-Age` equal to the session TTL and `Secure` added over HTTPS.
 - `/ws/ticket` returns a single-use ticket that expires after 30 seconds (at most 5 outstanding per session). Pass it as `ticket.<hex>` in the `Sec-WebSocket-Protocol` header when opening the collaboration WebSocket.
+- **Collaboration rooms are bound to the owner.** The server builds the room from the ticket as `owner/project`: for a session ticket the owner is the signed-in user, so naming another user's project id only creates an empty room of your own. A `/ws/ticket/shared` ticket is bound to the share link's owner and project, whatever project id the client sends, and the link is checked again when the socket upgrades. The username shown to others comes from the ticket, not from the join message.
+- Only `engineer` and `admin` sessions and edit-mode share links can send patches; `read-only` and `reviewer` sessions and read-mode links can receive them (`Read-only access` error otherwise). A connection that sends more than 50 messages in one second is closed (code 1008), and frames over 64 KB are refused.
 - Error messages you may see: `400 Missing credentials`, `400 Invalid username`, `400 Password must be at least 8 characters`, `400 Password too long`, `400 Missing token or password`, `400 Invalid or expired reset token`, `400 Missing passwords`, `400 Deletion confirmation is required`, `409 User exists`, `401 Current password is incorrect`.
 
 ---

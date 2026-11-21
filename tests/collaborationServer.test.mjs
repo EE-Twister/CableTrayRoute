@@ -340,3 +340,120 @@ describe('attachCollaborationServer — invalid JSON', () => {
     assert.ok(errors.length >= 1, 'should return error for invalid JSON');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Authorization: rooms are bound to the authenticated owner
+// ---------------------------------------------------------------------------
+
+async function connectWithContext(httpServer, wss, validateResult) {
+  const socket = { destroy() { this.destroyed = true; } };
+  let captured;
+  const original = wss.handleUpgrade.bind(wss);
+  wss.handleUpgrade = (request, sock, head, cb) => {
+    captured = original(request, sock, head, cb);
+    return captured;
+  };
+  httpServer._emit('upgrade', makeRequest('http://localhost/ws/collab'), socket, Buffer.alloc(0));
+  await new Promise(resolve => setTimeout(resolve, 0));
+  return { ws: captured, socket };
+}
+
+async function setupAuthorized(contextByTicket) {
+  const httpServer = new MockHttpServer();
+  const wss = new MockWss();
+  let next = null;
+  attachCollaborationServer(httpServer, wss, {
+    validateUpgrade: async () => next,
+    maxMessagesPerSecond: 5,
+  });
+  return {
+    wss,
+    async connect(result) {
+      next = result;
+      return connectWithContext(httpServer, wss, result);
+    },
+  };
+}
+
+describe('attachCollaborationServer — authorized rooms', () => {
+  it('rejects the upgrade when validation fails', async () => {
+    const { connect } = await setupAuthorized(null);
+    const { ws, socket } = await connect(false);
+    assert.strictEqual(ws, undefined);
+    assert.strictEqual(socket.destroyed, true);
+  });
+
+  it('keeps different owners with the same project id in separate rooms', async () => {
+    const { connect } = await setupAuthorized();
+    const alice = (await connect({ username: 'alice', owner: 'alice', canWrite: true })).ws;
+    const bob = (await connect({ username: 'bob', owner: 'bob', canWrite: true })).ws;
+    alice._receive({ type: 'join', projectId: 'plant' });
+    bob._receive({ type: 'join', projectId: 'plant' });
+    const aliceBefore = alice.sent.length;
+    bob._receive({ type: 'patch', projectId: 'plant', patch: { x: 1 } });
+    assert.strictEqual(alice.sent.slice(aliceBefore).filter(m => m.type === 'patch').length, 0,
+      "bob's patch must not reach alice's room");
+    assert.deepStrictEqual(bob.sentOfType('presence').pop().users, ['bob']);
+  });
+
+  it('lets two connections of the same owner collaborate', async () => {
+    const { connect } = await setupAuthorized();
+    const a1 = (await connect({ username: 'alice', owner: 'alice', canWrite: true })).ws;
+    const a2 = (await connect({ username: 'alice', owner: 'alice', canWrite: true })).ws;
+    a1._receive({ type: 'join', projectId: 'plant' });
+    a2._receive({ type: 'join', projectId: 'plant' });
+    a1._receive({ type: 'patch', projectId: 'plant', patch: { x: 1 } });
+    const relayed = a2.sentOfType('patch');
+    assert.strictEqual(relayed.length, 1);
+    assert.strictEqual(relayed[0].projectId, 'plant');
+    assert.deepStrictEqual(relayed[0].patch, { x: 1 });
+  });
+
+  it('ignores the client-supplied username', async () => {
+    const { connect } = await setupAuthorized();
+    const alice = (await connect({ username: 'alice', owner: 'alice', canWrite: true })).ws;
+    const second = (await connect({ username: 'alice', owner: 'alice', canWrite: true })).ws;
+    alice._receive({ type: 'join', projectId: 'plant', username: 'admin' });
+    second._receive({ type: 'join', projectId: 'plant', username: 'root' });
+    alice._receive({ type: 'patch', patch: { x: 1 } });
+    assert.strictEqual(second.sentOfType('patch')[0].username, 'alice');
+    assert.deepStrictEqual(second.sentOfType('presence').pop().users, ['alice', 'alice']);
+  });
+
+  it('binds a share-link connection to its snapshot project, ignoring the join id', async () => {
+    const { connect } = await setupAuthorized();
+    const owner = (await connect({ username: 'alice', owner: 'alice', canWrite: true })).ws;
+    const guest = (await connect({ username: 'Guest', owner: 'alice', project: 'plant', canWrite: true })).ws;
+    owner._receive({ type: 'join', projectId: 'plant' });
+    guest._receive({ type: 'join', projectId: 'someone-elses-project' });
+    guest._receive({ type: 'patch', patch: { y: 2 } });
+    const relayed = owner.sentOfType('patch');
+    assert.strictEqual(relayed.length, 1);
+    assert.strictEqual(relayed[0].projectId, 'plant');
+    assert.strictEqual(relayed[0].username, 'Guest');
+  });
+
+  it('refuses patches from read-only connections but lets them receive', async () => {
+    const { connect } = await setupAuthorized();
+    const owner = (await connect({ username: 'alice', owner: 'alice', canWrite: true })).ws;
+    const viewer = (await connect({ username: 'Guest', owner: 'alice', project: 'plant', canWrite: false })).ws;
+    owner._receive({ type: 'join', projectId: 'plant' });
+    viewer._receive({ type: 'join', projectId: 'plant' });
+    const ownerBefore = owner.sent.length;
+    viewer._receive({ type: 'patch', patch: { evil: true } });
+    assert.strictEqual(viewer.lastSent().message, 'Read-only access');
+    assert.strictEqual(owner.sent.slice(ownerBefore).filter(m => m.type === 'patch').length, 0);
+    owner._receive({ type: 'patch', patch: { ok: true } });
+    assert.deepStrictEqual(viewer.sentOfType('patch')[0].patch, { ok: true });
+  });
+
+  it('disconnects a client that exceeds the per-second message budget', async () => {
+    const { connect } = await setupAuthorized();
+    const { ws } = await connect({ username: 'alice', owner: 'alice', canWrite: true });
+    for (let i = 0; i < 5; i += 1) ws._receive({ type: 'ping' });
+    assert.strictEqual(ws.readyState, WS_OPEN);
+    ws._receive({ type: 'ping' });
+    assert.strictEqual(ws.lastSent().message, 'Rate limit exceeded');
+    assert.strictEqual(ws.readyState, WS_CLOSED);
+  });
+});

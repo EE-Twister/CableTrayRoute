@@ -33,15 +33,16 @@ let presenceBarEl = null;
  * @param {object} opts
  * @param {string} opts.projectId  - project identifier
  * @param {string} [opts.username] - override username (defaults to stored auth user)
+ * @param {string} [opts.snapshotToken] - share-link token; joins the shared project's room instead of using a session
  */
-export function initCollaboration({ projectId, username } = {}) {
+export function initCollaboration({ projectId, username, snapshotToken } = {}) {
   // Tear down any previous session
   stopCollaboration();
 
   const authState = getAuthContextState ? getAuthContextState() : null;
   const resolvedUsername = username || (authState && authState.user) || 'Guest';
 
-  activeClient = new CollabClient({ projectId, username: resolvedUsername });
+  activeClient = new CollabClient({ projectId, username: resolvedUsername, snapshotToken });
 
   // Conflict notifications (out-of-order patches warning)
   initConflictNotifications(activeClient);
