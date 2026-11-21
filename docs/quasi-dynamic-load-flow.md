@@ -64,7 +64,7 @@ Pg_t  = Pg_base  × genScale_t     (bus real generation, kW)
 Qg_t  = Qg_base  × genScale_t     (bus reactive generation, kVAR)
 ```
 
-The scaled snapshot is passed to the full Newton-Raphson AC load-flow solver (same engine as the [Load Flow](loadFlow.html) study). Each timestep is independent — no inter-step dynamics, ramp limits, or energy storage state is tracked.
+The scaled snapshot is passed to the full Newton-Raphson AC load-flow solver (same engine as the [Load Flow](../loadFlow.html) study). Each timestep is independent — no inter-step dynamics, ramp limits, or energy storage state is tracked.
 
 **Energy loss accumulation** (each step stands for the gap to the next step's `hour`; a single or last step reuses the previous gap, default 1 h):
 ```

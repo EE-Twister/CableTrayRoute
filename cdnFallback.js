@@ -14,12 +14,12 @@
  */
 
 window.initCdnFallback = function initCdnFallback(deps) {
-  var missing = deps.filter(function (d) {
+  const missing = deps.filter(function (d) {
     return !window[d.global];
   });
   if (!missing.length) return;
 
-  var banner = document.createElement('div');
+  const banner = document.createElement('div');
   banner.setAttribute('role', 'alert');
   banner.setAttribute('aria-live', 'assertive');
   banner.style.cssText = [
@@ -35,9 +35,9 @@ window.initCdnFallback = function initCdnFallback(deps) {
     'display:flex', 'align-items:center', 'gap:0.75rem',
   ].join(';');
 
-  var labels = missing.map(function (d) { return d.label; }).join(', ');
-  var msg = document.createTextNode('Some features may be unavailable: ' + labels + '. Check your network connection.');
-  var close = document.createElement('button');
+  const labels = missing.map(function (d) { return d.label; }).join(', ');
+  const msg = document.createTextNode('Some features may be unavailable: ' + labels + '. Check your network connection.');
+  const close = document.createElement('button');
   close.textContent = '×';
   close.setAttribute('aria-label', 'Dismiss');
   close.style.cssText = 'background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;padding:0 0.25rem;line-height:1;';

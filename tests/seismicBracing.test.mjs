@@ -34,7 +34,7 @@ function it(name, fn) {
 // ---------------------------------------------------------------------------
 // SDC determination from SDS
 // ---------------------------------------------------------------------------
-describe('sdcFromSds — ASCE 7-22 Table 11.6-1', () => {
+describe('sdcFromSds — ASCE 7-16 Table 11.6-1', () => {
   it('SDC A for low SDS (Risk Cat II)', () => {
     assert.strictEqual(sdcFromSds(0.1, 'II'), 'A');
   });
@@ -59,7 +59,7 @@ describe('sdcFromSds — ASCE 7-22 Table 11.6-1', () => {
 // ---------------------------------------------------------------------------
 // SDC determination from SD1
 // ---------------------------------------------------------------------------
-describe('sdcFromSd1 — ASCE 7-22 Table 11.6-2', () => {
+describe('sdcFromSd1 — ASCE 7-16 Table 11.6-2', () => {
   it('SDC A for SD1 < 0.067 (Risk Cat II)', () => {
     assert.strictEqual(sdcFromSd1(0.05, 'II'), 'A');
   });

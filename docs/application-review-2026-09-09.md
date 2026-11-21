@@ -8,7 +8,7 @@ The highest-value work is protecting saved work, repairing first-use sample load
 
 ### 1. High — concurrent project saves silently lose successful updates
 
-**Evidence:** [server.mjs:202](C:/Users/Derek/OneDrive/Documents/GitHub/CableTrayRoute/server.mjs:202), [server.mjs:231](C:/Users/Derek/OneDrive/Documents/GitHub/CableTrayRoute/server.mjs:231).
+**Evidence:** [server.mjs:202](../server.mjs#L202), [server.mjs:231](../server.mjs#L231).
 
 The version comparison and write are separate asynchronous operations. Concurrent requests can all read the same version, pass the comparison, and overwrite each other's work. Revision filenames use `Date.now()`, so multiple writes within one millisecond can also target the same file.
 
@@ -22,7 +22,7 @@ The version comparison and write are separate asynchronous operations. Concurren
 
 ### 2. High — the first guided sample can report success while dropping its schedules
 
-**Evidence:** [src/sampleGallery.js:292](C:/Users/Derek/OneDrive/Documents/GitHub/CableTrayRoute/src/sampleGallery.js:292), [dataStore.mjs:299](C:/Users/Derek/OneDrive/Documents/GitHub/CableTrayRoute/dataStore.mjs:299), [dataStore.mjs:1567](C:/Users/Derek/OneDrive/Documents/GitHub/CableTrayRoute/dataStore.mjs:1567).
+**Evidence:** [src/sampleGallery.js:292](../src/sampleGallery.js#L292), [dataStore.mjs:299](../dataStore.mjs#L299), [dataStore.mjs:1567](../dataStore.mjs#L1567).
 
 The sample calls `importProject(payload)` before assigning its project name. The data-store guard rejects named-project collection writes in an unnamed workspace. Import does not propagate those setter failures and still returns success.
 
@@ -32,11 +32,11 @@ The sample calls `importProject(payload)` before assigning its project name. The
 
 **Correction:** Establish the destination project context before import and apply the import atomically. Propagate rejected writes, roll back partial imports, and verify imported collection counts before displaying success or saving a sample copy.
 
-**Acceptance check:** From a fresh browser context and ordinary production URL, start every guided sample and inspect its equipment, loads, cables, and one-line. No unexpected project-name prompt; imported counts match the fixture. Existing sample smoke coverage uses `?e2e=1`; [dataStore.mjs:284](C:/Users/Derek/OneDrive/Documents/GitHub/CableTrayRoute/dataStore.mjs:284) bypasses this guard in that mode.
+**Acceptance check:** From a fresh browser context and ordinary production URL, start every guided sample and inspect its equipment, loads, cables, and one-line. No unexpected project-name prompt; imported counts match the fixture. Existing sample smoke coverage uses `?e2e=1`; [dataStore.mjs:284](../dataStore.mjs#L284) bypasses this guard in that mode.
 
 ### 3. High — the cable editor uses a different, dimensionally ambiguous voltage-drop calculation
 
-**Evidence:** [cableschedule.js:318](C:/Users/Derek/OneDrive/Documents/GitHub/CableTrayRoute/cableschedule.js:318), [src/cable-schedule/scheduleConfig.js:175](C:/Users/Derek/OneDrive/Documents/GitHub/CableTrayRoute/src/cable-schedule/scheduleConfig.js:175), [src/voltageDrop.js:59](C:/Users/Derek/OneDrive/Documents/GitHub/CableTrayRoute/src/voltageDrop.js:59).
+**Evidence:** [cableschedule.js:318](../cableschedule.js#L318), [src/cable-schedule/scheduleConfig.js:175](../src/cable-schedule/scheduleConfig.js#L175), [src/voltageDrop.js:59](../src/voltageDrop.js#L59).
 
 The editor labels its input **Impedance (Ω)** and computes `length × current × impedance / voltage × 100`. Length is in feet, so the labeled dimensions do not produce volts. The editor does not take phase or power factor into account. The study uses the separate AC resistance/reactance calculation with phase and power factor.
 
@@ -50,7 +50,7 @@ The editor labels its input **Impedance (Ω)** and computes `length × current �
 
 ### 4. High — voltage-drop studies ignore parallel runs
 
-**Evidence:** [src/voltageDrop.js:32](C:/Users/Derek/OneDrive/Documents/GitHub/CableTrayRoute/src/voltageDrop.js:32), [analysis/voltageDropStudy.mjs:158](C:/Users/Derek/OneDrive/Documents/GitHub/CableTrayRoute/analysis/voltageDropStudy.mjs:158), [src/cable-schedule/scheduleConfig.js:166](C:/Users/Derek/OneDrive/Documents/GitHub/CableTrayRoute/src/cable-schedule/scheduleConfig.js:166).
+**Evidence:** [src/voltageDrop.js:32](../src/voltageDrop.js#L32), [analysis/voltageDropStudy.mjs:158](../analysis/voltageDropStudy.mjs#L158), [src/cable-schedule/scheduleConfig.js:166](../src/cable-schedule/scheduleConfig.js#L166).
 
 The schedule supports `parallel_count`, but the voltage-drop calculation applies total `est_load` to a single conductor impedance regardless of that count.
 
@@ -64,7 +64,7 @@ The schedule supports `parallel_count`, but the voltage-drop calculation applies
 
 ### 5. High — metric conductor sizes are silently interpreted as AWG/kcmil tokens
 
-**Evidence:** [src/necTable9.mjs:54](C:/Users/Derek/OneDrive/Documents/GitHub/CableTrayRoute/src/necTable9.mjs:54).
+**Evidence:** [src/necTable9.mjs:54](../src/necTable9.mjs#L54).
 
 Size normalization extracts the first number and discards its unit. **`10 mm2` and `10 AWG` produce exactly the same Table 9 resistance/reactance.** Both were checked directly. Metric sizes whose numbers match a table key can therefore produce plausible numeric results for a different conductor.
 
@@ -76,7 +76,7 @@ Size normalization extracts the first number and discards its unit. **`10 mm2` a
 
 ### 6. Medium — “nonmagnetic” conduit selects magnetic-conduit impedance
 
-**Evidence:** [src/necTable9.mjs:65](C:/Users/Derek/OneDrive/Documents/GitHub/CableTrayRoute/src/necTable9.mjs:65).
+**Evidence:** [src/necTable9.mjs:65](../src/necTable9.mjs#L65).
 
 The regex includes `magnetic` as a substring, so `nonmagnetic` and `non-magnetic` match it. The generic `rigid` alternative also needs material-aware handling.
 
@@ -90,7 +90,7 @@ The regex includes `magnetic` as a substring, so `nonmagnetic` and `non-magnetic
 
 ### 7. High — the voltage-drop REST endpoint ignores the project's cables
 
-**Evidence:** [server.mjs:2048](C:/Users/Derek/OneDrive/Documents/GitHub/CableTrayRoute/server.mjs:2048), [analysis/voltageDropStudy.mjs:281](C:/Users/Derek/OneDrive/Documents/GitHub/CableTrayRoute/analysis/voltageDropStudy.mjs:281).
+**Evidence:** [server.mjs:2048](../server.mjs#L2048), [analysis/voltageDropStudy.mjs:281](../analysis/voltageDropStudy.mjs#L281).
 
 The endpoint loads the project, then calls `runVoltageDropStudy()` with no arguments. That function defaults to an empty cable array. Installing a temporary one-line data store does not supply its cable argument.
 
@@ -100,11 +100,11 @@ The endpoint loads the project, then calls `runVoltageDropStudy()` with no argum
 
 **Correction:** Pass normalized project cables, loads, and applicable load-flow data explicitly. Distinguish an empty project from an adapter failure. Prefer pure request-scoped calculation inputs over swapping process-global `localStorage`.
 
-**Acceptance check:** API and direct/browser evaluation of the same saved fixture return matching row counts, cable IDs, provenance, and numeric results. [tests/restApi.test.mjs:181](C:/Users/Derek/OneDrive/Documents/GitHub/CableTrayRoute/tests/restApi.test.mjs:181) currently verifies response status and field presence, so it accepts an empty result.
+**Acceptance check:** API and direct/browser evaluation of the same saved fixture return matching row counts, cable IDs, provenance, and numeric results. [tests/restApi.test.mjs:181](../tests/restApi.test.mjs#L181) currently verifies response status and field presence, so it accepts an empty result.
 
 ### 8. Medium — Express static assets bypass the advertised gzip behavior
 
-**Evidence:** [server.mjs:1108](C:/Users/Derek/OneDrive/Documents/GitHub/CableTrayRoute/server.mjs:1108), [server.mjs:1159](C:/Users/Derek/OneDrive/Documents/GitHub/CableTrayRoute/server.mjs:1159).
+**Evidence:** [server.mjs:1108](../server.mjs#L1108), [server.mjs:1159](../server.mjs#L1159).
 
 Compression wraps `res.send`, while `express.static` streams files through a different path.
 

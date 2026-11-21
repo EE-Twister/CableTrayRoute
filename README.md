@@ -55,7 +55,7 @@ The deployment server applies cache and compression defaults optimized for finge
 - Other static files use `Cache-Control: public, max-age=600, must-revalidate`.
 - Text-like responses larger than 1 KB (HTML/CSS/JS/JSON/XML/SVG) are gzip-compressed by default.
 
-The build copy pipeline (`scripts/copyAssets.js`) now emits fingerprinted copies and an `asset-manifest.json` map in both `dist/` and `docs/` so deployments can adopt immutable URLs while keeping HTML short-lived.
+The build copy pipeline (`scripts/copyAssets.cjs`) now emits fingerprinted copies and an `asset-manifest.json` map in both `dist/` and `docs/` so deployments can adopt immutable URLs while keeping HTML short-lived.
 
 For rollout safety, keep older fingerprinted files available until all clients have refreshed to the new HTML references.
 

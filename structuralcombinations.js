@@ -295,10 +295,10 @@ document.addEventListener('DOMContentLoaded', () => {
         <summary>Calculation method</summary>
         <p>Dead load D = tray weight + cable weight =
            ${r.deadLoad_lbs_ft.toFixed(2)} lbs/ft</p>
-        <p>Wind lateral W per ASCE 7-22 Chapter 27/30, Eq. 27.3-1:
+        <p>Wind lateral W per ASCE 7-22 §29.4 (force coefficient method):
            F = q_z × G × C_f × A_f / span =
            ${r.windLateral_lbs_ft.toFixed(2)} lbs/ft</p>
-        <p>Seismic E_h per ASCE 7-22 §13.3.1:
+        <p>Seismic E_h per ASCE 7-16 §13.3.1 (default edition):
            F_p = (0.4·a_p·S_DS·W_p / (R_p/I_p)) × (1 + 2z/h),
            bounded by [0.3·S_DS·I_p·W_p, 1.6·S_DS·I_p·W_p] =
            ${r.seismicLateral_lbs_ft.toFixed(2)} lbs/ft</p>

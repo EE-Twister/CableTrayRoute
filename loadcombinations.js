@@ -255,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <tr><th scope="row">Snow (S)</th><td>${params.S.toFixed(2)} lbs/ft</td></tr>
           </tbody>
         </table>
-        <p>Load factors per ASCE 7-22 §2.3.2. Seismic forces per §13.3.1.
+        <p>Load factors per ASCE 7-22 §2.3.2. Seismic forces per ASCE 7-16 §13.3.1.
         Wind forces per §26.10-1 and §29.4. For cable tray, L (live), Lr (roof live),
         and R (rain) loads are omitted per standard practice.</p>
         ${all.map(c => !c.applicable ? '' : `

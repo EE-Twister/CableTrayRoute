@@ -112,7 +112,7 @@
         <ul>
           <li><strong>D</strong> = dead load: tray self-weight + cable weight (lbs/ft)</li>
           <li><strong>W</strong> = design wind force per linear foot (ASCE 7-22 §29.4)</li>
-          <li><strong>E</strong> = seismic force per ASCE 7-22 §13.3.1, resolved into
+          <li><strong>E</strong> = seismic force per ASCE 7-16 §13.3.1, resolved into
             lateral (E_lat) and vertical (E_v = ±0.2 × SDS × D) components</li>
           <li><strong>S</strong> = snow load per linear foot of tray</li>
         </ul>
@@ -149,7 +149,7 @@
       <fieldset>
         <legend><strong>Seismic Parameters (E)</strong></legend>
         <p class="field-hint">
-          Seismic forces are computed internally via ASCE 7-22 §13.3.1.
+          Seismic forces are computed internally via ASCE 7-16 §13.3.1.
           Set S<sub>DS</sub> = 0 to exclude seismic loads (LC-S1 and LC-S2 will be N/A).
           See <a href="seismicBracing.html">Seismic Bracing</a> for detailed results.
         </p>
@@ -234,7 +234,7 @@
           <input type="number" id="wpPerFt" min="0.1" step="0.1"
                  value="10.0" aria-describedby="wpPerFtHint" aria-required="true">
           <p id="wpPerFtHint" class="field-hint">
-            Used to compute the seismic force E per ASCE 7-22 §13.3.1.
+            Used to compute the seismic force E per ASCE 7-16 §13.3.1.
             Should equal the Dead Load (D) entered above.
           </p>
         </div>

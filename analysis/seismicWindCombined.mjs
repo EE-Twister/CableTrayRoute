@@ -142,7 +142,7 @@ function zeroWindDetail(params) {
  * — Dead load —
  * @param {number}  params.wp_lbs_ft         Tray + cable weight per linear foot (lbs/ft), > 0
  *
- * — Seismic parameters (ASCE 7-22 Chapter 13) —
+ * — Seismic parameters (ASCE 7-16 Chapter 13 by default; opt-in 7-22 via asce7edition) —
  * @param {number}  params.sds               Design spectral acceleration, short period (g), >= 0
  * @param {number}  params.sd1               Design spectral acceleration, 1-second period (g), >= 0
  * @param {string}  params.riskCategory      'I' | 'II' | 'III' | 'IV'
@@ -187,7 +187,7 @@ export function calcSeismicWindCombined(params) {
   const G    = params.G    ?? 0.85;
   const snowLoad_lbs_ft = params.snowLoad_lbs_ft ?? 0;
 
-  // 1. Seismic brace forces (ASCE 7-22 Chapter 13)
+  // 1. Seismic brace forces (ASCE 7-16 Chapter 13 by default; 7-22 opt-in)
   const seismicDetail = calcBraceForces({
     sds,
     sd1,

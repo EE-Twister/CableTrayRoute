@@ -12,7 +12,7 @@ Navigate to **Studies → Equipment Sizing → Demand Schedule**, or click **Dem
 
 ## Prerequisites
 
-Populate the [Load List](loadlist.html) with:
+Populate the [Load List](../loadlist.html) with:
 
 - **Source / Panel** — which panel or switchboard feeds the load (used for per-panel breakdown)
 - **Load Type** — free-text; keyword-matched to an NEC 220 category

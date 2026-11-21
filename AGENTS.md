@@ -18,8 +18,8 @@ This repository uses this file for all developer tasks. The rules below apply to
 ## Project Structure Expectations
 - UI modules live under `src/`. Avoid placing UI logic in root-level files; root entry points should delegate into `src/` components.
 - All persistence flows must pass through the APIs in `projectStorage.js`. Avoid direct `localStorage` access in feature code.
-- Vendor bundles (such as the fast-json-patch shim) are built exclusively by `scripts/buildFastJsonPatch.js`. Do not check generated vendor files into source or rebuild them ad hoc from other scripts.
-- Static assets and documentation artifacts are copied via `scripts/copyAssets.js`. Update that script (rather than duplicating copy logic) when new assets need to be distributed.
+- Vendor bundles (such as the fast-json-patch shim) are built exclusively by `scripts/buildFastJsonPatch.cjs`. Do not check generated vendor files into source or rebuild them ad hoc from other scripts.
+- Static assets and documentation artifacts are copied via `scripts/copyAssets.cjs`. Update that script (rather than duplicating copy logic) when new assets need to be distributed.
 
 ## Storage Invariants
 - Respect the `PROJECT_KEY` namespace and reuse `setProjectState`, `setProjectKey`, and `removeProjectKey` to mutate stored data so undo/redo tracking remains correct.

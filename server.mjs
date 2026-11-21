@@ -1911,10 +1911,11 @@ When answering queries:
   // ---------------------------------------------------------------------------
   // Public REST API v1 — scripting / automation surface
   //
-  // All endpoints require Bearer token auth (same token returned by /login).
-  // CSRF protection is intentionally skipped: these endpoints are designed for
-  // programmatic access from scripts, not browser forms, so there is no CSRF
-  // risk from the same-origin policy.
+  // All endpoints go through the shared `auth` middleware: the HttpOnly ctr_auth
+  // cookie, or the legacy Authorization: Bearer token during the deprecation
+  // window. Routes that change stored state apply `csrfProtection` explicitly
+  // (x-csrf-token). The study POST routes only compute from saved data and
+  // persist nothing, so they skip it; keep that true when adding routes.
   //
   // Rate limit: shared with /projects (100 req / 15 min per IP by default).
   // ---------------------------------------------------------------------------
