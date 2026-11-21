@@ -276,6 +276,83 @@ await check('admin user record has oidc:false for password users', async () => {
   assert.equal(adminRecord.role, 'admin');
 });
 
+console.log('\nRBAC — Admin-issued password reset');
+const issueReset = (session, username) => fetch(`${base}/api/v1/admin/users/${username}/password-reset`, {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${session.token}`,
+    'X-CSRF-Token': session.csrfToken,
+  },
+});
+let resetToken = null;
+await check('non-admin cannot issue a reset link (403)', async () => {
+  const r = await issueReset(engSession, 'readonly_user');
+  assert.equal(r.status, 403);
+});
+await check('unknown and prototype-named users return 404', async () => {
+  assert.equal((await issueReset(adminSession, 'no_such_user')).status, 404);
+  assert.equal((await issueReset(adminSession, '__proto__')).status, 404);
+});
+await check('admin issues a one-time link for a password account', async () => {
+  const r = await issueReset(adminSession, 'readonly_user');
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('cache-control'), 'no-store');
+  const body = await r.json();
+  assert.equal(body.username, 'readonly_user');
+  assert.match(body.token, /^[0-9a-f]{64}$/);
+  assert.ok(body.expiresAt > Date.now());
+  assert.ok(body.url.endsWith(`/reset-password.html?token=${body.token}`), body.url);
+  resetToken = body.token;
+});
+await check('/forgot-password stores nothing and points users to an administrator', async () => {
+  const r = await fetch(`${base}/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'readonly_user' }),
+  });
+  assert.equal(r.status, 200);
+  assert.match((await r.json()).message, /administrator/);
+});
+await check('the token resets the password once and revokes existing sessions', async () => {
+  const reset = await fetch(`${base}/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: resetToken, newPassword: 'BrandNew456!' }),
+  });
+  assert.equal(reset.status, 200);
+  const replay = await fetch(`${base}/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: resetToken, newPassword: 'AnotherOne789!' }),
+  });
+  assert.equal(replay.status, 400, 'a used token cannot be replayed');
+  assert.equal((await getProject(readonlySession, 'anything')).status, 401, 'old session is revoked');
+  const oldLogin = await fetch(`${base}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'readonly_user', password: 'TestPass123!' }),
+  });
+  assert.equal(oldLogin.status, 401);
+  const newLogin = await fetch(`${base}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'readonly_user', password: 'BrandNew456!' }),
+  });
+  assert.equal(newLogin.status, 200);
+});
+await check('issuing and using a reset link are audited', async () => {
+  await new Promise(resolve => setTimeout(resolve, 100));
+  for (const action of ['PASSWORD_RESET_ISSUED', 'PASSWORD_RESET']) {
+    const r = await fetch(`${base}/api/v1/admin/audit-log?action=${action}`, {
+      headers: { Authorization: `Bearer ${adminSession.token}` },
+    });
+    const body = await r.json();
+    assert.ok(body.entries.length >= 1, `expected a ${action} entry`);
+    assert.equal(body.entries[0].entityId, 'readonly_user');
+    assert.ok(!JSON.stringify(body.entries).includes(resetToken), 'the token is never written to the audit log');
+  }
+});
+
 await closeServer(server);
 await fs.rm(tmpDir, { recursive: true, force: true });
 console.log('\nAll RBAC tests complete.');

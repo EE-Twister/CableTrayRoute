@@ -926,24 +926,31 @@ const RESET_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
 class ResetTokenStore {
   constructor() {
-    this.tokens = new Map(); // token -> { username, expiresAt }
+    this.tokens = new Map(); // sha256(token) -> { username, expiresAt }
+  }
+
+  // Only the hash is kept, so a memory dump or debug print never exposes a
+  // usable reset token.
+  static #hash(token) {
+    return crypto.createHash('sha256').update(String(token)).digest('hex');
   }
 
   create(username) {
     // Invalidate any existing token for this user
-    for (const [tok, entry] of this.tokens.entries()) {
-      if (entry.username === username) this.tokens.delete(tok);
+    for (const [key, entry] of this.tokens.entries()) {
+      if (entry.username === username) this.tokens.delete(key);
     }
     const token = crypto.randomBytes(32).toString('hex');
-    this.tokens.set(token, { username, expiresAt: Date.now() + RESET_TOKEN_TTL_MS });
+    this.tokens.set(ResetTokenStore.#hash(token), { username, expiresAt: Date.now() + RESET_TOKEN_TTL_MS });
     return token;
   }
 
   validate(token) {
-    const entry = this.tokens.get(token);
+    const key = ResetTokenStore.#hash(token);
+    const entry = this.tokens.get(key);
     if (!entry) return null;
     if (entry.expiresAt <= Date.now()) {
-      this.tokens.delete(token);
+      this.tokens.delete(key);
       return null;
     }
     return entry.username;
@@ -951,7 +958,7 @@ class ResetTokenStore {
 
   consume(token) {
     const username = this.validate(token);
-    if (username) this.tokens.delete(token);
+    if (username) this.tokens.delete(ResetTokenStore.#hash(token));
     return username;
   }
 }
@@ -1614,20 +1621,11 @@ export async function createApp(options = {}) {
   app.post(
     '/forgot-password',
     asyncHandler(async (req, res) => {
-      const { username } = req.body || {};
-      if (typeof username !== 'string' || !isValidName(username.trim())) {
-        // Always respond with success to avoid user enumeration
-        res.json({ message: 'If that account exists, a reset token has been generated.' });
-        return;
-      }
-      const trimmedUser = username.trim();
-      if (!users[trimmedUser]) {
-        res.json({ message: 'If that account exists, a reset token has been generated.' });
-        return;
-      }
-      resetTokenStore.create(trimmedUser);
-      console.error(`[password-reset] Reset requested for "${trimmedUser}".`);
-      res.json({ message: 'If that account exists, a reset token has been generated.' });
+      // Reset links are issued by an administrator (POST
+      // /api/v1/admin/users/:username/password-reset), so this endpoint stores
+      // nothing and answers identically for every input: it cannot be used to
+      // find out which accounts exist or to fill memory with tokens.
+      res.json({ message: 'If that account exists, ask an administrator to issue you a password reset link.' });
     })
   );
 
@@ -1660,6 +1658,7 @@ export async function createApp(options = {}) {
       await saveUsers();
       // Invalidate any active sessions for this user
       await sessionStore.revokeUserSessions(username);
+      appendAuditEntry(auditLogFile, { actor: username, action: 'PASSWORD_RESET', entityType: 'user', entityId: username }).catch(() => {});
       res.json({ message: 'Password reset successfully. You may now sign in.' });
     })
   );
@@ -2374,6 +2373,42 @@ When answering queries:
     })
   );
 
+  // Issue a one-time, 15-minute password reset link for a password account.
+  // The token is returned only in this response and stored only as a hash.
+  app.post(
+    '/api/v1/admin/users/:username/password-reset',
+    auth,
+    csrfProtection,
+    requireRole('admin'),
+    asyncHandler(async (req, res) => {
+      const target = req.params.username;
+      if (!isValidName(target) || !Object.hasOwn(users, target)) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+      if (users[target].oidcSub) {
+        res.status(400).json({ error: 'SSO accounts have no password to reset' });
+        return;
+      }
+      const token = resetTokenStore.create(target);
+      const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+      const host = req.get('host');
+      appendAuditEntry(auditLogFile, {
+        actor: req.username,
+        action: 'PASSWORD_RESET_ISSUED',
+        entityType: 'user',
+        entityId: target,
+      }).catch(() => {});
+      res.setHeader('Cache-Control', 'no-store');
+      res.json({
+        username: target,
+        token,
+        expiresAt: Date.now() + RESET_TOKEN_TTL_MS,
+        url: host ? `${protocol}://${host}/reset-password.html?token=${token}` : null,
+      });
+    })
+  );
+
   app.patch(
     '/api/v1/admin/users/:username/role',
     auth,
@@ -2824,4 +2859,4 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
 
 // attachCollaborationServer imported from src/collaborationServer.mjs above
 export { attachCollaborationServer };
-export { applyMergePatch, createRateLimiter, isValidName, isValidUsername, writeFileAtomic };
+export { ResetTokenStore, applyMergePatch, createRateLimiter, isValidName, isValidUsername, writeFileAtomic };

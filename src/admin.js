@@ -217,8 +217,49 @@ function renderUsersTable(users) {
       <td class="actions-cell"></td>
     `;
     tr.querySelector('.role-cell').appendChild(roleSelect);
-    tr.querySelector('.actions-cell').appendChild(saveBtn);
+    const actionsCell = tr.querySelector('.actions-cell');
+    actionsCell.appendChild(saveBtn);
+    if (!user.oidc) {
+      const resetBtn = document.createElement('button');
+      resetBtn.className = 'btn btn-sm';
+      resetBtn.type = 'button';
+      resetBtn.textContent = 'Reset password';
+      resetBtn.setAttribute('aria-label', `Issue a password reset link for ${user.username}`);
+      resetBtn.addEventListener('click', () => issuePasswordReset(user.username));
+      actionsCell.appendChild(resetBtn);
+    }
     tbody.appendChild(tr);
+  }
+}
+
+async function issuePasswordReset(username) {
+  const confirmed = await showModal(
+    'Issue Password Reset Link',
+    `Create a one-time reset link for ${username}? Any earlier link for this user stops working.`
+  );
+  if (!confirmed) return;
+  try {
+    const res = await fetch(`/api/v1/admin/users/${encodeURIComponent(username)}/password-reset`, {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showError(`Failed to issue reset link: ${body.error ?? res.status}`);
+      return;
+    }
+    const link = body.url || body.token;
+    try {
+      await navigator.clipboard?.writeText(link);
+    } catch {
+      // Clipboard access is best effort; the link is also shown below.
+    }
+    await showModal(
+      `Reset link for ${username}`,
+      `Give this link to ${username}. It is shown only once and expires in 15 minutes:\n\n${link}`
+    );
+  } catch (err) {
+    showError(`Error issuing reset link: ${err.message}`);
   }
 }
 

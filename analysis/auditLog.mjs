@@ -9,6 +9,8 @@ export const VALID_ACTIONS = Object.freeze([
   'LOGIN',
   'LOGOUT',
   'ROLE_CHANGE',
+  'PASSWORD_RESET_ISSUED',
+  'PASSWORD_RESET',
 ]);
 
 export function computeEntryHash({ id, actor, ts, action, entityId }) {

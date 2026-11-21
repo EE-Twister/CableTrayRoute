@@ -43,7 +43,7 @@ Each entry contains:
 | `id` | UUID for this entry |
 | `ts` | ISO 8601 timestamp |
 | `actor` | Username who performed the action |
-| `action` | `CREATE`, `UPDATE`, `DELETE`, `READ_SENSITIVE`, `LOGIN`, `LOGOUT`, `ROLE_CHANGE` |
+| `action` | `CREATE`, `UPDATE`, `DELETE`, `READ_SENSITIVE`, `LOGIN`, `LOGOUT`, `ROLE_CHANGE`, `PASSWORD_RESET_ISSUED`, `PASSWORD_RESET` |
 | `entityType` | `project`, `session`, `user`, etc. |
 | `entityId` | ID of the affected entity |
 | `projectId` | Project name (for project mutations) |
@@ -163,6 +163,12 @@ Requires: `admin` role + CSRF token.
 Body: `{ "role": "engineer" }` — valid values: `read-only`, `reviewer`, `engineer`, `admin`.
 
 Returns: `{ "username": "alice", "role": "engineer" }`
+
+### `POST /api/v1/admin/users/:username/password-reset`
+
+Requires: `admin` role + CSRF token. No body.
+
+Issues a one-time password reset link for a password account (`400` for SSO accounts, `404` for an unknown user). Returns `{ "username", "token", "expiresAt", "url" }`; the link is valid for 15 minutes and is shown only in this response. Issuing a new link for the same user invalidates the earlier one. The user opens the link (`/reset-password.html?token=...`), chooses a new password, and all of their sessions are revoked. The admin panel's **Reset password** button calls this endpoint and copies the link. Both steps are recorded in the audit log as `PASSWORD_RESET_ISSUED` and `PASSWORD_RESET`.
 
 ### `GET /api/v1/admin/audit-log`
 

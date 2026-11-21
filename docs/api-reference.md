@@ -543,8 +543,9 @@ Unless noted, bodies are JSON, errors are `{ "error": "..." }`, and the route is
 | `POST` | `/session/refresh` | yes | yes | none | `200 { token, csrfToken, expiresAt }`, new cookie, old session deleted |
 | `POST` | `/logout` | yes | yes | none | `200 { "loggedOut": true }`, cookie cleared |
 | `POST` | `/account/signout-all` | yes | yes | none | `200 { "loggedOut": true }`, every session of the user revoked |
-| `POST` | `/forgot-password` | no | no | `{ username }` | always `200` (never reveals whether the account exists) |
-| `POST` | `/reset-password` | no | no | `{ token, newPassword }` | `200 { "message": ... }`, all sessions revoked |
+| `POST` | `/forgot-password` | no | no | `{ username }` | always `200` with the same message; stores nothing (reset links are issued by an administrator) |
+| `POST` | `/reset-password` | no | no | `{ token, newPassword }` | `200 { "message": ... }`, all sessions revoked, audited as `PASSWORD_RESET` |
+| `POST` | `/api/v1/admin/users/:username/password-reset` | admin | yes | none | `200 { username, token, expiresAt, url }`; `404` unknown user, `400` SSO account |
 | `POST` | `/account/change-password` | yes | yes | `{ currentPassword, newPassword }` | `200 { message, token, csrfToken, expiresAt }`, new cookie (other sessions are not revoked) |
 | `GET` | `/account/sessions` | yes | n/a | none | `200 { sessions: [{ id, current, issuedAt, expiresAt }] }`, current session first |
 | `GET` | `/account/deletion-request` | yes | n/a | none | `200 { request }` (`request` is `null` when none exists) |
@@ -556,7 +557,7 @@ Unless noted, bodies are JSON, errors are `{ "error": "..." }`, and the route is
 - Usernames match `[A-Za-z0-9_-]{1,100}` and cannot be `libraries`, `team-library-releases`, `__proto__`, `constructor`, or `prototype` (case-insensitive). Passwords must be 8-1000 characters.
 - `/login` returns the same `401 Invalid credentials` for an unknown user, a wrong password, an invalid name, or an over-long password. It also upgrades the stored scrypt hash when needed.
 - `/session/refresh` only succeeds within 5 minutes of expiry and before the absolute lifetime; otherwise it returns `401 Session not eligible for refresh` and clears the cookie.
-- `/forgot-password` creates a reset token valid for 15 minutes. It is logged on the server console as `[password-reset]` and is never returned in the response.
+- Password resets are admin-issued. An administrator calls `POST /api/v1/admin/users/:username/password-reset` (or uses **Reset password** in the Admin panel) and gives the user the returned link. The one-time token is valid for 15 minutes, is returned only in that response (`Cache-Control: no-store`), is kept server-side only as a SHA-256 hash, and a newer link for the same user replaces the earlier one. Both issuing and using a link are written to the audit log (`PASSWORD_RESET_ISSUED`, `PASSWORD_RESET`).
 - The `ctr_auth` cookie is `HttpOnly; Path=/; SameSite=Lax`, with `Max-Age` equal to the session TTL and `Secure` added over HTTPS.
 - `/ws/ticket` returns a single-use ticket that expires after 30 seconds (at most 5 outstanding per session). Pass it as `ticket.<hex>` in the `Sec-WebSocket-Protocol` header when opening the collaboration WebSocket.
 - **Collaboration rooms are bound to the owner.** The server builds the room from the ticket as `owner/project`: for a session ticket the owner is the signed-in user, so naming another user's project id only creates an empty room of your own. A `/ws/ticket/shared` ticket is bound to the share link's owner and project, whatever project id the client sends, and the link is checked again when the socket upgrades. The username shown to others comes from the ticket, not from the join message.

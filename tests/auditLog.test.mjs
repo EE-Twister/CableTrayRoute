@@ -48,6 +48,10 @@ await setup();
 console.log('Audit Log — VALID_ACTIONS');
 check('contains LOGIN', () => assert.ok(VALID_ACTIONS.includes('LOGIN')));
 check('contains ROLE_CHANGE', () => assert.ok(VALID_ACTIONS.includes('ROLE_CHANGE')));
+check('contains PASSWORD_RESET_ISSUED and PASSWORD_RESET', () => {
+  assert.ok(VALID_ACTIONS.includes('PASSWORD_RESET_ISSUED'));
+  assert.ok(VALID_ACTIONS.includes('PASSWORD_RESET'));
+});
 check('contains UPDATE', () => assert.ok(VALID_ACTIONS.includes('UPDATE')));
 
 console.log('\nAudit Log — buildEntry');

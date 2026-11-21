@@ -1,5 +1,6 @@
 import assert from 'assert';
 import {
+  ResetTokenStore,
   applyMergePatch,
   createRateLimiter,
   isValidName,
@@ -133,6 +134,44 @@ check('failure rejects and removes the temp file', async () => {
     assert.deepStrictEqual(await fs.readdir(dir), []);
   } finally {
     await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+console.log('ResetTokenStore');
+check('validates and consumes a token exactly once', () => {
+  const store = new ResetTokenStore();
+  const token = store.create('alice');
+  assert.match(token, /^[0-9a-f]{64}$/);
+  assert.strictEqual(store.validate(token), 'alice');
+  assert.strictEqual(store.consume(token), 'alice');
+  assert.strictEqual(store.consume(token), null, 'a used token cannot be replayed');
+});
+check('keeps only a hash of the token', () => {
+  const store = new ResetTokenStore();
+  const token = store.create('alice');
+  assert.ok(!store.tokens.has(token), 'plain token is not a key');
+  assert.ok(!JSON.stringify([...store.tokens.values()]).includes(token));
+  assert.ok([...store.tokens.keys()].every(key => /^[0-9a-f]{64}$/.test(key) && key !== token));
+});
+check('issuing a new token invalidates the previous one for that user', () => {
+  const store = new ResetTokenStore();
+  const first = store.create('alice');
+  const second = store.create('alice');
+  assert.strictEqual(store.validate(first), null);
+  assert.strictEqual(store.validate(second), 'alice');
+  assert.strictEqual(store.create('bob') !== second, true);
+  assert.strictEqual(store.validate(second), 'alice', 'other users do not invalidate it');
+});
+check('rejects unknown and expired tokens', () => {
+  const store = new ResetTokenStore();
+  assert.strictEqual(store.validate('f'.repeat(64)), null);
+  const token = store.create('alice');
+  const realNow = Date.now;
+  Date.now = () => realNow() + 16 * 60 * 1000;
+  try {
+    assert.strictEqual(store.validate(token), null);
+  } finally {
+    Date.now = realNow;
   }
 });
 
