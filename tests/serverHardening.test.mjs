@@ -4,15 +4,28 @@ import {
   createRateLimiter,
   isValidName,
   isValidUsername,
+  writeFileAtomic,
 } from '../server.mjs';
+import fs from 'fs/promises';
+import os from 'os';
+import path from 'path';
 
+const pending = [];
 function check(name, fn) {
+  const report = (err) => {
+    if (err) {
+      console.error('  \u2717', name, err.message || err);
+      process.exitCode = 1;
+    } else {
+      console.log('  \u2713', name);
+    }
+  };
   try {
-    fn();
-    console.log('  ✓', name);
+    const result = fn();
+    if (result && typeof result.then === 'function') pending.push(result.then(() => report(), report));
+    else report();
   } catch (err) {
-    console.error('  ✗', name, err.message || err);
-    process.exitCode = 1;
+    report(err);
   }
 }
 
@@ -84,3 +97,43 @@ check('tracked keys stay bounded under a key flood', () => {
   // Memory is not observable from outside, so assert the limiter still works.
   assert.strictEqual(call(limiter, '9.9.9.9').passed, true);
 });
+
+console.log('writeFileAtomic');
+check('writes the file with the requested mode and leaves no temp file', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ctr-atomic-'));
+  try {
+    const file = path.join(dir, 'users.json');
+    await writeFileAtomic(file, '{"a":1}', { mode: 0o600 });
+    assert.strictEqual(await fs.readFile(file, 'utf-8'), '{"a":1}');
+    if (process.platform !== 'win32') {
+      assert.strictEqual((await fs.stat(file)).mode & 0o777, 0o600);
+    }
+    assert.deepStrictEqual(await fs.readdir(dir), ['users.json']);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+check('concurrent writes never leave a partial file', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ctr-atomic-'));
+  try {
+    const file = path.join(dir, 'sessions.json');
+    const payloads = Array.from({ length: 25 }, (_, i) => JSON.stringify({ i, pad: 'x'.repeat(5000 + i) }));
+    await Promise.all(payloads.map(data => writeFileAtomic(file, data)));
+    const final = await fs.readFile(file, 'utf-8');
+    assert.ok(payloads.includes(final), 'final content is exactly one of the written payloads');
+    assert.deepStrictEqual(await fs.readdir(dir), ['sessions.json']);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+check('failure rejects and removes the temp file', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ctr-atomic-'));
+  try {
+    await assert.rejects(() => writeFileAtomic(path.join(dir, 'missing', 'x.json'), '{}'));
+    assert.deepStrictEqual(await fs.readdir(dir), []);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+await Promise.all(pending);

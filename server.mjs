@@ -46,6 +46,20 @@ function isValidUsername(name) {
   return isValidName(name) && !RESERVED_USERNAMES.has(name.toLowerCase());
 }
 
+// Write to a unique temp file and rename it into place so a crash or a
+// concurrent save can never leave a truncated or interleaved file. The temp
+// name does not end in .json, so stores that list *.json ignore leftovers.
+async function writeFileAtomic(filePath, data, { mode } = {}) {
+  const tempPath = `${filePath}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`;
+  try {
+    await fs.writeFile(tempPath, data, mode === undefined ? undefined : { mode });
+    await fs.rename(tempPath, filePath);
+  } catch (err) {
+    await fs.rm(tempPath, { force: true }).catch(() => {});
+    throw err;
+  }
+}
+
 function appendServerTiming(res, metricName, durationMs) {
   const normalizedDuration = Math.max(0, durationMs);
   const metric = `${metricName};dur=${normalizedDuration.toFixed(2)}`;
@@ -273,7 +287,7 @@ class ProjectStore {
     // Date.now() alone can collide when rapid writes are serialized in the
     // same millisecond. The current version is a monotonic lower bound.
     const version = Math.max(Date.now(), Number(current.version) + 1 || 0).toString();
-    await fs.writeFile(path.join(userDir, `${version}.json`), prettyJson);
+    await writeFileAtomic(path.join(userDir, `${version}.json`), prettyJson);
     const writeDoneAt = process.hrtime.bigint();
     metrics.writeMs = formatDurationMs(writeStartedAt, writeDoneAt);
 
@@ -406,7 +420,7 @@ class CloudLibraryStore {
     await fs.mkdir(libDir, { recursive: true });
     const writeStartedAt = process.hrtime.bigint();
     const version = Math.max(Date.now(), Number(current.version) + 1 || 0).toString();
-    await fs.writeFile(path.join(libDir, `${version}.json`), prettyJson);
+    await writeFileAtomic(path.join(libDir, `${version}.json`), prettyJson);
     const writeDoneAt = process.hrtime.bigint();
     metrics.writeMs = formatDurationMs(writeStartedAt, writeDoneAt);
 
@@ -499,7 +513,7 @@ class TeamLibraryStore {
       publishedBy: username,
       releaseNotes: String(releaseNotes || '').trim(),
     };
-    await fs.writeFile(this.#releasePath(version), `${JSON.stringify(record, null, 2)}\n`);
+    await writeFileAtomic(this.#releasePath(version), `${JSON.stringify(record, null, 2)}\n`);
     return { ...record, unchanged: false };
   }
 }
@@ -535,7 +549,7 @@ class LibraryShareStore {
       if (a.createdAt > b.createdAt) return -1;
       return 0;
     });
-    await fs.writeFile(this.filePath, JSON.stringify(payload, null, 2));
+    await writeFileAtomic(this.filePath, JSON.stringify(payload, null, 2), { mode: 0o600 });
   }
 
   #isExpired(entry, now = Date.now()) {
@@ -644,7 +658,7 @@ class SnapshotStore {
       if (a.createdAt > b.createdAt) return -1;
       return 0;
     });
-    await fs.writeFile(this.filePath, JSON.stringify(payload, null, 2));
+    await writeFileAtomic(this.filePath, JSON.stringify(payload, null, 2), { mode: 0o600 });
   }
 
   #isExpired(entry, now = Date.now()) {
@@ -803,7 +817,7 @@ class FileSessionStore {
   async #persist() {
     if (!this.ready) return;
     const payload = Object.fromEntries(this.sessions.entries());
-    await fs.writeFile(this.filePath, JSON.stringify(payload, null, 2));
+    await writeFileAtomic(this.filePath, JSON.stringify(payload, null, 2), { mode: 0o600 });
   }
 
   async #pruneExpired() {
@@ -1076,7 +1090,7 @@ export async function createApp(options = {}) {
   const resetTokenStore = new ResetTokenStore();
 
   async function saveUsers() {
-    await fs.writeFile(usersFile, JSON.stringify(users, null, 2));
+    await writeFileAtomic(usersFile, JSON.stringify(users, null, 2), { mode: 0o600 });
   }
 
   async function readAccountDeletionRequests() {
@@ -1090,7 +1104,7 @@ export async function createApp(options = {}) {
   }
 
   async function saveAccountDeletionRequests(requests) {
-    await fs.writeFile(accountDeletionRequestsFile, JSON.stringify(requests, null, 2));
+    await writeFileAtomic(accountDeletionRequestsFile, JSON.stringify(requests, null, 2), { mode: 0o600 });
   }
 
   const app = express();
@@ -2701,4 +2715,4 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
 
 // attachCollaborationServer imported from src/collaborationServer.mjs above
 export { attachCollaborationServer };
-export { applyMergePatch, createRateLimiter, isValidName, isValidUsername };
+export { applyMergePatch, createRateLimiter, isValidName, isValidUsername, writeFileAtomic };
