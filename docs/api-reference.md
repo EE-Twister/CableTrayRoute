@@ -552,7 +552,7 @@ Unless noted, bodies are JSON, errors are `{ "error": "..." }`, and the route is
 | `POST` | `/ws/ticket` | yes | yes | none | `200 { ticket, expiresAt }` |
 
 **Rules**
-- Usernames match `[A-Za-z0-9_-]{1,100}`. Passwords must be 8-1000 characters.
+- Usernames match `[A-Za-z0-9_-]{1,100}` and cannot be `libraries`, `team-library-releases`, `__proto__`, `constructor`, or `prototype` (case-insensitive). Passwords must be 8-1000 characters.
 - `/login` returns the same `401 Invalid credentials` for an unknown user, a wrong password, an invalid name, or an over-long password. It also upgrades the stored scrypt hash when needed.
 - `/session/refresh` only succeeds within 5 minutes of expiry and before the absolute lifetime; otherwise it returns `401 Session not eligible for refresh` and clears the cookie.
 - `/forgot-password` creates a reset token valid for 15 minutes. It is logged on the server console as `[password-reset]` and is never returned in the response.
@@ -617,7 +617,7 @@ Public routes addressed by a share token; they use the project rate limiter and 
 | Method | Path | Behavior |
 |--------|------|----------|
 | `GET` | `/shared/:token` | `200 { snapshot: { id, project, mode, version, createdAt, expiresAt, revokedAt }, data }` |
-| `POST` | `/shared/:token` | Saves the request body as the project (replace mode) when the snapshot is in `edit` mode. `200 { version, unchanged }` |
+| `POST` | `/shared/:token` | Saves the request body as the project (replace mode) when the snapshot is in `edit` mode. The body must be a non-empty JSON object (`400 Invalid project data` otherwise). `200 { version, unchanged }` |
 
 An unknown, revoked, or expired token returns `404 { "error": "Not found" }`. Saving through a `read` snapshot returns `403 { "error": "Read-only snapshot" }`. See [sharing_security.md](sharing_security.md).
 
@@ -655,13 +655,14 @@ No auth. Limited to 50 requests per window per IP. Browsers post uncaught errors
 
 | Status | Meaning |
 |--------|---------|
-| 400 | Invalid name, missing or invalid input, or HTTPS required |
+| 400 | Invalid name, missing or invalid input, malformed JSON (`Invalid JSON`), or HTTPS required |
 | 401 | Missing, expired, or invalid session (cookie or Bearer token) |
 | 403 | Invalid or missing `x-csrf-token`, insufficient role, or write to a read-only snapshot |
 | 404 | Project, library, or share link not found |
 | 409 | Version conflict (response includes `currentVersion`) |
 | 429 | Rate limit exceeded (see `Retry-After`) |
-| 500 | Internal server error. Request bodies over 1 MB and malformed JSON also end up here, because the generic error handler does not distinguish them |
+| 413 | Request body over 1 MB (`Payload too large`) |
+| 500 | Internal server error |
 
 All errors return JSON: `{ "error": "description" }`. Successful `204` responses have no body.
 

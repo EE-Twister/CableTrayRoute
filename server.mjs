@@ -37,6 +37,15 @@ function isValidName(name) {
   return typeof name === 'string' && VALID_NAME_RE.test(name);
 }
 
+// Usernames double as storage directory names, so they must not collide with
+// the shared top-level directories or with prototype property names.
+const RESERVED_USERNAMES = new Set([
+  '__proto__', 'constructor', 'prototype', 'libraries', 'team-library-releases'
+]);
+function isValidUsername(name) {
+  return isValidName(name) && !RESERVED_USERNAMES.has(name.toLowerCase());
+}
+
 function appendServerTiming(res, metricName, durationMs) {
   const normalizedDuration = Math.max(0, durationMs);
   const metric = `${metricName};dur=${normalizedDuration.toFixed(2)}`;
@@ -75,6 +84,7 @@ function applyMergePatch(target, patch) {
 
   const base = target && typeof target === 'object' && !Array.isArray(target) ? { ...target } : {};
   for (const [key, value] of Object.entries(patch)) {
+    if (key === '__proto__') continue;
     if (value === null) {
       delete base[key];
       continue;
@@ -717,11 +727,23 @@ class SnapshotStore {
   }
 }
 
+const RATE_LIMIT_MAX_TRACKED_KEYS = 50000;
+
 function createRateLimiter({ windowMs, max }) {
   const hits = new Map();
+  let lastSweep = 0;
 
   return (req, res, next) => {
     const now = Date.now();
+    if (hits.size > 1000 && now - lastSweep > 60000) {
+      lastSweep = now;
+      for (const [trackedKey, trackedEntry] of hits) {
+        if (trackedEntry.resetTime <= now) hits.delete(trackedKey);
+      }
+    }
+    while (hits.size >= RATE_LIMIT_MAX_TRACKED_KEYS) {
+      hits.delete(hits.keys().next().value);
+    }
     const key = req.ip || req.connection?.remoteAddress || 'unknown';
     const limit = Math.max(1, max);
     const window = Math.max(1, windowMs);
@@ -1033,12 +1055,12 @@ export async function createApp(options = {}) {
     }
   }
 
-  let users = {};
+  let users = Object.create(null);
   try {
-    users = JSON.parse(await fs.readFile(usersFile, 'utf-8'));
+    users = Object.assign(Object.create(null), JSON.parse(await fs.readFile(usersFile, 'utf-8')));
   } catch (err) {
     if (err.code !== 'ENOENT') throw err;
-    users = {};
+    users = Object.create(null);
   }
 
   const sessionStore = new FileSessionStore(sessionsFile, tokenTtlMs);
@@ -1326,7 +1348,7 @@ export async function createApp(options = {}) {
         res.status(400).json({ error: 'Missing credentials' });
         return;
       }
-      if (!isValidName(trimmedUser)) {
+      if (!isValidUsername(trimmedUser)) {
         res.status(400).json({ error: 'Invalid username' });
         return;
       }
@@ -1706,7 +1728,12 @@ export async function createApp(options = {}) {
         res.status(403).json({ error: 'Read-only snapshot' });
         return;
       }
-      const saved = await projectStore.save(snapshot.owner, snapshot.project, req.body);
+      const body = req.body;
+      if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length === 0) {
+        res.status(400).json({ error: 'Invalid project data' });
+        return;
+      }
+      const saved = await projectStore.save(snapshot.owner, snapshot.project, body);
       await snapshotStore.touch(snapshot.id);
       res.json({ version: saved.version, unchanged: saved.metrics.skippedWrite });
     })
@@ -2305,7 +2332,7 @@ When answering queries:
         return;
       }
       const target = req.params.username;
-      if (!users[target]) {
+      if (!isValidName(target) || !Object.hasOwn(users, target)) {
         res.status(404).json({ error: 'User not found' });
         return;
       }
@@ -2520,7 +2547,7 @@ When answering queries:
           .slice(0, 80) || 'oidcuser';
         username = base;
         let suffix = 2;
-        while (users[username]) { username = `${base}_${suffix++}`; }
+        while (users[username] || !isValidUsername(username)) { username = `${base}_${suffix++}`; }
         users[username] = {
           oidcSub: sub,
           email,
@@ -2565,6 +2592,18 @@ When answering queries:
   // -------------------------------------------------------------------------
 
   app.use((err, req, res, next) => {
+    const status = Number(err?.status ?? err?.statusCode);
+    if (!res.headersSent && status >= 400 && status < 500) {
+      // Client errors (malformed JSON, oversized body) are not logged: the
+      // parser error carries the raw request body, which may hold credentials.
+      const message = err.type === 'entity.too.large'
+        ? 'Payload too large'
+        : err.type === 'entity.parse.failed'
+          ? 'Invalid JSON'
+          : 'Bad request';
+      res.status(status).json({ error: message });
+      return;
+    }
     console.error(err);
     if (res.headersSent) {
       next(err);
@@ -2650,7 +2689,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   // Real-time collaboration via WebSocket
   try {
     const { WebSocketServer } = await import('ws');
-    attachCollaborationServer(server, new WebSocketServer({ noServer: true }), {
+    attachCollaborationServer(server, new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 }), {
       validateUpgrade: app.get('collabUpgradeValidator'),
       maxMessageBytes: 64 * 1024,
     });
@@ -2662,3 +2701,4 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
 
 // attachCollaborationServer imported from src/collaborationServer.mjs above
 export { attachCollaborationServer };
+export { applyMergePatch, createRateLimiter, isValidName, isValidUsername };
