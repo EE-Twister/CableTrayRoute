@@ -21,8 +21,8 @@ Checked 2026-11-21. "Implemented" is the edition the calculations, benchmarks, a
 
 | Standard | Latest edition | Implemented / validated | Delta review |
 | --- | --- | --- | --- |
-| NFPA 70 (NEC) | 2026 (issued 2025-08-20, effective 2025-09-09) | 2023 (tray fill, conduit fill, ampacity, voltage-drop benchmarks) | Pending |
-| NFPA 70E | 2027 (issued 2026-04-16, effective 2026-05-06; dates from trade-press sources, confirm on nfpa.org) | 2024 (DC arc flash Annex D.8 / D.8.1); label text reviewed against 2021 | Pending |
+| NFPA 70 (NEC) | 2026 (issued 2025-08-20, effective 2025-09-09) | 2023 (tray fill, conduit fill, ampacity, voltage-drop benchmarks) | See [nec-2026-nfpa-70e-2027-edition-assessment.md](nec-2026-nfpa-70e-2027-edition-assessment.md) |
+| NFPA 70E | 2027 (issued 2026-04-16, effective 2026-05-06; dates from trade-press sources, confirm on nfpa.org) | 2024 (DC arc flash Annex D.8 / D.8.1); label text reviewed against 2021 | See [nec-2026-nfpa-70e-2027-edition-assessment.md](nec-2026-nfpa-70e-2027-edition-assessment.md) |
 | IEC 60909-0 | 2026, edition 3.0 | 2016 | See [iec60909-2026-edition-assessment.md](iec60909-2026-edition-assessment.md) |
 
 The Submittal Package page defaults to NEC 2026 and prints the calculation basis whenever the selected edition differs from the implemented one. Relabel a row to the latest edition only after a reviewer records the changed clauses and re-runs the affected benchmarks.
