@@ -1,6 +1,7 @@
 import { showAlertModal } from './src/components/modal.js';
 import { detectClashes, overallSeverity, CLASH_SEVERITY } from './analysis/clashDetect.mjs';
 import { getTrays } from './dataStore.mjs';
+import { escapeHtml as esc } from './src/htmlUtils.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -111,12 +112,5 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     resultsDiv.innerHTML = html;
-  }
-
-  function esc(s) {
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
   }
 });

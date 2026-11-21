@@ -1097,7 +1097,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Validation
-- Source files: `analysis/clashDetect.mjs`, `clashdetect.js`, `src/clashdetect.js`, `src/projectManagerEntry.js`
+- Source files: `analysis/clashDetect.mjs`, `clashdetect.js`, `src/clashdetect.js`, `src/htmlUtils.mjs`, `src/projectManagerEntry.js`
 
 **Undocumented Reads**
 - None
@@ -1121,7 +1121,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `traySchedule`
-  - clashdetect.js:18 getTrays()
+  - clashdetect.js:19 getTrays()
 
 **Detected Writes**
 - None

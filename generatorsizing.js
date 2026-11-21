@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const snapshot = createStudyInputSnapshot('generatorSizing', inputs, projectInputModel.bindings, projectOverrides);
       result = withStudyProvenance(result, snapshot);
     } catch (err) {
-      showModal('Analysis Error', `<p>${err.message}</p>`, 'error');
+      showModal('Analysis Error', `<p>${escHtml(err.message)}</p>`, 'error');
       return;
     }
 

@@ -1,6 +1,7 @@
 import { listScenarios, getCurrentScenario, switchScenario, cloneScenario, getOneLine, getRevisions, restoreRevision, getCablesForScenario } from '../dataStore.mjs';
 import { isValidScenarioName } from '../projectStorage.js';
 import { showAlertModal, openModal } from './components/modal.js';
+import { escapeHtml as esc } from './htmlUtils.mjs';
 
 function ensureDefaults() {
   const defaults = ['base', 'future', 'emergency'];
@@ -56,14 +57,6 @@ function diffScenarios(a, b) {
 // ---------------------------------------------------------------------------
 // Scenario comparison — side-by-side cable schedule diff (Gap #17)
 // ---------------------------------------------------------------------------
-
-function esc(str) {
-  return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 function buildCableMap(cables) {
   const m = new Map();

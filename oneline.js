@@ -9029,7 +9029,7 @@ function refreshLayerAssignDropdown() {
   if (!sel) return;
   const currentLayer = selected?.layer || '';
   sel.innerHTML = '<option value="">— Default (unassigned) —</option>' +
-    layers.map(l => `<option value="${l.id}"${currentLayer === l.id ? ' selected' : ''}>${l.name}</option>`).join('');
+    layers.map(l => `<option value="${escapeHtml(l.id)}"${currentLayer === l.id ? ' selected' : ''}>${escapeHtml(l.name)}</option>`).join('');
 }
 
 // ============================================================

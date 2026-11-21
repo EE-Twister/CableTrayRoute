@@ -148,7 +148,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // -------------------------------------------------------------------------
   function renderError(containerId, message) {
     const div = document.getElementById(containerId);
-    div.innerHTML = `<p class="alert-error" role="alert">Error: ${message}</p>`;
+    const paragraph = document.createElement('p');
+    paragraph.className = 'alert-error';
+    paragraph.setAttribute('role', 'alert');
+    paragraph.textContent = `Error: ${message}`;
+    div.replaceChildren(paragraph);
   }
 
   function row(label, value) {

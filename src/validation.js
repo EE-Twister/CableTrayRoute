@@ -1,14 +1,7 @@
 import { initSettings, initDarkMode, initCompactMode, initHelpModal, initNavToggle } from '../site.js';
+import { escapeHtml as esc } from './htmlUtils.mjs';
 
 const MANIFEST_URL = 'dist/validationManifest.json';
-
-function esc(s) {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 function slug(value) {
   return String(value ?? '')
