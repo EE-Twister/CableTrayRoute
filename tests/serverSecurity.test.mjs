@@ -1000,7 +1000,7 @@ async function wsTicketScenario() {
           'sec-websocket-protocol': `ctr-collab, ticket.${ticket}`,
         },
       });
-      assert.strictEqual(ok, true, 'first use accepted');
+      assert.deepStrictEqual(ok, { username: 'wsuser', owner: 'wsuser', canWrite: true }, 'first use accepted with the owner context');
       const replay = await validate({
         headers: {
           origin: baseUrl,
@@ -1054,7 +1054,7 @@ async function wsTicketScenario() {
         },
       });
       assert.strictEqual(oldest, false, 'oldest outstanding ticket was evicted');
-      assert.strictEqual(newest, true, 'newer ticket remains usable');
+      assert.strictEqual(newest?.owner, 'wsuser', 'newer ticket remains usable');
     });
   } finally {
     await closeServer(server);

@@ -286,7 +286,9 @@ const issueReset = (session, username) => fetch(`${base}/api/v1/admin/users/${us
 });
 let resetToken = null;
 await check('non-admin cannot issue a reset link (403)', async () => {
-  const r = await issueReset(engSession, 'readonly_user');
+  // Earlier tests log eng_user in again (which rotates its sessions), so use a fresh login.
+  const reviewer = await loginAs('reviewer_user');
+  const r = await issueReset(reviewer, 'readonly_user');
   assert.equal(r.status, 403);
 });
 await check('unknown and prototype-named users return 404', async () => {
