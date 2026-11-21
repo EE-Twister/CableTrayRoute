@@ -8,6 +8,13 @@ import { fileURLToPath } from 'url';
 import { attachCollaborationServer } from './src/collaborationServer.mjs';
 import { validateLibraryPayload } from './src/validation/librarySchema.mjs';
 import { appendAuditEntry, queryAuditLog } from './analysis/auditLog.mjs';
+import {
+  IdTokenError,
+  assertDiscoveryIssuer,
+  fetchJsonWithTimeout,
+  normalizeIssuer,
+  verifyIdToken,
+} from './src/oidcValidation.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -2391,12 +2398,40 @@ When answering queries:
     return buf.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
   }
 
+  const OIDC_METADATA_TTL_MS = 60 * 60 * 1000;
+  let oidcJwksCache = null;
+
   async function getOidcDiscovery(issuer) {
-    if (oidcDiscoveryCache) return oidcDiscoveryCache;
-    const resp = await fetch(`${issuer}/.well-known/openid-configuration`);
-    if (!resp.ok) throw new Error(`OIDC discovery failed: ${resp.status}`);
-    oidcDiscoveryCache = await resp.json();
-    return oidcDiscoveryCache;
+    if (oidcDiscoveryCache && Date.now() - oidcDiscoveryCache.fetchedAt < OIDC_METADATA_TTL_MS) {
+      return oidcDiscoveryCache.value;
+    }
+    const value = await fetchJsonWithTimeout(`${normalizeIssuer(issuer)}/.well-known/openid-configuration`);
+    assertDiscoveryIssuer(value, issuer);
+    oidcDiscoveryCache = { value, fetchedAt: Date.now() };
+    return value;
+  }
+
+  async function getOidcJwks(discovery, { forceRefresh = false } = {}) {
+    if (!forceRefresh && oidcJwksCache && Date.now() - oidcJwksCache.fetchedAt < OIDC_METADATA_TTL_MS) {
+      return oidcJwksCache.value;
+    }
+    if (typeof discovery.jwks_uri !== 'string') throw new Error('OIDC discovery has no jwks_uri');
+    const value = await fetchJsonWithTimeout(discovery.jwks_uri);
+    oidcJwksCache = { value, fetchedAt: Date.now() };
+    return value;
+  }
+
+  // Verify the ID token against the IdP's signing keys. An unknown key id
+  // triggers one refresh of the key set, which covers normal key rotation.
+  async function verifyOidcIdToken(idToken, discovery, expected) {
+    try {
+      return verifyIdToken(idToken, { jwks: await getOidcJwks(discovery), ...expected });
+    } catch (err) {
+      if (err instanceof IdTokenError && err.code === 'key_not_found') {
+        return verifyIdToken(idToken, { jwks: await getOidcJwks(discovery, { forceRefresh: true }), ...expected });
+      }
+      throw err;
+    }
   }
 
   const authRateLimiterOidc = createRateLimiter({ windowMs: rateLimitWindowMs, max: 20 });
@@ -2429,7 +2464,8 @@ When answering queries:
         if (Date.now() - v.createdAt > OIDC_STATE_TTL_MS) oidcStateStore.delete(k);
       }
       const stateBinding = base64urlEncode(crypto.randomBytes(32));
-      oidcStateStore.set(state, { codeVerifier, stateBinding, createdAt: Date.now() });
+      const nonce = base64urlEncode(crypto.randomBytes(32));
+      oidcStateStore.set(state, { codeVerifier, stateBinding, nonce, createdAt: Date.now() });
       res.setHeader('Set-Cookie', serializeCookie('oidc_state_binding', stateBinding, {
         path: '/auth/oidc',
         maxAge: Math.floor(OIDC_STATE_TTL_MS / 1000),
@@ -2447,6 +2483,7 @@ When answering queries:
         redirect_uri: redirectUri,
         scope: 'openid email profile',
         state,
+        nonce,
         code_challenge: codeChallenge,
         code_challenge_method: 'S256',
       });
@@ -2525,6 +2562,7 @@ When answering queries:
             client_secret: clientSecret,
             code_verifier: flow.codeVerifier,
           }),
+          signal: AbortSignal.timeout(10_000),
         });
         if (!tokenResp.ok) throw new Error(`token exchange ${tokenResp.status}`);
         tokens = await tokenResp.json();
@@ -2533,11 +2571,26 @@ When answering queries:
         return;
       }
 
+      // Verify the ID token (signature, issuer, audience, expiry, nonce) before
+      // trusting anything the IdP says about the user.
+      let idClaims;
+      try {
+        idClaims = await verifyOidcIdToken(tokens.id_token, discovery, {
+          issuer,
+          audience: clientId,
+          nonce: flow.nonce,
+        });
+      } catch {
+        res.redirect('/login.html?error=oidc_token_invalid');
+        return;
+      }
+
       // Fetch identity from userinfo endpoint
       let userInfo;
       try {
         const uiResp = await fetch(discovery.userinfo_endpoint, {
           headers: { Authorization: `Bearer ${tokens.access_token}` },
+          signal: AbortSignal.timeout(10_000),
         });
         if (!uiResp.ok) throw new Error(`userinfo ${uiResp.status}`);
         userInfo = await uiResp.json();
@@ -2546,8 +2599,14 @@ When answering queries:
         return;
       }
 
-      const sub = String(userInfo.sub);
-      const email = typeof userInfo.email === 'string' ? userInfo.email : sub;
+      // OIDC Core 5.3.2: the userinfo subject must match the verified ID token.
+      if (String(userInfo.sub) !== idClaims.sub) {
+        res.redirect('/login.html?error=oidc_token_invalid');
+        return;
+      }
+      const sub = idClaims.sub;
+      const emailUnverified = userInfo.email_verified === false || userInfo.email_verified === 'false';
+      const email = typeof userInfo.email === 'string' && !emailUnverified ? userInfo.email : sub;
 
       // JIT provisioning: find existing user by OIDC subject, or create one.
       let username = null;

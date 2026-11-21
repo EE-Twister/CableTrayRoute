@@ -21,6 +21,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
+import crypto from 'node:crypto';
 import { createApp } from '../server.mjs';
 
 // ---------------------------------------------------------------------------
@@ -32,6 +33,27 @@ function createStubIdp() {
   const ACCESS_TOKEN = 'stub_access_token_xyz';
   let capturedCodeVerifier = null;
   let userInfoOverride = null;
+  const signingKeys = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const untrustedKeys = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const jwk = { ...signingKeys.publicKey.export({ format: 'jwk' }), kid: 'stub-key', use: 'sig', alg: 'RS256' };
+  let currentNonce = null;
+  let signWithUntrustedKey = false;
+  let idTokenSubject = null;
+
+  function makeIdToken(issuer) {
+    const now = Math.floor(Date.now() / 1000);
+    const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+    const signingInput = `${encode({ alg: 'RS256', typ: 'JWT', kid: 'stub-key' })}.${encode({
+      iss: issuer,
+      aud: 'test-client',
+      sub: idTokenSubject ?? userInfoOverride?.sub ?? 'oidc-sub-user1',
+      nonce: currentNonce,
+      iat: now,
+      exp: now + 300,
+    })}`;
+    const key = signWithUntrustedKey ? untrustedKeys.privateKey : signingKeys.privateKey;
+    return `${signingInput}.${crypto.sign('sha256', Buffer.from(signingInput), key).toString('base64url')}`;
+  }
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
@@ -45,7 +67,14 @@ function createStubIdp() {
         authorization_endpoint: `${base}/authorize`,
         token_endpoint: `${base}/token`,
         userinfo_endpoint: `${base}/userinfo`,
+        jwks_uri: `${base}/jwks`,
       }));
+      return;
+    }
+
+    if (url.pathname === '/jwks') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ keys: [jwk] }));
       return;
     }
 
@@ -73,7 +102,11 @@ function createStubIdp() {
         const params = new URLSearchParams(body);
         capturedCodeVerifier = params.get('code_verifier');
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ access_token: ACCESS_TOKEN, token_type: 'Bearer' }));
+        res.end(JSON.stringify({
+          access_token: ACCESS_TOKEN,
+          token_type: 'Bearer',
+          id_token: makeIdToken(`http://127.0.0.1:${server.address().port}`),
+        }));
       });
       return;
     }
@@ -103,6 +136,9 @@ function createStubIdp() {
         setUserInfo: info => { userInfoOverride = info; },
         resetUserInfo: () => { userInfoOverride = null; },
         getCapturedVerifier: () => capturedCodeVerifier,
+        setNonce: nonce => { currentNonce = nonce; },
+        setSignWithUntrustedKey: value => { signWithUntrustedKey = value; },
+        setIdTokenSubject: value => { idTokenSubject = value; },
       });
     });
   });
@@ -206,6 +242,8 @@ await check('/auth/oidc/login redirects to IdP authorization_endpoint', async ()
   const locationUrl = new URL(location);
   capturedState = locationUrl.searchParams.get('state');
   assert.ok(capturedState, 'state parameter present');
+  assert.ok(locationUrl.searchParams.get('nonce'), 'nonce parameter present');
+  idp.setNonce(locationUrl.searchParams.get('nonce'));
   assert.equal(locationUrl.searchParams.get('code_challenge_method'), 'S256', 'PKCE S256 used');
   assert.ok(locationUrl.searchParams.get('code_challenge'), 'code_challenge present');
   oidcCookie = getCookieHeaderFromSetCookie(r.headers.get('set-cookie'));
@@ -246,6 +284,7 @@ await check('second OIDC login for same sub reuses existing account', async () =
   const r2 = await fetchNoFollow(`${appBase}/auth/oidc/login`);
   const location2 = r2.headers.get('location');
   const state2 = new URL(location2).searchParams.get('state');
+  idp.setNonce(new URL(location2).searchParams.get('nonce'));
   const cookie2 = getCookieHeaderFromSetCookie(r2.headers.get('set-cookie'));
   const r3 = await fetchNoFollow(`${appBase}/auth/oidc/callback?code=stub_auth_code_abc123&state=${state2}`, {
     headers: { Cookie: cookie2 },
@@ -273,6 +312,7 @@ await check('JIT-provisioned user appears in admin users list', async () => {
   // Login as OIDC user via another flow
   const r1 = await fetchNoFollow(`http://127.0.0.1:${p2}/auth/oidc/login`);
   const st = new URL(r1.headers.get('location')).searchParams.get('state');
+  idp.setNonce(new URL(r1.headers.get('location')).searchParams.get('nonce'));
   const cookie = getCookieHeaderFromSetCookie(r1.headers.get('set-cookie'));
   const r2 = await fetchNoFollow(`http://127.0.0.1:${p2}/auth/oidc/callback?code=stub_auth_code_abc123&state=${st}`, {
     headers: { Cookie: cookie },
@@ -320,6 +360,44 @@ await check('callback without OIDC state cookie is rejected', async () => {
   const callback = await fetchNoFollow(`${errBase}/auth/oidc/callback?code=stub_auth_code_abc123&state=${state}`);
   assert.ok([301, 302, 303].includes(callback.status));
   assert.ok(callback.headers.get('location').includes('oidc_state_invalid'), 'missing state cookie is rejected');
+});
+
+async function runTokenCallback(nonceOverride) {
+  const login = await fetchNoFollow(`${errBase}/auth/oidc/login`);
+  const location = new URL(login.headers.get('location'));
+  idp.setNonce(nonceOverride ?? location.searchParams.get('nonce'));
+  return fetchNoFollow(
+    `${errBase}/auth/oidc/callback?code=stub_auth_code_abc123&state=${location.searchParams.get('state')}`,
+    { headers: { Cookie: getCookieHeaderFromSetCookie(login.headers.get('set-cookie')) } },
+  );
+}
+
+await check('callback rejects an ID token with the wrong nonce', async () => {
+  const r = await runTokenCallback('replayed-nonce');
+  assert.ok(r.headers.get('location').includes('oidc_token_invalid'), r.headers.get('location'));
+  assert.equal(getSetCookieValue(r.headers, 'ctr_auth'), null, 'no session is issued');
+});
+
+await check('callback rejects an ID token signed by an untrusted key', async () => {
+  idp.setSignWithUntrustedKey(true);
+  try {
+    const r = await runTokenCallback();
+    assert.ok(r.headers.get('location').includes('oidc_token_invalid'), r.headers.get('location'));
+    assert.equal(getSetCookieValue(r.headers, 'ctr_auth'), null, 'no session is issued');
+  } finally {
+    idp.setSignWithUntrustedKey(false);
+  }
+});
+
+await check('callback rejects a userinfo subject that differs from the ID token', async () => {
+  idp.setIdTokenSubject('a-different-subject');
+  try {
+    const r = await runTokenCallback();
+    assert.ok(r.headers.get('location').includes('oidc_token_invalid'), r.headers.get('location'));
+    assert.equal(getSetCookieValue(r.headers, 'ctr_auth'), null, 'no session is issued');
+  } finally {
+    idp.setIdTokenSubject(null);
+  }
 });
 
 await check('callback with IdP error param redirects to login with error', async () => {

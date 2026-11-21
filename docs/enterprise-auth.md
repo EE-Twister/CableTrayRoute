@@ -77,7 +77,8 @@ CableTrayRoute implements the OAuth 2.0 authorization code flow with PKCE (RFC 7
 Any OIDC-compliant provider that supports:
 - Authorization code flow
 - PKCE (S256)
-- `/.well-known/openid-configuration` discovery
+- `/.well-known/openid-configuration` discovery, with a `jwks_uri` and an `issuer` that matches `OIDC_ISSUER`
+- Signed ID tokens (`RS256`, `RS384`, `RS512`, `PS256`, `ES256`, or `ES384`) that echo the `nonce`
 - `userinfo` endpoint
 
 Tested with: Microsoft Entra ID (Azure AD), Okta, Google Workspace, Keycloak.
@@ -99,11 +100,23 @@ Tested with: Microsoft Entra ID (Azure AD), Okta, Google Workspace, Keycloak.
 4. Set the environment variables and start (or restart) the server.
 5. The **Sign in with SSO** button will appear on the login page automatically.
 
+### ID token verification
+
+The server does not trust anything the provider returns until the ID token from the token endpoint has been verified. The callback rejects the sign-in and redirects to `/login.html?error=oidc_token_invalid` (no session is created) unless all of these hold:
+
+- the token is signed by a key published at the provider's `jwks_uri`, using one of the algorithms above (`none` and HMAC algorithms are refused, and an unknown key id triggers one refresh of the key set to cover key rotation);
+- `iss` matches `OIDC_ISSUER` and `aud` contains `OIDC_CLIENT_ID` (with `azp` equal to the client when there are several audiences);
+- the token is not expired (60 seconds of clock skew allowed) and not issued in the future;
+- `nonce` equals the value generated for this login attempt;
+- the `sub` returned by the `userinfo` endpoint equals the ID token's `sub`.
+
+The discovery document's `issuer` must also match `OIDC_ISSUER`. Discovery and key-set responses are cached for one hour, and every request to the provider times out after 10 seconds. An unverified email (`email_verified: false`) is not used to derive the username.
+
 ### Just-in-time provisioning
 
 When a user signs in via SSO for the first time, a new CableTrayRoute account is created automatically:
 - Username is derived from the `email` claim's local part (e.g. `alice.smith` from `alice.smith@company.com`), sanitized to `[a-zA-Z0-9_-]`.
-- A numeric suffix is appended if the derived username is already taken.
+- A numeric suffix is appended if the derived username is already taken or is reserved (`libraries`, `team-library-releases`, `__proto__`, `constructor`, `prototype`).
 - The initial role is `reviewer`. Promote to `engineer` or `admin` via the Admin panel.
 
 On subsequent logins, the existing account is reused (matched by the OIDC `sub` claim).

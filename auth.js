@@ -270,6 +270,7 @@ if (urlError) {
     oidc_denied: 'SSO sign-in was cancelled or denied.',
     oidc_state_invalid: 'SSO session expired. Please try again.',
     oidc_token_failed: 'SSO token exchange failed. Contact your administrator.',
+    oidc_token_invalid: 'SSO sign-in could not be verified. Contact your administrator.',
     oidc_userinfo_failed: 'Could not retrieve SSO identity. Contact your administrator.',
     oidc_discovery_failed: 'SSO configuration error. Contact your administrator.',
   };
