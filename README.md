@@ -9,6 +9,21 @@ The Sample Gallery includes workflow and specialist projects with populated equi
 
 The Project Workflow Core sample also drives a reproducible 20-sheet engineering demonstration package with expanded equipment and load lists, cable and raceway schedules, multiple ductbank and tray cross-sections, a multi-branch one-line, short-circuit and arc-flash results, arc-flash labels, and a TCC chart. Run `npm run sample:engineering-report` to create the single PDF described in [Engineering Sample Report Package](docs/engineering-sample-report.md).
 
+## Development Setup
+
+Use Node.js 20 or newer (CI runs Node 20).
+
+```bash
+npm ci                      # install dependencies from the lockfile
+npm run build               # validate catalogs, bundle with Rollup, copy assets
+npm run server              # build, then start the Express server (node server.mjs)
+npm test                    # unit tests (npm run test:critical runs the fast subset)
+npm run lint                # ESLint plus architecture and CSS checks
+npx playwright install      # one-time browser download before npm run e2e
+```
+
+Contribution rules are in [AGENTS.md](AGENTS.md); vulnerabilities go through [SECURITY.md](SECURITY.md).
+
 ## Secure Authentication & API Hardening
 
 The app supports two authentication modes:
