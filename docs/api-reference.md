@@ -620,8 +620,8 @@ Public routes addressed by a share token; they use the project rate limiter and 
 
 | Method | Path | Behavior |
 |--------|------|----------|
-| `GET` | `/shared/:token` | `200 { snapshot: { id, project, mode, version, createdAt, expiresAt, revokedAt }, data }` |
-| `POST` | `/shared/:token` | Saves the request body as the project (replace mode) when the snapshot is in `edit` mode. The body must be a non-empty JSON object (`400 Invalid project data` otherwise). `200 { version, unchanged }` |
+| `GET` | `/shared/:token` | `200 { snapshot: { id, project, mode, version, createdAt, expiresAt, revokedAt }, version, data }`. `snapshot.version` is the version the link was created at; the top-level `version` is the project's latest version, which an editor sends back as `baseVersion` |
+| `POST` | `/shared/:token` | Saves `{ data, baseVersion }` as the project (replace mode) when the snapshot is in `edit` mode. `baseVersion` is required: a missing or stale value returns `409 { error, currentVersion }` so an edit link cannot silently overwrite newer changes. The body must be a non-empty JSON object (`400 Invalid project data` otherwise). `200 { version, unchanged }` |
 
 An unknown, revoked, or expired token returns `404 { "error": "Not found" }`. Saving through a `read` snapshot returns `403 { "error": "Read-only snapshot" }`. See [sharing_security.md](sharing_security.md).
 

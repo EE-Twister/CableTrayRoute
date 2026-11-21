@@ -23,6 +23,7 @@
 import { CollabClient, renderPresenceBar } from './collaboration.js';
 import { initConflictNotifications } from './collaborationConflict.js';
 import { getAuthContextState } from '../projectStorage.js';
+import { isSharedSessionActive } from './sharedProjectApi.mjs';
 
 let activeClient = null;
 let presenceBarEl = null;
@@ -36,6 +37,8 @@ let presenceBarEl = null;
  * @param {string} [opts.snapshotToken] - share-link token; joins the shared project's room instead of using a session
  */
 export function initCollaboration({ projectId, username, snapshotToken } = {}) {
+  // A share link owns the connection; ordinary session collaboration stands down.
+  if (!snapshotToken && isSharedSessionActive()) return;
   // Tear down any previous session
   stopCollaboration();
 

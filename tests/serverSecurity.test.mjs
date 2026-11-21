@@ -195,10 +195,28 @@ async function authScenario() {
     });
 
     await check('allows editable snapshot updates and revocation', async () => {
+      const shared = await (await fetch(`${baseUrl}/shared/${snapshot.edit.token}`)).json();
+      assert.ok(shared.version, 'GET returns the latest project version for use as baseVersion');
+
+      const noBase = await fetch(`${baseUrl}/shared/${snapshot.edit.token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: { value: 9 } })
+      });
+      assert.strictEqual(noBase.status, 409, 'an edit link must say which version it is replacing');
+
+      const stale = await fetch(`${baseUrl}/shared/${snapshot.edit.token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: { value: 9 }, baseVersion: 'not-the-current-version' })
+      });
+      assert.strictEqual(stale.status, 409);
+      assert.strictEqual((await stale.json()).currentVersion, shared.version);
+
       const writeAttempt = await fetch(`${baseUrl}/shared/${snapshot.edit.token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: 9 })
+        body: JSON.stringify({ data: { value: 9 }, baseVersion: shared.version })
       });
       assert.strictEqual(writeAttempt.status, 200);
 

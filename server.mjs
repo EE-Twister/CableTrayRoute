@@ -1765,6 +1765,9 @@ export async function createApp(options = {}) {
           expiresAt: snapshot.expiresAt,
           revokedAt: snapshot.revokedAt
         },
+        // Latest saved version of the project; edit-link holders send it back
+        // as baseVersion so they cannot silently overwrite newer changes.
+        version: latest.version,
         data: latest.data
       });
     })
@@ -1787,7 +1790,20 @@ export async function createApp(options = {}) {
         res.status(400).json({ error: 'Invalid project data' });
         return;
       }
-      const saved = await projectStore.save(snapshot.owner, snapshot.project, body);
+      let saved;
+      try {
+        saved = await projectStore.save(snapshot.owner, snapshot.project, body, { requireBaseVersion: true });
+      } catch (err) {
+        if (err.code === 'VERSION_CONFLICT') {
+          res.status(409).json({ error: 'Version conflict', currentVersion: err.currentVersion });
+          return;
+        }
+        if (err.code === 'VERSION_REQUIRED') {
+          res.status(409).json({ error: 'Base version required for project update', currentVersion: err.currentVersion });
+          return;
+        }
+        throw err;
+      }
       await snapshotStore.touch(snapshot.id);
       res.json({ version: saved.version, unchanged: saved.metrics.skippedWrite });
     })

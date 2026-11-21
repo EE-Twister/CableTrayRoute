@@ -67,6 +67,7 @@ import {
 import { openModal, showAlertModal } from "./src/components/modal.js";
 import { createDomWriteBatcher, createElementCache, createHandlerProfiler } from "./src/utils/domLifecycle.js";
 import { initCollaboration, stopCollaboration } from "./src/collabManager.js";
+import "./src/sharedProject.js";
 import {
   canonicalJSONString,
   compressString,
@@ -2752,8 +2753,7 @@ globalThis.showSelfCheckModal=showSelfCheckModal;
       if (!auth) return; // only start when logged in
       if (window.localStorage?.getItem('ctrEnableCollaboration') !== 'true') return;
       const projectId = (window.currentProjectId || '').trim();
-      // The CollabClient reads the cookie-backed session via the ticket endpoint,
-      // so we only pass the projectId/username here.
+      // CollabClient trades the cookie session for a ticket; pass only projectId/username.
       initCollaboration({
         projectId,
         username: auth.user,
