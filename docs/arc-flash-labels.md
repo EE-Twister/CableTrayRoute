@@ -13,7 +13,9 @@ The project engineer and employer remain responsible for the risk assessment, st
 
 ## Regulatory Background
 
-### NFPA 70E 2021 §130.5(H) — Equipment Labeling
+### NFPA 70E §130.5(H) — Equipment Labeling
+
+> **Edition note:** the quoted text and required fields below were reviewed against the 2021 edition. The current edition is NFPA 70E-2027 (issued 2026-04-16); the 2024 and 2027 label requirements have not yet been re-reviewed against this tool. See "Edition currency" in [standards.md](standards.md).
 
 > "Electrical equipment such as switchboards, panelboards, industrial control panels, meter socket enclosures, and motor control centers that are in other than dwelling units and are likely to require examination, adjustment, servicing, or maintenance while energized shall be field-marked with a label containing all of the following information..."
 
@@ -136,4 +138,4 @@ Available placeholder tokens:
 - **Label renderer:** `reports/labels.mjs` — `generateArcFlashLabel(data)`
 - **Overlay renderer:** `oneline.js` — `renderArcFlashLabelOverlays(svg)`
 - **Tests:** `tests/arcFlashLabels.test.mjs` (17 assertions)
-- **Standard:** NFPA 70E 2021 §130.5(H), ANSI Z535 signal word hierarchy
+- **Standard:** NFPA 70E §130.5(H) (reviewed against the 2021 edition; 2027 is current, review pending), ANSI Z535 signal word hierarchy

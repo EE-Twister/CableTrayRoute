@@ -1021,9 +1021,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - seismicBracing.js:175 getCables()
+  - seismicBracing.js:206 getCables()
 - `traySchedule`
-  - seismicBracing.js:174 getTrays()
+  - seismicBracing.js:205 getTrays()
 
 **Detected Writes**
 - None
@@ -1666,41 +1666,41 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - submittal.js:118 getCables()
-  - submittal.js:206 getCables()
-  - submittal.js:618 getCables()
+  - submittal.js:126 getCables()
+  - submittal.js:214 getCables()
+  - submittal.js:626 getCables()
 - `conduitSchedule`
-  - submittal.js:120 getConduits()
-  - submittal.js:207 getConduits()
-  - submittal.js:620 getConduits()
+  - submittal.js:128 getConduits()
+  - submittal.js:215 getConduits()
+  - submittal.js:628 getConduits()
 - `ductbankSchedule`
-  - submittal.js:122 getDuctbanks()
-  - submittal.js:207 getDuctbanks()
+  - submittal.js:130 getDuctbanks()
+  - submittal.js:215 getDuctbanks()
 - `equipment`
-  - submittal.js:121 getEquipment()
-  - submittal.js:205 getEquipment()
-  - submittal.js:621 getEquipment()
+  - submittal.js:129 getEquipment()
+  - submittal.js:213 getEquipment()
+  - submittal.js:629 getEquipment()
 - `settings.deliverableArtifacts`
-  - submittal.js:157 getDeliverableArtifacts()
-  - submittal.js:189 getDeliverableArtifacts()
-  - submittal.js:745 getDeliverableArtifacts()
+  - submittal.js:165 getDeliverableArtifacts()
+  - submittal.js:197 getDeliverableArtifacts()
+  - submittal.js:753 getDeliverableArtifacts()
 - `settings.fieldExecutionRecords`
-  - submittal.js:161 getFieldExecutionRecords()
-  - submittal.js:208 getFieldExecutionRecords()
-  - submittal.js:756 getFieldExecutionRecords()
+  - submittal.js:169 getFieldExecutionRecords()
+  - submittal.js:216 getFieldExecutionRecords()
+  - submittal.js:764 getFieldExecutionRecords()
 - `settings.projectMeta`
-  - submittal.js:46 getProjectMeta()
-  - submittal.js:61 getProjectMeta()
+  - submittal.js:54 getProjectMeta()
+  - submittal.js:69 getProjectMeta()
 - `traySchedule`
-  - submittal.js:119 getTrays()
-  - submittal.js:207 getTrays()
-  - submittal.js:619 getTrays()
+  - submittal.js:127 getTrays()
+  - submittal.js:215 getTrays()
+  - submittal.js:627 getTrays()
 
 **Detected Writes**
 - `settings.deliverableArtifacts`
-  - submittal.js:211 upsertDeliverableArtifact()
+  - submittal.js:219 upsertDeliverableArtifact()
 - `settings.projectMeta`
-  - submittal.js:63 setProjectMeta()
+  - submittal.js:71 setProjectMeta()
 
 ### Project Report (`projectreport.html`)
 

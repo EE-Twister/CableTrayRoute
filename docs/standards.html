@@ -39,6 +39,17 @@
       <li><strong>SVG/PNG Chart Export</strong> – TCC chart export produces a self‑contained SVG 1.1 file conforming to the W3C SVG specification, with annotation styles inlined. PNG export rasterises the SVG at 2× pixel density using the HTML5 Canvas API. Utilities are in <code>analysis/chartExportUtils.mjs</code>.</li>
       <li><strong>IEEE 1584‑2018</strong> – <em>IEEE Guide for Performing Arc‑Flash Hazard Calculations</em>. The arc‑flash engine in <code>analysis/ieee1584.mjs</code> uses the full 2018 empirical path (electrode‑configuration coefficients, intermediate arcing current, arcing‑current variation, enclosure‑size correction, incident energy and arc‑flash boundary) and is checked against the standard's Annex D.1 and D.2 worked examples in <code>tests/ieee1584.test.mjs</code>.</li>
     </ul>
+    <h2 id="edition-currency">Edition currency</h2>
+    <p>Checked 2026-11-21. &ldquo;Implemented&rdquo; is the edition the calculations, benchmarks and citations in this tool were built and validated against. A delta review against the latest edition has not been completed for the rows below, so no compliance with the latest edition is claimed.</p>
+    <table>
+      <thead><tr><th>Standard</th><th>Latest edition</th><th>Implemented / validated</th><th>Delta review</th></tr></thead>
+      <tbody>
+        <tr><td>NFPA 70 (NEC)</td><td>2026 (issued 2025-08-20, effective 2025-09-09)</td><td>2023 (tray fill, conduit fill, ampacity, voltage-drop benchmarks)</td><td>Pending</td></tr>
+        <tr><td>NFPA 70E</td><td>2027 (issued 2026-04-16, effective 2026-05-06; dates from trade-press sources, confirm on nfpa.org)</td><td>2024 (DC arc flash Annex D.8 / D.8.1); label text reviewed against 2021</td><td>Pending</td></tr>
+        <tr><td>IEC 60909-0</td><td>2026, edition 3.0</td><td>2016</td><td>See <a href="iec60909-2026-edition-assessment.md">edition assessment</a></td></tr>
+      </tbody>
+    </table>
+    <p>The Submittal Package page defaults to NEC 2026 and prints the calculation basis whenever the selected edition differs from the implemented one. Relabel a row to the latest edition only after a reviewer records the changed clauses and re-runs the affected benchmarks.</p>
     <p>See this file as the citation source for comments in the code referencing each of these standards.</p>
   </main>
 </div>

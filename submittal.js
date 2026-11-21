@@ -17,6 +17,14 @@ import { buildArtifactRegisterRows, normalizeDeliverableArtifact } from './analy
 import { summarizeFieldExecution } from './analysis/fieldExecution.mjs';
 import { cablesAssignedToTray, evaluateTrayFill, summarizeTrayFillResult } from './analysis/trayFill.mjs';
 
+const NEC_CALCULATION_BASIS = '2023';
+
+function necEditionLabel(edition) {
+  return edition === NEC_CALCULATION_BASIS
+    ? `NEC ${edition}`
+    : `NEC ${edition} (fill and ampacity calculations use NEC ${NEC_CALCULATION_BASIS} tables; delta review pending)`;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
   initDarkMode();
@@ -266,7 +274,7 @@ function buildCoverPage(info) {
           <tr><th scope="row">Client / Owner</th><td>${esc(info.client)}</td></tr>
           <tr><th scope="row">Engineer of Record</th><td>${esc(info.engineer)}</td></tr>
           <tr><th scope="row">Submittal Date</th><td>${esc(info.date)}</td></tr>
-          <tr><th scope="row">NEC Edition</th><td>NEC ${esc(info.necEdition)}</td></tr>
+          <tr><th scope="row">NEC Edition</th><td>${esc(necEditionLabel(info.necEdition))}</td></tr>
           <tr><th scope="row">Revision</th><td>${esc(info.revision)}</td></tr>
         </tbody>
       </table>
@@ -554,7 +562,7 @@ function buildComplianceSection(info) {
       <h2>Code Compliance Statement</h2>
       <p>This submittal package has been prepared in accordance with the following codes and standards:</p>
       <ul>
-        <li><strong>NFPA 70 NEC ${esc(info.necEdition)}</strong> — National Electrical Code</li>
+        <li><strong>NFPA 70 ${esc(necEditionLabel(info.necEdition))}</strong> — National Electrical Code</li>
         <li><strong>NEMA VE 1-2017</strong> — Cable Tray Systems (load class, fill, support span)</li>
         <li><strong>IEEE Std 835</strong> — Standard Power Cable Ampacity Tables</li>
         <li><strong>NFPA 70E</strong> — Standard for Electrical Safety in the Workplace</li>
@@ -648,7 +656,7 @@ function exportXlsx() {
     ['Client', info.client],
     ['Engineer', info.engineer],
     ['Date', info.date],
-    ['NEC Edition', `NEC ${info.necEdition}`],
+    ['NEC Edition', necEditionLabel(info.necEdition)],
     ['Revision', info.revision],
   ]);
 
