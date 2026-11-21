@@ -3,7 +3,7 @@ import { getOneLine, getStudies, setStudies } from '../dataStore.mjs';
 import { getProjectState } from '../projectStorage.js';
 import { generateArcFlashReport } from '../reports/arcFlashReport.mjs';
 import { fingerprintStudySource } from '../analysis/studyResultReadiness.mjs';
-import { arcFlashBarRows, barChartHtml, kpiStripHtml, ppeCategoryForEnergy, statusLegendHtml } from '../src/components/resultViz.mjs';
+import { arcFlashBarRows, barChartHtml, incidentEnergyBand, kpiStripHtml, statusLegendHtml } from '../src/components/resultViz.mjs';
 import {
   arcFlashReadinessLabel,
   arcFlashResultEntries,
@@ -38,17 +38,17 @@ function renderArcFlashChart(entries) {
     return;
   }
   const worst = rows.reduce((best, row) => (row.value > best.value ? row : best), rows[0]);
-  const worstCategory = ppeCategoryForEnergy(worst.value);
+  const worstBand = incidentEnergyBand(worst.value);
   const dangerous = rows.filter(row => row.value > 40).length;
   chart.innerHTML = `${kpiStripHtml([
-    { label: 'Highest incident energy', value: `${worst.value.toFixed(1)} cal/cm²`, hint: worst.label, status: worstCategory.status },
-    { label: 'Worst PPE category', value: worstCategory.label.replace(/ cal\/cm².*/, ''), status: worstCategory.status },
+    { label: 'Highest incident energy', value: `${worst.value.toFixed(1)} cal/cm²`, hint: worst.label, status: worstBand.status },
+    { label: 'Minimum arc rating (worst case)', value: worstBand.minimumArcRatingCalCm2 === null ? 'n/a' : `${worstBand.minimumArcRatingCalCm2.toFixed(2)} cal/cm²`, status: worstBand.status },
     { label: 'Over 40 cal/cm²', value: String(dangerous), status: dangerous ? 'fail' : 'pass' }
   ])}
   <h3 class="study-chart__title">Incident energy by equipment</h3>
   ${barChartHtml(rows, { unit: 'cal/cm²', ariaLabel: 'Incident energy by equipment' })}
   ${statusLegendHtml()}
-  <p class="field-hint">PPE categories follow NFPA 70E thresholds: 1.2, 4, 8, 25 and 40 cal/cm². The tick marks 40 cal/cm², above which energized work is generally not permitted. Confirm against your site arc-flash program.</p>`;
+  <p class="field-hint">Colors are display bands at 1.2, 4, 8, 25 and 40 cal/cm²; they are not PPE categories. Select arc-rated PPE by the incident-energy method (arc rating at or above the calculated energy). The tick marks 40 cal/cm², a common screening ceiling; confirm limits against your site arc-flash program.</p>`;
 }
 
 function renderResults(results, scope = 'project') {

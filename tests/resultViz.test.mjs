@@ -3,7 +3,7 @@ import {
   arcFlashBarRows,
   barChartHtml,
   nextStandardAicKa,
-  ppeCategoryForEnergy,
+  incidentEnergyBand,
   shortCircuitBarRows,
   statusBadgeHtml,
   voltageDropBarRows,
@@ -14,13 +14,19 @@ assert.strictEqual(nextStandardAicKa(22), 22);
 assert.strictEqual(nextStandardAicKa(250), null);
 assert.strictEqual(nextStandardAicKa('abc'), null);
 
-assert.strictEqual(ppeCategoryForEnergy(1).id, 'cat0');
-assert.strictEqual(ppeCategoryForEnergy(4).id, 'cat1');
-assert.strictEqual(ppeCategoryForEnergy(8).id, 'cat2');
-assert.strictEqual(ppeCategoryForEnergy(25).id, 'cat3');
-assert.strictEqual(ppeCategoryForEnergy(40).id, 'cat4');
-assert.strictEqual(ppeCategoryForEnergy(41).id, 'danger');
-assert.strictEqual(ppeCategoryForEnergy(null).id, 'unknown');
+assert.strictEqual(incidentEnergyBand(1).id, 'below-boundary');
+assert.strictEqual(incidentEnergyBand(4).id, 'low');
+assert.strictEqual(incidentEnergyBand(8).id, 'moderate');
+assert.strictEqual(incidentEnergyBand(25).id, 'elevated');
+assert.strictEqual(incidentEnergyBand(40).id, 'high');
+assert.strictEqual(incidentEnergyBand(41).id, 'extreme');
+assert.strictEqual(incidentEnergyBand(null).id, 'unknown');
+assert.strictEqual(incidentEnergyBand(12.341).minimumArcRatingCalCm2, 12.35, 'arc rating rounds up, never understates');
+assert.strictEqual(incidentEnergyBand(0.5).minimumArcRatingCalCm2, 0);
+for (const energy of [0.5, 2, 6, 20, 35, 60]) {
+  const band = incidentEnergyBand(energy);
+  assert.ok(!/cat(egory)?\b|PPE Cat/i.test(`${band.id} ${band.label}`), `no PPE category is assigned at ${energy} cal/cm²`);
+}
 
 const scRows = shortCircuitBarRows([['a', { equipmentTag: 'MSB', threePhaseKA: 43 }], ['b', { threePhaseKA: 'x' }]]);
 assert.strictEqual(scRows.length, 1);
@@ -28,6 +34,7 @@ assert.strictEqual(scRows[0].status, 'warn');
 assert.match(scRows[0].note, /50 kA/);
 
 assert.strictEqual(arcFlashBarRows([['x', { incidentEnergy: 12, boundary: 900 }]])[0].status, 'warn');
+assert.match(arcFlashBarRows([['x', { incidentEnergy: 12, boundary: 900 }]])[0].valueLabel, /Arc rating ≥ 12\.00 cal\/cm²/);
 
 const vd = voltageDropBarRows([
   { tag: 'C1', evaluated: true, dropPct: 2, limitPct: 3, status: 'pass' },

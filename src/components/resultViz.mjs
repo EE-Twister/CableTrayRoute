@@ -45,16 +45,27 @@ export function nextStandardAicKa(faultKa) {
   return STANDARD_AIC_RATINGS_KA.find(rating => rating >= value) ?? null;
 }
 
-/** NFPA 70E-style PPE category for an incident energy in cal/cm². */
-export function ppeCategoryForEnergy(calCm2) {
+/**
+ * Display-only severity band for a calculated incident energy in cal/cm².
+ * It does not select PPE: NFPA 70E keeps the incident-energy method separate
+ * from the PPE-category tables, so the result reports the minimum arc rating
+ * (the calculated energy, rounded up) rather than a category.
+ */
+export function incidentEnergyBand(calCm2) {
   const energy = finite(calCm2);
-  if (energy === null) return { id: 'unknown', label: 'No result', status: 'na', rank: -1 };
-  if (energy < 1.2) return { id: 'cat0', label: 'Below 1.2 cal/cm²', status: 'pass', rank: 0 };
-  if (energy <= 4) return { id: 'cat1', label: 'PPE Cat 1', status: 'pass', rank: 1 };
-  if (energy <= 8) return { id: 'cat2', label: 'PPE Cat 2', status: 'warn', rank: 2 };
-  if (energy <= 25) return { id: 'cat3', label: 'PPE Cat 3', status: 'warn', rank: 3 };
-  if (energy <= 40) return { id: 'cat4', label: 'PPE Cat 4', status: 'fail', rank: 4 };
-  return { id: 'danger', label: 'Dangerous > 40 cal/cm²', status: 'fail', rank: 5 };
+  if (energy === null || energy < 0) {
+    return { id: 'unknown', label: 'No result', status: 'na', rank: -1, minimumArcRatingCalCm2: null };
+  }
+  if (energy < 1.2) {
+    return { id: 'below-boundary', label: 'Below 1.2 cal/cm² threshold', status: 'pass', rank: 0, minimumArcRatingCalCm2: 0 };
+  }
+  const minimumArcRatingCalCm2 = Math.ceil(energy * 100) / 100;
+  const label = `Arc rating ≥ ${minimumArcRatingCalCm2.toFixed(2)} cal/cm²`;
+  if (energy <= 4) return { id: 'low', label, status: 'pass', rank: 1, minimumArcRatingCalCm2 };
+  if (energy <= 8) return { id: 'moderate', label, status: 'warn', rank: 2, minimumArcRatingCalCm2 };
+  if (energy <= 25) return { id: 'elevated', label, status: 'warn', rank: 3, minimumArcRatingCalCm2 };
+  if (energy <= 40) return { id: 'high', label, status: 'fail', rank: 4, minimumArcRatingCalCm2 };
+  return { id: 'extreme', label: `${label} (above 40 cal/cm²)`, status: 'fail', rank: 5, minimumArcRatingCalCm2 };
 }
 
 /**
@@ -139,18 +150,18 @@ export function shortCircuitBarRows(entries, ratings = {}) {
   }).filter(Boolean);
 }
 
-/** Arc-flash rows -> bar chart rows with PPE category badges. */
+/** Arc-flash rows -> bar chart rows with incident-energy band badges. */
 export function arcFlashBarRows(entries) {
   return (entries || []).map(([id, result]) => {
     const energy = finite(result?.incidentEnergy);
     if (energy === null) return null;
-    const category = ppeCategoryForEnergy(energy);
+    const band = incidentEnergyBand(energy);
     return {
       label: result.equipmentTag || id,
       value: energy,
       limit: 40,
-      status: category.status,
-      valueLabel: `${energy.toFixed(2)} cal/cm² · ${category.label}`,
+      status: band.status,
+      valueLabel: `${energy.toFixed(2)} cal/cm² · ${band.label}`,
       note: finite(result.boundary) !== null ? `Arc-flash boundary ${Math.round(result.boundary)} mm` : '',
     };
   }).filter(Boolean);
