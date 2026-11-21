@@ -1716,7 +1716,6 @@ export async function createApp(options = {}) {
 
   // Write operations on projects require at least engineer role.
   app.post('/projects/:project', requireEngineer);
-  app.delete('/projects/:project', requireEngineer);
   app.post('/projects/:project/snapshots', requireEngineer);
   app.delete('/projects/:project/snapshots/:snapshotId', requireEngineer);
 

@@ -592,7 +592,7 @@ Updating an existing project requires `baseVersion` (optimistic concurrency); cr
 
 **Conflicts:** `409 { "error": "Version conflict", "currentVersion": "..." }` when `baseVersion` is stale (`currentVersion` is `null` if the project does not exist), or `409 { "error": "Base version required for project update", "currentVersion": "..." }` when it is missing for an existing project.
 
-`DELETE /projects/:project` is not implemented: a role check is registered for it but no handler.
+There is no `DELETE /projects/:project` route; only share links can be deleted (see below).
 
 ### GET /projects/:project/snapshots
 
