@@ -11,7 +11,7 @@ The Project Workflow Core sample also drives a reproducible 20-sheet engineering
 
 ## Development Setup
 
-Use Node.js 20 or newer (CI runs Node 20).
+Use Node.js 22 (the version CI runs; see `.nvmrc`).
 
 ```bash
 npm ci                      # install dependencies from the lockfile
