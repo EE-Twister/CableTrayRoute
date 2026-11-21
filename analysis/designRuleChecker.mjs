@@ -25,6 +25,7 @@ import {
   recordId,
 } from './conduitFill.mjs';
 import {
+  bundlingFactor,
   inferTerminalTempRating,
   nextStandardOcpd,
   normalizeConductorMaterial,
@@ -48,21 +49,6 @@ export const DRC_SEVERITY = {
 // unavailable. This is a project capacity screen, not an NEC compliance rule.
 // ---------------------------------------------------------------------------
 const DEFAULT_TRAY_CAPACITY_SCREENING_LIMIT = 0.40;
-
-// ---------------------------------------------------------------------------
-// NEC 310.15(B)(3)(a) — Tray derating factors for power cables
-//   When installed in a cable tray the "bundling" derating factor applies to
-//   the number of current-carrying conductors in the tray section.  We use
-//   a simplified stepped table (Table 310.15(C)(1) equivalent).
-// ---------------------------------------------------------------------------
-const TRAY_DERATING_FACTORS = [
-  { maxConductors:  3, factor: 1.00 },
-  { maxConductors:  6, factor: 0.80 },
-  { maxConductors:  9, factor: 0.70 },
-  { maxConductors: 20, factor: 0.50 },
-  { maxConductors: 30, factor: 0.45 },
-  { maxConductors: Infinity, factor: 0.40 },
-];
 
 // ---------------------------------------------------------------------------
 // NEC Table 310.16 baseline ampacity (formerly 310.15(B)(16)) — 75 °C copper, used as default
@@ -261,13 +247,6 @@ function cableSlotIndex(cable) {
   if (raw === undefined || raw === null || raw === '') return null;
   const parsed = Number.parseInt(String(raw), 10);
   return Number.isInteger(parsed) ? parsed : null;
-}
-
-function derateFactor(conductorCount) {
-  for (const entry of TRAY_DERATING_FACTORS) {
-    if (conductorCount <= entry.maxConductors) return entry.factor;
-  }
-  return TRAY_DERATING_FACTORS[TRAY_DERATING_FACTORS.length - 1].factor;
 }
 
 /**
@@ -661,7 +640,7 @@ function checkAmpacity(cables, trayCableMap) {
         return sum + conductors * parallelSets;
       }, 0);
 
-      const factor = derateFactor(conductorCount);
+      const factor = bundlingFactor(conductorCount);
       const deratedAmpacity = aggregateAmpacity * factor;
       const designCurrent = parseFloat(cable.design_current ?? cable.load_amps) || null;
       const parallelLabel = parallelCount > 1 ? ` (${parallelCount} × ${ratedAmpacity} A)` : '';

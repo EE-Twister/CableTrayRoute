@@ -485,6 +485,15 @@ describe('sizeFeeder — installation conditions', () => {
     assert.ok(Math.abs(r.deratingFactor - 0.88) < 0.001);
   });
 
+  it('bundlingFactor follows NEC Table 310.15(C)(1) at the band edges', () => {
+    assert.strictEqual(bundlingFactor(3), 1.00);
+    assert.strictEqual(bundlingFactor(30), 0.45);
+    assert.strictEqual(bundlingFactor(31), 0.40);
+    assert.strictEqual(bundlingFactor(40), 0.40);
+    assert.strictEqual(bundlingFactor(41), 0.35);
+    assert.strictEqual(bundlingFactor(120), 0.35);
+  });
+
   it('6 bundled conductors gives 0.80 bundling factor', () => {
     // NEC 310.15(C)(1): 4-6 conductors → 0.80
     assert.strictEqual(bundlingFactor(6), 0.80);

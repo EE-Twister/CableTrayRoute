@@ -259,6 +259,33 @@ describe('DRC-03 Ampacity Derating', () => {
     assert.ok(drc03errors.length > 0, 'Expected DRC-03 ERROR for ampacity exceedance');
   });
 
+  it('uses the 0.35 adjustment factor above 40 conductors (NEC 310.15(C)(1))', () => {
+    // #4 AWG 75°C Cu = 85 A. 45 conductors → 0.35 → 29.75 A; a 0.40 floor would give 34 A.
+    const cableNames = Array.from({ length: 15 }, (_, i) => `C${i + 1}`);
+    const allCables = cableNames.map((n, i) =>
+      makeCable(n, i === 0 ? { design_current: 32 } : {})
+    );
+    const trayCableMap = { T1: allCables.map(c => ({ name: c.name, cable_type: 'Power', conductors: 3 })) };
+    const { findings } = runDRC({ trays: [makeTray('T1', 5)], cables: allCables, trayCableMap });
+    const errors = findings.filter(f =>
+      f.ruleId === 'DRC-03' && f.severity === DRC_SEVERITY.ERROR && f.location.startsWith('C1 @'));
+    assert.strictEqual(errors.length, 1, 'Expected C1 to exceed the 0.35-derated ampacity');
+    assert.ok(errors[0].message.includes('0.35 derating'), errors[0].message);
+  });
+
+  it('uses 0.40 for 31-40 conductors, so the same load passes', () => {
+    // 39 conductors → 0.40 → 34 A; design 32 A is within the limit.
+    const cableNames = Array.from({ length: 13 }, (_, i) => `C${i + 1}`);
+    const allCables = cableNames.map((n, i) =>
+      makeCable(n, i === 0 ? { design_current: 32 } : {})
+    );
+    const trayCableMap = { T1: allCables.map(c => ({ name: c.name, cable_type: 'Power', conductors: 3 })) };
+    const { findings } = runDRC({ trays: [makeTray('T1', 5)], cables: allCables, trayCableMap });
+    const errors = findings.filter(f =>
+      f.ruleId === 'DRC-03' && f.severity === DRC_SEVERITY.ERROR && f.location.startsWith('C1 @'));
+    assert.strictEqual(errors.length, 0);
+  });
+
   it('can be skipped via skipAmpacity option', () => {
     const cables = [makeCable('C1', { design_current: 200 })];
     const trayCableMap = { T1: [{ name: 'C1', cable_type: 'Power', conductors: 3 }] };

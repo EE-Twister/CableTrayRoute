@@ -33,7 +33,7 @@ Edition pinning exists only for tray fill (`NEC_2023_TRAY_FILL_BASIS`, `analysis
 | Conduit fill | `analysis/conduitFill.mjs` (`CONDUIT_INTERNAL_AREA_IN2`, `conduitFillLimit`); `conduitfill.js` | Chapter 9 Table 1 and Annex C | Compare the 53/31/40% limits and the conduit area tables. Tables 4, 5 and 5A are not implemented (cable area comes from user-entered OD) |
 | Table 9 impedance | `src/necTable9.mjs` | Chapter 9 Table 9 | Compare R and X values by size, material, and conduit type |
 | Ampacity | `analysis/autoSize.mjs` (`NEC_AMPACITY_TABLE`, `selectConductorSize`); duplicate dataset in `codes/necTables.js` | Table 310.16, 110.14(C), 240.4(D) | Compare table values and any new conductor rows, and the terminal-rating and small-conductor rules |
-| Derating | `analysis/autoSize.mjs` (`ambientTempFactor`, `bundlingFactor`, `trayFillFactor`); `analysis/designRuleChecker.mjs` (`TRAY_DERATING_FACTORS`) | Table 310.15(B)(1)(a), 310.15(C)(1), 392.80(A)(1)(b) | Compare ambient and adjustment factors, and the tray rules in 392.80 |
+| Derating | `analysis/autoSize.mjs` (`ambientTempFactor`, `bundlingFactor`, `trayFillFactor`); `analysis/designRuleChecker.mjs` (DRC-03, via the shared `bundlingFactor`) | Table 310.15(B)(1)(a), 310.15(C)(1), 392.80(A)(1)(b) | Compare ambient and adjustment factors, and the tray rules in 392.80 |
 | Parallel conductors | `autoSize.mjs`; DRC-07 | 310.10(H) | Compare size minimums and equal-length requirements |
 | Voltage drop | `analysis/voltageDropStudy.mjs` (`NEC_LIMITS` 3/3/5%); `analysis/busDuctSizing.mjs` | 210.19(A)(1) and 215.2 informational notes; 215.2(A)(4); 368.12 | Compare the informational-note recommendations and any renumbering |
 | Pull box and bends | `analysis/pullBoxSizing.mjs`; `analysis/conduitBendSchedule.mjs` | 314.28(A)(1) and (A)(2); 358.26 | Compare the 8x and 6x multipliers and the 360 degree limit |
@@ -58,7 +58,7 @@ Edition pinning exists only for tray fill (`NEC_2023_TRAY_FILL_BASIS`, `analysis
 
 These were verified in the source during this assessment and should be resolved regardless of the edition decision.
 
-1. **Tray derating above 40 conductors.** `TRAY_DERATING_FACTORS` in `analysis/designRuleChecker.mjs:58` uses 0.40 for every count above 30. `BUNDLING_FACTORS` in `analysis/autoSize.mjs:183` uses 0.40 for 31-40 and 0.35 above 40. The DRC therefore derates less than auto-sizing for more than 40 conductors. Decide which is correct against the adjustment-factor table and use one shared table.
+1. **Tray derating above 40 conductors (resolved 2026-11-21).** `analysis/designRuleChecker.mjs` kept a private table that used 0.40 for every count above 30, while `analysis/autoSize.mjs` used 0.40 for 31-40 and 0.35 above 40 (NEC Table 310.15(C)(1) values for the 2023 basis). The checker now calls the shared `bundlingFactor`, so both modules use one table. Regression tests: `tests/designRuleChecker.test.mjs` (45 conductors at 0.35, 39 at 0.40) and `tests/autoSize.test.mjs` (band edges at 3, 30, 31, 40, 41). The factors themselves are still the 2023 values and remain subject to the 2026 review.
 2. **PPE category versus the no-category rule.** `analysis/dcShortCircuit.mjs:38-46` states that 70E does not permit converting calculated incident energy into a PPE category, and reports a minimum arc rating instead. `ppeCategoryForEnergy` in `src/components/resultViz.mjs:48` assigns Cat 1-4 from calculated energy. One of the two positions is wrong for the incident-energy method.
 3. **Duplicate ampacity data.** `codes/necTables.js` repeats ampacity, temperature, and adjustment data with no citation comments, and is imported by `sizing.js`.
 4. **Legacy identifier.** `nec358_24Check` implements NEC 358.26 (bends in one run); 358.24 is "Bends - How Made". The name is kept for saved-project compatibility, as the file header notes.
@@ -88,7 +88,7 @@ Each item needs confirmation against the licensed text before any code or label 
 
 1. Obtain authorized text of NEC 2023 and 2026, and NFPA 70E-2024 and 2027, or NFPA-issued change documents.
 2. For each row in the code surface tables, record every changed clause, table, factor, and definition that affects it, plus renumbering.
-3. Resolve the internal discrepancies above first, so the 2023-basis implementation is self-consistent before comparing editions.
+3. Resolve the remaining internal discrepancies above first, so the 2023-basis implementation is self-consistent before comparing editions.
 4. Map each reviewed change to code, inputs, outputs, reports, UI strings, and documentation.
 5. Implement the reviewed delta without overwriting the 2023/2024 path if projects still require those editions (the Submittal Package already offers older editions).
 6. Add named, edition-specific benchmarks or fixtures for every affected calculation family, including `TRAY-NEC-001`, `nec2023-conduit-fill-count`, `VDROP-001`, and `VDROP-002` equivalents for the new edition.
