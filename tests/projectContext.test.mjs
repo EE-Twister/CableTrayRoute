@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  importedProjectName,
   normalizeActiveProjectName,
   recoverActiveProjectName,
   resolveActiveProjectName
@@ -36,3 +37,13 @@ assert.equal(recoverActiveProjectName({
 assert.equal(readError?.message, 'storage unavailable');
 
 console.log('✓ project context resolves named projects without treating default as a name');
+
+assert.equal(importedProjectName('Plant A.ctr.json', []), 'Plant A');
+assert.equal(importedProjectName('backup.JSON', []), 'backup');
+assert.equal(importedProjectName('C:\\exports\\Unit 4.ctr.json', []), 'Unit 4');
+assert.equal(importedProjectName('', []), 'Imported Project');
+assert.equal(importedProjectName('default.ctr.json', []), 'Imported Project', 'reserved name falls back');
+assert.equal(importedProjectName('Plant A.ctr.json', ['plant a', 'Plant A (2)']), 'Plant A (3)');
+
+console.log('✓ imported project files get a unique project name from the file name');
+

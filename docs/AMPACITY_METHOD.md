@@ -17,7 +17,7 @@ The allowable current **I** in amperes is obtained from:
 I = sqrt( (T_c - (T_a + ΔT_d)) / ( R_dc × (1 + Y_c) × R_ca ) )
 ```
 
-where `R_ca = R_cond + R_ins + R_duct + R_soil`. In the Ductbank Route
+where `R_ca = R_cond + R_ins + R_duct + R_gap + R_soil`. In the Ductbank Route
 estimator, heat loss is also scaled by `N_c`, the current-carrying conductor
 count for the cable.
 
@@ -30,7 +30,14 @@ count for the cable.
 - **Y_c** – ac resistance correction factor for skin and proximity effects.
 - **R_cond** – thermal resistance internal to the conductor.
 - **R_ins** – thermal resistance of insulation.
-- **R_duct** – thermal resistance of any raceway or duct.
+- **R_duct** – thermal resistance of the duct wall (and concrete envelope when selected).
+- **R_gap** – thermal resistance of the air gap between the cable(s) and the inside of the duct,
+  IEC 60287-2-1 §4.2.7.2 for PVC/PE ducts in earth:
+  `R_gap = 1.87 / (1 + 0.1 (0.312 + 0.0037 θ_m) D_e)` with `θ_m = 60 °C` and `D_e` in mm.
+  `D_e` is the cable diameter (×2.16 for a three-conductor cable), or the bundle diameter
+  `D_e·√n` (limited to the duct inside diameter) when `n` cables share the conduit. For a
+  23 mm cable this is about 0.84 °C·m/W. Earlier versions omitted it and rated a single
+  500 kcmil cable in a PVC duct at 993 A instead of about 680 A.
 - **R_soil** – thermal resistance of the surrounding soil. It is calculated using
   a cylindrical model:
 
@@ -105,3 +112,28 @@ conductor arrangement, conduit geometry, and benchmark source is reconciled.
 - **NEC 310‑15(C)** – National Electrical Code, 2023 edition.
 - **IEEE Std 835** – *IEEE Standard Power Cable Ampacity Tables*.
 - J. H. Neher and M. H. McGrath, “The Calculation of the Temperature Rise and Load Carrying Capability of Cable Systems,” *AIEE Transactions*, 1957.
+
+
+## Finite-Difference Thermal Solver
+
+The heat map and conduit temperatures come from a two-dimensional finite-difference solution
+of `k ∇²T = −q` (`thermalWorker.js`). Numerical details that matter for accuracy:
+
+- **Heat conservation:** each conduit's loss is spread over the cells that represent it, so the
+  total injected equals the cable loss at every resolution.
+- **Far-field boundaries:** the side and bottom edges are held at the analytic temperature of the
+  conduits treated as line sources with images above the isothermal grade
+  (`T = T_earth + Σ P ρ / 2π · ln(d′/d)`), not at the undisturbed earth temperature. Edges only
+  one burial depth away forced the domain too cool by 13–19%.
+- **Convergence:** successive over-relaxation, iterated until the largest change per sweep is below
+  1e-4 °C. The earlier Jacobi loop stopped at 0.01 °C per sweep or 2000 sweeps and returned
+  under-converged results on finer grids (a single conduit read +20%, +8% and −47% at the 20, 40
+  and 80 node settings).
+- **Resolution:** the cell size resolves the smallest conduit with about four cells across its
+  radius within a budget of roughly 120,000 cells, so the grid-size setting no longer changes the
+  temperatures (it still sets the resolution of the displayed map).
+- **Duct resistance:** each conduit temperature adds `P × (R_duct + R_gap + user duct resistance)`.
+
+A single conduit agrees with the exact solution `ΔT = P ρ / 2π · [ln(2L/R) + ¼]` to within about
+4%. Two conduits agree with the superposition of the single rise and the image-method mutual
+heating. Uniform soil, an isothermal grade and no moisture migration (dry-out) are assumed.

@@ -108,16 +108,16 @@ For 50 Hz systems, limits are scaled proportionally.
 
 DER harmonic current injection at the PCC must not exceed the limits in IEEE 1547-2018 Table 2, expressed as a percentage of the DER rated fundamental current.
 
-**Key limits:**
-| Harmonic Order | Limit (% of I_rated) |
-|---------------|---------------------|
-| 3rd, 5th, 7th | 3.0% |
-| 9th | 0.5% |
-| 11th, 13th | 1.0% |
-| 15th, 21st | 0.3% |
-| 17th, 19th | 1.5% |
-| 23rd, 25th | 0.6% |
-| **THD** | **5.0%** |
+**Limits (odd harmonics, % of rated current capability):**
+| Harmonic order h | Limit |
+|---|---|
+| h < 11 (3rd–9th) | 4.0% |
+| 11 ≤ h < 17 | 2.0% |
+| 17 ≤ h < 23 | 1.5% |
+| 23 ≤ h < 35 | 0.6% |
+| 35 ≤ h ≤ 50 | 0.3% |
+| Even harmonics | 25% of the limit of their band |
+| **THD (TDD)** | **5.0%** |
 
 **Pass criterion:** THD ≤ 5% AND all individual harmonics within limits.
 

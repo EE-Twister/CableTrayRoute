@@ -764,6 +764,10 @@
     line-height: 1.1;
 }
 
+.project-sync-status[hidden] {
+    display: none;
+}
+
 .project-sync-status--saved,
 .project-sync-status--ready {
     background: color-mix(in srgb, var(--success-bg) 80%, transparent);
@@ -817,6 +821,16 @@
     cursor: pointer;
 }
 
+.project-actions-heading {
+    margin: 0 0 0.25rem;
+    padding: 0.35rem 0.6rem 0.45rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
 .project-actions-item:hover,
 .project-actions-item:focus-visible {
     background: color-mix(in srgb, var(--color-primary) 10%, transparent);
@@ -845,12 +859,14 @@
         padding-inline: 0.35rem;
     }
 
+    /* Keep the project name visible at laptop widths; drop the decorative
+       icon and caret instead so the trigger stays compact. */
     .project-actions-trigger {
         min-width: 18rem;
         min-height: 2.75rem;
         max-width: 22rem;
-        justify-content: center;
-        padding: 0.25rem 0.4rem;
+        justify-content: flex-start;
+        padding: 0.25rem 0.45rem;
     }
 
     .project-actions-trigger .project-display-chip {
@@ -865,7 +881,8 @@
         text-overflow: ellipsis;
     }
 
-    .project-actions-trigger::after {
+    .project-actions-trigger::after,
+    .project-actions-icon {
         display: none;
     }
 

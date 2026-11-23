@@ -1,4 +1,5 @@
 import { parseBreakerAmpFrame } from './mcc-lineup/breakerBucketSizing.mjs';
+import { motorFLC3Ph } from '../analysis/autoSize.mjs';
 
 export const MCC_LINEUPS_KEY = 'mccLineups';
 
@@ -942,6 +943,39 @@ export function validateMccLineup(lineup) {
           bucketId: bucket.id,
           message: `${section.name} ${bucketName} uses a generic amp-frame bucket-size estimate; confirm breaker and MCC manufacturer construction.`
         });
+      }
+      // Motor branch-circuit device vs NEC Table 430.250 full-load current (three-phase,
+      // 200/208/230/460/575 V columns). Only flagged when the table can be read.
+      const motorHp = Number.parseFloat(bucket.hp);
+      const deviceAmps = Number.parseFloat(bucket.breakerA);
+      const systemVoltage = Number.parseFloat(normalized.voltage);
+      const threePhase = !normalized.systemRequirements.phases || Number.parseInt(normalized.systemRequirements.phases, 10) === 3;
+      if (bucket.type === 'starter' && motorHp > 0 && deviceAmps > 0 && systemVoltage > 0 && threePhase) {
+        const flc = motorFLC3Ph(motorHp, systemVoltage);
+        if (flc > 0) {
+          if (deviceAmps < flc) {
+            messages.push({
+              severity: 'error',
+              sectionId: section.id,
+              bucketId: bucket.id,
+              message: `${section.name} ${bucketName} has a ${deviceAmps} A device for a ${motorHp} hp motor with ${flc} A full-load current (NEC 430.250); the device cannot carry the motor load.`
+            });
+          } else if (deviceAmps < flc * 1.25) {
+            messages.push({
+              severity: 'warning',
+              sectionId: section.id,
+              bucketId: bucket.id,
+              message: `${section.name} ${bucketName} has a ${deviceAmps} A device, under 125% of the ${flc} A full-load current; acceptable only for an adjustable instantaneous-trip (MCP) device and likely to nuisance-trip on starting.`
+            });
+          } else if (deviceAmps > flc * 2.5) {
+            messages.push({
+              severity: 'warning',
+              sectionId: section.id,
+              bucketId: bucket.id,
+              message: `${section.name} ${bucketName} has a ${deviceAmps} A device, over 250% of the ${flc} A full-load current; NEC 430.52 allows this only for instantaneous-trip/MCP devices or with its listed exceptions.`
+            });
+          }
+        }
       }
       if (bucket.motorSpaceHeaterRequired && !bucket.motorSpaceHeaterVa) {
         messages.push({

@@ -90,6 +90,7 @@
         <ul>
           <li>Pst ≤ 1.0 — mandatory limit at PCC</li>
           <li>Pst ≤ 0.8 — planning level (utility allocation)</li>
+          <li>Plt ≤ 0.65 — long-term limit (IEC 61000-3-3)</li>
         </ul>
         <p>This simplified model is suitable for arc furnaces, motor starts, welders, and wind turbines with known step-change magnitudes. For continuous random fluctuations, use a full IEC 61000-4-15 signal-processing flickermeter with measured voltage waveforms.</p>
       </details>
@@ -109,7 +110,13 @@
           <div class="field-row">
             <label for="xr-ratio">Source X/R ratio</label>
             <input type="number" id="xr-ratio" min="0.1" max="100" step="0.5" value="10" required aria-describedby="xr-ratio-hint">
-            <p id="xr-ratio-hint" class="field-hint">Source X/R ratio at the PCC. Used for display and voltage dip angle correction. Industrial systems: 5–20.</p>
+            <p id="xr-ratio-hint" class="field-hint">Source X/R ratio at the PCC. Combined with the load power factor to get the voltage change. Industrial systems: 5–20.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="load-pf">Load power factor (lagging)</label>
+            <input type="number" id="load-pf" min="0.05" max="1" step="0.01" value="0.9" required aria-describedby="load-pf-hint">
+            <p id="load-pf-hint" class="field-hint">Power factor of the load step. The voltage change is (ΔP·R + ΔQ·X)/V², so a motor start (pf 0.2–0.4) changes the voltage far more per kW than a resistive step. Use the locked-rotor power factor for motor starts.</p>
           </div>
 
           <div class="field-row">
@@ -174,7 +181,7 @@
       <ul>
         <li><strong>Pst ≤ 1.0</strong> — mandatory limit at the PCC (IEC 61000-3-3 / IEEE 1453)</li>
         <li><strong>Pst ≤ 0.8</strong> — planning level; below this value no action is normally required</li>
-        <li><strong>Plt ≤ 0.8</strong> — same planning level for long-term assessment</li>
+        <li><strong>Plt ≤ 0.65</strong> — long-term limit (IEC 61000-3-3); planning level 80% of that</li>
       </ul>
       <h3>Typical Pst values by load type</h3>
       <ul>

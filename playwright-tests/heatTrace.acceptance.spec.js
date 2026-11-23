@@ -119,7 +119,7 @@ test.describe('heat trace sizing acceptance', () => {
     expect(heatLossPaths.every(path => path.trim().length > 0)).toBeTruthy();
     await expect(page.locator('#heatloss-breakdown-legend')).toContainText('Conduction');
     await expect(page.locator('#heatloss-breakdown-legend')).toContainText(/Convection|Soil Conduction/);
-    await expect(page.locator('#heatloss-breakdown-legend')).toContainText('Radiation / Margin');
+    await expect(page.locator('#heatloss-breakdown-legend')).toContainText('Design margin and pipe-material allowance');
 
     await fillHeatTraceInputs(page, HEAT_TRACE_FIXTURES.warning);
     await runHeatTraceAnalysis(page);

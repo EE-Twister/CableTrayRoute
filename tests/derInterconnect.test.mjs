@@ -19,6 +19,7 @@ import {
   VOLTAGE_RIDE_THROUGH,
   FREQUENCY_RIDE_THROUGH,
   HARMONIC_CURRENT_LIMITS_PCT,
+  harmonicLimitPct,
 } from '../analysis/derInterconnect.mjs';
 
 // ---------------------------------------------------------------------------
@@ -82,13 +83,20 @@ describe('Constants', () => {
 
 describe('checkPCCVoltage()', () => {
   it('nominal case — small DER, unity PF → Range A pass', () => {
-    // 500 kW DER, 100 MVA SC, R=0.01 pu, X=0.05 pu
-    // P_pu = 0.5/100 = 0.005; Q_pu = 0
-    // ΔV = (0.005 × 0.01) / 1 = 0.00005 pu → tiny rise
+    // 500 kW DER, R = 0.01 pu on 1 MVA: ΔV = 0.5 MW × 0.01 = 0.005 pu = 0.5%
     const r = checkPCCVoltage({ v_pcc_pu: 1.0, der_rated_kW: 500, der_rated_kVAR: 0, sc_MVA: 100, r_pu: 0.01, x_pu: 0.05 });
     assert.ok(r.rangeA_pass, 'Expected Range A pass for small DER on stiff grid');
     assert.ok(r.rangeB_pass, 'Expected Range B pass');
     assert.ok(r.pass, 'Overall pass expected');
+    approx(r.delta_v_pct, 0.5, 1e-6, 'ΔV% with P in MW and R per-unit on 1 MVA: ');
+  });
+
+  it('voltage rise does not depend on sc_MVA separately (R, X already carry the source strength)', () => {
+    const a = checkPCCVoltage({ der_rated_kW: 2000, der_rated_kVAR: 500, sc_MVA: 10, r_pu: 0.02, x_pu: 0.08 });
+    const b = checkPCCVoltage({ der_rated_kW: 2000, der_rated_kVAR: 500, sc_MVA: 200, r_pu: 0.02, x_pu: 0.08 });
+    // ΔV = (2 × 0.02 + 0.5 × 0.08) = 0.08 pu
+    approx(a.delta_v_pct, 8, 1e-6, 'ΔV% (sc 10 MVA): ');
+    approx(b.delta_v_pct, 8, 1e-6, 'ΔV% (sc 200 MVA): ');
   });
 
   it('delta_v_pct is proportional to P and R', () => {
@@ -351,14 +359,14 @@ describe('checkHarmonicsCompliance()', () => {
     assert.ok(!r.pass);
   });
 
-  it('individual harmonic 5th at limit (3.0%) → pass', () => {
-    const r = checkHarmonicsCompliance({ thd_pct: 2.0, individual_harmonics: [{ order: 5, pct: 3.0 }] });
+  it('individual harmonic 5th at the Table 2 limit (4.0%) → pass', () => {
+    const r = checkHarmonicsCompliance({ thd_pct: 2.0, individual_harmonics: [{ order: 5, pct: 4.0 }] });
     assert.ok(r.individual_pass, '5th at limit should pass');
     assert.strictEqual(r.violations.length, 0);
   });
 
-  it('individual harmonic 5th above limit (3.1%) → violation', () => {
-    const r = checkHarmonicsCompliance({ thd_pct: 2.0, individual_harmonics: [{ order: 5, pct: 3.1 }] });
+  it('individual harmonic 5th above limit (4.1%) → violation', () => {
+    const r = checkHarmonicsCompliance({ thd_pct: 2.0, individual_harmonics: [{ order: 5, pct: 4.1 }] });
     assert.ok(!r.individual_pass);
     assert.strictEqual(r.violations.length, 1);
     assert.strictEqual(r.violations[0].order, 5);
@@ -369,9 +377,9 @@ describe('checkHarmonicsCompliance()', () => {
     const r = checkHarmonicsCompliance({
       thd_pct: 4.0,
       individual_harmonics: [
-        { order: 3, pct: 2.0 },  // OK (limit 3.0)
-        { order: 5, pct: 4.0 },  // VIOLATES (limit 3.0)
-        { order: 7, pct: 1.5 },  // OK (limit 3.0)
+        { order: 3, pct: 2.0 },  // OK (limit 4.0)
+        { order: 5, pct: 4.5 },  // VIOLATES (limit 4.0)
+        { order: 7, pct: 1.5 },  // OK (limit 4.0)
       ],
     });
     assert.strictEqual(r.violations.length, 1, 'Only 5th should be a violation');
@@ -465,3 +473,26 @@ describe('runDERInterconnectStudy()', () => {
 });
 
 console.log('\n  Done.\n');
+
+
+describe('IEEE 1547-2018 Table 2 harmonic bands', () => {
+  it('band limits: 4.0 (h<11), 2.0 (11-16), 1.5 (17-22), 0.6 (23-34), 0.3 (35-50)', () => {
+    assert.strictEqual(harmonicLimitPct(9), 4.0);
+    assert.strictEqual(harmonicLimitPct(13), 2.0);
+    assert.strictEqual(harmonicLimitPct(19), 1.5);
+    assert.strictEqual(harmonicLimitPct(29), 0.6);
+    assert.strictEqual(harmonicLimitPct(41), 0.3);
+    assert.strictEqual(harmonicLimitPct(55), null);
+  });
+  it('even harmonics are 25% of the band limit', () => {
+    assert.strictEqual(harmonicLimitPct(4), 1.0);
+    assert.strictEqual(harmonicLimitPct(14), 0.5);
+    assert.strictEqual(harmonicLimitPct(40), 0.075);
+  });
+  it('a 15th harmonic of 1.5% is compliant (an earlier table allowed only 0.3%)', () => {
+    const r = checkHarmonicsCompliance({ thd_pct: 3, individual_harmonics: [{ order: 15, pct: 1.5 }, { order: 9, pct: 3.5 }] });
+    assert.ok(r.individual_pass, JSON.stringify(r.violations));
+    const bad = checkHarmonicsCompliance({ thd_pct: 3, individual_harmonics: [{ order: 15, pct: 2.5 }] });
+    assert.ok(!bad.individual_pass);
+  });
+});

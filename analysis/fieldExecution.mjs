@@ -21,7 +21,9 @@ export function fieldExecutionKey(recordType, sourceId) {
 export function normalizeFieldExecutionRecord(input = {}) {
   const recordType = text(input.recordType || input.type || 'cable').toLowerCase();
   const sourceId = text(input.sourceId || input.tag || input.id);
-  const status = STATUS_SET.has(input.status) ? input.status : 'not-started';
+  // Accept 'Installed', 'Not Started', 'not started' as well as the canonical slugs.
+  const statusSlug = text(input.status).toLowerCase().replace(/[\s_]+/g, '-');
+  const status = STATUS_SET.has(statusSlug) ? statusSlug : 'not-started';
   const updatedAt = text(input.updatedAt) || new Date().toISOString();
   const notes = text(input.notes);
 
@@ -62,9 +64,13 @@ export function findFieldExecutionRecord(records = [], recordType, sourceId) {
 }
 
 export function summarizeFieldExecution(records = []) {
+  // One record per item: a repeated key (imports, merges) must not be counted twice.
+  // The list is newest-first (upsert prepends), so the first occurrence wins.
+  const seen = new Set();
   const normalized = (Array.isArray(records) ? records : [])
     .map(item => normalizeFieldExecutionRecord(item))
-    .filter(item => item.sourceId);
+    .filter(item => item.sourceId)
+    .filter(item => (seen.has(item.key) ? false : (seen.add(item.key), true)));
   const byStatus = Object.fromEntries(FIELD_EXECUTION_STATUSES.map(status => [status, 0]));
   for (const item of normalized) byStatus[item.status] += 1;
   return {

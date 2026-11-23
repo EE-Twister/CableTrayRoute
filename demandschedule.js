@@ -79,9 +79,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const mode = modeSelect ? modeSelect.value : 'nec';
     const profile = profileSelect ? profileSelect.value : 'commercial';
+    const lightingOccupancy = document.getElementById('lighting-occupancy-select')?.value || 'general';
     const runContext = captureStudyRunContext('demandSchedule', {
       inputs: loads,
-      options: { mode, profile },
+      options: { mode, profile, lightingOccupancy },
       inputSources: {
         loads: 'dataStore.loadList',
         standard: mode === 'iec' ? 'IEC 60439-1' : 'NEC 220',
@@ -89,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     let result;
     try {
-      result = buildDemandSchedule(loads, { mode, profile });
+      result = buildDemandSchedule(loads, { mode, profile, lightingOccupancy });
     } catch (err) {
       showAlertModal('Calculation Error', err.message);
       return;

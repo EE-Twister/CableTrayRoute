@@ -300,7 +300,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'cableschedule.html': contract({
     workflowStep: 'cableSchedule',
     standaloneInputs: ['Manual cable rows, template selection, imports, inline edits, and report options.'],
-    projectInputs: [equipment, loads, panels, oneLine, trays, conduits, ductbanks, cableTagSettings, cableChangeLog, designBasis, designSynthesisReviewDraft, projectInput('settings.trayHardwareCatalogCustomProducts', 'setting', false, 'Project-owned governed cable constructions imported from the shared manufacturer catalog.')],
+    projectInputs: [equipment, loads, panels, oneLine, trays, conduits, ductbanks, cableTagSettings, cableChangeLog, designBasis, designSynthesisReviewDraft, latestRouteResults, projectInput('settings.trayHardwareCatalogCustomProducts', 'setting', false, 'Project-owned governed cable constructions imported from the shared manufacturer catalog.')],
     outputs: [
       output('cableSchedule', 'schedule', 'Cable rows with tags, endpoints, conductor details, length, and raceway assignments.', ['racewayschedule.html', 'cabletrayfill.html', 'conduitfill.html', 'optimalRoute.html', 'voltagedropstudy.html']),
       output('settings.cableTemplates', 'setting', 'User-maintained cable templates.', ['cableschedule.html']),
@@ -329,6 +329,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
     projectInputs: [
       cables,
       designBasis,
+      latestRouteResults,
       bimCoordinationSnapshot,
       bimCoordinationIssues,
       projectInput('settings.trayHardwareCatalogCustomProducts', 'setting', false, 'Project-owned approved tray and conduit products available for routed segment assignment.'),
@@ -656,6 +657,16 @@ export const PAGE_CONTRACTS_BY_HREF = {
     ],
     readiness: ready('Ready when cable, ambient, grouping, and at least one installation condition are valid.', ['Missing cable size, invalid ambient values, no selected installation, or malformed load profile data.']),
     downstream: ['designcoach.html', 'projectreport.html']
+  }),
+  'directburial.html': contract({
+    workflowStep: 'studies',
+    standaloneInputs: ['Required circuit current, cover depth, soil thermal resistivity and temperature, conductor material and arrangement, candidate sizes and circuit spacings, and cost allowances.'],
+    projectInputs: [],
+    outputs: [
+      exportOnly('Direct-burial size, spacing, circuit-count and cost comparison CSV.', ['projectreport.html'])
+    ],
+    readiness: ready('Ready when required current, cover depth, and soil properties are valid and at least one conductor size and spacing is selected.', ['Missing or non-positive current, cover, or soil resistivity, or no candidate sizes or spacings.']),
+    downstream: ['projectreport.html']
   }),
   'tcc.html': contract({
     workflowStep: 'studies',

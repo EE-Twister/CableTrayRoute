@@ -157,6 +157,26 @@ import { createPropertyDetailRenderer } from './src/one-line/propertyDetailView.
 import { createStudyExecutionController } from './src/one-line/studyExecutionController.mjs';
 import { createEventStateAdapter, initializeOneLineEvents } from './src/one-line/eventBindingController.mjs';
 import {
+  applyPropertyClipboardToComponent,
+  canPastePropertyClipboard,
+  createPropertyClipboardFromComponent
+} from './src/one-line/propertyClipboardModel.mjs';
+import {
+  buildTransformerPortLabel,
+  computeComponentOperatingVoltage,
+  formatOperatingVoltage,
+  formatVoltage,
+  formatVoltageString,
+  getFiniteVoltageMagnitudes,
+  getTransformerPortRole,
+  getVoltageMagnitudeEntries,
+  parseVoltageNumber,
+  resolveComponentVoltageVolts,
+  resolveNominalVoltage,
+  resolveTransformerVoltageValue,
+  sanitizeOverlayStudyFields
+} from './src/one-line/voltageModel.mjs';
+import {
   resolveTransformerKva,
   resolveTransformerPercentZ,
   resolveTransformerXrRatio,
@@ -168,6 +188,8 @@ import './site.js';
 import { getAuthRole, getProjectState, readAppSetting, writeAppSetting } from './projectStorage.js';
 const ONE_LINE_READINESS_COPY = getContractReadinessCopy('oneline.html');
 let componentMeta = {};
+let componentMetaTypeIndex = null;
+
 document.querySelectorAll('.oneline-canvas-scroll > .prop-modal').forEach(modal => {
   document.body.appendChild(modal);
 });
@@ -861,14 +883,23 @@ function resolveComponentMetaKey(comp) {
   const directCandidate = candidates.find(candidate => componentMeta[candidate]);
   if (directCandidate) return directCandidate;
   if (type && subtype) {
-    const match = Object.entries(componentMeta).find(([, meta]) => (
-      meta
-      && String(meta.type || '').toLowerCase() === String(type).toLowerCase()
-      && String(meta.subtype || '').toLowerCase() === String(subtype).toLowerCase()
-    ));
-    if (match) return match[0];
+    const match = componentMetaKeyByTypeAndSubtype(type, subtype);
+    if (match) return match;
   }
   return subtype;
+}
+
+// Case-insensitive type/subtype lookup; the first matching key wins, as a linear scan would.
+function componentMetaKeyByTypeAndSubtype(type, subtype) {
+  if (!componentMetaTypeIndex) {
+    componentMetaTypeIndex = new Map();
+    Object.entries(componentMeta).forEach(([key, meta]) => {
+      if (!meta) return;
+      const indexKey = `${String(meta.type || '').toLowerCase()}|${String(meta.subtype || '').toLowerCase()}`;
+      if (!componentMetaTypeIndex.has(indexKey)) componentMetaTypeIndex.set(indexKey, key);
+    });
+  }
+  return componentMetaTypeIndex.get(`${String(type).toLowerCase()}|${String(subtype).toLowerCase()}`);
 }
 
 function resolveComponentMeta(comp) {
@@ -1774,6 +1805,7 @@ function ensureCapacitorReactorPropertyMetadata() {
 // === REPLACE THE ENTIRE FUNCTION ===
 async function loadComponentLibrary({ renderPalette = true } = {}) {
   componentMeta = {};
+  componentMetaTypeIndex = null;
   propSchemas = {};
   subtypeCategory = {};
   componentTypes = {};
@@ -1860,6 +1892,7 @@ async function loadComponentLibrary({ renderPalette = true } = {}) {
     if (Number.isFinite(resolvedWidth)) meta.width = resolvedWidth;
     if (Number.isFinite(resolvedHeight)) meta.height = resolvedHeight;
     componentMeta[key] = meta;
+    componentMetaTypeIndex = null;
     subtypeCategory[key] = category;
     if (!componentTypes[category]) componentTypes[category] = [];
     if (!componentTypes[category].includes(key)) componentTypes[category].push(key);
@@ -2162,157 +2195,6 @@ function createDiagramEntityId(prefix = 'n') {
   return id;
 }
 
-const PROPERTY_CLIPBOARD_EXCLUDE_KEYS = new Set([
-  'id',
-  'label',
-  'name',
-  'tag',
-  'ref',
-  'x',
-  'y',
-  'z',
-  'connections',
-  'ports',
-  'portCounts',
-  'icon',
-  'width',
-  'height',
-  'rotation',
-  'rotationManual',
-  'flipped',
-  'labelOffset',
-  'category',
-  'type',
-  'subtype',
-  'defaultRotation',
-  'isVirtualNode',
-  'templateId',
-  'isTemplate',
-  'diagramId',
-  'diagramSheet',
-  'diagram',
-  'diagramScale',
-  'diagramViewport',
-  'diagramZoom',
-  'diagramOffset',
-  'locked',
-  'componentVersion'
-]);
-
-const PROPERTY_CLIPBOARD_UNIQUE_KEYS = new Set(['id', 'label', 'name', 'tag', 'ref']);
-
-function isDomNode(value) {
-  if (!value || typeof value !== 'object') return false;
-  if (typeof Element !== 'undefined' && value instanceof Element) return true;
-  if (typeof Node !== 'undefined' && value instanceof Node) return true;
-  return false;
-}
-
-function clonePropertyClipboardValue(value) {
-  if (Array.isArray(value)) {
-    return value.map(item => clonePropertyClipboardValue(item));
-  }
-  if (value === null || typeof value !== 'object') {
-    return value;
-  }
-  if (value instanceof Date) {
-    return new Date(value.getTime());
-  }
-  if (isDomNode(value)) return undefined;
-  const result = {};
-  Object.keys(value).forEach(key => {
-    if (PROPERTY_CLIPBOARD_UNIQUE_KEYS.has(key)) return;
-    const cloned = clonePropertyClipboardValue(value[key]);
-    if (cloned !== undefined) {
-      result[key] = cloned;
-    }
-  });
-  return result;
-}
-
-function buildPropertyClipboardData(comp) {
-  if (!comp || typeof comp !== 'object') return {};
-  const data = {};
-  Object.keys(comp).forEach(key => {
-    if (PROPERTY_CLIPBOARD_EXCLUDE_KEYS.has(key)) return;
-    const value = comp[key];
-    if (typeof value === 'function') return;
-    if (value === undefined) return;
-    if (isDomNode(value)) return;
-    const cloned = clonePropertyClipboardValue(value);
-    if (cloned !== undefined) {
-      data[key] = cloned;
-    }
-  });
-  return data;
-}
-
-function createPropertyClipboardFromComponent(comp) {
-  if (!comp || comp.isVirtualNode) return null;
-  const data = buildPropertyClipboardData(comp);
-  if (!Object.keys(data).length) return null;
-  return {
-    subtype: comp.subtype || '',
-    type: comp.type || '',
-    data
-  };
-}
-
-function canPastePropertyClipboard(clipboardData, target) {
-  if (!clipboardData || !clipboardData.data) return false;
-  if (!target || target.isVirtualNode) return false;
-  const sourceKey = clipboardData.subtype || clipboardData.type || '';
-  const targetKey = target.subtype || target.type || '';
-  if (!sourceKey || !targetKey) return true;
-  return sourceKey === targetKey;
-}
-
-function deepEqualValues(a, b) {
-  if (a === b) return true;
-  if (Number.isNaN(a) && Number.isNaN(b)) return true;
-  if (typeof a !== typeof b) return false;
-  if (Array.isArray(a) && Array.isArray(b)) {
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i += 1) {
-      if (!deepEqualValues(a[i], b[i])) return false;
-    }
-    return true;
-  }
-  if (a && typeof a === 'object' && b && typeof b === 'object') {
-    const keysA = Object.keys(a);
-    const keysB = Object.keys(b);
-    if (keysA.length !== keysB.length) return false;
-    for (const key of keysA) {
-      if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
-      if (!deepEqualValues(a[key], b[key])) return false;
-    }
-    return true;
-  }
-  return false;
-}
-
-function applyPropertyClipboardToComponent(target, clipboardData) {
-  if (!target || !clipboardData || !clipboardData.data) return false;
-  const data = clipboardData.data;
-  let changed = false;
-  Object.keys(target).forEach(key => {
-    if (PROPERTY_CLIPBOARD_EXCLUDE_KEYS.has(key)) return;
-    if (Object.prototype.hasOwnProperty.call(data, key)) return;
-    if (Object.prototype.hasOwnProperty.call(target, key)) {
-      delete target[key];
-      changed = true;
-    }
-  });
-  Object.entries(data).forEach(([key, value]) => {
-    const cloned = clonePropertyClipboardValue(value);
-    if (cloned === undefined && value !== undefined) return;
-    if (!deepEqualValues(target[key], cloned)) {
-      target[key] = cloned;
-      changed = true;
-    }
-  });
-  return changed;
-}
 let contextTarget = null;
 let contextCanvasPoint = null;
 let connectMode = false;
@@ -4227,6 +4109,8 @@ const studyExecutionController = createStudyExecutionController({
   getActiveSheet: () => activeSheet,
   getProtectiveDeviceCatalog: () => protectiveDeviceCatalog,
   loadReferencedProtectiveDevices,
+  getCables,
+  getTccSettings: () => getItem('tccSettings', null),
   runLoadFlow: runLoadFlowOffMain,
   runShortCircuitOffMain,
   runShortCircuit,
@@ -4693,72 +4577,6 @@ function editPrefixes() {
       closeModal();
     }
   };
-
-  function renderCategoryButtons() {
-    categoryListEl.innerHTML = '';
-    categoryButtonMap.clear();
-    categoryOrder.forEach(categoryKey => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'prop-category-option';
-      button.textContent = getCategoryLabel(categoryKey);
-      button.dataset.category = categoryKey;
-      button.setAttribute('aria-pressed', 'false');
-      button.addEventListener('click', () => {
-        if (activeCategory === categoryKey) return;
-        activeCategory = categoryKey;
-        const nextDevice = categoryEntries.get(activeCategory)?.[0] || null;
-        renderDeviceButtons();
-        updateCategoryStates();
-        if (nextDevice) {
-          setActiveComponent(nextDevice);
-        } else {
-          selected = null;
-          selection = [];
-          selectedConnection = null;
-          renderPropertiesFor(null);
-          updateButtonStates();
-        }
-      });
-      categoryButtonMap.set(categoryKey, button);
-      categoryListEl.appendChild(button);
-    });
-  }
-
-  function renderDeviceButtons() {
-    componentListEl.innerHTML = '';
-    buttonMap.clear();
-    const devices = categoryEntries.get(activeCategory) || [];
-    const headingLabel = activeCategory ? `Device Tags – ${getCategoryLabel(activeCategory)}` : 'Device Tags';
-    componentHeading.textContent = headingLabel;
-    devices.forEach(device => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'prop-component-option';
-      button.dataset.componentId = device.id;
-      button.textContent = getComponentListLabel(device);
-      button.setAttribute('aria-pressed', 'false');
-      button.addEventListener('click', () => setActiveComponent(device));
-      button.addEventListener('keydown', event => {
-        if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-        event.preventDefault();
-        const list = categoryEntries.get(activeCategory) || [];
-        const currentIndex = list.findIndex(item => item.id === device.id);
-        if (currentIndex === -1) return;
-        const offset = event.key === 'ArrowUp' ? -1 : 1;
-        let nextIndex = currentIndex + offset;
-        if (nextIndex < 0) nextIndex = 0;
-        if (nextIndex >= list.length) nextIndex = list.length - 1;
-        const nextDevice = list[nextIndex];
-        if (!nextDevice) return;
-        setActiveComponent(nextDevice);
-        const nextButton = buttonMap.get(nextDevice.id);
-        nextButton?.focus();
-      });
-      buttonMap.set(device.id, button);
-      componentListEl.appendChild(button);
-    });
-  }
 
   const header = document.createElement('div');
   header.className = 'modal-header';
@@ -7356,182 +7174,6 @@ function appendConnectedTerminalBridges(group, component, meta) {
   });
 }
 
-const transformerVoltageKeyMap = {
-  two_winding: ['volts_primary', 'volts_secondary'],
-  auto_transformer: ['volts_primary', 'volts_secondary'],
-  grounding_transformer: ['volts_primary', 'volts_secondary'],
-  three_winding: ['volts_hv', 'volts_lv', 'volts_tv']
-};
-
-function getTransformerConnectionSetting(transformer, role) {
-  if (!transformer || !role) return null;
-  const key = `${role}_connection`;
-  const direct = transformer[key];
-  if (typeof direct === 'string' && direct.trim()) return direct.trim();
-  if (transformer.props && typeof transformer.props[key] === 'string') {
-    const value = transformer.props[key].trim();
-    if (value) return value;
-  }
-  const metaProps = componentMeta[transformer.subtype]?.props || {};
-  const metaValue = metaProps[key];
-  if (typeof metaValue === 'string' && metaValue.trim()) return metaValue.trim();
-  return null;
-}
-
-function getTransformerPortRole(transformer, portIndex) {
-  if (!transformer || transformer.type !== 'transformer') return null;
-  const idx = Number(portIndex);
-  if (!Number.isFinite(idx)) return null;
-  if (transformer.subtype === 'three_winding') {
-    if (idx === 0) return 'primary';
-    if (idx === 1) return 'secondary';
-    if (idx === 2) return 'tertiary';
-  }
-  if (idx === 0) return 'primary';
-  if (idx === 1) return 'secondary';
-  if (idx === 2) return 'tertiary';
-  return null;
-}
-
-function buildTransformerPortLabel(transformer, portIndex) {
-  const role = getTransformerPortRole(transformer, portIndex);
-  if (!role) return null;
-  let roleLabel;
-  switch (role) {
-    case 'primary':
-      roleLabel = 'Primary';
-      break;
-    case 'secondary':
-      roleLabel = 'Secondary';
-      break;
-    case 'tertiary':
-      roleLabel = 'Tertiary';
-      break;
-    default:
-      roleLabel = role;
-      break;
-  }
-  const config = getTransformerConnectionSetting(transformer, role);
-  return config ? `${roleLabel} (${config})` : roleLabel;
-}
-
-function parseVoltageNumber(value) {
-  if (value === undefined || value === null) return null;
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : null;
-  }
-  const str = String(value);
-  const match = str.replace(/[,\s]+/g, ' ').match(/[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/);
-  if (!match) return null;
-  const num = Number.parseFloat(match[0]);
-  return Number.isFinite(num) ? num : null;
-}
-
-function resolveTransformerVoltageValue(transformer, portIndex) {
-  if (!transformer) return null;
-  const metaProps = componentMeta[transformer.subtype]?.props || {};
-  const subtypeKeys = transformerVoltageKeyMap[transformer.subtype] || [];
-  const fallbacks = portIndex === 0
-    ? ['volts_primary', 'voltage_primary', 'primary_voltage', 'volts_hv', 'voltage']
-    : portIndex === 1
-      ? ['volts_secondary', 'voltage_secondary', 'secondary_voltage', 'volts_lv', 'voltage']
-      : ['volts_tv', 'volts_tertiary', 'tertiary_voltage', 'volts_lv', 'voltage'];
-  const keys = [subtypeKeys[portIndex], ...fallbacks];
-  const seen = new Set();
-  for (const key of keys) {
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    const value = transformer[key] ?? transformer.props?.[key] ?? metaProps[key];
-    if (parseVoltageNumber(value) !== null) return value;
-  }
-  return null;
-}
-
-function formatVoltageString(num) {
-  if (!Number.isFinite(num)) return null;
-  const rounded = Number(num.toFixed(4));
-  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
-}
-
-function formatVoltage(volts) {
-  if (!Number.isFinite(volts)) return '';
-  const abs = Math.abs(volts);
-  if (abs >= 1000) {
-    const kv = Number((volts / 1000).toFixed(3));
-    return `${kv} kV`;
-  }
-  const value = Number(volts.toFixed(1));
-  return `${value} V`;
-}
-
-function resolveNominalVoltage(component) {
-  if (!component || typeof component !== 'object') return null;
-  const resolved = resolveComponentVoltageVolts(component, { includeOperatingVoltage: false });
-  if (Number.isFinite(resolved) && resolved > 0) return resolved;
-  return null;
-}
-
-function resolveVoltageMagnitude(component) {
-  if (!component || typeof component !== 'object') return null;
-  const raw = component.voltage_mag;
-  if (typeof raw === 'number' && Number.isFinite(raw)) {
-    return raw;
-  }
-  if (raw && typeof raw === 'object') {
-    const values = Object.values(raw)
-      .map(val => Number(val))
-      .filter(val => Number.isFinite(val) && val > 0);
-    if (values.length) {
-      const total = values.reduce((sum, val) => sum + val, 0);
-      return total / values.length;
-    }
-  }
-  return null;
-}
-
-
-function getFiniteVoltageMagnitudes(voltageMag) {
-  if (typeof voltageMag === 'number') {
-    return Number.isFinite(voltageMag) ? [voltageMag] : [];
-  }
-  if (!voltageMag || typeof voltageMag !== 'object') return [];
-  const mags = [];
-  for (const value of Object.values(voltageMag)) {
-    const numeric = Number(value);
-    if (Number.isFinite(numeric)) mags.push(numeric);
-  }
-  return mags;
-}
-
-function getVoltageMagnitudeEntries(voltageMag) {
-  if (!voltageMag || typeof voltageMag !== 'object') return [];
-  const entries = [];
-  for (const [phase, value] of Object.entries(voltageMag)) {
-    const numeric = Number(value);
-    if (Number.isFinite(numeric)) entries.push([phase, numeric]);
-  }
-  return entries;
-}
-
-function sanitizeOverlayStudyFields(component) {
-  if (!component || typeof component !== 'object') return component;
-  const cleanedMags = getFiniteVoltageMagnitudes(component.voltage_mag);
-  if (component.voltage_mag !== undefined && cleanedMags.length === 0) {
-    delete component.voltage_mag;
-  }
-  return component;
-}
-function computeComponentOperatingVoltage(component) {
-  if (!component) return null;
-  const nominal = resolveNominalVoltage(component);
-  if (nominal === null) return null;
-  const magnitude = resolveVoltageMagnitude(component);
-  if (magnitude !== null) {
-    return nominal * magnitude;
-  }
-  return nominal;
-}
-
 function syncSourceVoltageFields(component, preferredDriver = null) {
   if (!isSourceComponent(component)) return false;
   const driverNames = [
@@ -7596,13 +7238,6 @@ function syncSourceVoltageFields(component, preferredDriver = null) {
     assign(component.props, 'source_voltage_base', kv);
   }
   return changed;
-}
-
-function formatOperatingVoltage(value) {
-  if (value === null || value === undefined || value === '') return '';
-  const num = Number(value);
-  if (Number.isFinite(num)) return Number(num.toFixed(2));
-  return value;
 }
 
 let pendingImplicitHistoryUpdate = false;
@@ -7697,7 +7332,7 @@ function propagateTransformerVoltages(comps) {
       secondaryPorts.push(idx);
     }
     secondaryPorts.forEach(portIdx => {
-      const voltageValue = resolveTransformerVoltageValue(transformer, portIdx);
+      const voltageValue = resolveTransformerVoltageValue(transformer, portIdx, componentMeta);
       if (voltageValue === null) return;
       const voltageInVolts = normalizeVoltageToVolts(voltageValue);
       const resolvedVolts = Number.isFinite(voltageInVolts) && voltageInVolts > 0
@@ -8123,7 +7758,7 @@ function inferComponentPortBaseKV(comp, portIndex, role = 'source') {
   const idx = normalizePortIndex(portIndex);
   let volts = null;
   if (comp.type === 'transformer' && Number.isFinite(idx)) {
-    const portVoltage = resolveTransformerVoltageValue(comp, idx);
+    const portVoltage = resolveTransformerVoltageValue(comp, idx, componentMeta);
     const normalized = normalizeVoltageToVolts(portVoltage);
     if (Number.isFinite(normalized) && normalized > 0) {
       volts = normalized;
@@ -9623,7 +9258,7 @@ function render() {
     appendConnectedTerminalBridges,
     asset,
     attachLabelInteractions,
-    buildTransformerPortLabel,
+    buildTransformerPortLabel: (transformer, portIndex) => buildTransformerPortLabel(transformer, portIndex, componentMeta),
     cancelPendingClickSelection,
     compHeight,
     compWidth,
@@ -11897,7 +11532,7 @@ const oneLineEventState = createEventStateAdapter({
   checkpoints: { get: () => checkpoints, set: value => { checkpoints = value; } },
   clickSelectTimer: { get: () => clickSelectTimer, set: value => { clickSelectTimer = value; } },
   clipboard: { get: () => clipboard, set: value => { clipboard = value; } },
-  componentMeta: { get: () => componentMeta, set: value => { componentMeta = value; } },
+  componentMeta: { get: () => componentMeta, set: value => { componentMeta = value; componentMetaTypeIndex = null; } },
   components: { get: () => components, set: value => { components = value; } },
   connectMode: { get: () => connectMode, set: value => { connectMode = value; } },
   connectSource: { get: () => connectSource, set: value => { connectSource = value; } },
@@ -12269,48 +11904,6 @@ function showToast(msg, linkText, linkHref) {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-function resolveComponentVoltageVolts(comp, options = {}) {
-  if (!comp || typeof comp !== 'object') return null;
-  const { includeOperatingVoltage = true } = options;
-  const containers = [comp];
-  if (comp.props && typeof comp.props === 'object') containers.push(comp.props);
-  if (comp.parameters && typeof comp.parameters === 'object') containers.push(comp.parameters);
-  if (comp.cable && typeof comp.cable === 'object') containers.push(comp.cable);
-  const primaryKeys = [
-    'voltage',
-    'volts',
-    'voltage_v',
-    'voltage_kv',
-    'operating_voltage',
-    'rated_voltage',
-    'rated_volts',
-    'voltage_rating'
-  ];
-  const directKeys = includeOperatingVoltage ? primaryKeys : primaryKeys.filter(key => key !== 'operating_voltage');
-  for (const container of containers) {
-    if (!container || typeof container !== 'object') continue;
-    for (const key of directKeys) {
-      if (!(key in container)) continue;
-      const resolved = normalizeVoltageToVolts({ [key]: container[key] });
-      if (resolved !== null && Number.isFinite(resolved) && resolved > 0) {
-        return resolved;
-      }
-    }
-  }
-  const baseKeys = ['baseKV', 'kV', 'kv', 'nominalVoltage', 'nominal_voltage', 'prefault_voltage'];
-  for (const container of containers) {
-    if (!container || typeof container !== 'object') continue;
-    for (const key of baseKeys) {
-      if (!(key in container)) continue;
-      const base = toBaseKV({ kV: container[key] });
-      if (Number.isFinite(base) && base > 0) {
-        return base * 1000;
-      }
-    }
-  }
-  return null;
-}
-
 function resolveConnectionVoltageVolts(component, connection, role) {
   if (!component) return null;
   if (component.type === 'transformer' && connection) {
@@ -12318,7 +11911,7 @@ function resolveConnectionVoltageVolts(component, connection, role) {
       ? normalizePortIndex(connection?.targetPort)
       : normalizePortIndex(connection?.sourcePort);
     if (Number.isFinite(portIndex)) {
-      const portVoltage = resolveTransformerVoltageValue(component, portIndex);
+      const portVoltage = resolveTransformerVoltageValue(component, portIndex, componentMeta);
       const normalized = normalizeVoltageToVolts(portVoltage);
       if (normalized !== null && Number.isFinite(normalized) && normalized > 0) {
         return normalized;
@@ -12330,10 +11923,14 @@ function resolveConnectionVoltageVolts(component, connection, role) {
 
 function resetValidationIssueMarkers(svg) {
   if (!svg) return;
+  const componentsById = new Map();
+  components.forEach(c => {
+    if (!componentsById.has(c.id)) componentsById.set(c.id, c);
+  });
   svg.querySelectorAll('g.component').forEach(g => {
     g.classList.remove('invalid');
     g.querySelectorAll('.issue-badge').forEach(b => b.remove());
-    const comp = components.find(c => c.id === g.dataset.id);
+    const comp = componentsById.get(g.dataset.id);
     if (!comp) return;
     const tip = [];
     if (comp.label) tip.push(`Label: ${comp.label}`);

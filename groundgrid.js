@@ -1,4 +1,6 @@
+import { showAlertModal } from './src/components/modal.js';
 import { analyzeGroundGrid, analyzeIrregularGrid } from './src/workers/groundGridClient.js';
+import { twoLayerEffectiveRho } from './analysis/groundGrid.mjs';
 import { normalizePreviewGeometry } from './src/groundgridPreviewGeometry.js';
 import {
   buildGroundGridRecommendations,
@@ -44,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     limitations: [
       'Full numerical accuracy requires SES CDEGS, XGSLab, or equivalent FEM/BEM solver',
       'Polygon grid equivalence uses area and perimeter only; non-rectangular correction factors are approximated',
-      'Two-layer soil: rho1 used as effective uniform resistivity in IEEE 80 mesh/step formulas',
+      'Two-layer soil: effective resistivity = larger of rho1 and the Wenner apparent resistivity at a = sqrt(grid area)',
       'Transferred voltage from LV neutrals and fences not automated',
     ],
     benchmarkId: 'ieee80-ground-grid',
@@ -835,7 +837,7 @@ document.addEventListener('DOMContentLoaded', () => {
         bw,
       });
     } catch (err) {
-      resultsDiv.innerHTML = `<p class="alert-error" role="alert">Error: ${err.message}</p>`;
+      resultsDiv.innerHTML = `<p class="alert-error" role="alert">Error: ${escapeHtml(err.message)}</p>`;
       return;
     }
     if (runToken !== runSequence) return;
@@ -894,6 +896,11 @@ document.addEventListener('DOMContentLoaded', () => {
       section.appendChild(renderResult('Rod Count', String(r.rodCount), '', null));
     }
     section.appendChild(renderResult('Effective n', r.n.toFixed(2), '', null));
+    if (Number.isFinite(r.Lm) && Number.isFinite(r.Ls)) {
+      const fmtLen = (v) => (imperial ? `${(v / 0.3048).toFixed(1)} ft` : `${v.toFixed(1)} m`);
+      section.appendChild(renderResult('Mesh Length Lm', fmtLen(r.Lm), '', null));
+      section.appendChild(renderResult('Step Length Ls (0.75 L + 0.85 ΣLr)', fmtLen(r.Ls), '', null));
+    }
     section.appendChild(renderResult('Mesh Spacing Km', r.Km.toFixed(3), '', null));
     section.appendChild(renderResult('Step Factor Ks', r.Ks.toFixed(3), '', null));
     section.appendChild(renderResult('Irregularity Ki', r.Ki.toFixed(3), '', null));
@@ -989,7 +996,7 @@ document.addEventListener('DOMContentLoaded', () => {
       calculate().catch(err => {
         console.error('[groundgrid] calculate failed', err);
         if (resultsDiv) {
-          resultsDiv.innerHTML = `<p class="alert-error" role="alert">Error: ${err.message || err}</p>`;
+          resultsDiv.innerHTML = `<p class="alert-error" role="alert">Error: ${escapeHtml(err.message || err)}</p>`;
         }
       });
     });
@@ -1176,7 +1183,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!soilFitResult) return;
     const rhoInput = document.getElementById('soil-rho');
     if (rhoInput) {
-      rhoInput.value = soilFitResult.rho1.toFixed(1);
+      // Use the conservative effective resistivity for the entered grid size rather than ρ1 alone:
+      // a more resistive lower layer raises the grid resistance and GPR.
+      const imperial = getUnits() === 'imperial';
+      const lx = imperial ? ftToM(getNum('grid-lx')) : getNum('grid-lx');
+      const ly = imperial ? ftToM(getNum('grid-ly')) : getNum('grid-ly');
+      const area = lx > 0 && ly > 0 ? lx * ly : NaN;
+      const effective = Number.isFinite(area) ? twoLayerEffectiveRho(soilFitResult, area) : soilFitResult.rho1;
+      rhoInput.value = effective.toFixed(1);
       handleFormStateChange();
       switchGGTab('ieee80');
     }

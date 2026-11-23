@@ -60,8 +60,9 @@ export function checkInterruptingRating(ratingKA, faultKA) {
 
 /**
  * Compare a device's short-time withstand rating against fault current × clearing time.
- * Adjusts the rated current to the actual clearing time using constant-energy (I²t) rule:
- *   I_withstand_at_t = ratingKA × sqrt(ratingSeconds / clearingSeconds)
+ * Derates the rated current for clearing times longer than the rated duration using the
+ * constant-energy (I²t) rule; shorter clearing times keep the nameplate rating:
+ *   I_withstand_at_t = ratingKA × sqrt(ratingSeconds / max(clearingSeconds, ratingSeconds))
  *
  * @param {number|null} ratingKA      - withstand current rating in kA
  * @param {number|null} ratingCycles  - rated duration in cycles (typically 3, 10, or 30)
@@ -87,7 +88,10 @@ export function checkWithstand(ratingKA, ratingCycles, faultKA, clearingTimeS) {
   }
   const cycles       = Number.isFinite(ratingCycles) && ratingCycles > 0 ? ratingCycles : 30;
   const ratingS      = cycles / 60;
-  const adjustedKA   = ratingKA * Math.sqrt(ratingS / Math.max(clearingTimeS, 0.001));
+  // I²t scaling only derates the rating for clearing times LONGER than the rated
+  // duration. A faster clear does not raise the withstand above its nameplate value,
+  // because the peak (mechanical) capability of the equipment is what limits it.
+  const adjustedKA   = ratingKA * Math.sqrt(ratingS / Math.max(clearingTimeS, ratingS));
   const status       = faultKA <= adjustedKA ? EVAL_STATUS.PASS : EVAL_STATUS.FAIL;
   return {
     status,

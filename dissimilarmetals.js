@@ -1,4 +1,5 @@
 
+import { showModal } from './src/components/modal.js';
 import { getStudies, getStudyAssessments, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { escapeHtml } from './src/htmlUtils.mjs';
 import { studyExportMetadata } from './analysis/studyExportMetadata.mjs';
@@ -828,6 +829,11 @@ function renderInspectionMilestones(result) {
       <div class="corrosion-milestone-grid">${milestoneHtml}</div>
     </section>
   `;
+}
+
+function round(value, decimals) {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
 }
 
 function getCorrosionTimelineConfig(result) {

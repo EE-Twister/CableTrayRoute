@@ -3,7 +3,7 @@
 ## Purpose
 
 The Conduit Bend & Pull-Box Schedule tool calculates the geometry of conduit bends
-(90°, offset, kick, 3-bend saddle) and validates NEC 358.24 cumulative bend limits
+(90°, offset, kick, 3-bend saddle) and validates NEC 358.26 cumulative bend limits
 between pull points. It also sizes pull boxes and junction boxes per NEC 314.28(A).
 
 This tool is the standard construction deliverable required before conduit is
@@ -53,10 +53,10 @@ A single bend at the specified angle. No shrink; mark spacing = height × multip
 Centre 45° bend with two outer 22.5° bends. Outer-to-centre spacing = **2.5 × height**.
 Total span = **5 × height**. Shrink ≈ 0.213" per inch of height.
 
-### NEC 358.24 — Cumulative Bend Limit
+### NEC 358.26 — Cumulative Bend Limit
 
-NEC 358.24 (EMT) — and the equivalent sections for IMC (342.24), RMC (344.24),
-and LFMC (350.24) — prohibit more than **360° of bends** between pull points. Each
+NEC 358.26 (EMT) — and the equivalent sections for IMC (342.26), RMC (344.26),
+and LFMC (350.26) — prohibit more than **360° of bends** between pull points. Each
 run is checked against this limit; a red badge appears if the limit is exceeded.
 
 **Remediation:** Add a pull box or junction box between the bend-dense section and
@@ -76,6 +76,8 @@ For each wall with conduits:
 minimum dimension = **6 × largest trade size + sum of other trade sizes on the same wall**
 
 Example: Wall A has 2", 1½", 1½" conduits → 6 × 2 + 1.5 + 1.5 = 15".
+
+Enter wall sizes as decimals, fractions or mixed numbers separated by commas (for example `2, 1-1/2, 3/4`). An unrecognised size or an empty entry is reported as an error rather than ignored, because a dropped conduit would undersize the box. The standard-box selection accepts a box turned on its side, so a required 24" × 30" is met by a 30" × 24" box. NEC 314.28(A)(2) also requires the distance between the entries of conduits carrying the same conductor to be at least 6 × the largest trade size; check that separately when laying out the wall.
 
 ## Input Fields
 
@@ -109,7 +111,7 @@ Example: Wall A has 2", 1½", 1½" conduits → 6 × 2 + 1.5 + 1.5 = 15".
 ## Output
 
 - **Bend schedule table** — per-bend: type, dimension, degrees, mark spacing, shrink, notes
-- **Cumulative degree total** with NEC 358.24 pass/fail badge
+- **Cumulative degree total** with NEC 358.26 pass/fail badge
 - **Pull-box sizing card** — minimum required dimensions and nearest standard box size
 - **3D run layout** - code-native SVG isometric view showing run endpoints, bend stations, bend direction, pull-box positions, and endpoint mismatch warnings
 
@@ -132,8 +134,8 @@ the run.
 
 ## References
 
-- **NEC 358.24** — Maximum number of bends (EMT)
-- **NEC 342.24 / 344.24 / 350.24** — Equivalent limits for IMC / RMC / LFMC
+- **NEC 358.26** — Bends — number in one run (EMT)
+- **NEC 342.26 / 344.26 / 350.26** — Equivalent limits for IMC / RMC / LFMC
 - **NEC 314.28(A)** — Pull-box and junction-box sizing
 - Tom Henry's Conduit Bending Manual
 - Mike Holt's Illustrated Guide to the National Electrical Code

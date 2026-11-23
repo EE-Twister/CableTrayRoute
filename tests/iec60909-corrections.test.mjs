@@ -14,14 +14,18 @@ function close(actual, expected, tolerance = 0.01) {
 
 const equalZ = { r: 0.02, x: 0.2 };
 
-// C1: the expm1 form remains finite at the high-X/R limit and honors duration.
+// C1: IEC 60909-0:2016 Eq. 102 stays finite across the X/R range and honors
+// duration. m tends to 2 as kappa -> 2 (a DC component that never decays).
 for (const xr of [0.1, 0.2, 0.5, 1, 10]) {
   const kappa = kappaIEC(xr);
   const m = thermalMFactor(kappa, 1, 50);
-  assert.ok(Number.isFinite(m) && m >= 0 && m <= 1, `invalid m at X/R=${xr}`);
+  assert.ok(Number.isFinite(m) && m >= 0 && m <= 2, `invalid m at X/R=${xr}`);
 }
-assert.equal(thermalMFactor(1.02, 1, 50), 0);
-assert.equal(thermalMFactor(2, 1, 50), 1);
+assert.ok(thermalMFactor(1.02, 1, 50) < 0.01);
+assert.equal(thermalMFactor(2, 1, 50), 2);
+assert.ok(thermalMFactor(1.8, 0.1, 50) > thermalMFactor(1.8, 1, 50), 'm falls as fault duration grows');
+assert.equal(thermalMFactor(2.5, 1, 50), null);
+assert.equal(thermalMFactor(Number.NaN, 1, 50), null);
 assert.equal(kappaIEC(0), null);
 assert.equal(kappaIEC(-1), null);
 assert.equal(kappaIEC(Number.NaN), null);

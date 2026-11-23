@@ -1967,15 +1967,11 @@ When answering queries:
   }
 
   /**
-   * Run an analysis function that depends on dataStore (which uses localStorage).
-   * In Node.js, localStorage is unavailable, so we install an isolated in-memory
-   * mock for the duration of the synchronous analysis call, then restore it.
-   *
-   * Because all analysis functions are synchronous (no await inside them), no
-   * concurrent request can interleave between the mock setup and restore.
-   *
+   * Build request-scoped study inputs from a saved project snapshot. Solvers
+   * receive these explicitly so concurrent requests never share mutable
+   * storage, and the API sees the same normalized one-line, Cable Schedule,
+   * and TCC settings that the browser studies use.
    * @param {object} projectData  Raw project data blob from storage.
-   * @param {function} fn  Called with ({ setOneLine, setStudies }); must be synchronous.
    */
   // GET /api/v1/projects/:project/cables
   app.get(

@@ -160,11 +160,20 @@ describe('buildDemandSchedule() — NEC 220 category factors', () => {
     assert.strictEqual(result.summary.totalDemandKw, 20);
   });
 
-  it('applies tiered demand to lighting > 50 kVA', () => {
-    // 80 kW connected: first 50 at 100%, remaining 30 at 50% = 65 kW demand
+  it('keeps lighting at 100% for all other occupancies, however large (Table 220.42)', () => {
     const loads = [{ tag: 'L1', kw: '80', quantity: '1', loadType: 'LED lighting', powerFactor: '1' }];
     const result = buildDemandSchedule(loads, { mode: 'nec' });
-    assert.strictEqual(result.summary.totalDemandKw, 65);
+    assert.strictEqual(result.summary.totalDemandKw, 80);
+  });
+
+  it('applies the Table 220.42 occupancy tiers when an occupancy is selected', () => {
+    const lighting = kw => [{ tag: 'L1', kw: String(kw), loadType: 'LED lighting', powerFactor: '1' }];
+    // Warehouse: first 12.5 kVA 100%, remainder 50%: 12.5 + 37.5 x 0.5 = 31.25
+    assert.strictEqual(buildDemandSchedule(lighting(50), { mode: 'nec', lightingOccupancy: 'warehouse' }).summary.totalDemandKw, 31.25);
+    // Hospital: first 50 kVA 40%, remainder 20%: 20 + 30 x 0.2 = 26
+    assert.strictEqual(buildDemandSchedule(lighting(80), { mode: 'nec', lightingOccupancy: 'hospital' }).summary.totalDemandKw, 26);
+    // Hotel: 20 x 0.5 + 80 x 0.4 + 50 x 0.3 = 10 + 32 + 15 = 57
+    assert.strictEqual(buildDemandSchedule(lighting(150), { mode: 'nec', lightingOccupancy: 'hotel' }).summary.totalDemandKw, 57);
   });
 
   it('applies 100% to receptacles ≤ 10 kVA', () => {
@@ -188,7 +197,7 @@ describe('buildDemandSchedule() — NEC 220 category factors', () => {
     assert.strictEqual(result.rows[0].demandKw, 30);
   });
 
-  it('applies 75% to fixed appliances when count ≥ 4', () => {
+  it('keeps non-dwelling fixed appliances at 100% even with 4 or more (220.53 is dwelling only)', () => {
     const loads = [
       { tag: 'A1', kw: '2', quantity: '1', loadType: 'washer', powerFactor: '1' },
       { tag: 'A2', kw: '3', quantity: '1', loadType: 'dryer', powerFactor: '1' },
@@ -196,9 +205,8 @@ describe('buildDemandSchedule() — NEC 220 category factors', () => {
       { tag: 'A4', kw: '3', quantity: '1', loadType: 'fixed appliance', powerFactor: '1' },
     ];
     const result = buildDemandSchedule(loads, { mode: 'nec' });
-    result.rows.forEach(r => assert.strictEqual(r.demandFactor, 0.75));
-    // total connected 10 kW × 0.75 = 7.5 kW
-    assert.strictEqual(result.summary.totalDemandKw, 7.5);
+    result.rows.forEach(r => assert.strictEqual(r.demandFactor, 1));
+    assert.strictEqual(result.summary.totalDemandKw, 10);
   });
 
   it('applies 100% to fixed appliances when count < 4', () => {
@@ -270,25 +278,23 @@ describe('buildDemandSchedule() — NEC 220.56 kitchen demand', () => {
 
 // ---------------------------------------------------------------------------
 describe('buildDemandSchedule() — NEC 625.42 EV charging', () => {
-  it('applies 100% to first EV charger, 75% to 2nd–4th', () => {
+  it('keeps every EV charger at 100% (continuous load, no ordinal demand factors)', () => {
     const loads = [
       { tag: 'EV1', kw: '7.2', quantity: '1', loadType: 'EV charger', powerFactor: '1' },
       { tag: 'EV2', kw: '7.2', quantity: '1', loadType: 'EV charger', powerFactor: '1' },
       { tag: 'EV3', kw: '7.2', quantity: '1', loadType: 'EVSE', powerFactor: '1' },
     ];
     const result = buildDemandSchedule(loads, { mode: 'nec' });
-    const [ev1, ev2, ev3] = result.rows;
-    assert.strictEqual(ev1.demandFactor, 1.0);
-    assert.strictEqual(ev2.demandFactor, 0.75);
-    assert.strictEqual(ev3.demandFactor, 0.75);
+    result.rows.forEach(r => assert.strictEqual(r.demandFactor, 1.0));
+    assert.strictEqual(result.summary.totalDemandKw, 21.6);
   });
 
-  it('applies 50% from 5th EV charger onward', () => {
+  it('five EV chargers are still 100% (an old table gave the 5th only 50%)', () => {
     const loads = Array.from({ length: 5 }, (_, i) => ({
       tag: `EV${i + 1}`, kw: '10', quantity: '1', loadType: 'EV charger', powerFactor: '1'
     }));
     const result = buildDemandSchedule(loads, { mode: 'nec' });
-    assert.strictEqual(result.rows[4].demandFactor, 0.50);
+    assert.strictEqual(result.rows[4].demandFactor, 1.0);
   });
 });
 
@@ -424,5 +430,35 @@ describe('NEC_CATEGORIES constant', () => {
       assert.ok(NEC_CATEGORIES[k], `Missing category: ${k}`);
       assert.ok(NEC_CATEGORIES[k].label, `Missing label for: ${k}`);
     }
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+describe('review regressions: largest motor ties and kitchen minimum', () => {
+  it('only one of several identical motors carries the +25%', () => {
+    const loads = Array.from({ length: 5 }, (_, i) => ({ tag: `M${i + 1}`, kw: '10', loadType: 'pump motor', powerFactor: '1' }));
+    const result = buildDemandSchedule(loads, { mode: 'nec' });
+    assert.strictEqual(result.rows.filter(r => r.demandFactor === 1.25).length, 1);
+    assert.strictEqual(result.summary.totalDemandKw, 52.5); // 50 + 25% of one 10 kW motor, not 62.5
+  });
+
+  it('identifies the largest motor on the efficiency-adjusted connected kW', () => {
+    const loads = [
+      { tag: 'M1', kw: '10', efficiency: '50', loadType: 'motor', powerFactor: '1' }, // 20 kW connected
+      { tag: 'M2', kw: '15', efficiency: '100', loadType: 'motor', powerFactor: '1' }, // 15 kW connected
+    ];
+    const result = buildDemandSchedule(loads, { mode: 'nec' });
+    assert.strictEqual(result.rows.find(r => r.tag === 'M1').demandFactor, 1.25);
+    assert.strictEqual(result.rows.find(r => r.tag === 'M2').demandFactor, 1);
+  });
+
+  it('kitchen demand never falls below the two largest pieces (Table 220.56)', () => {
+    // Six pieces totalling 40 kW: 65% gives 26 kW, but the two largest pieces (30 + 8) set a 38 kW minimum
+    const kw = [30, 8, 1, 0.5, 0.25, 0.25];
+    const loads = kw.map((v, i) => ({ tag: `K${i + 1}`, kw: String(v), loadType: 'commercial oven', powerFactor: '1' }));
+    const result = buildDemandSchedule(loads, { mode: 'nec' });
+    const total = kw.reduce((a, b) => a + b, 0);
+    assert.ok(Math.abs(result.summary.totalDemandKw - 38) < 0.02, `demand ${result.summary.totalDemandKw} of ${total}`);
   });
 });

@@ -1,3 +1,4 @@
+import { showAlertModal } from './src/components/modal.js';
 import { calcBraceForces, calcSeismicDesignCategory, maxBraceSpacing } from './analysis/seismicBracing.mjs';
 import { getTrays, getCables } from './dataStore.mjs';
 import { CABLE_WEIGHT_LB_FT } from './analysis/supportSpan.mjs';

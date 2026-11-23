@@ -17,6 +17,7 @@ import {
   applyEstimateBasis,
   parsePricingCSV,
   exportPricingCSV,
+  cableSizeKeyCandidates,
 } from '../analysis/costEstimate.mjs';
 
 function describe(name, fn) {
@@ -616,5 +617,54 @@ describe('exportPricingCSV — roundtrip', () => {
     const { prices, meta } = parsePricingCSV(csv);
     assert.strictEqual(prices.cable['4 AWG, special'], 1.25);
     assert.strictEqual(meta.source, 'Distributor, Inc.');
+  });
+});
+
+describe('cable sizes as written in schedules map to the price table', () => {
+  const price = size => estimateCableCosts([{ cable_tag: 'A', conductor_size: size, conductors: 1, length_ft: 100 }], [], {})[0];
+  it('#12 AWG, 12 and 12 AWG all price as 12 AWG ($0.25/ft), not the $1.50 default', () => {
+    for (const size of ['#12 AWG', '12', '12 AWG']) {
+      const line = price(size);
+      assert.strictEqual(line.unitPrice, DEFAULT_PRICES.cable['12 AWG'], size);
+      assert.strictEqual(line.usedDefaultPrice, false, size);
+    }
+  });
+  it('1/0 AWG, #1/0 and 4/0 AWG map to the 1/0 and 4/0 keys; 500 MCM to 500 kcmil', () => {
+    assert.strictEqual(price('1/0 AWG').unitPrice, DEFAULT_PRICES.cable['1/0']);
+    assert.strictEqual(price('#1/0').unitPrice, DEFAULT_PRICES.cable['1/0']);
+    assert.strictEqual(price('4/0 AWG').unitPrice, DEFAULT_PRICES.cable['4/0']);
+    assert.strictEqual(price('500 MCM').unitPrice, DEFAULT_PRICES.cable['500 kcmil']);
+  });
+  it('a leading conductor count and material suffix are ignored (3-#4 CU -> 4 AWG)', () => {
+    assert.deepStrictEqual(cableSizeKeyCandidates('3-#4 CU'), ['4 AWG']);
+  });
+  it('a user price keyed exactly as the schedule writes it still wins', () => {
+    const line = estimateCableCosts([{ cable_tag: 'A', conductor_size: '#12 AWG', conductors: 1, length_ft: 100 }], [],
+      { cable: { '#12 AWG': 9.99 } })[0];
+    assert.strictEqual(line.unitPrice, 9.99);
+  });
+  it('an unknown size still falls back to the flagged default', () => {
+    const line = price('#22 AWG');
+    assert.strictEqual(line.usedDefaultPrice, true);
+  });
+});
+
+describe('conduit trade sizes written as fractions', () => {
+  const price = ts => estimateConduitCosts([{ conduit_id: 'C', trade_size: ts, length_ft: 100 }], {})[0];
+  it("3/4 prices as 3/4 inch ($0.85/ft), not 3 inch ($5.80/ft)", () => {
+    assert.strictEqual(price('3/4').unitPrice, DEFAULT_PRICES.conduit['0.75']);
+    assert.strictEqual(price('1/2').unitPrice, DEFAULT_PRICES.conduit['0.5']);
+  });
+  it('mixed fractions map to their decimal keys (1-1/4, 1-1/2, 1 1/2, 2-1/2)', () => {
+    assert.strictEqual(price('1-1/4').unitPrice, DEFAULT_PRICES.conduit['1.25']);
+    assert.strictEqual(price('1-1/2').unitPrice, DEFAULT_PRICES.conduit['1.5']);
+    assert.strictEqual(price('1 1/2').unitPrice, DEFAULT_PRICES.conduit['1.5']);
+    assert.strictEqual(price('2-1/2').unitPrice, DEFAULT_PRICES.conduit['2.5']);
+  });
+  it('whole and decimal sizes and exact user keys are unchanged', () => {
+    assert.strictEqual(price('2').unitPrice, DEFAULT_PRICES.conduit['2']);
+    assert.strictEqual(price('0.75').unitPrice, DEFAULT_PRICES.conduit['0.75']);
+    const custom = estimateConduitCosts([{ conduit_id: 'C', trade_size: '3/4', length_ft: 10 }], { conduit: { '3/4': 7 } })[0];
+    assert.strictEqual(custom.unitPrice, 7);
   });
 });

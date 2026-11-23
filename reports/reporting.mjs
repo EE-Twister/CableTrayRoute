@@ -1,3 +1,5 @@
+import { csvCell } from '../utils/csv.mjs';
+
 let jsPdfPromise = null;
 const dynamicImport = specifier => Function('s', 'return import(s);')(specifier);
 
@@ -47,24 +49,30 @@ async function ensureJsPDF() {
  * @returns {string}
  */
 function sanitizeCsvCell(value) {
-  let raw = value ?? '';
-  if (raw && typeof raw === 'object') {
-    try { raw = JSON.stringify(raw); } catch (_) { raw = String(raw); }
+  // Lifecycle metadata cells can hold objects; serialize them before the
+  // shared CSV formatting (formula neutralising and quoting) is applied.
+  if (value && typeof value === 'object') {
+    let text;
+    try { text = JSON.stringify(value); } catch (_) { text = String(value); }
+    return csvCell(text);
   }
-  let cell = String(raw);
-  if (typeof raw === 'string' && /^[\s]*[=+\-@]/.test(cell)) {
-    cell = `'${cell}`;
-  }
-  if (/[",\r\n]/.test(cell)) {
-    cell = '"' + cell.replace(/"/g, '""') + '"';
-  }
-  return cell;
+  return csvCell(value);
+}
+
+/**
+ * Read the cell for a header from a row. Rows may be objects keyed by header
+ * name or positional arrays aligned with `headers`; both shapes are used by
+ * study pages, and reading an array by header name silently yields blanks.
+ */
+function rowCell(row, header, index) {
+  if (Array.isArray(row)) return row[index];
+  return row?.[header];
 }
 
 export function toCSV(headers = [], rows = []) {
-  const lines = [headers.map(sanitizeCsvCell).join(',')];
+  const lines = [headers.map(h => sanitizeCsvCell(h)).join(',')];
   rows.forEach(r => {
-    const line = headers.map(h => sanitizeCsvCell(r[h])).join(',');
+    const line = headers.map((h, i) => sanitizeCsvCell(rowCell(r, h, i))).join(',');
     lines.push(line);
   });
   return lines.join('\n');
@@ -105,7 +113,7 @@ export async function toPDF(title = 'Report', headers = [], rows = []) {
     try { return JSON.stringify(value); } catch (_) { return String(value); }
   };
   rows.forEach(r => {
-    const line = headers.map(h => pdfCell(r[h])).join(' | ');
+    const line = headers.map((h, i) => pdfCell(rowCell(r, h, i))).join(' | ');
     drawWrapped(line);
   });
   return doc.output('arraybuffer');

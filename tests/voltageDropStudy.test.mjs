@@ -212,3 +212,16 @@ describe('runVoltageDropStudy', () => {
     assert.ok(['feeder', 'branch'].includes(r.circuitType));
   });
 });
+
+// Review regression: the insulation rating must not override the real system voltage.
+{
+  const { resolveCableStudyInputs, runVoltageDropStudy } = await import('../analysis/voltageDropStudy.mjs');
+  const cable = { tag: 'C1', to_location: 'P-1', cable_rating: '600', conductor_size: '#4 AWG', conductor_material: 'CU', length: 200, phases: 3 };
+  const load = { tag: 'P-1', voltage: 480, current: 60 };
+  const [resolved] = resolveCableStudyInputs([cable], [load], null);
+  assert.strictEqual(Number(resolved.operating_voltage), 480, 'load-list 480 V wins over the 600 V insulation rating');
+  assert.strictEqual(resolved._voltageDropInputSource.voltage, 'Load List');
+  const fallback = runVoltageDropStudy([{ ...cable, est_load: 60 }]);
+  assert.strictEqual(fallback.results[0].inputSource.voltage, 'Cable insulation rating (assumed)');
+  assert.ok(fallback.warnings.some(w => /insulation rating/.test(w)));
+}

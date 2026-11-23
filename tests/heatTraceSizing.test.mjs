@@ -96,8 +96,71 @@ describe('heat trace sizing representative W/ft cases', () => {
       safetyMarginPct: 15,
     });
 
-    approx(result.requiredWPerFt, 2.19, 0.01);
+    // Hand calculation: 1 in pipe (OD 1.315 in), 1.5 in mineral wool (k 0.04), freezer film h = 7 x 1.35.
+    //   R_ins = ln(54.8 / 16.7) / (2 pi 0.04) = 4.728 K.m/W,  R_film = 1 / (9.45 x 2 pi x 0.0548) = 0.307
+    //   loss = 35 K / 5.035 = 6.95 W/m = 2.12 W/ft;  plastic pipe gets no reduction; margin 1.15 -> 2.44 W/ft.
+    approx(result.requiredWPerFt, 2.44, 0.01);
     assert.strictEqual(result.recommendedCableRatingWPerFt, 3);
+  });
+});
+
+describe('achievable pipe temperature replaces the invented profile', () => {
+  const inputs = { pipeNps: '2', insulationThicknessIn: 1, lineLengthFt: 200, maintainTempC: 60, ambientTempC: 0, safetyMarginPct: 10 };
+
+  it('an adequate cable holds the set point along the whole run', () => {
+    const r = runHeatTraceSizingAnalysis(inputs);
+    assert.strictEqual(r.achievableTempC, 60);
+    assert.ok(r.profile.every(p => p.expectedPipeTempC === 60));
+    assert.ok(r.temperatureMarginC >= 0);
+  });
+
+  it('an undersized cable shows the temperature it can really hold, from T = ambient + Q x R', () => {
+    const r = runHeatTraceSizingAnalysis({ ...inputs, pipeNps: '12', maintainTempC: 150, ambientTempC: -20 });
+    assert.ok(r.coverageRatio < 1);
+    const expected = -20 + (r.installedWPerFt / 0.3048) * r.thermalResistance.totalKmPerW;
+    approx(r.achievableTempC, expected, 0.05);
+    assert.ok(r.achievableTempC < 150);
+    assert.ok(r.temperatureMarginC < 0);
+    assert.ok(r.profile.every(p => Math.abs(p.expectedPipeTempC - r.achievableTempC) < 0.01));
+    assert.ok(r.warnings.some(w => /can only hold the pipe at about/.test(w)));
+  });
+
+  it('the profile no longer depends on the circuit length', () => {
+    const short = runHeatTraceSizingAnalysis({ ...inputs, lineLengthFt: 50 });
+    const long = runHeatTraceSizingAnalysis({ ...inputs, lineLengthFt: 480 });
+    assert.strictEqual(short.achievableTempC, long.achievableTempC);
+  });
+});
+
+describe('insulation conductivity at temperature', () => {
+  it('warns when the mean insulation temperature is high', () => {
+    const hot = runHeatTraceSizingAnalysis({ pipeNps: '4', insulationThicknessIn: 2, lineLengthFt: 100, maintainTempC: 180, ambientTempC: 10 });
+    assert.ok(hot.warnings.some(w => /conductivity rises with temperature/.test(w)));
+    const cool = runHeatTraceSizingAnalysis({ pipeNps: '4', insulationThicknessIn: 2, lineLengthFt: 100, maintainTempC: 5, ambientTempC: -20 });
+    assert.ok(!cool.warnings.some(w => /conductivity rises with temperature/.test(w)));
+  });
+});
+
+describe('shipped page defaults', () => {
+  it('the HTML default temperatures (degrees C) form a valid, runnable case', async () => {
+    const { readFileSync } = await import('node:fs');
+    const html = readFileSync(new URL('../heattracesizing.html', import.meta.url), 'utf8');
+    const value = id => Number(html.match(new RegExp(`id="${id}"[^>]*value="(-?[0-9.]+)"`))[1]);
+    const ambientC = value('ambient-temp-c');
+    const maintainC = value('maintain-temp-c');
+    assert.ok(maintainC > ambientC, `default maintain ${maintainC} must exceed ambient ${ambientC}`);
+    const r = runHeatTraceSizingAnalysis({ pipeNps: '1', insulationThicknessIn: value('insulation-thickness-in'), lineLengthFt: value('line-length-ft'), maintainTempC: maintainC, ambientTempC: ambientC });
+    assert.ok(r.requiredWPerFt > 0);
+  });
+});
+
+describe('plastic pipe is not given a lower requirement than metal', () => {
+  it('PVC and HDPE use a factor of at least 1.0', () => {
+    const inputs = { pipeNps: '2', insulationThicknessIn: 1, lineLengthFt: 100, maintainTempC: 40, ambientTempC: 0 };
+    const copper = runHeatTraceSizingAnalysis({ ...inputs, pipeMaterial: 'copper' });
+    for (const material of ['pvc', 'hdpe']) {
+      assert.ok(runHeatTraceSizingAnalysis({ ...inputs, pipeMaterial: material }).requiredWPerFt >= copper.requiredWPerFt - 1e-9);
+    }
   });
 });
 
@@ -236,15 +299,27 @@ describe('parallel runs and component allowances', () => {
     voltageV: 240,
   };
 
-  it('traceRunCount doubles installed output and current without changing required W/ft', () => {
+  it('each parallel run supplies its share: the rating is chosen per run, not for the whole requirement', () => {
     const single = runHeatTraceSizingAnalysis({ ...baseInputs, traceRunCount: 1 });
     const double = runHeatTraceSizingAnalysis({ ...baseInputs, traceRunCount: 2 });
 
     assert.strictEqual(double.requiredWPerFt, single.requiredWPerFt);
-    assert.strictEqual(double.installedWPerFt, single.installedWPerFt * 2);
-    assert.strictEqual(double.installedTotalWatts, single.installedTotalWatts * 2);
-    approx(double.installedLoadAmps, single.installedLoadAmps * 2, 0.01);
+    approx(double.requiredPerRunWPerFt, single.requiredWPerFt / 2, 0.01);
+    assert.ok(double.recommendedCableRatingWPerFt <= single.recommendedCableRatingWPerFt);
+    assert.ok(double.installedWPerFt >= double.requiredWPerFt, 'installed output still covers the requirement');
+    assert.strictEqual(double.installedWPerFt, double.recommendedCableRatingWPerFt * 2);
+    // Sizing every run for the full requirement would double the connected load for no benefit.
+    assert.ok(double.installedWPerFt < single.installedWPerFt * 1.6, `${double.installedWPerFt} vs ${single.installedWPerFt}`);
     assert.ok(double.warnings.some(warning => warning.includes('Multiple parallel heat-trace runs selected')));
+  });
+
+  it('a requirement above the largest cable is reachable with more runs', () => {
+    const inputs = { pipeNps: '12', insulationThicknessIn: 1, lineLengthFt: 100, maintainTempC: 150, ambientTempC: -20, safetyMarginPct: 10 };
+    const single = runHeatTraceSizingAnalysis({ ...inputs, traceRunCount: 1 });
+    const runs = runHeatTraceSizingAnalysis({ ...inputs, traceRunCount: 4 });
+    assert.ok(single.requiredWPerFt > 50, `${single.requiredWPerFt}`);
+    assert.ok(single.warnings.some(w => w.includes('exceeds available standard ratings')));
+    assert.ok(runs.coverageRatio >= 1, `coverage ${runs.coverageRatio}`);
   });
 
   it('component allowances increase effective length and installed connected load', () => {
@@ -300,7 +375,7 @@ describe('input validation', () => {
         maintainTempC: 10,
         ambientTempC: 10,
       }),
-      /maintainTempC must be greater than ambientTempC/
+      /Maintain temperature must be greater than ambient temperature/
     );
   });
 

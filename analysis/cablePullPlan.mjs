@@ -88,7 +88,7 @@ const analysisSegments = (pieces, defaultBendRadiusFt) => {
         });
       }
     }
-    segments.push({ type: 'straight', length: piece.length, pieceIndex: index });
+    segments.push({ type: 'straight', length: piece.length, rise: piece.end[2] - piece.start[2], pieceIndex: index });
   });
   return segments;
 };

@@ -108,6 +108,8 @@ dip% = (startingKVA / genKVA) × X'd%
 
 where `genKVA = selectedKw / 0.80` (assuming 0.80 pf nameplate rating) and `X'd` is the generator's subtransient reactance (typically 20–30%).
 
+The motor-start requirement is the smallest generator whose estimated dip stays within your limit, so a tighter dip limit or a higher X'd increases the selected size. The result also shows, for comparison, the larger set that would carry 100% of the starting kVA (`startingKVA × 0.80`).
+
 The default **35%** value is a preliminary, user-adjustable screen—not a
 universal NFPA 110 limit. Establish the acceptance threshold from connected
 contactor, relay, drive, and control ride-through requirements. If the dip
@@ -121,8 +123,9 @@ exceeds that project threshold, either:
 The tool selects the smallest standard nameplate kW that is ≥ the site-derated required kW:
 
 ```
-requiredKw = max(continuousKw / combinedFactor,
-                 motorStepLoadRecommendedKw / combinedFactor)
+dipLimitedKw  = ceil(startingKVA × X'd% / dipLimit% × 0.80)
+requiredKw    = max(continuousKw / combinedFactor,
+                    dipLimitedKw / combinedFactor)
 selectedKw = smallest standard size ≥ requiredKw
 ```
 

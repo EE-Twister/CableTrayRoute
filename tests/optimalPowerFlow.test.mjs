@@ -190,4 +190,29 @@ const approx = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg} (go
   approx(r1.totalCostPerHr, r2.totalCostPerHr, 1e-6, 'parsed fleet dispatches identically');
 })();
 
+// ---------------------------------------------------------------------------
+// Linear-cost (c = 0) units: the marginal unit must take the partial load
+// ---------------------------------------------------------------------------
+(function testLinearCostMarginalUnit() {
+  const fleet = [
+    { id: 'A', pmin: 0, pmax: 100, b: 10, c: 0 },
+    { id: 'B', pmin: 0, pmax: 100, b: 20, c: 0 },
+  ];
+  const r = runOptimalPowerFlow(fleet, 150);
+  approx(r.totalGenMW, 150, 1e-6, 'dispatch meets demand');
+  approx(r.dispatch[0].output, 100, 1e-6, 'cheap unit is fully loaded');
+  approx(r.dispatch[1].output, 50, 1e-6, 'marginal unit takes the remainder');
+  approx(r.totalCostPerHr, 100 * 10 + 50 * 20, 1e-6, 'cost = 100 MW at $10 + 50 MW at $20');
+
+  // With a quadratic unit alongside a linear one
+  const mixed = runOptimalPowerFlow([
+    { id: 'L', pmin: 0, pmax: 80, b: 12, c: 0 },
+    { id: 'Q', pmin: 0, pmax: 200, b: 8, c: 0.02 },
+  ], 150);
+  approx(mixed.totalGenMW, 150, 1e-3, 'mixed fleet meets demand');
+  // Q alone reaches IC 12 at P = (12-8)/0.04 = 100 MW; the last 50 MW come from L (80 max) -> L = 50
+  approx(mixed.dispatch[1].output, 100, 1e-2, 'quadratic unit stops at the linear unit breakpoint');
+  approx(mixed.dispatch[0].output, 50, 1e-2, 'linear unit supplies the rest');
+})();
+
 console.log('optimalPowerFlow.test.mjs — all assertions passed');

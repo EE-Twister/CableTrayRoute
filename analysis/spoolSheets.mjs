@@ -18,6 +18,8 @@
  *   Trimble SysQue product literature - LOD 400 MEP constructible modeling
  */
 
+import { extractRacewayIds } from './conduitFill.mjs';
+
 /** Standard tray section length (ft). */
 const DEFAULT_SECTION_LEN = 12;
 
@@ -268,8 +270,12 @@ function calcSpoolSheet(spoolId, trays, cables, opts = {}) {
 
   const width_in = parseFloat(trays[0]?.inside_width) || 12;
 
-  // Straight sections (ceiling division)
-  const straightSections = Math.ceil(totalLengthFt / sectionLen);
+  // Straight sections: each tray segment is cut from whole sections, so round up per
+  // segment (three 5 ft segments need 3 sections, not ceil(15/12) = 2).
+  const straightSections = trays.reduce((sum, t) => {
+    const len = trayLength(t);
+    return len > 0 ? sum + Math.ceil(len / sectionLen) : sum;
+  }, 0);
 
   // Support brackets: one per standard span (default 10 ft), minimum 2 per segment
   const BRACKET_SPAN = 10;
@@ -287,7 +293,11 @@ function calcSpoolSheet(spoolId, trays, cables, opts = {}) {
   const trayIdSet = new Set(trayIds);
   const spoolCables = [];
   for (const cable of cables) {
-    if (trayIdSet.has(cable.route_preference)) {
+    const assigned = [
+      ...extractRacewayIds(cable),
+      ...String(cable.route_preference ?? '').split(/[,;|>\n]+/).map(id => id.trim()).filter(Boolean),
+    ];
+    if (assigned.some(id => trayIdSet.has(id))) {
       // Use cable length from schedule if available, else estimate from tray
       const cableLenFt = parseFloat(cable.length_ft) || parseFloat(cable.cable_length) || totalLengthFt;
       spoolCables.push({

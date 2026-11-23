@@ -625,6 +625,7 @@ export function summarizeFactorCoverage(bom = [], embodied = {}) {
  *   projectLifeYears?: number,      // default 25
  *   lossesKw?: number,              // annual average conductor losses in kW (optional)
  *   alternative?: BomItem[],        // second BOM for comparison (optional)
+ *   alternativeLossesKw?: number,   // annual average losses (kW) of the alternative; defaults to lossesKw
  * }} SustainabilityOptions
  */
 
@@ -665,9 +666,21 @@ export function buildSustainabilityReport(bom = [], options = {}) {
   let alternativeComparison = null;
   if (Array.isArray(options.alternative) && options.alternative.length > 0) {
     const altEmbodied = embodiedCO2e(options.alternative);
-    const altTotal    = altEmbodied.totalKg + operatingKg;
+    // An upsized alternative exists to cut I²R losses, so it may carry its own
+    // loss figure; without one it is assumed to have the same losses as the base.
+    const hasAltLosses = options.alternativeLossesKw != null
+      && Number.isFinite(Number(options.alternativeLossesKw))
+      && Number(options.alternativeLossesKw) >= 0;
+    const altOperating = hasAltLosses
+      ? operatingCO2e(options.alternativeLossesKw, gridFactor, projectLifeYears)
+      : operating;
+    const altOperatingKg = altOperating ? altOperating.lifetimeKgCO2e : 0;
+    const altTotal    = altEmbodied.totalKg + altOperatingKg;
     alternativeComparison = {
       embodiedKg:  altEmbodied.totalKg,
+      operatingKg: altOperatingKg,
+      operating:   altOperating,
+      lossesBasis: hasAltLosses ? 'alternative-specific' : 'same-as-primary',
       totalKg:     altTotal,
       totalTonnes: altTotal / 1000,
       deltaKg:     altTotal - totalKg,

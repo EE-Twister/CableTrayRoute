@@ -14,6 +14,7 @@ import {
   getTrayHardwareCatalogCustomProducts
 } from '../dataStore.mjs';
 import { runShortCircuit } from './shortCircuit.mjs';
+import { saveProjectOnChange } from '../src/projectSaveState.js';
 import { scaleCurve, checkDuty, sanitizeCurve } from './tccUtils.js';
 import { checkCoordination, greedyCoordinate, greedyCoordinateGFP, generateFaultCurrents, interpolateTime } from './tccAutoCoord.mjs';
 import {
@@ -94,6 +95,7 @@ import {
   buildTypeGroups,
   describeEntryAttributes,
   getManufacturerLabel,
+  getTypeInfo,
   normalizeTypeKey
 } from './tcc/catalogPresentationModel.mjs';
 import {
@@ -158,8 +160,10 @@ import {
   getComponentValue,
   getComponentVendor,
   getNumericValue,
+  getTransformerVoltageCandidates,
   inferVoltage,
   mergeOverrides,
+  parseConductorsDescriptor,
   parseNumeric,
   parsePhases,
   resolveCableInfo,
@@ -414,6 +418,7 @@ const previewPositionOverrides = new Map();
 // Auto-coordination state — populated at the end of each plot() call
 let activePlotted = null;
 let activeCurvesUpdater = null;
+let activeDeviceInputsUpdater = null;
 let activeCoordMarkerDrawer = null;
 let activeEquipmentOverlays = [];
 let activeEquipmentConstraintChecks = [];
@@ -2138,6 +2143,7 @@ function refreshProjectCatalogDevices() {
 }
 
 async function init() {
+  saveProjectOnChange(['tccSettings', STORAGE_KEYS.studies, STORAGE_KEYS.oneLine]);
   try {
     const list = await protectiveDeviceCatalog.loadIndex();
     baseLibraryDevices = Array.isArray(list) ? list : [];
@@ -3868,6 +3874,7 @@ async function plot() {
   const state = {
     activeCoordMarkerDrawer,
     activeCurvesUpdater,
+    activeDeviceInputsUpdater,
     activeEquipmentConstraintChecks,
     activeEquipmentOverlays,
     activeLegendFocusKey,
@@ -3976,6 +3983,7 @@ async function plot() {
     ({
       activeCoordMarkerDrawer,
       activeCurvesUpdater,
+      activeDeviceInputsUpdater,
       activeEquipmentConstraintChecks,
       activeEquipmentOverlays,
       activeLegendFocusKey,
@@ -4053,7 +4061,7 @@ function autoCoordinate() {
         ? 'longTimeDelay'
         : (baseDevice?.iec60255 === true ? 'tms' : 'time');
       entry.overrides = { ...entry.overrides, [phaseDialKey]: r.timeDial };
-      if (typeof updateDeviceInputs === 'function') updateDeviceInputs(entry);
+      if (activeDeviceInputsUpdater) activeDeviceInputsUpdater(entry);
     });
   } else if (phaseDeviceEntries.length === 1) {
     result = greedyCoordinate(phaseDeviceEntries, maxFaultA, { margin, sampleCount: 50 });
@@ -4067,7 +4075,7 @@ function autoCoordinate() {
       const entry = gfpOrderedEntries[i];
       if (!entry || !r.found) return;
       entry.overrides = { ...entry.overrides, tms: r.timeDial };
-      if (typeof updateDeviceInputs === 'function') updateDeviceInputs(entry);
+      if (activeDeviceInputsUpdater) activeDeviceInputsUpdater(entry);
     });
     if (!gfpResult.allCoordinated) result.allCoordinated = false;
   }

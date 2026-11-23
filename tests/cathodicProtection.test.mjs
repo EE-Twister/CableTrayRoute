@@ -58,9 +58,9 @@ function baseInput(overrides = {}) {
   assert.equal(result.designCurrentDensityMaM2, 10);
   assert.equal(result.exposedAreaM2, 20);
   assert.equal(result.requiredCurrentA, 0.2971);
-  assert.equal(result.minimumAnodeMassKg, 71.361);
-  assert.equal(result.predictedLifeYears, 56.05);
-  assert.equal(result.safetyMarginYears, 36.05);
+  assert.equal(result.minimumAnodeMassKg, 86.347);
+  assert.equal(result.predictedLifeYears, 46.32);
+  assert.equal(result.safetyMarginYears, 26.32);
 
   assert.ok(result.requiredCurrentA > 0);
   assert.ok(result.minimumAnodeMassKg > 0);
@@ -100,8 +100,8 @@ function baseInput(overrides = {}) {
 
 (function testFormulaHelpers() {
   assert.equal(calculateRequiredCurrent(100, 0.01), 1);
-  assert.equal(calculateRequiredAnodeMass(1, 8760, 780, 0.85, 1.1).toFixed(6), '12.011518');
-  assert.equal(calculatePredictedDesignLife(100, 780, 0.85, 1.1, 1).toFixed(6), '8.325342');
+  assert.equal(calculateRequiredAnodeMass(1, 8760, 780, 0.85, 1.1).toFixed(6), '14.533937');
+  assert.equal(calculatePredictedDesignLife(100, 780, 0.85, 1.1, 1).toFixed(6), '6.880448');
   assert.deepEqual(
     calculateIccpSourceSizing(2, 1.25, 1.5, 5, 4, 10),
     {

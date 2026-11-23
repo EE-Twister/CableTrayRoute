@@ -40,12 +40,17 @@ export const ENVIRONMENT_MULTIPLIERS = {
   buried: 1.0,
 };
 
-/** Material correction factors for warm-up / hold behavior. */
+/**
+ * Material allowance on the required output. Steady-state heat loss does not
+ * depend on the pipe wall, and heat transfers from the trace into a plastic
+ * pipe less readily than into metal, so plastic pipes get no reduction (the
+ * previous 0.90 / 0.88 factors lowered the required output for PVC and HDPE).
+ */
 export const PIPE_MATERIAL_FACTORS = {
   carbonSteel: 1.1,
   stainlessSteel: 1.05,
-  pvc: 0.9,
-  hdpe: 0.88,
+  pvc: 1.0,
+  hdpe: 1.0,
   copper: 1.0,
   aluminum: 1.0,
 };
@@ -150,35 +155,40 @@ function classifyCircuitUtilization(utilizationRatio) {
   return 'withinLimit';
 }
 
+/**
+ * Steady-state pipe temperature the installed trace can hold:
+ *   T = T_ambient + Q_installed x R_total,   limited to the maintain set point
+ * (the controller stops heating once the set point is reached). The installed
+ * output is the nominal rating, so this is uniform along the run; it does not
+ * model the output falling off with voltage drop on a long circuit, which needs
+ * the manufacturer's curve. The earlier profile tapered the temperature by an
+ * invented 15% of the span scaled by circuit length, and so looked healthy even
+ * for an undersized cable.
+ */
 function generatePipeTempProfile({
   lineLengthFt,
   maintainTempC,
   ambientTempC,
-  circuitUtilizationRatio,
+  installedWPerM,
+  rTotalKmPerW,
   points = 11,
 }) {
   assertFinitePositive(lineLengthFt, 'lineLengthFt');
   assertFiniteComputed(maintainTempC, 'maintainTempC');
   assertFiniteComputed(ambientTempC, 'ambientTempC');
-  assertFiniteComputed(circuitUtilizationRatio, 'circuitUtilizationRatio');
+  assertFiniteComputed(installedWPerM, 'installedWPerM');
+  assertFinitePositive(rTotalKmPerW, 'rTotalKmPerW');
 
+  const achievableTempC = Math.min(maintainTempC, ambientTempC + installedWPerM * rTotalKmPerW);
   const profile = [];
   const stepFt = lineLengthFt / (points - 1);
-  const utilizationClamp = Math.max(0, Math.min(circuitUtilizationRatio, 1.25));
-  const expectedTailDropC = (maintainTempC - ambientTempC) * 0.15 * utilizationClamp;
-
   for (let i = 0; i < points; i += 1) {
-    const distanceFt = stepFt * i;
-    const progress = i / (points - 1);
-    const expectedPipeTempC = maintainTempC - expectedTailDropC * progress;
-
     profile.push({
-      distanceFt: round(distanceFt, 2),
-      expectedPipeTempC: round(expectedPipeTempC, 2),
+      distanceFt: round(stepFt * i, 2),
+      expectedPipeTempC: round(achievableTempC, 2),
     });
   }
-
-  return profile;
+  return { profile, achievableTempC };
 }
 
 /** Resolve pipe outside diameter in inches from direct OD or NPS. */
@@ -275,7 +285,7 @@ export function validateHeatTraceInputs(inputs) {
     throw new Error('maintainTempC and ambientTempC must be finite numbers');
   }
   if (maintainTempC <= ambientTempC) {
-    throw new Error('maintainTempC must be greater than ambientTempC for heat-loss sizing');
+    throw new Error('Maintain temperature must be greater than ambient temperature for heat-loss sizing');
   }
 
   if (!Number.isFinite(windSpeedMph) || windSpeedMph < 0) {
@@ -418,7 +428,7 @@ function isHazardousArea(environment) {
  *
  * Matching rules (all must pass):
  *  1. Product voltage list includes the circuit voltage.
- *  2. Product nominal W/ft >= circuit required W/ft.
+ *  2. Product nominal W/ft >= circuit required W/ft divided by the number of parallel runs.
  *  3. Hazardous-area circuits require a product with a non-null hazardousAreaRating.
  *  4. Circuit max exposure temp <= product maxExposureTempC.
  *  5. Circuit effective length <= product maxCircuitLengthFt for the given voltage.
@@ -519,7 +529,9 @@ export function selectHeatTraceProduct(circuit, catalog) {
   if (!Array.isArray(catalog)) throw new Error('catalog must be an array');
 
   const voltageV = Number(circuit.voltageV) || 240;
-  const requiredWPerFt = Number(circuit.requiredWPerFt) || 0;
+  // Parallel runs share the requirement, so each cable only has to supply its share.
+  const traceRunCount = Math.max(1, Number(circuit.traceRunCount) || Number(circuit.inputs?.traceRunCount) || 1);
+  const requiredWPerFt = (Number(circuit.requiredWPerFt) || 0) / traceRunCount;
   const effectiveLengthFt = Number(circuit.effectiveTraceLengthFt) || Number(circuit.lineLengthFt) || 0;
   const maintainTempC = Number(circuit.inputs?.maintainTempC) || Number(circuit.maintainTempC) || 0;
   const hazardous = isHazardousArea(circuit.inputs?.environment || circuit.environment || '');
@@ -775,7 +787,9 @@ export function runHeatTraceSizingAnalysis(inputs) {
   const requiredWPerFt = requiredWPerM * FT_TO_M;
   const totalCircuitWatts = requiredWPerFt * lineLengthFt;
 
-  const rating = selectStandardHeatTraceRating(requiredWPerFt);
+  // With several parallel runs each cable supplies its share of the required output.
+  const requiredPerRunWPerFt = requiredWPerFt / traceRunCount;
+  const rating = selectStandardHeatTraceRating(requiredPerRunWPerFt);
   const componentAllowanceLengthFt = componentAllowances.reduce((sum, item) => sum + item.totalEquivalentLengthFt, 0);
   const effectiveTraceLengthFt = lineLengthFt + componentAllowanceLengthFt;
   const installedWPerFt = rating.selectedWPerFt * traceRunCount;
@@ -795,8 +809,18 @@ export function runHeatTraceSizingAnalysis(inputs) {
   if (environment === 'buried') {
     warnings.push('Buried pipe case uses simplified radial soil conduction. Verify soil moisture, burial geometry, and manufacturer design method.');
   }
-  if (rating.selectedWPerFt < requiredWPerFt) {
-    warnings.push('Required W/ft exceeds available standard ratings. Use multiple runs or engineered solution.');
+  if (rating.selectedWPerFt < requiredPerRunWPerFt) {
+    warnings.push(traceRunCount > 1
+      ? 'Required W/ft per run exceeds available standard ratings. Add runs or use an engineered solution.'
+      : 'Required W/ft exceeds available standard ratings. Use multiple runs or engineered solution.');
+  }
+  const meanInsulationTempC = (maintainTempC + ambientTempC) / 2;
+  if (meanInsulationTempC > 50) {
+    warnings.push(
+      `Mean insulation temperature is about ${Math.round(meanInsulationTempC)} °C. Insulation conductivity rises with temperature ` +
+      '(mineral wool roughly 0.04 W/m·K at 25 °C to 0.07 W/m·K near 200 °C), so the nominal value used here can understate the heat loss. ' +
+      'Enter the conductivity at the mean temperature in the insulation conductivity override.'
+    );
   }
   if (coverageRatio < 1) {
     warnings.push('Installed trace output is below required W/ft. Increase run count or select a higher cable rating.');
@@ -822,12 +846,19 @@ export function runHeatTraceSizingAnalysis(inputs) {
 
   const circuitUtilizationRatio = lineLengthFt / maxCircuitLengthFt;
   const circuitLimitStatus = classifyCircuitUtilization(circuitUtilizationRatio);
-  const profile = generatePipeTempProfile({
+  const { profile, achievableTempC } = generatePipeTempProfile({
     lineLengthFt,
     maintainTempC,
     ambientTempC,
-    circuitUtilizationRatio,
+    installedWPerM: installedWPerFt / FT_TO_M,
+    rTotalKmPerW: rTotal,
   });
+  if (achievableTempC < maintainTempC - 0.05) {
+    warnings.push(
+      `Installed trace output can only hold the pipe at about ${round(achievableTempC, 1)} °C, ` +
+      `${round(maintainTempC - achievableTempC, 1)} °C below the ${maintainTempC} °C set point.`
+    );
+  }
 
   const baseLossConductionComponentWPerFt = baseLossConductionComponentWPerM * FT_TO_M;
   const baseLossExternalFilmComponentWPerFt = baseLossExternalFilmComponentWPerM * FT_TO_M;
@@ -884,6 +915,9 @@ export function runHeatTraceSizingAnalysis(inputs) {
     circuitLimitStatus,
     profile,
     requiredWPerFt: round(requiredWPerFt, 2),
+    requiredPerRunWPerFt: round(requiredPerRunWPerFt, 2),
+    achievableTempC: round(achievableTempC, 2),
+    temperatureMarginC: round(achievableTempC - maintainTempC, 2),
     requiredWPerM: round(requiredWPerM, 2),
     totalCircuitWatts: round(totalCircuitWatts, 1),
     componentAllowanceLengthFt: round(componentAllowanceLengthFt, 2),

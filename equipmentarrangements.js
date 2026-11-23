@@ -1,4 +1,5 @@
 import * as dataStore from './dataStore.mjs';
+import { saveProjectOnChange } from './src/projectSaveState.js';
 import { openModal } from './src/components/modal.js';
 import { findMccLineupForEquipment, mccLineupDimensions, renderMccElevationSvg, renderMccOneLineSvg } from './src/mccLineupModel.mjs';
 
@@ -269,10 +270,12 @@ function loadArrangements() {
   applyArrangementToState(getActiveArrangement());
 }
 
-// NEC 110.26 Condition 2 applies when the facing wall is grounded (metal).
-// Metal walls use Condition 2 clearances; all others use Condition 1.
+// NEC 110.26(A)(1) Condition 2 applies when grounded parts face the equipment, and the
+// Code states that concrete, brick, or tile walls shall be considered grounded. Metal,
+// concrete and CMU (concrete masonry) therefore use the larger Condition 2 clearances;
+// gypsum, fire-rated board and removable panels use Condition 1.
 function isConductive(wallType) {
-  return wallType === 'Metal';
+  return wallType === 'Metal' || wallType === 'Concrete' || wallType === 'CMU';
 }
 
 function clearanceDepthFt(voltageText, facingWallType) {
@@ -2891,6 +2894,7 @@ function initialize() {
   populateSelect('equipment-voltage', VOLTAGE_OPTIONS);
   populateEquipmentPreset();
   populateMccLineupPreset();
+  saveProjectOnChange([ARRANGEMENTS_KEY]);
   loadArrangements();
   compactToolbarControls();
   createContextMenu();

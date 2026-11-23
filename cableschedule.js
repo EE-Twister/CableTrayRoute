@@ -4,6 +4,7 @@ import * as dataStore from './dataStore.mjs';
 import { preliminaryMotorNotice, withCableReviewNotice } from './src/design-synthesis/preliminaryProjectNotice.mjs';
 import { createTable, STORAGE_KEYS } from './tableUtils.mjs';
 import { openModal, showAlertModal } from './src/components/modal.js';
+import './src/components/cableScheduleLinksBoot.js';
 import { confirmProjectEntityDeletion } from './src/components/projectDeletionReview.js';
 import { start as startTour } from './tour.js';
 import {
@@ -2258,8 +2259,10 @@ async function initCableSchedule() {
       markSaved();
       tableData = table.getData();
       dataStore.setCables(tableData); // persist only when user saves
-      dataStore.saveProject(projectId);
+      // Log first so the saved version includes the entries (else Save shows "Unsaved changes").
+      flushEditLog();
       recordCableChange('Saved schedule', `${tableData.length} cable${tableData.length === 1 ? '' : 's'} saved`);
+      dataStore.saveProject(projectId);
     }
   });
   tableInstance = table;
@@ -2271,17 +2274,20 @@ async function initCableSchedule() {
 
   const pendingEditedTags = new Set();
   let editLogTimer = null;
+  function flushEditLog() {
+    if (editLogTimer) window.clearTimeout(editLogTimer);
+    editLogTimer = null;
+    if (!pendingEditedTags.size) return;
+    const tags = Array.from(pendingEditedTags).slice(0, 3);
+    const extra = pendingEditedTags.size > tags.length ? ` and ${pendingEditedTags.size - tags.length} more` : '';
+    pendingEditedTags.clear();
+    recordCableChange('Edited cable data', `${tags.join(', ')}${extra}`);
+  }
   const queueEditLog = tr => {
     const tag = tr?.querySelector('[name="tag"]')?.value?.trim();
     if (tag) pendingEditedTags.add(tag);
     if (editLogTimer) window.clearTimeout(editLogTimer);
-    editLogTimer = window.setTimeout(() => {
-      if (!pendingEditedTags.size) return;
-      const tags = Array.from(pendingEditedTags).slice(0, 3);
-      const extra = pendingEditedTags.size > tags.length ? ` and ${pendingEditedTags.size - tags.length} more` : '';
-      pendingEditedTags.clear();
-      recordCableChange('Edited cable data', `${tags.join(', ')}${extra}`);
-    }, 900);
+    editLogTimer = window.setTimeout(flushEditLog, 900);
   };
 
   if (table.tbody) {

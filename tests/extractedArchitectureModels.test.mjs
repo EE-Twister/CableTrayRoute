@@ -42,6 +42,8 @@ assert.deepEqual(computeBreakerSpan(1, 3, 12), [1, 3, 5]);
 assert.equal(getDcPolarityForCircuit(1), '+');
 assert.equal(getDcPolarityForCircuit(3), '−');
 assert.deepEqual(getPanelPhaseSequence({ phases: 1 }), ['A', 'B']);
+assert.deepEqual(getPanelPhaseSequence({ phases: 3, poles: 1 }), ['A', 'B', 'C'], 'the pole limit must not remove phases from the bus');
+assert.deepEqual(getPanelPhaseSequence({ powerType: 'dc', poles: 1 }), ['+', '−'], 'a DC panel keeps both polarities');
 
 assert.deepEqual(collectPanelOptions([{ panel_id: 'P1' }, { id: 'P2' }, { panel_id: 'P1' }]), ['P1', 'P2']);
 assert.deepEqual(collectRacewayOptions({

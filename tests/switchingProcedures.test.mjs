@@ -31,4 +31,29 @@ assert.strictEqual(unsafeValidation.ready, false);
 assert.ok(unsafeValidation.issues.some(issue => issue.code === 'verify-before-ground'));
 assert.ok(unsafeValidation.issues.some(issue => issue.code === 'remove-ground-before-close'));
 
+// A verification made BEFORE a later switching operation does not cover grounding afterwards
+const staleVerify = validateSwitchingProcedure({
+  title: 'Stale verify', status: 'draft', steps: [
+    { type: SWITCHING_STEP_TYPES.verify },
+    { type: SWITCHING_STEP_TYPES.operate, deviceId: 'CB-1', action: 'open' },
+    { type: SWITCHING_STEP_TYPES.ground },
+  ]
+});
+assert.strictEqual(staleVerify.ready, false);
+assert.ok(staleVerify.issues.some(issue => issue.code === 'verify-before-ground' && issue.stepNumber === 3));
+
+// Verify -> ground, then a later operation needs a fresh verification before any new ground
+const reVerified = validateSwitchingProcedure({
+  title: 'Two isolations', status: 'draft', steps: [
+    { type: SWITCHING_STEP_TYPES.operate, deviceId: 'CB-1', action: 'open' },
+    { type: SWITCHING_STEP_TYPES.verify },
+    { type: SWITCHING_STEP_TYPES.ground },
+    { type: SWITCHING_STEP_TYPES.removeGround },
+    { type: SWITCHING_STEP_TYPES.operate, deviceId: 'DS-1', action: 'open' },
+    { type: SWITCHING_STEP_TYPES.verify },
+    { type: SWITCHING_STEP_TYPES.ground },
+  ]
+});
+assert.strictEqual(reVerified.issues.filter(issue => issue.severity === 'error').length, 0);
+
 console.log('switching procedure tests passed');

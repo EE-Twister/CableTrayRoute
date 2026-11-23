@@ -6,6 +6,7 @@ import {
 } from './catalogPresentationModel.mjs';
 import {
   formatOptionLabel,
+  formatSettingLabel,
   formatSettingValue,
   normalizeSettingOptions,
   resolveSettingType,

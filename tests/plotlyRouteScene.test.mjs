@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import { buildPlotlyRouteScene } from '../src/routing/plotlyRouteScene.mjs';
 import { ROUTE_VIEW_PRESETS } from '../src/routing/routeVisualizationModel.mjs';
+import { getRouteGraphTheme } from '../src/routing/routeGraphTheme.mjs';
 
 const theme = {
     surface: '#f4f7fb',
@@ -12,6 +13,13 @@ const theme = {
     hover: '#ffffff',
     floor: '#dbeafe'
 };
+
+assert.deepEqual(getRouteGraphTheme(), theme);
+assert.deepEqual(getRouteGraphTheme(true), {
+    surface: '#0f172a', text: '#e5e7eb',
+    grid: 'rgba(148, 163, 184, 0.2)', axis: '#64748b',
+    hover: '#0f172a', floor: '#1e293b'
+});
 
 const trays = [
     {

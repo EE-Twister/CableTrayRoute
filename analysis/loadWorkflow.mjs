@@ -52,6 +52,25 @@ export function missingLoadFields(load = {}) {
   };
 }
 
+/**
+ * Flag values that are present but cannot be right. A power factor typed as 85
+ * (percent) or a voltage of 0 passes a presence check yet silently corrupts kVA,
+ * current and every study that reads the load.
+ */
+export function invalidLoadFields(load = {}) {
+  const number = value => (hasValue(value) ? Number(String(value).trim()) : NaN);
+  const kw = number(load.kw);
+  const voltage = number(load.voltage);
+  const powerFactor = number(load.powerFactor);
+  const phases = number(load.phases);
+  return {
+    kw: hasValue(load.kw) && !(Number.isFinite(kw) && kw >= 0),
+    voltage: hasValue(load.voltage) && !(Number.isFinite(voltage) && voltage > 0),
+    powerFactor: hasValue(load.powerFactor) && !(Number.isFinite(powerFactor) && powerFactor > 0 && powerFactor <= 1),
+    phases: hasValue(load.phases) && !(phases === 1 || phases === 3),
+  };
+}
+
 export function summarizeLoadValidation(loads = []) {
   const meaningful = Array.isArray(loads) ? loads.filter(isMeaningfulLoad) : [];
   const summary = {
@@ -62,7 +81,11 @@ export function summarizeLoadValidation(loads = []) {
     missingKw: 0,
     missingVoltage: 0,
     missingPowerFactor: 0,
-    missingPhases: 0
+    missingPhases: 0,
+    invalidKw: 0,
+    invalidVoltage: 0,
+    invalidPowerFactor: 0,
+    invalidPhases: 0
   };
   meaningful.forEach(load => {
     const missing = missingLoadFields(load);
@@ -71,7 +94,12 @@ export function summarizeLoadValidation(loads = []) {
     if (missing.voltage) summary.missingVoltage += 1;
     if (missing.powerFactor) summary.missingPowerFactor += 1;
     if (missing.phases) summary.missingPhases += 1;
-    if (Object.values(missing).some(Boolean)) summary.incomplete += 1;
+    const invalid = invalidLoadFields(load);
+    if (invalid.kw) summary.invalidKw += 1;
+    if (invalid.voltage) summary.invalidVoltage += 1;
+    if (invalid.powerFactor) summary.invalidPowerFactor += 1;
+    if (invalid.phases) summary.invalidPhases += 1;
+    if (Object.values(missing).some(Boolean) || Object.values(invalid).some(Boolean)) summary.incomplete += 1;
     else summary.complete += 1;
   });
   return summary;

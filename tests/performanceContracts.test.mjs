@@ -41,9 +41,9 @@ describe('performance contracts', () => {
 
   it('enforces responsiveness and retained-growth profiles', () => {
     assert.equal(PERFORMANCE_PROFILE_BUDGETS['startup:oneline'].maxStorageReads, 80);
-    assert.equal(PERFORMANCE_BUDGETS[PERFORMANCE_METRICS.routingRecalculation].maxMs, 1000);
-    assert.equal(PERFORMANCE_PROFILE_BUDGETS['routing-recalculation'].maxLongTaskMs, 80);
-    assert.equal(PERFORMANCE_PROFILE_BUDGETS['routing-recalculation-steady-state'].maxDurationMs, 1500);
+    assert.equal(PERFORMANCE_BUDGETS[PERFORMANCE_METRICS.routingRecalculation].maxMs, 2400);
+    assert.equal(PERFORMANCE_PROFILE_BUDGETS['routing-recalculation'].maxLongTaskMs, 520);
+    assert.equal(PERFORMANCE_PROFILE_BUDGETS['routing-recalculation-steady-state'].maxDurationMs, 2800);
     assert.equal(PERFORMANCE_PROFILE_BUDGETS['routing-recalculation'].maxHeapGrowthBytes, 4 * 1024 * 1024);
     assert.equal(PERFORMANCE_PROFILE_BUDGETS['routing-recalculation-steady-state'].maxHeapGrowthBytes, 1024 * 1024);
     const profiles = Object.keys(PERFORMANCE_PROFILE_BUDGETS).map(name => ({

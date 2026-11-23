@@ -1,3 +1,4 @@
+import { showAlertModal } from './src/components/modal.js';
 import {
   calcWindForce,
   calcVelocityPressure,

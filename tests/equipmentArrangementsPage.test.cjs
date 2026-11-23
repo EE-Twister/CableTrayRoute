@@ -312,6 +312,11 @@ describe('equipment arrangements page', () => {
     assert.ok(js.includes("wallType === 'Metal'"), 'equipmentarrangements.js missing Metal wall conductivity check');
   });
 
+  it('treats concrete and CMU walls as grounded, per NEC 110.26(A)(1)', () => {
+    assert.ok(js.includes("wallType === 'Concrete'"), 'equipmentarrangements.js must treat Concrete walls as grounded');
+    assert.ok(js.includes("wallType === 'CMU'"), 'equipmentarrangements.js must treat CMU walls as grounded');
+  });
+
   it('keeps the drawing canvas on a light drafting surface', () => {
     assert.ok(
       css.includes('--equipment-canvas-bg:#eef4fb'),

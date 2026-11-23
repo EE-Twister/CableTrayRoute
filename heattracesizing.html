@@ -498,7 +498,7 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
           <section id="heattrace-panel-temp" class="heattrace-panel" role="tabpanel" aria-labelledby="heattrace-tab-temp" tabindex="0" hidden>
             <div class="card heattrace-dashboard-card">
               <h2>Temperature Profile Detail</h2>
-              <p>Temperature profile is the expected pipe temperature along the run after applying the selected heat-trace output. Heat Loss explains the load to overcome; Temperature Profile explains whether the maintained pipe temperature stays above the target along the circuit.</p>
+              <p>The profile is the steady-state pipe temperature the installed trace can hold: ambient plus the installed output times the total thermal resistance, limited to the set point. When the installed output covers the heat loss the line sits at the set point; when it does not, the line shows the lower temperature it can actually reach. It uses the cable's nominal output and is uniform along the run, so it does not show output falling off with voltage drop on a long circuit. Use the manufacturer's output curve for that.</p>
               <div id="heattrace-temperature-detail" class="heattrace-detail-grid"></div>
             </div>
           </section>

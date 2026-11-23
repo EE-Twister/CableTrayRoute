@@ -134,6 +134,7 @@ export function parallelImpedances(zList) {
  * @param {Array}  [inputs.capacitorBanks] [{kvar, label}]
  * @param {Array}  [inputs.cables]         [{rOhmPerKft, xOhmPerKft, lengthKft, label}]
  * @param {Array}  [inputs.filters]        [{reactorPct, kvar, label}]
+ * @param {number} [inputs.dampingLoadKw=0] Resistive load (kW) in parallel at the bus, which damps resonance peaks
  * @param {object} [inputs.harmonicRange]  {min, max} harmonic orders (default 1–50)
  * @returns {{ inputs, points, resonances, warnings }}
  */
@@ -154,11 +155,10 @@ export function runFrequencyScan(inputs) {
   const hMin = Math.max(1, harmonicRange.min ?? 1);
   const hMax = Math.min(SCAN_MAX_DEFAULT, harmonicRange.max ?? SCAN_MAX_DEFAULT);
 
-  const points = [];
+  const dampingLoadKw = Number(inputs.dampingLoadKw) > 0 ? Number(inputs.dampingLoadKw) : 0;
 
-  for (let raw = hMin * 2; raw <= hMax * 2 + 1e-9; raw++) {
-    const h = raw / 2;
-
+  /** Driving-point impedance at harmonic order h. */
+  const zDpAt = h => {
     // Total series impedance: source + cables
     const zSrc = computeSourceImpedance(h, { systemKv, scMva, xrRatio });
     let rSeries = zSrc.r;
@@ -170,29 +170,58 @@ export function runFrequencyScan(inputs) {
     }
     const zSeries = { r: rSeries, x: xSeries };
 
-    // Shunt elements: cap banks and filters
+    // Shunt elements: cap banks, filters and the resistive damping load
     const shunts = [
       ...capacitorBanks.map(cb => computeCapacitorImpedance(h, { kvar: cb.kvar, systemKv })),
       ...filters.map(f => computeFilterImpedance(h, { reactorPct: f.reactorPct, kvar: f.kvar, systemKv })),
     ];
+    if (shunts.length > 0 && dampingLoadKw > 0) {
+      shunts.push({ r: (systemKv * systemKv * 1000) / dampingLoadKw, x: 0 });
+    }
 
-    const zDp = shunts.length === 0
-      ? zSeries
-      : parallelImpedances([zSeries, ...shunts]);
+    return shunts.length === 0 ? zSeries : parallelImpedances([zSeries, ...shunts]);
+  };
 
+  const toPoint = h => {
+    const zDp = zDpAt(h);
     const zMag = Math.sqrt(zDp.r * zDp.r + zDp.x * zDp.x);
-
-    points.push({
+    return {
       h: round(h, 2),
       freqHz: round(h * baseFreqHz, 1),
       zMagOhm: round(zMag, 4),
       zPhaseDeg: round(Math.atan2(zDp.x, zDp.r) * 180 / Math.PI, 2),
       zRealOhm: round(zDp.r, 4),
       zImagOhm: round(zDp.x, 4),
-    });
+    };
+  };
+
+  const points = [];
+  for (let raw = hMin * 2; raw <= hMax * 2 + 1e-9; raw++) {
+    points.push(toPoint(raw / 2));
   }
 
-  const resonances = identifyResonances(points);
+  // The 0.5-order grid can miss a sharp resonance by up to 0.25 orders, which
+  // matters when deciding whether it sits on a characteristic harmonic. Refine
+  // each extremum on the true impedance curve at 0.01-order resolution.
+  const resonances = identifyResonances(points).map(res => {
+    const wantPeak = res.type === 'parallel';
+    let best = toPoint(res.h);
+    for (let hh = Math.max(hMin, res.h - 0.5); hh <= Math.min(hMax, res.h + 0.5) + 1e-9; hh += 0.01) {
+      const cand = toPoint(hh);
+      if (wantPeak ? cand.zMagOhm > best.zMagOhm : cand.zMagOhm < best.zMagOhm) best = cand;
+    }
+    const risk = wantPeak ? classifyParallelResonanceRisk(best.h) : 'info';
+    return {
+      ...res,
+      h: best.h,
+      freqHz: best.freqHz,
+      zMagOhm: best.zMagOhm,
+      risk,
+      description: wantPeak
+        ? `Parallel resonance at h = ${best.h} — voltage amplification risk`
+        : `Series resonance at h = ${best.h} — current amplification risk`,
+    };
+  });
   const warnings = buildWarnings(inputs);
 
   return { inputs, points, resonances, warnings };

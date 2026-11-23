@@ -139,6 +139,16 @@ console.log('TCC equipment overlay model');
 }
 
 {
+  // I = k * A / sqrt(t): 4/0 AWG = 211,600 cmil = 107.2 mm2; k = 143 (Cu 90 C) or 94 (Al 90 C, IEC 60364-5-54)
+  const copper = buildCableCurve({ conductor_size: '4/0 AWG', conductor_material: 'copper', insulation_rating: 90 }, 3);
+  const aluminum = buildCableCurve({ conductor_size: '4/0 AWG', conductor_material: 'aluminum', insulation_rating: 90 }, 3);
+  const at1s = cableCurve => cableCurve.curve.find(point => point.time === 1).current;
+  nearlyEqual(at1s(copper), 143 * 211600 * 0.000506707478, 1e-6);
+  nearlyEqual(at1s(aluminum), 94 * 211600 * 0.000506707478, 1e-6);
+  console.log('  ✓ cable damage curve uses k = 143 (Cu) and 94 (Al) at 90 C');
+}
+
+{
   const source = await readFile(new URL('../../analysis/tcc/equipmentOverlayModel.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /\b(?:document|window|HTMLElement|HTMLCanvasElement|d3)\b/);
   console.log('  ✓ remains independent of browser and chart APIs');

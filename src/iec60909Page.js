@@ -1,7 +1,8 @@
 import { initStudyApprovalPanel } from './components/studyApproval.js';
 import { initStudyBasisPanel } from './components/studyBasis.js';
 import { runShortCircuit } from '../analysis/shortCircuit.mjs';
-import { getOneLine, getStudies, captureStudyRunContext, saveStudyResult, getProjectInputFingerprint } from '../dataStore.mjs';
+import { getCables, getOneLine, getStudies, captureStudyRunContext, saveStudyResult, getProjectInputFingerprint } from '../dataStore.mjs';
+import { barChartHtml, shortCircuitBarRows } from './components/resultViz.mjs';
 import { downloadIEC60909PDF } from '../reports/iec60909Report.mjs';
 import { loadReferencedProtectiveDevices } from './protectiveDevices/calculationCatalog.mjs';
 
@@ -77,7 +78,9 @@ function buildModel() {
     : sheets;
   let buses = comps.filter(c => c.subtype === 'Bus');
   if (buses.length === 0) buses = comps;
-  return { buses, components: comps };
+  // Feeder impedance between buses comes from the Cable Schedule, matching
+  // the One-Line short-circuit study and the REST API.
+  return { buses, components: comps, cables: getCables() };
 }
 
 function renderResults(res) {
@@ -128,6 +131,15 @@ function renderResults(res) {
     cell.textContent = `Details — required inputs: ${(r.requiredInputs || []).join('; ') || 'none'} | warnings: ${(r.warnings || []).join('; ') || 'none'} | provenance: ${JSON.stringify(r.provenance || r.inputSources || {})} | model limits: ${JSON.stringify(r.modelLimits || {})} | saved options: ${JSON.stringify(r.studyOptions || {})}`;
     detail.appendChild(cell);
     tbody.appendChild(detail);
+  }
+  const chart = document.getElementById('results-chart');
+  if (chart) {
+    const rows = shortCircuitBarRows(entries).filter(Boolean);
+    chart.innerHTML = rows.length
+      ? `<h3 class="study-chart__title">Initial symmetrical short-circuit current I″k3 by bus</h3>
+        ${barChartHtml(rows, { unit: 'kA', ariaLabel: 'Initial symmetrical short-circuit current by bus' })}
+        <p class="field-hint">Bars are colored by magnitude. Each note shows the smallest standard interrupting rating that covers the fault current.</p>`
+      : '';
   }
   resultsSection.hidden = false;
   lastObservedFingerprint = buildInputFingerprint();

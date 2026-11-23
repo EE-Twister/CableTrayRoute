@@ -57,7 +57,7 @@ describe('cable routing system extraction', () => {
         })), [
             { type: 'field', start: [-5, 0, 0], end: [0, 0, 0], length: 5, tray_id: 'TR-1' },
             { type: 'tray', start: [0, 0, 0], end: [100, 0, 0], length: 100, tray_id: 'TR-1' },
-            { type: 'field', start: [100, 0, 0], end: [105, 0, 0], length: 5, tray_id: 'proj' }
+            { type: 'field', start: [100, 0, 0], end: [105, 0, 0], length: 5, tray_id: 'TR-1' }
         ]);
         assert.equal(debugCalls.length, 1);
         assert.match(debugCalls[0][0], /Route -5,0,0 -> 105,0,0 \(5\.0ms\)/);

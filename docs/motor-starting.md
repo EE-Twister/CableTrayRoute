@@ -23,4 +23,6 @@ A successful run stores its input provenance and the controlling motor's startin
 - Wye-delta uses one-third locked-rotor current during the entered switching time.
 - Autotransformer uses the square of the entered tap setting for the source-current screen.
 
+Enter the Thevenin resistance and reactance as **per-phase ohms at the motor voltage** (for example 480 V / (√3 × available fault current)). Voltage sag is the line-to-line drop as a percentage of the line voltage, √3 × I<sub>start</sub> × |Z| / V, which equals I<sub>start</sub> / I<sub>short-circuit</sub>. A motor without a source impedance is reported as not computed rather than as 0% sag.
+
 The result is a Thevenin-equivalent screening calculation. It compares voltage sag and acceleration time with the project criteria and reports **Pass** or **Review**. It is not a full electromagnetic-transient or manufacturer-specific torque-speed simulation.

@@ -1,5 +1,5 @@
 import { getItem, setItem, STORAGE_KEYS } from './dataStore.mjs';
-import { showAlertModal } from './src/components/modal.js';
+import { showAlertModal, trapFocus } from './src/components/modal.js';
 import { readAppSetting, writeAppSetting } from './projectStorage.js';
 
 const TABLE_VIEW_SETTING_PREFIX = 'ctr:table:view:';
@@ -334,9 +334,11 @@ class TableManager {
           label.textContent = g.name;
           th.appendChild(label);
           const toggle = document.createElement('button');
+          toggle.type = 'button';
           toggle.className = 'group-toggle';
           toggle.textContent = '-';
-          toggle.setAttribute('aria-label','Toggle group');
+          toggle.setAttribute('aria-expanded', 'true');
+          toggle.setAttribute('aria-label', `Collapse ${g.name} columns`);
           toggle.addEventListener('click', e => { e.stopPropagation(); this.toggleGroup(g.name); });
           th.appendChild(toggle);
           this.groupThs[g.name] = th;
@@ -756,7 +758,12 @@ class TableManager {
         if (row.cells[i + offset]) row.cells[i + offset].classList.toggle('group-hidden', hide);
       });
     });
-    if (this.groupToggles[name]) this.groupToggles[name].textContent = hide ? '+' : '-';
+    const toggle = this.groupToggles[name];
+    if (toggle) {
+      toggle.textContent = hide ? '+' : '-';
+      toggle.setAttribute('aria-expanded', String(!hide));
+      toggle.setAttribute('aria-label', `${hide ? 'Expand' : 'Collapse'} ${name} columns`);
+    }
     if (hide) this.hiddenGroups.add(name); else this.hiddenGroups.delete(name);
     this.syncGroupHeader(name);
     this.syncGroupBlankWidth();

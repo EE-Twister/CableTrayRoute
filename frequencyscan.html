@@ -121,6 +121,12 @@
             <input type="number" id="xr-ratio" min="0.1" max="100" step="0.5" value="10" required aria-describedby="xr-ratio-hint">
             <p id="xr-ratio-hint" class="field-hint">Ratio of source reactance to resistance at fundamental. Industrial systems typically range from 5 to 20. Higher X/R produces sharper resonance peaks.</p>
           </div>
+
+          <div class="field-row">
+            <label for="damping-kw">Damping load (kW, optional)</label>
+            <input type="number" id="damping-kw" min="0" step="10" value="0" aria-describedby="damping-kw-hint">
+            <p id="damping-kw-hint" class="field-hint">Resistive load (motors, heaters, lighting) connected at the bus. Real loads damp resonance: with 0 the parallel peaks are undamped and the peak impedance is overstated. Enter the connected kW to see a realistic peak height.</p>
+          </div>
         </fieldset>
 
         <fieldset>

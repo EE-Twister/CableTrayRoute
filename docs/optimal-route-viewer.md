@@ -60,7 +60,7 @@ The allowable tension is the lowest working limit among the cable, puller, rope,
 
 ### Automatic multi-cable pull sets
 
-Keep **Suggest multi-cable pull sets** enabled to compare routed cables after the individual pull checks finish. Automatic recommendations require the cables to share the complete start-to-end route and the same circuit class. Partial shared corridors, different HV/LV/Instrument/Communication assignments, missing cable weight or outside diameter, and combined equipment-limit failures are reported as reasons to keep cables separate.
+Keep **Suggest multi-cable pull sets** enabled to compare routed cables after the individual pull checks finish. Automatic recommendations require the cables to share the complete start-to-end route and the same circuit class and the same voltage class (LV up to 1 kV, MV up to 35 kV, HV above; a cable with no voltage is kept apart from cables that have one). A group's bend-stiffness tension is the sum of its members' stiffness terms, and its tension limit is each cable's limit divided by that cable's share of the bundle weight. Partial shared corridors, different HV/LV/Instrument/Communication assignments, missing cable weight or outside diameter, and combined equipment-limit failures are reported as reasons to keep cables separate.
 
 The group calculation uses combined cable weight, an area-equivalent bundle diameter, the most conservative friction coefficient, and weight-proportional sharing of the total tension and sidewall pressure. The group card reports the number of payoff stations, physical cable reels, tugger setups, sheaves, rollers, and avoided separate pull operations. The **Maximum cables per suggested pull set** setting limits automatic group size from 2 through 12 cables.
 

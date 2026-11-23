@@ -14,7 +14,7 @@ The Sag-Tension study computes the sag and tension of an overhead conductor acro
 1. Navigate to **Studies → Structural → Conductor Sag-Tension**.
 2. Select a conductor from the library.
 3. Enter the **span lengths** in the section (the ruling span is computed automatically).
-4. Choose the **NESC loading district** and the **design tension** (% of rated strength).
+4. Choose the **NESC loading district** and the **design tension** (maximum tension at the support, as % of rated strength; default 50%, NESC limit 60%). The horizontal tension used for sag is solved from H + w·D = design tension, so the percentage limits the tension the structure actually sees.
 5. Set the **stringing temperature range**.
 6. Click **Run Sag-Tension**, review the loading cases and stringing table, then **Export Results (CSV)**.
 
@@ -58,7 +58,7 @@ solved as a cubic for the positive root (`E` = modulus, `A` = area, `α` = therm
 ## Interpreting Results
 
 - **Design sag** — the sag at the loaded design condition; use it for clearance checks.
-- **Loading cases** — tension and sag at each NESC district, with the percentage of UTS consumed (NESC final-tension limits are typically 60% loaded / 35% unloaded).
+- **Loading cases** — tension and sag at each NESC district, with the percentage of UTS consumed (NESC limit 60% loaded). The study also reports the unloaded tension at 60 °F and warns above 35% UTS (limit) and 25% UTS (usual no-damper limit for aeolian vibration).
 - **Stringing table** — the bare-conductor horizontal and support tension and sag at each temperature, for the installation crew. Sag rises and tension falls as temperature increases.
 
 ## Limitations

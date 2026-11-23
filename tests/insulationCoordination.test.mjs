@@ -390,4 +390,26 @@ import {
   console.log('✓ validation errors');
 })();
 
+(function testReviewRegressions() {
+  const fail = runInsulationCoordinationStudy({
+    nominalVoltageKv: 6.9, umKv: 7.2, groundingType: 'isolated', altitudeM: 12000,
+  });
+  // Ka = e^(0.75*12000/8150) = 3.0166 -> 7.2 * 1.15 * 3.0166 = 24.98 kV rms > 20 kV PFWV
+  assert.equal(fail.tovResult.selectedPfwvKv, null);
+  assert.equal(fail.allPassed, false, 'an uncovered TOV must fail the study');
+  assert.ok(fail.warnings.some(w => /PFWV/.test(w)));
+
+  const ok = runInsulationCoordinationStudy({ nominalVoltageKv: 6.9, umKv: 7.2, groundingType: 'isolated' });
+  assert.equal(ok.tovResult.selectedPfwvKv, 20);
+  assert.equal(ok.allPassed, true);
+
+  // Switching stress on a Range I system cannot be checked against a standard level.
+  const si = runInsulationCoordinationStudy({
+    nominalVoltageKv: 13.8, umKv: 17.5,
+    switchingImpulse: { representativeKvPeak: 40, arresterResidualKvPeak: 35 },
+  });
+  assert.ok(si.warnings.some(w => /no standard switching impulse/.test(w)));
+  console.log('✓ review regressions');
+})();
+
 console.log('\nAll insulationCoordination tests passed.');

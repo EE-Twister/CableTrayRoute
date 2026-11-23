@@ -660,7 +660,11 @@ if (typeof window !== 'undefined') {
         validation.missingKw ? `${validation.missingKw} missing kW` : '',
         validation.missingVoltage ? `${validation.missingVoltage} missing voltage` : '',
         validation.missingPowerFactor ? `${validation.missingPowerFactor} missing power factor` : '',
-        validation.missingPhases ? `${validation.missingPhases} missing phases` : ''
+        validation.missingPhases ? `${validation.missingPhases} missing phases` : '',
+        validation.invalidKw ? `${validation.invalidKw} invalid kW (must be 0 or more)` : '',
+        validation.invalidVoltage ? `${validation.invalidVoltage} invalid voltage` : '',
+        validation.invalidPowerFactor ? `${validation.invalidPowerFactor} invalid power factor (enter 0.85, not 85)` : '',
+        validation.invalidPhases ? `${validation.invalidPhases} invalid phases (1 or 3)` : ''
       ].filter(Boolean);
       validationSummary.textContent = `${validation.incomplete} load${validation.incomplete === 1 ? '' : 's'} need workflow fields: ${parts.join(', ')}.`;
       validationSummary.className = 'load-validation-summary is-warning';
@@ -688,7 +692,7 @@ if (typeof window !== 'undefined') {
       nextActionEl.innerHTML = `
         <div>
           <strong>${READINESS_VOCABULARY.missingInputs}: Complete load readiness</strong>
-          <p>${validation.incomplete} load${validation.incomplete === 1 ? '' : 's'} still need source, kW, voltage, power factor, or phases.</p>
+          <p>${validation.incomplete} load${validation.incomplete === 1 ? '' : 's'} still need a source and valid kW, voltage, power factor (0–1), and phases.</p>
         </div>
         <button class="btn primary-btn" type="button" data-filter="${blockerFilter}">Show Blockers</button>
       `;

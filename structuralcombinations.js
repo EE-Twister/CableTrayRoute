@@ -6,6 +6,7 @@
  * capacity utilization check.
  */
 
+import { showAlertModal } from './src/components/modal.js';
 import { calcStructuralCombinations } from './analysis/structuralLoadCombinations.mjs';
 import { calcSeismicDesignCategory, maxBraceSpacing } from './analysis/seismicBracing.mjs';
 

@@ -221,7 +221,16 @@ export function runQuasiDynamic(baseModel, profiles, opts = {}) {
   let totalEnergyLossKwh = 0;
   let convergedCount = 0;
 
-  for (const step of profiles) {
+  // Hours each step represents: the gap to the next step's `hour`, so a 4-hourly or
+  // 2-hourly profile integrates correctly; a single/non-increasing step counts 1 h.
+  const stepHours = profiles.map((step, i) => {
+    const gap = Number(profiles[i + 1]?.hour) - Number(step.hour);
+    if (Number.isFinite(gap) && gap > 0) return gap;
+    const prevGap = i > 0 ? Number(step.hour) - Number(profiles[i - 1]?.hour) : NaN;
+    return Number.isFinite(prevGap) && prevGap > 0 ? prevGap : 1;
+  });
+
+  for (const [stepIndex, step] of profiles.entries()) {
     const { hour, loadScale = 1.0, genScale = 1.0 } = step;
     const m = applyScaling(model, loadScale, genScale);
 
@@ -241,7 +250,8 @@ export function runQuasiDynamic(baseModel, profiles, opts = {}) {
     const totalGenKw    = lfResult.summary?.totalGenKW   ?? 0;
     const totalLossKw   = lfResult.summary?.totalLossKW  ?? 0;
 
-    totalEnergyLossKwh += totalLossKw; // each step assumed = 1 hour
+    // Losses from a step that failed to converge are not a real operating point.
+    if (converged) totalEnergyLossKwh += totalLossKw * stepHours[stepIndex];
 
     const busSummary = lfBuses.map(b => ({
       id:    b.id,
@@ -273,8 +283,10 @@ export function runQuasiDynamic(baseModel, profiles, opts = {}) {
       }
     }
 
-    if (!peakStep   || totalLoadKw > peakStep.totalLoadKw)   peakStep   = tsEntry;
-    if (!valleyStep || totalLoadKw < valleyStep.totalLoadKw) valleyStep = tsEntry;
+    if (converged) {
+      if (!peakStep   || totalLoadKw > peakStep.totalLoadKw)   peakStep   = tsEntry;
+      if (!valleyStep || totalLoadKw < valleyStep.totalLoadKw) valleyStep = tsEntry;
+    }
   }
 
   // Build bus voltage envelope table

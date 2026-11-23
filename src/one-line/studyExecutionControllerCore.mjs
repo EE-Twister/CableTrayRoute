@@ -8,7 +8,7 @@ export function createStudyExecutionController({
   saveStudyResult, getStudyAssessment, getStudySourceSnapshot, fingerprintStudyValue,
   normalizeStudySourceSnapshot, getStudyProjectIdentity, getCurrentScenario, buildStudyProvenance,
   getStudySettings, getActiveSheet, getProtectiveDeviceCatalog, loadReferencedProtectiveDevices,
-  runLoadFlow, runShortCircuitOffMain, runShortCircuit, runArcFlash, runHarmonics,
+  getCables, getTccSettings, runLoadFlow, runShortCircuitOffMain, runShortCircuit, runArcFlash, runHarmonics,
   runNetworkHarmonics, runMotorStart, runReliability, assertSheetsUnchanged,
   getSheetsRevision, recordProvenance, updateCableOperatingVoltages,
   markScheduleReconcilePending, renderStudyResults, renderLoadFlowResults, render,
@@ -66,14 +66,23 @@ export function createStudyExecutionController({
     return result;
   };
 
+  // Every short-circuit run — the standalone study (in a worker, which has no
+  // storage) and the arc-flash basis (main thread) — must evaluate the same
+  // inputs, so the Cable Schedule and saved TCC settings travel explicitly.
+  const buildShortCircuitOptions = async (solverInput, settings) => ({
+    method: settings.shortCircuit.method,
+    deviceCatalog: await loadReferencedProtectiveDevices(solverInput, { catalog: getProtectiveDeviceCatalog() }),
+    ...(typeof getCables === 'function' ? { cables: getCables() } : {}),
+    ...(typeof getTccSettings === 'function' ? { tccSettings: getTccSettings() } : {})
+  });
+
   const runShortCircuitStudy = async () => {
     const oneLine = getOneLine();
     const solverInput = cloneSolverInput(oneLine);
     const revision = getSheetsRevision(oneLine);
     const settings = getStudySettings();
     const runContext = beginStudy('shortCircuit', { oneLine: solverInput, settings: settings.shortCircuit }, settings.shortCircuit);
-    const deviceCatalog = await loadReferencedProtectiveDevices(solverInput, { catalog: getProtectiveDeviceCatalog() });
-    const result = await runShortCircuitOffMain(solverInput, { method: settings.shortCircuit.method, deviceCatalog });
+    const result = await runShortCircuitOffMain(solverInput, await buildShortCircuitOptions(solverInput, settings));
     const current = assertSheetsUnchanged(revision, 'Short circuit');
     assertRunContextUnchanged('shortCircuit', runContext);
     const applied = applyShortCircuitResultsToDiagram(oneLine, result);
@@ -81,6 +90,63 @@ export function createStudyExecutionController({
     commitStudy('shortCircuit', result, contextAfterOverlay('shortCircuit', runContext));
     renderStudyResults(); render();
     return result;
+  };
+
+  const runArcFlashStudy = async () => {
+    const oneLine = getOneLine();
+    const solverInput = cloneSolverInput(oneLine);
+    const revision = getSheetsRevision(oneLine);
+    const settings = getStudySettings();
+    const shortCircuitContext = beginStudy('shortCircuit', { oneLine: solverInput, settings: settings.shortCircuit }, settings.shortCircuit);
+    const options = await buildShortCircuitOptions(solverInput, settings);
+    const { deviceCatalog } = options;
+    const shortCircuit = runShortCircuit(options);
+    const shortCircuitContextForSave = contextAfterOverlay('shortCircuit', shortCircuitContext);
+    const shortCircuitProvenance = buildStudyProvenance?.('shortCircuit', shortCircuit, shortCircuitContextForSave);
+    // The run context records the study options; the cable schedule and TCC
+    // settings are already covered by the project input fingerprint.
+    const { cables: _cables, tccSettings: _tccSettings, ...contextOptions } = options;
+    const arcFlashContext = beginStudy('arcFlash', { oneLine: solverInput, settings: settings.shortCircuit }, contextOptions, {
+      dependencies: shortCircuitProvenance ? {
+        shortCircuit: {
+          resultHash: fingerprintStudyValue(shortCircuit),
+          provenanceHash: fingerprintStudyValue(shortCircuitProvenance),
+        }
+      } : undefined
+    });
+    const arcFlash = await runArcFlash({ shortCircuit: { ...options }, deviceCatalog });
+    const current = assertSheetsUnchanged(revision, 'Arc flash');
+    assertRunContextUnchanged('shortCircuit', shortCircuitContext);
+    assertRunContextUnchanged('arcFlash', arcFlashContext);
+    applyShortCircuitResultsToDiagram(current, shortCircuit);
+    current.sheets.flatMap(sheet => sheet.components).forEach(component => { component.arcFlash = arcFlash[component.id]; });
+    setOneLine({ activeSheet: getActiveSheet(), sheets: current.sheets });
+    // The synchronous short-circuit projection is part of this run's saved
+    // source. Recompute its provenance after projection, then bind Arc
+    // Flash to that actual same-run dependency rather than the pre-overlay
+    // prediction. Async edit/project guards above still reject intervening
+    // changes before this controlled commit.
+    const shortCircuitSaveContext = contextAfterOverlay('shortCircuit', shortCircuitContext);
+    const actualShortCircuitProvenance = buildStudyProvenance?.(
+      'shortCircuit', shortCircuit, shortCircuitSaveContext,
+    );
+    const arcFlashDependencies = actualShortCircuitProvenance ? [{
+      studyKey: 'shortCircuit',
+      resultHash: fingerprintStudyValue(shortCircuit),
+      provenanceHash: fingerprintStudyValue(actualShortCircuitProvenance),
+      status: null,
+    }] : arcFlashContext.dependencies;
+    const arcFlashSaveContext = {
+      ...contextAfterOverlay('arcFlash', arcFlashContext),
+      dependencies: arcFlashDependencies,
+      dependencyFingerprint: fingerprintStudyValue(arcFlashDependencies),
+    };
+    commitStudy('shortCircuit', shortCircuit, shortCircuitSaveContext);
+    commitStudy('arcFlash', arcFlash, arcFlashSaveContext);
+    generateArcFlashReport(arcFlash, { assessment: getStudyAssessment?.('arcFlash') });
+    if (buttons.printArcFlashLabels) buttons.printArcFlashLabels.disabled = Boolean(getStudyAssessment && !getStudyAssessment('arcFlash').eligible);
+    renderStudyResults(); render();
+    return { shortCircuit, arcFlash };
   };
 
   const runReliabilityStudy = async () => {
@@ -104,58 +170,9 @@ export function createStudyExecutionController({
     buttons.shortCircuit?.addEventListener('click', () => runShortCircuitStudy().catch(error => {
       console.error('[oneline] short circuit failed', error); showAlertModal('Short Circuit Error', error?.message || String(error));
     }));
-    buttons.arcFlash?.addEventListener('click', async () => {
-      const oneLine = getOneLine();
-      const solverInput = cloneSolverInput(oneLine);
-      const revision = getSheetsRevision(oneLine);
-      const settings = getStudySettings();
-      const shortCircuitContext = beginStudy('shortCircuit', { oneLine: solverInput, settings: settings.shortCircuit }, settings.shortCircuit);
-      const deviceCatalog = await loadReferencedProtectiveDevices(solverInput, { catalog: getProtectiveDeviceCatalog() });
-      const options = { method: settings.shortCircuit.method, deviceCatalog };
-      const shortCircuit = runShortCircuit(options);
-      const shortCircuitContextForSave = contextAfterOverlay('shortCircuit', shortCircuitContext);
-      const shortCircuitProvenance = buildStudyProvenance?.('shortCircuit', shortCircuit, shortCircuitContextForSave);
-      const arcFlashContext = beginStudy('arcFlash', { oneLine: solverInput, settings: settings.shortCircuit }, options, {
-        dependencies: shortCircuitProvenance ? {
-          shortCircuit: {
-            resultHash: fingerprintStudyValue(shortCircuit),
-            provenanceHash: fingerprintStudyValue(shortCircuitProvenance),
-          }
-        } : undefined
-      });
-      const arcFlash = await runArcFlash({ shortCircuit: { ...options }, deviceCatalog });
-      const current = assertSheetsUnchanged(revision, 'Arc flash');
-      assertRunContextUnchanged('shortCircuit', shortCircuitContext);
-      assertRunContextUnchanged('arcFlash', arcFlashContext);
-      applyShortCircuitResultsToDiagram(current, shortCircuit);
-      current.sheets.flatMap(sheet => sheet.components).forEach(component => { component.arcFlash = arcFlash[component.id]; });
-      setOneLine({ activeSheet: getActiveSheet(), sheets: current.sheets });
-      // The synchronous short-circuit projection is part of this run's saved
-      // source. Recompute its provenance after projection, then bind Arc
-      // Flash to that actual same-run dependency rather than the pre-overlay
-      // prediction. Async edit/project guards above still reject intervening
-      // changes before this controlled commit.
-      const shortCircuitSaveContext = contextAfterOverlay('shortCircuit', shortCircuitContext);
-      const actualShortCircuitProvenance = buildStudyProvenance?.(
-        'shortCircuit', shortCircuit, shortCircuitSaveContext,
-      );
-      const arcFlashDependencies = actualShortCircuitProvenance ? [{
-        studyKey: 'shortCircuit',
-        resultHash: fingerprintStudyValue(shortCircuit),
-        provenanceHash: fingerprintStudyValue(actualShortCircuitProvenance),
-        status: null,
-      }] : arcFlashContext.dependencies;
-      const arcFlashSaveContext = {
-        ...contextAfterOverlay('arcFlash', arcFlashContext),
-        dependencies: arcFlashDependencies,
-        dependencyFingerprint: fingerprintStudyValue(arcFlashDependencies),
-      };
-      commitStudy('shortCircuit', shortCircuit, shortCircuitSaveContext);
-      commitStudy('arcFlash', arcFlash, arcFlashSaveContext);
-      generateArcFlashReport(arcFlash, { assessment: getStudyAssessment?.('arcFlash') });
-      if (buttons.printArcFlashLabels) buttons.printArcFlashLabels.disabled = Boolean(getStudyAssessment && !getStudyAssessment('arcFlash').eligible);
-      renderStudyResults(); render();
-    });
+    buttons.arcFlash?.addEventListener('click', () => runArcFlashStudy().catch(error => {
+      console.error('[oneline] arc flash failed', error); showAlertModal('Arc Flash Error', error?.message || String(error));
+    }));
     buttons.printArcFlashLabels?.addEventListener('click', () => {
       if (getStudyAssessment && !getStudyAssessment('arcFlash').eligible) return;
       openLabelPrintWindow(getStudies()?.arcFlash || {});
@@ -181,5 +198,5 @@ export function createStudyExecutionController({
     }));
   };
 
-  return { bind, runLoadFlowStudy, runReliabilityStudy, runShortCircuitStudy };
+  return { bind, runArcFlashStudy, runLoadFlowStudy, runReliabilityStudy, runShortCircuitStudy };
 }

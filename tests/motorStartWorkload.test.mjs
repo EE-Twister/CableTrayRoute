@@ -5,7 +5,8 @@ import { runMotorStart, MOTOR_START_LIMITS } from '../analysis/motorStartCalc.mj
 const motor = { id: 'M', type: 'motor', hp: 100, voltage: 480, inertia: 5, thevenin_r: 0.01, thevenin_x: 0.03 };
 const run = components => runMotorStart({ oneLine: { sheets: [{ components }] } });
 const limit = components => assert.throws(() => run(components), { code: 'MOTOR_START_WORK_LIMIT' });
-const expected = { inrushKA: 0.66, voltageSagPct: 4.19, accelTime: 11.17, starterType: 'dol' };
+// Three-phase sag uses the line-to-line drop sqrt(3) * I * Z (see calculateMotorStartCase).
+const expected = { inrushKA: 0.66, voltageSagPct: 7.01, accelTime: 11.32, starterType: 'dol' };
 assert.deepEqual(run([motor]), { M: expected });
 for (const curve of ['0:20 25:30 50:40 100:70', '0:10 0:20 50:35 50:40 100:60', '10:20 20:40']) {
   const expectedCurve = { ...expected, accelTime: 60.01 };

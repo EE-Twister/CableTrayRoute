@@ -6,6 +6,7 @@ import {
   classifyFlickerRisk,
   runVoltageFlickerStudy,
   PST_LIMIT,
+  PLT_LIMIT,
   PST_PASS_THRESHOLD,
   PLT_OBSERVATION_PERIODS,
 } from '../analysis/voltageFlicker.mjs';
@@ -262,3 +263,40 @@ function baseInputs(overrides = {}) {
 })();
 
 console.log('✓ voltage flicker tests passed');
+
+// ---------------------------------------------------------------------------
+// Review regressions: network-angle voltage change and Plt limit
+// ---------------------------------------------------------------------------
+(function testVoltageChangeUsesSourceAndLoadAngles() {
+  // Independent form: d = (dP*R + dQ*X) / V^2 with R = Z cos(psi), X = Z sin(psi), Z = V^2/Ssc
+  const dP = 1000, Ssc = 50000, xr = 10, pf = 0.9;
+  const dQ = dP * Math.tan(Math.acos(pf));
+  const cosPsi = 1 / Math.sqrt(1 + xr * xr);
+  const sinPsi = xr * cosPsi;
+  const expected = ((dP * cosPsi + dQ * sinPsi) / Ssc) * 100;
+  const { deltaVPercent } = calcVoltageDip(dP, Ssc, xr, pf);
+  assert.ok(Math.abs(deltaVPercent - expected) < 1e-3, `ΔV ${deltaVPercent} vs ${expected}`);
+
+  // A resistive step on a stiff X/R = 10 source changes the voltage ~10x less than dP/Ssc
+  const resistive = calcVoltageDip(1000, 50000, 10, 1).deltaVPercent;
+  assert.ok(Math.abs(resistive - 2 * cosPsi) < 1e-3);
+  // A motor start at pf 0.3 changes it ~3x more than dP/Ssc
+  const motor = calcVoltageDip(1000, 50000, 10, 0.3).deltaVPercent;
+  assert.ok(motor > 3 * 2 * 0.95 / 1.0 * 0.5 && motor > 6, `motor start ΔV ${motor}`);
+  assert.throws(() => calcVoltageDip(1000, 50000, 10, 1.5), /powerFactor/);
+  assert.throws(() => runVoltageFlickerStudy({ ...baseInputs(), loadPowerFactor: 0 }), /loadPowerFactor/);
+})();
+
+(function testStudyUsesLoadPowerFactorAndPltLimit() {
+  const low = runVoltageFlickerStudy({ ...baseInputs(), loadPowerFactor: 0.3 });
+  const high = runVoltageFlickerStudy({ ...baseInputs(), loadPowerFactor: 1 });
+  assert.ok(low.loadStepResults[0].deltaVPercent > high.loadStepResults[0].deltaVPercent);
+  // Plt limit is 0.65 (IEC 61000-3-3), not the Pst limit of 1.0
+  assert.equal(PLT_LIMIT, 0.65);
+  assert.equal(classifyFlickerRisk(0.7, PLT_LIMIT), 'fail');
+  assert.equal(classifyFlickerRisk(0.6, PLT_LIMIT), 'marginal');
+  assert.equal(classifyFlickerRisk(0.5, PLT_LIMIT), 'pass');
+  const r = runVoltageFlickerStudy({ ...baseInputs(), pstSeriesForPlt: Array(12).fill(0.7) });
+  assert.equal(r.pltRisk, 'fail');
+  assert.ok(r.warnings.some(w => /long-term limit/.test(w)));
+})();

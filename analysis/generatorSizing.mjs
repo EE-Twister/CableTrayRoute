@@ -72,7 +72,7 @@ export const DIESEL_SFC_LB_PER_HP_HR = 0.38; // Typical for 75% load, 4-stroke d
  * @returns {{ deratedKw: number, altitudeFactor: number, note: string }}
  */
 export function derateForAltitude(ratedKw, altitudeFt, aspiration = 'naturally-aspirated') {
-  if (ratedKw <= 0) throw new Error('ratedKw must be greater than zero');
+  if (!(ratedKw > 0)) throw new Error('ratedKw must be greater than zero');
   if (altitudeFt < 0) throw new Error('altitudeFt must be ≥ 0');
 
   const excessKft = Math.max(0, (altitudeFt - 500) / 1000);
@@ -103,7 +103,7 @@ export function derateForAltitude(ratedKw, altitudeFt, aspiration = 'naturally-a
  * @returns {{ deratedKw: number, tempFactor: number, note: string }}
  */
 export function derateForTemperature(ratedKw, ambientC) {
-  if (ratedKw <= 0) throw new Error('ratedKw must be greater than zero');
+  if (!(ratedKw > 0)) throw new Error('ratedKw must be greater than zero');
 
   const excessC = Math.max(0, ambientC - 40);
   const tempFactor = Math.max(0.6, 1 - 0.01 * excessC);
@@ -143,10 +143,10 @@ export function largestMotorStepLoad({
   efficiency = 0.92,
   lrcMultiplier = 6,
 }) {
-  if (motorHp <= 0) throw new Error('motorHp must be greater than zero');
+  if (!(motorHp > 0)) throw new Error('motorHp must be greater than zero');
   if (powerFactor <= 0 || powerFactor > 1) throw new Error('powerFactor must be in (0, 1]');
   if (efficiency <= 0 || efficiency > 1) throw new Error('efficiency must be in (0, 1]');
-  if (lrcMultiplier <= 0) throw new Error('lrcMultiplier must be greater than zero');
+  if (!(lrcMultiplier > 0)) throw new Error('lrcMultiplier must be greater than zero');
 
   const runningKw = (motorHp * 0.746) / efficiency;
   const startingKva = Math.round((runningKw / powerFactor) * lrcMultiplier * 10) / 10;
@@ -155,6 +155,23 @@ export function largestMotorStepLoad({
   const recommendedGenKw = Math.ceil(startingKva * 0.80);
 
   return { startingKva, startingKw, recommendedGenKw };
+}
+
+/**
+ * Generator nameplate kW needed for the largest motor start to stay within the
+ * project voltage-dip limit. Inverting  dip% = (startKva / genKva) * X'd%  gives
+ *
+ *   genKva >= startKva * X'd% / limit%
+ *
+ * expressed as kW at the 0.80 pf nameplate rating. Unlike
+ * largestMotorStepLoad().recommendedGenKw, which sizes the set to carry 100% of
+ * the starting kVA, this responds to the X'd and dip-limit inputs.
+ */
+export function stepLoadGeneratorKw({ startingKva, xdPrimePct = 25, limitPct = 35 }) {
+  if (!(startingKva >= 0)) throw new Error('startingKva must be ≥ 0');
+  if (!(xdPrimePct > 0 && xdPrimePct < 100)) throw new Error('xdPrimePct must be in (0, 100)');
+  if (!(limitPct > 0 && limitPct < 100)) throw new Error('limitPct must be in (0, 100)');
+  return Math.ceil(startingKva * (xdPrimePct / limitPct) * 0.8);
 }
 
 /**
@@ -177,7 +194,7 @@ export function largestMotorStepLoad({
  */
 export function estimateVoltageDip({ stepLoadKva, genKva, xdPrimePct = 25, limitPct = 35 }) {
   if (stepLoadKva < 0) throw new Error('stepLoadKva must be ≥ 0');
-  if (genKva <= 0) throw new Error('genKva must be greater than zero');
+  if (!(genKva > 0)) throw new Error('genKva must be greater than zero');
   if (xdPrimePct <= 0 || xdPrimePct >= 100) throw new Error('xdPrimePct must be in (0, 100)');
   if (limitPct <= 0 || limitPct >= 100) throw new Error('limitPct must be in (0, 100)');
 
@@ -232,9 +249,9 @@ export function continuousLoad(loads) {
  * @returns {{ runtimeHours: number, fuelRateGalPerHr: number }}
  */
 export function fuelRuntime({ loadKw, fuelCapGal, sfcLbPerHpHr = DIESEL_SFC_LB_PER_HP_HR }) {
-  if (loadKw <= 0) throw new Error('loadKw must be greater than zero');
-  if (fuelCapGal <= 0) throw new Error('fuelCapGal must be greater than zero');
-  if (sfcLbPerHpHr <= 0) throw new Error('sfcLbPerHpHr must be greater than zero');
+  if (!(loadKw > 0)) throw new Error('loadKw must be greater than zero');
+  if (!(fuelCapGal > 0)) throw new Error('fuelCapGal must be greater than zero');
+  if (!(sfcLbPerHpHr > 0)) throw new Error('sfcLbPerHpHr must be greater than zero');
 
   const DIESEL_DENSITY = 6.791; // lb/US gal
   const HP_PER_KW = 1.341;
@@ -345,8 +362,14 @@ export function runGeneratorSizingAnalysis(inputs) {
       lrcMultiplier,
     });
 
-    // Determine required kW accounting for motor start
-    const requiredFromStep = stepLoad.recommendedGenKw / siteCapacityFactor;
+    // Determine required kW accounting for motor start: the smallest set whose
+    // estimated dip stays within the project limit.
+    stepLoad.dipLimitedGenKw = stepLoadGeneratorKw({
+      startingKva: stepLoad.startingKva,
+      xdPrimePct,
+      limitPct: voltageDipLimitPct,
+    });
+    const requiredFromStep = stepLoad.dipLimitedGenKw / siteCapacityFactor;
 
     // Select a tentative standard size for voltage dip calculation
     const tentativeRequiredKw = Math.max(siteDeratedKw, requiredFromStep);
@@ -373,7 +396,7 @@ export function runGeneratorSizingAnalysis(inputs) {
   // Step 5 — Required standard-condition nameplate kW. Both the continuous
   // load and the step-load screen must be supported after site derating.
   const stepRequiredKw = stepLoad
-    ? Math.round((stepLoad.recommendedGenKw / siteCapacityFactor) * 10) / 10
+    ? Math.round((stepLoad.dipLimitedGenKw / siteCapacityFactor) * 10) / 10
     : 0;
   const requiredKw = Math.max(siteDeratedKw, stepRequiredKw);
 
@@ -383,6 +406,14 @@ export function runGeneratorSizingAnalysis(inputs) {
     warnings.push(
       `Required nameplate capacity ${requiredKw.toFixed(1)} kW exceeds the built-in 2,000 kW catalog range. ` +
       'No generator size was selected; evaluate paralleled units or a manufacturer-specific package.'
+    );
+  }
+
+  if (sizeResult.selectedKw && continuousKw / (sizeResult.selectedKw * siteCapacityFactor) > 0.9) {
+    const loadingPct = (continuousKw / (sizeResult.selectedKw * siteCapacityFactor)) * 100;
+    warnings.push(
+      `The selected ${sizeResult.selectedKw} kW set would run at ${loadingPct.toFixed(0)}% of its site capacity ` +
+      'with no allowance for load growth or future additions. Consider adding a spare-capacity margin to the load list.'
     );
   }
 

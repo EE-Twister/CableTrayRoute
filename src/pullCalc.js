@@ -38,6 +38,25 @@ export function calcStiffnessTension(sizeKcmil, outerDiameterIn, conductorMateri
   return EI * angleRad / (radiusFt * radiusFt);            // lbf
 }
 
+/**
+ * Tension change along a straight run, including the gravity term for an inclined run:
+ *   ΔT = w · L · (μ·cosφ + sinφ),   sinφ = rise / L  (rise > 0 when pulling upward)
+ * A horizontal run reduces to w·μ·L. Pulling up a 30 ft riser adds w·30 lbf on top of friction.
+ *
+ * @param {number} weight lb/ft
+ * @param {number} mu     effective friction coefficient
+ * @param {number} length run length (ft)
+ * @param {number} rise   elevation gain along the pull direction (ft)
+ * @returns {number} ΔT (lbf), negative when a downward pull is gravity-driven
+ */
+export function calcStraightTensionDelta(weight, mu, length, rise = 0) {
+  const L = Number(length) || 0;
+  if (!(L > 0)) return 0;
+  const sin = Math.max(-1, Math.min(1, (Number(rise) || 0) / L));
+  const cos = Math.sqrt(1 - sin * sin);
+  return weight * L * (mu * cos + sin);
+}
+
 export function calcSidewallPressure(bendRadius, tension) {
   if (!bendRadius) return 0;
   return tension / bendRadius;
@@ -100,6 +119,7 @@ export function tracePullTension(routeSegments = [], cableProps = {}) {
   let stiffnessLbs  = 0;
   let staticApplied = false;
   let firstSegment  = true;
+  let gravityAssisted = false;
   const segments = [];
 
   for (const [index, seg] of routeSegments.entries()) {
@@ -146,7 +166,11 @@ export function tracePullTension(routeSegments = [], cableProps = {}) {
         effectiveMu: muEff
       });
     } else {
-      tension += weight * muEff * (seg.length || 0);
+      const rise = Number.isFinite(seg.rise)
+        ? seg.rise
+        : (Array.isArray(seg.start) && Array.isArray(seg.end) ? Number(seg.end[2]) - Number(seg.start[2]) : 0);
+      tension += calcStraightTensionDelta(weight, muEff, seg.length || 0, rise);
+      if (tension < 0) { tension = 0; gravityAssisted = true; }
       segments.push({
         index,
         type: seg.type || 'straight',
@@ -179,6 +203,7 @@ export function tracePullTension(routeSegments = [], cableProps = {}) {
     stiffnessCorrectionLbs: Math.round(stiffnessLbs * 100) / 100,
     staticFrictionApplied: staticApplied,
     incomingTension,
+    gravityAssisted,
   };
   return { summary, segments };
 }
@@ -186,6 +211,7 @@ export function tracePullTension(routeSegments = [], cableProps = {}) {
 if (typeof self !== 'undefined') {
   self.calcPullTension       = calcPullTension;
   self.calcSidewallPressure  = calcSidewallPressure;
+  self.calcStraightTensionDelta = calcStraightTensionDelta;
   self.calcStiffnessTension  = calcStiffnessTension;
   self.tracePullTension      = tracePullTension;
 }

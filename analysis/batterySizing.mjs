@@ -227,8 +227,8 @@ export function standardBankSize(kwhRequired) {
  * @returns {{ loadFraction: number, loadKw: number, runtimeHours: number }[]}
  */
 export function runtimeCurve(kwhSelected, nominalLoadKw, chemistry) {
-  if (kwhSelected <= 0) throw new Error('kwhSelected must be greater than zero.');
-  if (nominalLoadKw <= 0) throw new Error('nominalLoadKw must be greater than zero.');
+  if (!(kwhSelected > 0)) throw new Error('kwhSelected must be greater than zero.');
+  if (!(nominalLoadKw > 0)) throw new Error('nominalLoadKw must be greater than zero.');
   const chem = CHEMISTRY[chemistry];
   if (!chem) {
     throw new Error(
@@ -740,6 +740,12 @@ export function runBatterySizingAnalysis(inputs) {
     warnings.push(
       `Required capacity (${cap.kwhFinal} kWh) is large. Consider paralleling multiple battery ` +
       'strings rather than a single oversized bank for maintainability and availability.'
+    );
+  }
+  if (peakLoadKw < averageLoadKw) {
+    warnings.push(
+      `Peak load (${peakLoadKw} kW) is lower than the average load (${averageLoadKw} kW). ` +
+      'The UPS is sized on the peak, so check that the two values are not swapped.'
     );
   }
   if (peakLoadKw > averageLoadKw * 3) {

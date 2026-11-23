@@ -66,10 +66,11 @@ Qg_t  = Qg_base  × genScale_t     (bus reactive generation, kVAR)
 
 The scaled snapshot is passed to the full Newton-Raphson AC load-flow solver (same engine as the [Load Flow](loadFlow.html) study). Each timestep is independent — no inter-step dynamics, ramp limits, or energy storage state is tracked.
 
-**Energy loss accumulation** (each step assumed = 1 hour):
+**Energy loss accumulation** (each step stands for the gap to the next step's `hour`; a single or last step reuses the previous gap, default 1 h):
 ```
-E_loss = Σ P_loss_t    (kWh)
+E_loss = Σ P_loss_t × Δt_t    (kWh, converged steps only)
 ```
+Steps whose load flow did not converge are excluded from the energy total and from the peak/valley selection.
 
 **Load factor:**
 ```

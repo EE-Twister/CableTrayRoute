@@ -62,6 +62,13 @@ import {
   resolveCableTemperatureRating
 } from './src/ductbank-route/thermalPrimitives.js';
 import { createDuctbankAmpacityModel } from './src/ductbank-route/ampacityModel.js';
+import {
+  buildDuctbankIssueContext,
+  conduitFillLimit,
+  hasIssueCode,
+  normalizeDuctbankId,
+  rowMatchesDuctbankFilter
+} from './src/ductbank-route/issueModel.js';
 
 function projectDuctbankId(ductbank={}){
  return String(ductbank.ductbank_id||ductbank.id||ductbank.tag||'').trim();
@@ -2657,6 +2664,89 @@ function validateMoistureContent(){
   el.value=val;
 }
 
+// <relax-kernel>
+// Far-field temperature (C) at grid node (i,j) from every conduit treated as a
+// line source with its image above the isothermal grade (IEC 60287-2-1 /
+// Kennelly): T = Te + sum P*rho/(2 pi) * ln(d_image / d).
+function ductbankFarFieldTemperature(heatMap,opts){
+  const {earthT,rho,dx,offsetXm,offsetYm}=opts;
+  const sources=Object.values(heatMap).filter(h=>h&&h.power>0).map(h=>({
+    x:h.cx+offsetXm,y:h.cy+offsetYm,c:h.power*rho/(2*Math.PI),r:Math.max(h.r,dx/2)
+  }));
+  return (i,j)=>{
+    const x=i*dx,y=j*dx;
+    let t=earthT;
+    for(const s of sources){
+      const d=Math.max(Math.hypot(x-s.x,y-s.y),s.r);
+      t+=s.c*Math.log(Math.hypot(x-s.x,y+s.y)/d);
+    }
+    return t;
+  };
+}
+
+// Successive over-relaxation for  k * laplacian(T) = -q  on the node grid.
+// Side and bottom edges are held at the far-field temperature (edgeTemp), not at
+// the undisturbed earth temperature: an edge only one burial depth from the bank
+// forced the domain too cool by 13-19%. Iterates until the largest per-sweep
+// change is below RELAX_TOLERANCE_C (the previous Jacobi loop stopped on 0.01 C
+// per sweep and 2000 sweeps, so finer grids returned badly under-converged results).
+function relaxDuctbankGrid(state,progressCb){
+  const {grid,powerGrid,sourceMask,sourceTemp,nx,ny,airT,Bi,edgeTemp}=state;
+  const RELAX_TOLERANCE_C=1e-4,MAX_SWEEPS=20000;
+  const N=nx*ny;
+  const t=new Float64Array(N),pw=new Float64Array(N),fixed=new Uint8Array(N);
+  for(let j=0;j<ny;j++){
+    for(let i=0;i<nx;i++){
+      const n=j*nx+i;
+      pw[n]=powerGrid[j][i];
+      if(sourceMask[j][i]){fixed[n]=1;t[n]=sourceTemp[j][i];}
+      else if(j===ny-1||i===0||i===nx-1){fixed[n]=1;t[n]=edgeTemp(i,j);}
+      else t[n]=edgeTemp(i,j);
+    }
+  }
+  const omega=Math.min(1.98,2/(1+Math.sin(Math.PI/Math.max(nx,ny))));
+  let diff=Infinity,iter=0;
+  while(iter<MAX_SWEEPS&&(iter<4||diff>RELAX_TOLERANCE_C)){
+    diff=0;
+    for(let j=0;j<ny;j++){
+      const base=j*nx;
+      for(let i=0;i<nx;i++){
+        const n=base+i;
+        if(fixed[n])continue;
+        let val;
+        if(j===0){
+          val=(t[n+nx]+Bi*airT)/(1+Bi);
+        }else{
+          const target=0.25*(t[n-1]+t[n+1]+t[n-nx]+t[n+nx]+pw[n]);
+          val=t[n]+omega*(target-t[n]);
+        }
+        const change=Math.abs(val-t[n]);
+        if(change>diff)diff=change;
+        t[n]=val;
+      }
+    }
+    iter++;
+    if(progressCb&&iter%25===0)progressCb(iter,MAX_SWEEPS);
+  }
+  for(let j=0;j<ny;j++){
+    for(let i=0;i<nx;i++)grid[j][i]=t[j*nx+i];
+  }
+  return {iter,diff};
+}
+// </relax-kernel>
+
+function getRduct(conduit,params){
+  if(!conduit||!conduit.conduit_type)return params.concreteEncasement?0.1:0.08;
+  const mat=conduit.conduit_type.includes('PVC')?'PVC':'steel';
+  const base=(RDUCT_TABLE[mat]||{})[conduit.trade_size];
+  let val=base!==undefined?base:(mat==='PVC'?0.1:0.08);
+  if(params.concreteEncasement){
+    const extra=RDUCT_TABLE.concrete[conduit.trade_size];
+    val+=(extra!==undefined?extra:0.05);
+  }
+  return val;
+}
+
 function solveDuctbankTemperatures(conduits,cables,params,progress){
   const svg=document.getElementById('grid');
   const width=Math.round(parseFloat(svg.getAttribute('width'))||svg.clientWidth);
@@ -2682,7 +2772,16 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
   const referenceSolverHeight=referenceHeight+coverOffsetPx+boundaryPadPx;
   const requestedStep=Math.ceil(Math.max(solverWidth,solverHeight)/GRID_SIZE);
   const referenceStep=Math.ceil(Math.max(referenceSolverWidth,referenceSolverHeight)/GRID_SIZE);
-  const step=Math.max(4,Math.min(requestedStep,referenceStep,scale*2)); // pixel step for solver grid
+  // Resolve the smallest conduit with about 4 cells across its radius (the grid
+  // setting alone gave a 4 in conduit a single cell), within a cell budget.
+  let minRadiusPx=Infinity;
+  conduits.forEach(cd=>{
+    const area=CONDUIT_SPECS[cd.conduit_type]?.[cd.trade_size];
+    if(Number.isFinite(area)&&area>0)minRadiusPx=Math.min(minRadiusPx,Math.sqrt(area/Math.PI)*scale);
+  });
+  let step=Math.max(4,Math.min(requestedStep,referenceStep,scale*2)); // pixel step for solver grid
+  if(Number.isFinite(minRadiusPx))step=Math.max(4,Math.min(step,Math.floor(minRadiusPx/4)));
+  while((solverWidth/step)*(solverHeight/step)>120000)step+=2;
   const dx=(0.0254/scale)*step;
   const nx=Math.ceil(solverWidth/step);
   const ny=Math.ceil(solverHeight/step);
@@ -2722,16 +2821,19 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
     const cxPx=Math.round((h.cx/0.0254*scale+margin+boundaryPadPx)/step);
     const cyPx=Math.round((h.cy/0.0254*scale+margin+coverOffsetPx)/step);
     const rPx=Math.max(1,Math.round((h.r/0.0254*scale)/step));
-    const q=h.power/(Math.PI*h.r*h.r)*dx*dx/k;
+    const cells=[];
     for(let j=Math.max(0,cyPx-rPx);j<=Math.min(ny-1,cyPx+rPx);j++){
       for(let i=Math.max(0,cxPx-rPx);i<=Math.min(nx-1,cxPx+rPx);i++){
         const dxp=i-cxPx,dyp=j-cyPx;
-        if(dxp*dxp+dyp*dyp<=rPx*rPx){
-          powerGrid[j][i]+=q;
-          if(!conduitCells[cid])conduitCells[cid]=[];
-          conduitCells[cid].push([j,i]);
-        }
+        if(dxp*dxp+dyp*dyp<=rPx*rPx)cells.push([j,i]);
       }
+    }
+    // Spread the heat over the cells actually used to represent the conduit, so the
+    // total injected equals the cable loss whatever the grid resolution.
+    if(cells.length){
+      const q=h.power/(cells.length*k);
+      cells.forEach(([j,i])=>{powerGrid[j][i]+=q;});
+      conduitCells[cid]=cells;
     }
   });
 
@@ -2776,77 +2878,57 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
     }
   });
 
-  let diff=Infinity,iter=0,maxIter=2000;
-  const minIter=Math.max(80,GRID_SIZE*4);
-  return new Promise(resolve=>{
-    function step(){
-      let count=0;
-      while((iter<minIter || diff>0.01)&&iter<maxIter&&count<10){
-        diff=0;
-        for(let j=0;j<ny;j++){
-          for(let i=0;i<nx;i++){
-            let val;
-            if(sourceMask[j][i]){
-              val=sourceTemp[j][i];
-            }else if(j===ny-1||i===0||i===nx-1){
-              val=earthT;
-            }else if(j===0){
-              val=(grid[j+1][i]+Bi*airT)/(1+Bi);
-            }else{
-              val=0.25*(grid[j][i-1]+grid[j][i+1]+grid[j-1][i]+grid[j+1][i]+powerGrid[j][i]);
-            }
-            newGrid[j][i]=val;
-            diff=Math.max(diff,Math.abs(val-grid[j][i]));
-          }
-        }
-        for(let j=0;j<ny;j++){
-          for(let i=0;i<nx;i++)grid[j][i]=newGrid[j][i];
-        }
-        iter++;
-        count++;
-      }
-      if(typeof progress==='function') progress(iter,maxIter);
-      if(diff>0.01&&iter<maxIter){
-        requestAnimationFrame(step);
-      }else{
-        const temps={};
-        Object.keys(conduitCells).forEach(cid=>{
-          const cells=conduitCells[cid];
-          let sum=0;
-          cells.forEach(([j,i])=>{sum+=grid[j][i];});
-          const base=sum/cells.length;
-          const p=heatMap[cid].power||0;
-          const cd=conduits.find(d=>d.conduit_id===cid)||{};
-          const rduct=getRduct(cd,params)+(params.ductThermRes||0);
-          temps[cid]=base+p*rduct;
-        });
-        const cropCols=Math.max(1,GRID_SIZE);
-        const cropRows=Math.max(1,Math.ceil((height/Math.max(width,1))*GRID_SIZE));
-        const drawingOriginX=Number.isFinite(params.drawingOriginX)?params.drawingOriginX:margin;
-        const drawingOriginY=Number.isFinite(params.drawingOriginY)?params.drawingOriginY:margin;
-        const cropOriginX=boundaryPadPx+margin-drawingOriginX;
-        const cropOriginY=coverOffsetPx+margin-drawingOriginY;
-        const visibleGrid=[];
-        for(let j=0;j<cropRows;j++){
-          const yPx=cropOriginY+(cropRows===1?0:(j/(cropRows-1))*height);
-          const sourceJ=Math.min(ny-1,Math.max(0,Math.round(yPx/step)));
-          const sourceRow=grid[sourceJ] || [];
-          const row=[];
-          for(let i=0;i<cropCols;i++){
-            const xPx=cropOriginX+(cropCols===1?0:(i/(cropCols-1))*width);
-            const sourceI=Math.min(nx-1,Math.max(0,Math.round(xPx/step)));
-            row.push(Number.isFinite(sourceRow[sourceI])?sourceRow[sourceI]:earthT);
-          }
-          visibleGrid.push(row);
-        }
-        resolve({grid:visibleGrid,conduitTemps:temps,iter,diff,ambient:earthT});
-      }
-    }
-    step();
+  const edgeTemp=ductbankFarFieldTemperature(heatMap,{
+    earthT,rho:1/k,dx,
+    offsetXm:(margin+boundaryPadPx)/scale*0.0254,
+    offsetYm:(margin+coverOffsetPx)/scale*0.0254
   });
+  const {iter,diff}=relaxDuctbankGrid({grid,powerGrid,sourceMask,sourceTemp,nx,ny,airT,Bi,edgeTemp},progress);
+    const temps={};
+    Object.keys(conduitCells).forEach(cid=>{
+      const cells=conduitCells[cid];
+      let sum=0;
+      cells.forEach(([j,i])=>{sum+=grid[j][i];});
+      const base=sum/cells.length;
+      const p=heatMap[cid].power||0;
+      const cd=conduits.find(d=>d.conduit_id===cid)||{};
+      const rduct=getRduct(cd,params)+((params.ductGapByConduit||{})[cid]||0)+(params.ductThermRes||0);
+      temps[cid]=base+p*rduct;
+    });
+    const cropCols=Math.max(1,GRID_SIZE);
+    const cropRows=Math.max(1,Math.ceil((height/Math.max(width,1))*GRID_SIZE));
+    const drawingOriginX=Number.isFinite(params.drawingOriginX)?params.drawingOriginX:margin;
+    const drawingOriginY=Number.isFinite(params.drawingOriginY)?params.drawingOriginY:margin;
+    const cropOriginX=boundaryPadPx+margin-drawingOriginX;
+    const cropOriginY=coverOffsetPx+margin-drawingOriginY;
+    const visibleGrid=[];
+    for(let j=0;j<cropRows;j++){
+      const yPx=cropOriginY+(cropRows===1?0:(j/(cropRows-1))*height);
+      const sourceJ=Math.min(ny-1,Math.max(0,Math.round(yPx/step)));
+      const sourceRow=grid[sourceJ] || [];
+      const row=[];
+      for(let i=0;i<cropCols;i++){
+        const xPx=cropOriginX+(cropCols===1?0:(i/(cropCols-1))*width);
+        const sourceI=Math.min(nx-1,Math.max(0,Math.round(xPx/step)));
+        row.push(Number.isFinite(sourceRow[sourceI])?sourceRow[sourceI]:earthT);
+      }
+      visibleGrid.push(row);
+    }
+  return Promise.resolve({grid:visibleGrid,conduitTemps:temps,iter,diff,ambient:earthT});
 }
 
-function solveDuctbankTemperaturesWorker(conduits,cables,params,progress){
+// Cable-to-duct air gap per conduit, from the same model that drives the screening ampacity.
+function ductGapResistances(conduits,cables){
+  const gaps={};
+  conduits.forEach(cd=>{
+    const inConduit=cables.filter(c=>c.conduit_id===cd.conduit_id);
+    gaps[cd.conduit_id]=ductbankAmpacityModel.ductAirGapResistance(cd,inConduit);
+  });
+  return gaps;
+}
+
+function solveDuctbankTemperaturesWorker(conduits,cables,rawParams,progress){
+  const params={...rawParams,ductGapByConduit:ductGapResistances(conduits,cables)};
   const svg=document.getElementById('grid');
   const width=Math.round(parseFloat(svg.getAttribute('width'))||svg.clientWidth);
   const height=Math.round(parseFloat(svg.getAttribute('height'))||svg.clientHeight);
@@ -3154,10 +3236,6 @@ function setDuctbankText(id, value){
  if(el) el.textContent=value;
 }
 
-function normalizeDuctbankId(value){
- return String(value || '').trim();
-}
-
 function rowTextContent(row){
  let text=row.textContent || '';
  row.querySelectorAll('input, select').forEach(field=>{
@@ -3166,127 +3244,16 @@ function rowTextContent(row){
  return text.toLowerCase();
 }
 
-function duplicateValues(values){
- const counts=new Map();
- values.map(normalizeDuctbankId).filter(Boolean).forEach(value=>{
-   counts.set(value,(counts.get(value)||0)+1);
- });
- return new Set(Array.from(counts.entries()).filter(([,count])=>count>1).map(([value])=>value));
-}
-
-function conduitFillLimit(cableCount){
- if(cableCount===1) return 53;
- if(cableCount===2) return 31;
- return 40;
-}
-
-function defaultDuctbankIssueDetails(issue){
- const defaults={
-   missing:{severity:'Missing Data',field:issue.table==='conduit'?'conduit_id':'tag',fix:'Complete the highlighted required field.'},
-   duplicate:{severity:'Duplicate',field:issue.table==='conduit'?'conduit_id':'tag',fix:'Rename the duplicate value so each row has a unique identifier.'},
-   assignment:{severity:'Assignment',field:'conduit_id',fix:'Assign the cable to an existing conduit.'},
-   fill:{severity:'Fill',field:'conduit_id',fix:'Move cables to another conduit or increase the conduit size.'},
-   thermal:{severity:'Thermal',field:'est_load',fix:'Reduce load, increase spacing, or review soil and thermal inputs.'},
-   ampacity:{severity:'Ampacity',field:'est_load',fix:'Reduce load, increase conductor size, or review ampacity assumptions.'}
- };
- return defaults[issue.code] || {severity:'Review',field:null,fix:'Review this row before exporting.'};
-}
-
-function addDuctbankIssue(context, issue){
- const normalized={...defaultDuctbankIssueDetails(issue),...issue};
- context.issues.push(normalized);
- const target=normalized.table==='conduit' ? context.conduitIssuesByRow : context.cableIssuesByRow;
- const list=target.get(normalized.row) || [];
- list.push(normalized);
- target.set(normalized.row,list);
-}
-
 function collectDuctbankContext(){
  const conduits=getAllConduits();
  const cables=getAllCables();
- const context={
-   conduits,
-   cables,
-   issues:[],
-   conduitIssuesByRow:new Map(),
-   cableIssuesByRow:new Map(),
-   conduitIds:new Set(conduits.map(c=>normalizeDuctbankId(c.conduit_id)).filter(Boolean)),
-   cableCountByConduit:new Map(),
-   fillMap:{},
-   fillWarningConduits:new Set(),
-   thermalConduits:new Set(),
-   ampacityConduits:new Set(),
-   ampacityCables:new Set()
- };
- conduits.forEach(c=>context.cableCountByConduit.set(normalizeDuctbankId(c.conduit_id),0));
- cables.forEach(c=>{
-   const cid=normalizeDuctbankId(c.conduit_id);
-   if(cid) context.cableCountByConduit.set(cid,(context.cableCountByConduit.get(cid)||0)+1);
- });
+ let fillMap={};
  try{
-   context.fillMap=fillResults();
+   fillMap=fillResults();
  }catch(e){
    console.warn('Unable to collect ductbank fill results for summary', e);
  }
- const duplicateConduits=duplicateValues(conduits.map(c=>c.conduit_id));
- const duplicateCables=duplicateValues(cables.map(c=>c.tag));
- conduits.forEach((conduit,row)=>{
-   const id=normalizeDuctbankId(conduit.conduit_id);
-   if(!id) addDuctbankIssue(context,{table:'conduit',row,code:'missing',field:'conduit_id',message:'Conduit is missing an ID',fix:'Enter a unique conduit ID.'});
-   if(id && duplicateConduits.has(id)) addDuctbankIssue(context,{table:'conduit',row,code:'duplicate',field:'conduit_id',message:`Duplicate conduit ID "${id}"`,fix:'Rename this conduit so every conduit ID is unique.'});
-   if(!CONDUIT_SPECS[conduit.conduit_type] || !CONDUIT_SPECS[conduit.conduit_type][conduit.trade_size]){
-     addDuctbankIssue(context,{table:'conduit',row,code:'missing',field:'trade_size',message:`Conduit ${id || row + 1} needs a valid type and trade size`,fix:'Choose a valid conduit type and trade size.'});
-   }
- });
- Object.entries(context.fillMap || {}).forEach(([conduitId,data])=>{
-   const count=data?.cables?.length || 0;
-   if(!count || !Number.isFinite(data.fillPct)) return;
-   const limit=conduitFillLimit(count);
-   if(data.fillPct > limit || data.fillPct > limit * 0.8){
-     context.fillWarningConduits.add(conduitId);
-     const row=conduits.findIndex(c=>normalizeDuctbankId(c.conduit_id)===conduitId);
-     if(row >= 0){
-       addDuctbankIssue(context,{
-         table:'conduit',
-         row,
-         code:'fill',
-         field:'conduit_id',
-         message:`Conduit ${conduitId} fill is ${data.fillPct.toFixed(1)}% of a ${limit}% limit`,
-         fix:'Move one or more cables to another conduit or select a larger trade size.'
-       });
-     }
-   }
- });
- Object.entries(window.conduitOverLimit || {}).forEach(([conduitId,result])=>{
-   if(result?.over) context.thermalConduits.add(conduitId);
- });
- Object.entries(window.cableOverLimit || {}).forEach(([tag,over])=>{
-   const normalizedTag=normalizeDuctbankId(tag);
-   if(over && normalizedTag) context.ampacityCables.add(normalizedTag);
- });
- cables.forEach((cable,row)=>{
-   const tag=normalizeDuctbankId(cable.tag);
-   const conduitId=normalizeDuctbankId(cable.conduit_id);
-   if(!tag) addDuctbankIssue(context,{table:'cable',row,code:'missing',field:'tag',message:'Cable is missing a tag',fix:'Enter a unique cable tag.'});
-   if(tag && duplicateCables.has(tag)) addDuctbankIssue(context,{table:'cable',row,code:'duplicate',field:'tag',message:`Duplicate cable tag "${tag}"`,fix:'Rename this cable so every cable tag is unique.'});
-   if(!(parseFloat(cable.diameter)>0)) addDuctbankIssue(context,{table:'cable',row,code:'missing',field:'diameter',message:`Cable ${tag || row + 1} needs a diameter`,fix:'Enter the outside diameter in inches.'});
-   if(!conduitId) addDuctbankIssue(context,{table:'cable',row,code:'assignment',field:'conduit_id',message:`Cable ${tag || row + 1} is not assigned to a conduit`,fix:'Choose the conduit this cable will be installed in.'});
-   else if(!context.conduitIds.has(conduitId)) addDuctbankIssue(context,{table:'cable',row,code:'assignment',field:'conduit_id',message:`Cable ${tag || row + 1} references missing conduit ${conduitId}`,fix:'Choose an existing conduit or add the missing conduit.'});
-   if(!(parseFloat(cable.insulation_thickness)>0)) addDuctbankIssue(context,{table:'cable',row,code:'missing',field:'insulation_thickness',message:`Cable ${tag || row + 1} needs insulation thickness`,fix:'Enter insulation thickness or select a conductor size with known defaults.'});
-   if(context.fillWarningConduits.has(conduitId)) addDuctbankIssue(context,{table:'cable',row,code:'fill',field:'conduit_id',message:`Cable ${tag || row + 1} is in a conduit near or over fill limit`,fix:'Move this cable to another conduit or increase conduit size.'});
-   if(context.thermalConduits.has(conduitId)){
-     addDuctbankIssue(context,{table:'cable',row,code:'thermal',field:'est_load',message:`Cable ${tag || row + 1} has a thermal alert`,fix:'Reduce estimated load, adjust spacing, or review soil assumptions.'});
-   }
-   if(context.ampacityCables.has(tag)){
-     if(conduitId) context.ampacityConduits.add(conduitId);
-     addDuctbankIssue(context,{table:'cable',row,code:'ampacity',field:'est_load',message:`Cable ${tag || row + 1} exceeds an ampacity estimate`,fix:'Reduce estimated load, increase conductor size, or review ampacity assumptions.'});
-   }
- });
- return context;
-}
-
-function hasIssueCode(issues, codes){
- return issues.some(issue=>codes.includes(issue.code));
+ return buildDuctbankIssueContext({conduits,cables,fillMap,conduitOverLimit:window.conduitOverLimit,cableOverLimit:window.cableOverLimit});
 }
 
 function ductbankIssueCodeMatchesFilter(code, filter=activeDuctbankFilter){
@@ -3303,35 +3270,7 @@ function ductbankIssueMatchesActiveFilter(issue, context){
  const rowData=issue.table==='conduit'
    ? context.conduits[issue.row]
    : context.cables[issue.row];
- return rowData ? rowMatchesDuctbankFilter(issue.table,rowData,issue.row,context) : true;
-}
-
-function rowMatchesDuctbankFilter(type, rowData, index, context){
- const issues=type==='conduit'
-   ? context.conduitIssuesByRow.get(index) || []
-   : context.cableIssuesByRow.get(index) || [];
- if(activeDuctbankFilter==='all') return true;
- if(type==='conduit'){
-   const id=normalizeDuctbankId(rowData.conduit_id);
-   const assigned=(context.cableCountByConduit.get(id) || 0) > 0;
-   if(activeDuctbankFilter==='assigned') return assigned;
-   if(activeDuctbankFilter==='unassigned') return id ? !assigned : false;
-   if(activeDuctbankFilter==='missing') return hasIssueCode(issues,['missing','duplicate','assignment']);
-   if(activeDuctbankFilter==='fill') return hasIssueCode(issues,['fill']);
-   if(activeDuctbankFilter==='thermal') return context.thermalConduits.has(id);
-   if(activeDuctbankFilter==='ampacity') return context.ampacityConduits.has(id);
- }else{
-   const tag=normalizeDuctbankId(rowData.tag);
-   const conduitId=normalizeDuctbankId(rowData.conduit_id);
-   const assigned=Boolean(conduitId && context.conduitIds.has(conduitId));
-   if(activeDuctbankFilter==='assigned') return assigned;
-   if(activeDuctbankFilter==='unassigned') return !assigned;
-   if(activeDuctbankFilter==='missing') return hasIssueCode(issues,['missing','duplicate','assignment']);
-   if(activeDuctbankFilter==='fill') return hasIssueCode(issues,['fill']);
-   if(activeDuctbankFilter==='thermal') return context.thermalConduits.has(conduitId);
-   if(activeDuctbankFilter==='ampacity') return context.ampacityCables.has(tag);
- }
- return true;
+ return rowData ? rowMatchesDuctbankFilter(issue.table,rowData,issue.row,context,activeDuctbankFilter) : true;
 }
 
 function applyDuctbankQuickFilter(context){
@@ -3339,7 +3278,7 @@ function applyDuctbankQuickFilter(context){
  document.querySelectorAll('#conduitTable tbody tr').forEach((row,index)=>{
    const data=context.conduits[index] || rowToConduit(row);
    const textMatch=!conduitQuery || rowTextContent(row).includes(conduitQuery);
-   const filterMatch=rowMatchesDuctbankFilter('conduit',data,index,context);
+   const filterMatch=rowMatchesDuctbankFilter('conduit',data,index,context,activeDuctbankFilter);
    const issues=context.conduitIssuesByRow.get(index) || [];
    const visibleIssues=issues.filter(issue=>ductbankIssueCodeMatchesFilter(issue.code));
    row.style.display=textMatch && filterMatch ? '' : 'none';
@@ -3353,7 +3292,7 @@ function applyDuctbankQuickFilter(context){
  document.querySelectorAll('#cableTable tbody tr').forEach((row,index)=>{
    const data=context.cables[index] || rowToCable(row);
    const textMatch=!cableQuery || rowTextContent(row).includes(cableQuery);
-   const filterMatch=rowMatchesDuctbankFilter('cable',data,index,context);
+   const filterMatch=rowMatchesDuctbankFilter('cable',data,index,context,activeDuctbankFilter);
    const issues=context.cableIssuesByRow.get(index) || [];
    const visibleIssues=issues.filter(issue=>ductbankIssueCodeMatchesFilter(issue.code));
    row.style.display=textMatch && filterMatch ? '' : 'none';

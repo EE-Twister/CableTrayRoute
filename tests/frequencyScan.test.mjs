@@ -264,3 +264,28 @@ function baseInput(overrides = {}) {
 })();
 
 console.log('✓ frequency scan tests passed');
+
+(function testReviewRegressions() {
+  const inputs = { baseFreqHz: 60, systemKv: 4.16, scMva: 40, xrRatio: 15, capacitorBanks: [{ kvar: 1500, label: 'C1' }] };
+  {
+  // refines the parallel resonance to the true order sqrt(MVAsc / MVAr) = 5.164, not the 0.5 grid
+    const r = runFrequencyScan(inputs);
+    const peak = r.resonances.find(x => x.type === 'parallel');
+    assert.ok(Math.abs(peak.h - Math.sqrt(40 / 1.5)) < 0.03, `peak at ${peak.h}`);
+    assert.strictEqual(peak.risk, 'danger'); // within 0.5 of the 5th
+  }
+  {
+  // a resistive damping load lowers the peak impedance
+    const base = runFrequencyScan(inputs);
+    const damped = runFrequencyScan({ ...inputs, dampingLoadKw: 1000 });
+    const peak = r => Math.max(...r.points.map(p => p.zMagOhm));
+    assert.ok(peak(damped) < 0.5 * peak(base), `${peak(damped)} vs ${peak(base)}`);
+  }
+  {
+  // damping load has no effect when there is no shunt capacitance
+    const a = runFrequencyScan({ ...inputs, capacitorBanks: [] });
+    const b = runFrequencyScan({ ...inputs, capacitorBanks: [], dampingLoadKw: 1000 });
+    assert.deepStrictEqual(a.points, b.points);
+  }
+  console.log('✓ frequency scan review regressions');
+})();

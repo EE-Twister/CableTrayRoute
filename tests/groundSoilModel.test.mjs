@@ -356,3 +356,71 @@ describe('evaluateRiskPoints — inspection point evaluation', () => {
 });
 
 console.log('\ngroundSoilModel tests complete.');
+
+// ---------------------------------------------------------------------------
+// Review regressions: series convergence, exact line-source potential, effective rho
+// ---------------------------------------------------------------------------
+import { analyzeGroundGrid, analyzeGroundGridWithSoil, twoLayerEffectiveRho } from '../analysis/groundGrid.mjs';
+
+describe('Wenner series convergence for high-contrast soil', () => {
+  it('approaches rho2 at large spacing when rho2/rho1 = 100 (K = 0.98)', () => {
+    // Closed-form limit: rho1 (1 + K)/(1 - K) = rho2
+    approx(wennerApparentResistivity(1, 100, 2, 50000), 100, 0.01);
+  });
+  it('rejects non-positive and blank measurements in the fit', () => {
+    const good = [{ a: 1, rhoA: 100 }, { a: 2, rhoA: 100 }, { a: 4, rhoA: 100 }];
+    assert.throws(() => fitTwoLayerSoil([...good.slice(0, 2), { a: 4, rhoA: 0 }]), /rhoA > 0/);
+    assert.throws(() => fitTwoLayerSoil([...good.slice(0, 2), { a: NaN, rhoA: 50 }]), /a > 0/);
+  });
+  it('recovers a 100:1 two-layer soil from synthetic data', () => {
+    const data = [0.5, 1, 2, 4, 8, 16, 32].map(a => ({ a, rhoA: wennerApparentResistivity(20, 2000, 3, a) }));
+    const fit = fitTwoLayerSoil(data);
+    approx(fit.rho1, 20, 0.05);
+    approx(fit.rho2, 2000, 0.05);
+    approx(fit.h, 3, 0.05);
+  });
+});
+
+describe('Surface potential line-source integration', () => {
+  it('matches rho I / (2 pi r) far from the conductors', () => {
+    const g = buildRectangularGeometry(30, 30, 7, 7, 0.5);
+    const V = estimateSurfacePotential({ x: 15 + 5000, y: 15 }, g.conductors, 100, 3000, g.totalConductorLength);
+    approx(V, (100 * 3000) / (2 * Math.PI * 5000), 0.01);
+  });
+  it('matches numerical integration along a single conductor', () => {
+    const c = { x1: 0, y1: 0, z1: -0.5, x2: 30, y2: 0, z2: -0.5 };
+    const P = { x: 10, y: 4 };
+    let num = 0;
+    const N = 200000;
+    for (let i = 0; i < N; i++) {
+      const x = (i + 0.5) * 30 / N;
+      num += (30 / N) / Math.sqrt((P.x - x) ** 2 + P.y ** 2 + 0.25);
+    }
+    const expected = (100 * 30) / (2 * Math.PI * 30) * num; // rho (I/L) / (2 pi) * integral, I = 30 A over L = 30 m
+    approx(estimateSurfacePotential(P, [c], 100, 30, 30), expected, 1e-4);
+  });
+  it('hazard map stays below GPR and gives plausible step voltages', () => {
+    const p = { rho: 100, gridLx: 30, gridLy: 30, nx: 7, ny: 7, h: 0.5, d: 0.01, Ig: 3000, tf: 0.5 };
+    const r = analyzeGroundGrid(p);
+    const g = buildRectangularGeometry(30, 30, 7, 7, 0.5);
+    const map = buildHazardMap(g, 100, 3000, r.Rg, r.Etouch, r.Estep, 1);
+    assert.ok(Math.max(...map.map(c => c.surfaceV)) < r.GPR, 'surface potential must not exceed GPR');
+    // The midpoint-source model gave > 7500 V step on this grid; IEEE 80 gives Es ~ 700 V.
+    assert.ok(Math.max(...map.map(c => c.stepV)) < 1.5 * r.Es);
+  });
+});
+
+describe('Two-layer effective resistivity', () => {
+  const grid = { gridLx: 30, gridLy: 30, nx: 7, ny: 7, h: 0.5, d: 0.01, Ig: 3000, tf: 0.5, rho: 100 };
+  it('uses the deeper layer when it is more resistive than the top layer', () => {
+    const soil = { rho1: 50, rho2: 500, h: 2 };
+    const eff = twoLayerEffectiveRho(soil, 900);
+    assert.ok(eff > 50);
+    approx(eff, wennerApparentResistivity(50, 500, 2, 30), 1e-9);
+    const r = analyzeGroundGridWithSoil(grid, soil);
+    assert.ok(r.Rg > analyzeGroundGrid({ ...grid, rho: 50 }).Rg);
+  });
+  it('keeps rho1 when the bottom layer is more conductive', () => {
+    assert.strictEqual(twoLayerEffectiveRho({ rho1: 500, rho2: 50, h: 2 }, 900), 500);
+  });
+});

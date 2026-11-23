@@ -42,7 +42,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const tempRating = parseInt(document.getElementById('feeder-temp').value, 10);
     const terminalTempValue = document.getElementById('feeder-terminal-temp').value;
     const terminalTempRating = terminalTempValue ? parseInt(terminalTempValue, 10) : null;
-    const ambientTempC = parseFloat(document.getElementById('feeder-ambient').value) || 30;
+    const ambientInput = parseFloat(document.getElementById('feeder-ambient').value);
+    const ambientTempC = Number.isFinite(ambientInput) ? ambientInput : 30;
     const bundledConductors = parseInt(document.getElementById('feeder-bundled').value, 10) || 3;
     const installationType = document.getElementById('feeder-install').value;
     let result;
@@ -90,7 +91,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const terminalTempValue = document.getElementById('motor-terminal-temp').value;
     const terminalTempRating = terminalTempValue ? parseInt(terminalTempValue, 10) : null;
     const highSF = document.getElementById('motor-highsf').checked;
-    const ambientTempC = parseFloat(document.getElementById('motor-ambient').value) || 30;
+    const ambientInput = parseFloat(document.getElementById('motor-ambient').value);
+    const ambientTempC = Number.isFinite(ambientInput) ? ambientInput : 30;
     const bundledConductors = parseInt(document.getElementById('motor-bundled').value, 10) || 3;
     const installationType = document.getElementById('motor-install').value;
     let result;

@@ -134,6 +134,8 @@ test.describe("CableTrayRoute workflow", () => {
     });
     await expect(lockButton).toBeVisible();
     await lockButton.click();
+    // Routing results open in review mode, which hides the setup sidebar and Route button
+    await page.click("#route-mode-toggle");
     await page.click("#calculate-route-btn");
     await expect(page.locator("#results-section")).toBeVisible();
   });

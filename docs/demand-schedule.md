@@ -42,19 +42,19 @@ The review panel is intentional. It prevents the estimator from silently applyin
 
 | Category | Keywords | NEC Reference | Demand Factor |
 |---|---|---|---|
-| Lighting | light, luminaire, lamp, illum | NEC 220.42 | 100% ≤ 50 kVA; 50% remainder |
+| Lighting | light, luminaire, lamp, illum | NEC Table 220.42 | 100% (all other occupancies); warehouse, hospital and hotel tiers selectable |
 | Receptacles | recept, outlet, plug, strip | NEC 220.44 | 100% first 10 kVA; 50% remainder |
 | Motors | motor, pump, fan, compressor, drive, VFD | NEC 430.24 | 100% all + 25% largest |
-| Kitchen / Cooking | kitchen, cook, oven, range, fryer | NEC Table 220.56 | 65%–100% by unit count |
+| Kitchen / Cooking | kitchen, cook, oven, range, fryer | NEC Table 220.56 | 65%–100% by unit count, not below the two largest pieces |
 | HVAC / Heating | hvac, heat, cool, AC, chiller, furnace | NEC 220.60 | 100% (verify non-coincident) |
-| EV Charging | ev, electric vehicle, charger, EVSE | NEC 625.42 | 100% / 75% / 50% by ordinal |
-| Fixed Appliances | appliance, washer, dryer | NEC 220.53 | 75% if ≥ 4, else 100% |
+| EV Charging | ev, electric vehicle, charger, EVSE | NEC 625.42 | 100% (continuous load) |
+| Fixed Appliances | appliance, washer, dryer | NEC 220.53 | 100% (the 75% factor is for dwelling units only) |
 | Critical / UPS | ups, critical, server, datacen | NEC 220 | 100% |
 | General / Other | (all others) | NEC 220 | 100% |
 
 ### NEC 430.24 — Motor Loads
 
-All motor kW values are taken at 100% of full-load amperes. The motor with the **largest connected kW** receives an additional **25% adder** per NEC 430.24. If a single motor is present it receives the 125% factor.
+All motor kW values are taken at 100% of full-load amperes. Exactly one motor, the one with the **largest connected kW** (ties go to the first in the list), receives an additional **25% adder** per NEC 430.24. If a single motor is present it receives the 125% factor.
 
 ### NEC 220.56 — Commercial Kitchen
 
@@ -68,15 +68,19 @@ Demand factor by total unit count (Table 220.56):
 | 5 | 70% |
 | 6+ | 65% |
 
+The demand for the category is never less than the sum of the two largest pieces of equipment.
+
+### NEC Table 220.42 — General Lighting
+
+Occupancies not listed in the table are 100%. Select a lighting occupancy to apply the tiered rows: warehouse (first 12.5 kVA at 100%, remainder 50%), hospital (first 50 kVA at 40%, remainder 20%), hotel/motel (first 20 kVA at 50%, next 80 kVA at 40%, remainder 30%).
+
 ### NEC 625.42 — EV Supply Equipment
 
-Chargers are applied in the order they appear in the Load List:
+EVSE is a continuous load and is taken at 100%. There is no ordinal demand-factor table; a lower demand is permitted only with a documented automatic load management system, which this tool does not model.
 
-| Charger ordinal | Factor |
-|---|---|
-| 1st | 100% |
-| 2nd – 4th | 75% |
-| 5th and above | 50% |
+### NEC 220.53 — Fixed Appliances
+
+The 75% factor for four or more appliances applies to dwelling units only. Non-dwelling fixed appliances are taken at 100%.
 
 ### NEC 220.60 — Non-Coincident Loads (HVAC)
 

@@ -183,7 +183,7 @@ export const TRAY_TYPES = {
  */
 export function requiredRatedLoad(cableWeightLbFt, spanFt) {
   if (cableWeightLbFt < 0) throw new Error('cableWeightLbFt must be ≥ 0');
-  if (spanFt <= 0) throw new Error('spanFt must be positive');
+  if (!(spanFt > 0)) throw new Error('spanFt must be positive');
   return cableWeightLbFt;
 }
 
@@ -247,7 +247,7 @@ export function recommendTrayTypes(application) {
  */
 export function selectMinWidth(totalCableCsaIn2, depthIn, fillFraction = 0.5) {
   if (totalCableCsaIn2 < 0) throw new Error('totalCableCsaIn2 must be ≥ 0');
-  if (depthIn <= 0) throw new Error('depthIn must be positive');
+  if (!(depthIn > 0)) throw new Error('depthIn must be positive');
   if (fillFraction <= 0 || fillFraction > 1) throw new Error('fillFraction must be in (0, 1]');
 
   for (const w of STANDARD_WIDTHS_IN) {

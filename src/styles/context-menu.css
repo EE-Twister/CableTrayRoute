@@ -12,6 +12,7 @@
     z-index: 1000;
 }
 
+/* The palette menu is placed from viewport (client) coordinates, so it must not scroll with the page. */
 #palette-context-menu {
     position: fixed;
 }

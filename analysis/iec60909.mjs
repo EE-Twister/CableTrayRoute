@@ -123,15 +123,16 @@ export function kappaIEC(xr) {
 // ---------------------------------------------------------------------------
 
 /**
- * Calculates the thermal factor m for DC component heating using the current
- * implementation's exponential time-constant screening approximation.
+ * Calculates the thermal factor m for the DC component heating effect
+ * (IEC 60909-0:2016 Eq. 102, Fig. 21):
  *
- * The stable form is m = (1 - exp(-2Tk/τ)) / (2Tk/τ), with τ derived from
- * the supplied κ/X/R relationship. This documents the numerical model used
- * by the application; it is not a claim that the approximation replaces the
- * governing IEC thermal-equivalent calculation for every source topology.
+ *   m = (e^(4 × f × Tk × ln(κ − 1)) − 1) / (2 × f × Tk × ln(κ − 1))
  *
- * @param {number} kappa - Peak factor κ
+ * m tends to 2 as κ → 2 (a DC component that never decays) and to 0 for
+ * long fault durations with a strongly damped DC component. Invalid inputs
+ * (non-finite values, Tk ≤ 0, κ outside 1.02–2) return null.
+ *
+ * @param {number} kappa - Peak factor κ (1.02 ≤ κ ≤ 2)
  * @param {number} faultDurationS - Fault duration Tk in seconds (default 1.0 s)
  * @param {number} freqHz - System frequency in Hz (default 50 Hz per IEC)
  * @returns {number} m factor (≥ 0)
@@ -143,22 +144,13 @@ export function thermalMFactor(kappa, faultDurationS = 1.0, freqHz = 50) {
   if (!Number.isFinite(k) || k < 1.02 || k > 2.0
     || !Number.isFinite(duration) || duration <= 0
     || !Number.isFinite(frequency) || frequency <= 0) return null;
-  const Tk = duration;
-  // DC component decrement: lnKsq = ln(κ²) but derived from κ = 1.02 + 0.98×e^(−3/xr)
-  // Equivalent: the DC time constant τ = X / (ω × R) = X/R / (2πf)
-  // From κ: κ − 1.02 = 0.98 × e^(−3/xr) → 3/xr = −ln((κ−1.02)/0.98)
-  // xr = −3 / ln((κ−1.02)/0.98)
-  const inner = (k - 1.02) / 0.98;
-  if (inner <= 0) return 0;
-  if (inner >= 1) return 1;
-  const xr = -3 / Math.log(inner);
-  const tau = xr / (2 * Math.PI * frequency); // DC time constant in seconds
-  const exponent = 2 * Tk / tau;
-  if (!Number.isFinite(exponent) || exponent < 0) return null;
-  // (1 - exp(-x)) / x, evaluated with expm1 to avoid cancellation as x→0.
-  if (exponent < 1e-12) return 1;
-  const m = -Math.expm1(-exponent) / exponent;
-  return Number.isFinite(m) ? Math.min(Math.max(m, 0), 1) : null;
+  const Tk = Math.max(duration, 0.02);
+  const lnTerm = Math.log(k - 1);
+  const y = 2 * frequency * Tk * lnTerm;
+  // κ = 2 gives ln(1) = 0: the DC component does not decay and m = 2.
+  if (Math.abs(y) < 1e-9) return 2;
+  const m = (Math.exp(2 * y) - 1) / y;
+  return Number.isFinite(m) ? m : null;
 }
 
 // ---------------------------------------------------------------------------

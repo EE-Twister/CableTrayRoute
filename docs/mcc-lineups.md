@@ -24,6 +24,7 @@ The MCC Lineups tool (`mcclineup.html`) builds motor control center lineup layou
 - Bucket selection from the elevation view, with the same bucket highlighted in the one-line preview and bucket list.
 - Layout validation for missing sections, section overflow, unit/inch mismatches, and active buckets without equipment tags.
 - Wireway validation for top/bottom horizontal wireway stack height and vertical wireway width versus section width.
+- Motor starter validation: for three-phase starter buckets with a horsepower and a device rating, the rating is compared with the NEC Table 430.250 full-load current at the lineup voltage (480 V reads the 460 V column). A device below the FLC is an error; below 125% or above 250% of FLC is a warning (acceptable only for adjustable instantaneous-trip/MCP devices).
 - A generated simple one-line diagram below the lineup elevation, with different symbols for starter, VFD, breaker/feeder, spare, and space cubicles. Starter cubicles can show a starter type and size such as `FVNR-2`; spare breaker ratings are shown as AT/AF when entered with trip and frame values; each branch drop is labeled with the section and bucket position such as `1A`, `2F`, or `3C`. Wide one-line previews keep their readable component scale and scroll horizontally instead of shrinking all branches to fit.
 - SVG sheet export for the current lineup.
 - PDF report export with the current lineup summary, elevation view, simple one-line, and bucket schedule.

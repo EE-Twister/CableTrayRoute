@@ -160,7 +160,11 @@ const DRAKE = CONDUCTOR_LIBRARY[0];
   });
 
   approx(r.rulingSpan, rulingSpan([500, 600, 550]), 1e-9, 'ruling span from spans');
-  approx(r.designTensionLb, 0.25 * DRAKE.uts, 1e-6, 'design tension = 25% UTS');
+  // The design percentage limits the MAXIMUM tension (at the support): H + w*D = 25% UTS
+  approx(r.designMaxTensionLb, 0.25 * DRAKE.uts, 1e-6, 'max tension = 25% UTS');
+  approx(r.designTensionLb + r.loading.wResultant * r.designSagFt, 0.25 * DRAKE.uts, 1e-6, 'H + w*sag = design max tension');
+  approx(r.designSupportTensionLb, 0.25 * DRAKE.uts, 1e-6, 'reported support tension = design max tension');
+  assert.ok(r.designTensionLb < 0.25 * DRAKE.uts, 'horizontal tension is below the maximum tension');
   assert.ok(r.designSagFt > 0, 'positive design sag');
   assert.equal(r.loadingCases.length, 3, 'three NESC loading cases');
   assert.ok(r.stringingTable.length === 7, '7 stringing rows (0..120 step 20)');
@@ -182,3 +186,39 @@ const DRAKE = CONDUCTOR_LIBRARY[0];
 })();
 
 console.log('sagTension.test.mjs — all assertions passed');
+
+// ---------------------------------------------------------------------------
+// Review regressions
+// ---------------------------------------------------------------------------
+(function testChangeOfStateLengthConsistency() {
+  // Independent check of the cubic: conductor length after the state change must equal the
+  // initial length corrected for thermal expansion and elastic stretch.
+  const cond = { e: DRAKE.e, area: DRAKE.area, alpha: DRAKE.alpha };
+  const S = 600, H1 = 7000, w1 = 2.0, t1 = 0, w2 = 1.094, t2 = 60;
+  const H2 = changeOfStateTension(cond, S, H1, w1, t1, w2, t2);
+  const len = (w, H) => S * (1 + (w * w * S * S) / (24 * H * H));
+  const expected = len(w1, H1) * (1 + cond.alpha * (t2 - t1)) * (1 + (H2 - H1) / (cond.e * cond.area));
+  approx(len(w2, H2), expected, 1e-4, 'length after change of state (linearised strain model)');
+})();
+
+(function testDesignTensionAtSupportAndUnloadedChecks() {
+  // Heavy loading on Drake at 600 ft, 60% UTS maximum tension (NESC limit)
+  const r = runSagTension({ conductor: DRAKE, rulingSpan: 600, district: 'heavy', designTensionPct: 60 });
+  const w = r.loading.wResultant;
+  const T = 0.6 * DRAKE.uts;
+  const H = (T + Math.sqrt(T * T - (w * w * 600 * 600) / 2)) / 2;
+  approx(r.designTensionLb, H, 1e-6, 'horizontal tension from support-tension equation');
+  assert.ok(r.unloaded60FPctUts > 0 && r.unloaded60FPctUts < 60);
+  // A high design tension must trigger the unloaded-tension warning
+  assert.ok(r.warnings.some(m => /60 °F/.test(m)), 'unloaded 60F warning for a 60% design');
+  // A low design tension should not
+  const low = runSagTension({ conductor: DRAKE, rulingSpan: 600, district: 'heavy', designTensionPct: 30 });
+  assert.ok(!low.warnings.some(m => /Unloaded tension at 60/.test(m)) || low.unloaded60FPctUts > 25);
+})();
+
+(function testImpossibleDesignTensionAndValidation() {
+  assert.throws(() => runSagTension({ conductor: DRAKE, rulingSpan: 6000, district: 'heavy', designTensionPct: 10 }), /cannot be reached/);
+  assert.throws(() => runSagTension({ conductor: { ...DRAKE, e: NaN }, rulingSpan: 400 }), /modulus/);
+  assert.throws(() => runSagTension({ conductor: { ...DRAKE, area: 0 }, rulingSpan: 400 }), /area/);
+  assert.throws(() => runSagTension({ conductor: DRAKE, rulingSpan: 400, stringingTemps: { min: 0, max: 1e6, step: 1 } }), /too many rows/);
+})();

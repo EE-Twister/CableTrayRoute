@@ -40,19 +40,25 @@ export const STC_TEMP_C = 25;
  * Segment endpoints are the "default operating point" values from the standard.
  */
 export const VOLT_VAR_CURVES = {
-  /** Category A — utility-scale, tighter deadband */
+  /**
+   * Category A — lower reactive-power capability (25 % of rating), no deadband at
+   * the reference voltage.
+   */
   A: [
+    [0.90, 0.25],
+    [1.00, 0.0],
+    [1.00, 0.0],
+    [1.10, -0.25],
+  ],
+  /**
+   * Category B — 44 % reactive-power capability with a ±2 % deadband
+   * (0.92 / 0.98 / 1.02 / 1.08). This is also the CA Rule 21 default curve.
+   */
+  B: [
     [0.92, 0.44],
     [0.98, 0.0],
     [1.02, 0.0],
     [1.08, -0.44],
-  ],
-  /** Category B — distributed rooftop, wider deadband */
-  B: [
-    [0.90, 0.44],
-    [0.98, 0.0],
-    [1.02, 0.0],
-    [1.10, -0.44],
   ],
 };
 
@@ -224,7 +230,7 @@ export function ibrPQCapability({
  * @param {object} p
  * @param {number} p.sRated_kVA          — inverter apparent power rating (kVA)
  * @param {number} p.vLL_kV              — line-to-line bus voltage (kV)
- * @param {number} [p.vBus_pu=1.0]       — pre-fault bus voltage (pu); scales rated current
+ * @param {number} [p.vBus_pu=1.0]       — pre-fault bus voltage (pu); informational, the current is limited
  * @param {number} [p.limitFactor=1.1]   — Ipeak/Irated ratio (IEEE 1547 §6.4: 1.05–1.2 pu)
  * @param {boolean} [p.rideThrough=true] — false = inverter trips; true = contributes fault I
  * @returns {{ Irated_A, Ifault_A, Ifault_pu, tripped }}
@@ -251,9 +257,10 @@ export function ibrFaultContribution({
     return { Irated_A, Ifault_A: 0, Ifault_pu: 0, tripped: true };
   }
 
-  // Fault current = limitFactor × rated current (voltage-independent: inverter current-limited)
+  // Fault current = limitFactor × rated current. An inverter is current-limited, so
+  // the contribution does not depend on the pre-fault voltage; pu and amperes agree.
   const Ifault_A = lf * Irated_A;
-  const Ifault_pu = lf * Math.max(0, Math.min(1, vpu));
+  const Ifault_pu = lf;
 
   return { Irated_A, Ifault_A, Ifault_pu, tripped: false };
 }
@@ -281,7 +288,7 @@ export const BESS_MODES = {
  * @param {number} [p.setpointKw=sRated_kW] — requested active power setpoint (kW)
  * @param {number} [p.vBus_pu=1.0]          — bus voltage for Volt-VAR in volt_var mode
  * @param {'A'|'B'} [p.voltVarCategory='B'] — IEEE 1547 Volt-VAR category
- * @param {number} [p.roundTripEff=0.92]    — round-trip efficiency (0–1)
+ * @param {number} [p.roundTripEff=0.92]    — AC-AC round-trip efficiency (0–1); each one-way leg uses its square root
  * @param {number} [p.minSocPct=10]         — minimum allowed SOC (%)
  * @param {number} [p.maxSocPct=95]         — maximum allowed SOC (%)
  * @returns {{ pAC_kW, qAC_kvar, socLimited, mode }}
@@ -301,7 +308,9 @@ export function bessDispatch({
   const Pk = Number(sRated_kW);
   const Sk = Number(sRated_kVA) || Pk;
   const soc = Number(soc_pct);
-  const eta = Math.max(0.5, Math.min(1, Number(roundTripEff)));
+  // The efficiency input is AC-AC round trip; charging and discharging each lose
+  // half of it (applying the full figure to one leg double-counts the loss).
+  const eta = Math.sqrt(Math.max(0.5, Math.min(1, Number(roundTripEff))));
   const spKw = Number.isFinite(Number(setpointKw)) ? Number(setpointKw) : Pk;
   const minSoc = Number(minSocPct);
   const maxSoc = Number(maxSocPct);

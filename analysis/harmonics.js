@@ -24,14 +24,37 @@ export function parseSpectrum(spec) {
     });
     return parsed;
   }
-  String(spec).split(/[,\s]+/).forEach(token => {
+  // Accept the notations people naturally type: "5:20%", "5=20", "5:20; 7:14".
+  String(spec).replace(/%/g, '').split(/[,;\s]+/).forEach(token => {
     if (!token) return;
-    const [orderValue, percentValue] = token.split(':');
+    const [orderValue, percentValue] = token.split(/[:=]/);
     const order = Number(orderValue);
     const percent = Number(percentValue ?? orderValue);
     if (order > 1 && Number.isFinite(percent) && percent !== 0) parsed[order] = percent;
   });
   return parsed;
+}
+
+/**
+ * Plain-language problems with a harmonic spectrum that would otherwise show
+ * up as a misleading 0% distortion.
+ */
+export function spectrumWarnings(parsedSpectrum, rawSpectrum) {
+  const warnings = [];
+  const values = Object.values(parsedSpectrum || {}).map(Number);
+  const hasInput = Array.isArray(rawSpectrum)
+    ? rawSpectrum.length > 0
+    : rawSpectrum && typeof rawSpectrum === 'object'
+      ? Object.keys(rawSpectrum).length > 0
+      : String(rawSpectrum ?? '').trim() !== '';
+  if (!values.length) {
+    warnings.push(hasInput
+      ? 'The harmonic spectrum could not be read. Use "order:percent" pairs such as 5:20, 7:14, 11:9.'
+      : 'No harmonic spectrum was entered, so distortion is 0% by default. Enter "order:percent" pairs such as 5:20, 7:14, 11:9.');
+  } else if (Math.max(...values) <= 1) {
+    warnings.push('Every harmonic magnitude is 1% or less. Spectrum values are percent of the fundamental (20 means 20%, not 0.2).');
+  }
+  return warnings;
 }
 
 // IEEE 519-2022 Table 1 — voltage total harmonic distortion (THD) limits (%)
@@ -131,6 +154,7 @@ export function estimateHarmonicDistortion({
     if (Number(order) > 1) harmonicCurrentSquared += (I1 * Number(percent) / 100) ** 2;
   });
   const ithd = I1 > 0 ? Math.sqrt(harmonicCurrentSquared) / I1 * 100 : 0;
+  const spectrumIssues = spectrumWarnings(parsedSpectrum, spectrum);
 
   const scMva = Number(shortCircuitMva);
   if (!Number.isFinite(scMva) || scMva <= 0) {
@@ -139,6 +163,7 @@ export function estimateHarmonicDistortion({
       vthd: null,
       evaluable: false,
       reason: 'Short-circuit MVA at the evaluation bus is required for voltage-distortion screening.',
+      ...(spectrumIssues.length ? { warnings: spectrumIssues } : {}),
     };
   }
 
@@ -185,6 +210,7 @@ export function estimateHarmonicDistortion({
     evaluable: Number.isFinite(vthd),
     z1Ohm: Number(z1Magnitude.toFixed(6)),
     capacitorSusceptanceS: Number(capacitorB1.toFixed(9)),
+    ...(spectrumIssues.length ? { warnings: spectrumIssues } : {}),
   };
 }
 
@@ -205,7 +231,7 @@ export function runHarmonics() {
 
   comps.forEach(c => {
     if (!truthyStudyFlag(pickFirst(c, ['harmonicSource', 'harmonic_source']))) return;
-    const spectrum = parseSpectrum(pickFirst(c, ['harmonics', 'harmonic_spectrum', 'spectrum']));
+    const spectrum = pickFirst(c, ['harmonics', 'harmonic_spectrum', 'spectrum']);
     const V = readVoltage(c);
     const P = readLoadKw(c);
     const I1 = readFundamentalCurrent(c, V, P);
@@ -237,7 +263,7 @@ export function runHarmonics() {
       calculationStatus: 'screening-only',
       pccAggregated: false,
       currentTddEvaluated: false,
-      requiredInputs: estimate.evaluable ? [] : [estimate.reason],
+      requiredInputs: [...(estimate.evaluable ? [] : [estimate.reason]), ...(estimate.warnings || [])],
       modelDetails: estimate,
     };
   });

@@ -28,6 +28,10 @@ The Pull Summary reports how many pull groups still require input.
 
 Ductbank route segments use the shared scope-qualified `ductbank:conduit` identity. An explicit Cable Schedule conduit assignment can complete a parent-only ductbank route when that conduit exists in the named ductbank. If multiple internal conduits remain possible, the Pull Card retains the ductbank step, reports the unresolved assignment, and marks input coverage incomplete instead of selecting a conduit.
 
+## Tension model
+
+Each straight run adds `w · L · (μ·cosφ + sinφ)`, where sinφ is the elevation gain divided by the run length along the pull direction. A horizontal run adds `w·μ·L`; a 30 ft vertical riser pulled upward adds `w × 30` lbf on top of friction, and a riser pulled downward reduces the tension (floored at zero, flagged as gravity-assisted). Elevation comes from the route segment coordinates, so pulling the same route from the other end gives a different result. Bends use the capstan exponential plus a bending-stiffness term, and sidewall pressure is tension divided by bend radius. The bend model does not add a separate weight term for vertical-to-horizontal transitions.
+
 ## Per-Pull Engineering Inputs
 
 Open a pull and use **Pull Engineering Inputs** to edit the following values for

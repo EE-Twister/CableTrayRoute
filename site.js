@@ -6,13 +6,11 @@ import { mountCopilot } from "./src/copilot.js";
 import { repairMojibake } from "./src/textEncoding.js";
 import { initReviewDraftBanner } from "./src/design-synthesis/reviewDraftBanner.js";
 
-import "./src/components/navigation.js";
+import { renderProjectDisplayName } from "./src/components/navigation.js";
 import "./src/components/commandPalette.js";
 import "./units.js";
 import {
   exportProject,
-  importProject,
-  getLastProjectImportError,
   getOneLine,
   getStudies,
   getStudyAssessments,
@@ -91,6 +89,8 @@ import {
 } from "./src/homepageSummary.js";
 import { createAutoSaveScheduler as createAutoSaveSchedulerModel } from "./src/autoSaveScheduler.js";
 import { recoverActiveProjectName } from "./src/projectContext.js";
+import { importProjectFileData } from "./src/projectFileImport.js";
+import { startProjectSaveStateTracking } from "./src/projectSaveState.js";
 
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
 const CHECKPOINT_KEY='CTR_CHECKPOINT';
@@ -672,23 +672,15 @@ function updateLastSavedIndicator(){
   if(typeof document==='undefined') return;
   const el=document.getElementById('last-saved-indicator');
   if(!el) return;
+  // A backup file is separate from the project's saved version shown by the
+  // header badge, so this text only reports backups.
   const savedText=formatLastSaved(lastSavedAt);
-  if(savedText){
-    el.textContent=`${savedText} • Edits auto-save in this browser.`;
-  }else{
-    el.textContent='Edits auto-save in this browser. Use Save Project for a downloadable backup.';
-  }
-}
-
-function dispatchProjectSyncStatus(detail){
-  if(typeof window==='undefined'||typeof window.dispatchEvent!=='function'||typeof CustomEvent!=='function') return;
-  window.dispatchEvent(new CustomEvent('ctr:project-sync-status',{detail}));
+  el.textContent=savedText?`Backup file: ${savedText.toLowerCase()}.`:'Save Project keeps your changes and can write a backup file.';
 }
 
 function recordSave(){
   lastSavedAt=new Date();
   updateLastSavedIndicator();
-  dispatchProjectSyncStatus({label:'Saved',state:'saved',detail:'Project backup was written.'});
   // Refresh "X ago" text every 30 seconds while the page is open
   if(lastSavedIndicatorTimer) clearInterval(lastSavedIndicatorTimer);
   lastSavedIndicatorTimer=setInterval(updateLastSavedIndicator,30000);
@@ -745,7 +737,7 @@ async function updateProjectDisplay(snapshot){
     }
     if(span){
       span.classList?.add('project-display-chip');
-      span.textContent=`Project: ${name}`;
+      renderProjectDisplayName(span,name);
       span.title=`Project hash: ${hash.slice(0,8)}`;
     }
   }catch(e){console.error('hash failed',e);}
@@ -888,10 +880,9 @@ function createProjectDisplayScheduler(){
 
 const projectDisplayScheduler=createProjectDisplayScheduler();
 
+const projectSaveState=startProjectSaveStateTracking();
 function save(snapshot,options={}){
-  if(options.reason!=='initial-render'&&options.reason!=='settings-init'){
-    dispatchProjectSyncStatus({label:'Unsaved changes',state:'dirty',detail:'Project changes are saved in this browser. Use Save Project to sync or back up this project.'});
-  }
+  projectSaveState.schedule();
   if(options.flush){
     return projectDisplayScheduler.flush(snapshot,options);
   }
@@ -2206,7 +2197,11 @@ function initCommonProjectFieldBindings(){
   const state=getProjectState();
   const meta=normalizeProjectMeta(getProjectMeta(),state?.name||'');
   const basis=getDesignBasis()||{};
-  const minAmbient=meta.minAmbientTempC;
+  // normalizeProjectMeta falls back to the 40 C hot design ambient when no minimum is
+  // set. That is the wrong value for freeze protection, so only link a minimum the
+  // project actually specified.
+  const rawMeta=getProjectMeta()||{};
+  const minAmbient=Number.isFinite(Number(rawMeta.minAmbientTempC))&&rawMeta.minAmbientTempC!==''?meta.minAmbientTempC:null;
   const maxAmbient=meta.maxAmbientTempC;
   const ambientValue=pageName==='heattracesizing.html'?minAmbient:maxAmbient;
   const bindings=[
@@ -2577,23 +2572,14 @@ function initProjectIO(){
               const confirmed = await confirmProjectImport(obj);
               if (!confirmed) { resolve(false); return; }
               const transaction = captureProjectTransactionSnapshot();
-              const activeProjectName = currentProjectFromHash()
-                || (typeof window !== 'undefined' && typeof window.currentProjectId === 'string'
-                  && window.currentProjectId !== 'default' ? window.currentProjectId.trim() : '');
-              if(importProject(obj)){
-                // Import is followed by a reload. Persist the imported
-                // canonical state to the active named project first, or the
-                // reload would restore the previous saved snapshot.
-                if (activeProjectName && !saveProject(activeProjectName)) {
-                  restoreProjectTransactionSnapshot(transaction);
-                  reject(new Error('Imported project could not be saved locally.'));
-                  return;
-                }
+              const result=importProjectFileData(obj,{fileName:file.name,hashName:currentProjectFromHash()});
+              if(result.ok){
+                if(result.createdProject) history.replaceState(null,'',`${location.pathname}${location.search}#${encodeURIComponent(result.projectName)}`);
                 resolve(true);
                 location.reload(); return;
               }
               restoreProjectTransactionSnapshot(transaction);
-              reject(new Error(getLastProjectImportError() || 'Import canceled or invalid project data.'));
+              reject(new Error(result.error || 'Import canceled or invalid project data.'));
             }catch(err){
               reject(err);
             }

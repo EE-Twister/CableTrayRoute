@@ -34,6 +34,17 @@ function it(name, fn){
       assert(csv.includes('C1,10'));
     });
 
+    it('exports positional array rows aligned with the headers', () => {
+      // Voltage drop, demand schedule, and reliability pages build array rows.
+      const csv = toCSV(['Cable', 'Drop (%)', 'Status'], [['C1', '1.250', 'pass'], ['C2', '', 'not evaluated']]);
+      assert.strictEqual(csv, 'Cable,Drop (%),Status\nC1,1.250,pass\nC2,,not evaluated');
+    });
+
+    it('sanitizes formula strings in array rows too', () => {
+      const csv = toCSV(['name'], [['=cmd()']]);
+      assert.strictEqual(csv, "name\n'=cmd()");
+    });
+
     it('exports PDF', async () => {
       const headers = ['cable', 'length'];
       const rows = [{ cable: 'C1', length: 10 }];
@@ -67,6 +78,26 @@ function it(name, fn){
         { key: 'provenance', value: Array.from({ length: 70 }, (_, index) => `line ${index}`).join('\\n') },
       ]);
       assert(pdf.byteLength > 0);
+    });
+
+    it('quotes cells containing line breaks so a row does not split', () => {
+      const csv = toCSV(['note', 'tag'], [{ note: 'line one\nline two', tag: 'A' }]);
+      assert.strictEqual(csv, 'note,tag\n"line one\nline two",A');
+      assert.strictEqual(csv.split('\n').length, 3, 'the multi-line cell spans lines inside its quotes');
+    });
+
+    it('leaves a negative number stored as text alone but still neutralises formulas', () => {
+      const csv = toCSV(['v'], [{ v: '-5' }, { v: '-0.25e-3' }, { v: '=1+1' }, { v: '-cmd|calc' }, { v: '\t=2' }]);
+      const lines = csv.split('\n');
+      assert.strictEqual(lines[1], '-5');
+      assert.strictEqual(lines[2], '-0.25e-3');
+      assert.strictEqual(lines[3], "'=1+1");
+      assert.strictEqual(lines[4], "'-cmd|calc");
+      assert.ok(lines[5].startsWith("'\t="), 'tab-prefixed formula is neutralised');
+    });
+
+    it('quotes headers that contain commas', () => {
+      assert.strictEqual(toCSV(['Load, kW'], [{ 'Load, kW': 5 }]), '"Load, kW"\n5');
     });
   });
 

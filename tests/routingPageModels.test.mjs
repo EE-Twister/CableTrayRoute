@@ -58,7 +58,9 @@ describe('routing page readiness model', () => {
 
         assert.equal(result.ready, true);
         assert.deepEqual(result.blocking, []);
-        assert.deepEqual(result.warnings, []);
+        // The 12 in x 4 in sample tray plans 19.2 in² at 40%; Table 392.22(A)(1) allows 14.0 in².
+        assert.equal(result.warnings.length, 1);
+        assert.match(result.warnings[0], /TR-1: 19\.2 vs 14\.0 in²/);
         assert.equal(result.diagnostics.coordinateReady, 1);
         assert.equal(result.diagnostics.cableSummary.routingReady, 1);
         assert.equal(result.routableSegments.length, 1);

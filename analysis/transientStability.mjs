@@ -101,6 +101,13 @@ export function simulateSwingEquation(params) {
 
   if (!Number.isFinite(H) || H <= 0) throw new Error('Inertia constant H must be positive');
   if (!Number.isFinite(Pm) || Pm < 0) throw new Error('Mechanical power Pm must be non-negative');
+  if (!(f > 0)) throw new Error('System frequency must be positive');
+  if (!(Pmax_fault >= 0) || !(Pmax_post >= 0) || !(Pmax_pre > 0)) {
+    throw new Error('Pmax values must be finite and non-negative (pre-fault Pmax positive)');
+  }
+  if (!Number.isFinite(delta0)) throw new Error('Initial rotor angle delta0 must be finite');
+  if (!(t_end > t_fault) || !(dt > 0)) throw new Error('t_end must exceed the fault time and dt must be positive');
+  if (!(t_clear >= t_fault)) throw new Error('Clearing time must not precede fault inception');
 
   const ws = 2 * Math.PI * f;         // synchronous angular frequency (rad/s)
   const M  = 2 * H / ws;              // inertia coefficient (s²/rad)
@@ -117,6 +124,18 @@ export function simulateSwingEquation(params) {
   let stable     = true;
   let t_unstable = null;
   let deltaMax   = delta0;
+
+  // After clearing, the undamped post-fault system conserves the energy
+  //   E = ½·M·ω² − Pm·δ − Pmax_post·cos δ
+  // and is stable only if E is below its value at the unstable equilibrium angle
+  // δu = π − asin(Pm/Pmax_post). Testing that at clearing decides the first-swing result
+  // without waiting for the rotor to reach 180° inside the simulation window, which would
+  // miss slow separations and overstate the CCT. With Pm > Pmax_post there is no
+  // post-fault equilibrium at all.
+  const noPostEquilibrium = Pm > Pmax_post;
+  const deltaU = noPostEquilibrium ? -Infinity : Math.PI - Math.asin(Pm / Pmax_post);
+  const energy = (d, w) => 0.5 * M * w * w - Pm * d - Pmax_post * Math.cos(d);
+  const energyCritical = noPostEquilibrium ? -Infinity : -Pm * deltaU - Pmax_post * Math.cos(deltaU);
 
   // RK4 acceleration function: d²δ/dt² = (Pm - Pmax × sin(δ)) / M
   function accel(t, d, w) {
@@ -148,8 +167,13 @@ export function simulateSwingEquation(params) {
 
     if (Math.abs(delta[i + 1]) > deltaMax) deltaMax = Math.abs(delta[i + 1]);
 
-    // Instability: δ ≥ π (rotor has "slipped a pole")
-    if (delta[i + 1] >= Math.PI && stable) {
+    // Instability: δ ≥ π (rotor has "slipped a pole"), or, once the fault is cleared, the rotor
+    // has crossed the post-fault unstable equilibrium while still moving outward.
+    const cleared = time[i + 1] >= t_clear;
+    const crossedUep = cleared && (noPostEquilibrium
+      || energy(delta[i + 1], omega[i + 1]) >= energyCritical - 1e-12
+      || (delta[i + 1] > deltaU && omega[i + 1] > 0));
+    if ((delta[i + 1] >= Math.PI || crossedUep) && stable) {
       stable     = false;
       t_unstable = time[i + 1];
     }
@@ -232,6 +256,33 @@ export function findCriticalClearingTime(baseParams, options = {}) {
   };
 }
 
+/**
+ * Time for the rotor to reach `target` (rad) under the during-fault swing equation, RK4 with
+ * a 0.1 ms step, searching up to 10 s. Returns Infinity if it does not get there.
+ */
+function timeToReachAngle({ M, Pm, Pmax, delta0, target, dt = 0.0001, tMax = 10 }) {
+  if (target <= delta0) return 0;
+  const acc = d => (Pm - Pmax * Math.sin(d)) / M;
+  let d = delta0;
+  let w = 0;
+  const steps = Math.round(tMax / dt);
+  for (let i = 0; i < steps; i++) {
+    const k1d = w, k1w = acc(d);
+    const k2d = w + 0.5 * dt * k1w, k2w = acc(d + 0.5 * dt * k1d);
+    const k3d = w + 0.5 * dt * k2w, k3w = acc(d + 0.5 * dt * k2d);
+    const k4d = w + dt * k3w, k4w = acc(d + dt * k3d);
+    const dNext = d + (dt / 6) * (k1d + 2 * k2d + 2 * k3d + k4d);
+    const wNext = w + (dt / 6) * (k1w + 2 * k2w + 2 * k3w + k4w);
+    if (dNext >= target) {
+      const frac = (target - d) / (dNext - d); // linear interpolation inside the step
+      return (i + frac) * dt;
+    }
+    d = dNext;
+    w = wNext;
+  }
+  return Infinity;
+}
+
 // ---------------------------------------------------------------------------
 // Equal-Area Criterion (analytical CCT estimate)
 // ---------------------------------------------------------------------------
@@ -245,12 +296,9 @@ export function findCriticalClearingTime(baseParams, options = {}) {
  * Acceleration area = Pm×(δ_cr - δ₀) - Pmax_fault×(cos(δ₀) - cos(δ_cr))
  * Deceleration area = Pmax_post×(cos(δ_cr) - cos(δ_max)) - Pm×(δ_max - δ_cr)
  *
- * Set them equal and solve numerically for δ_cr, then compute the time to
- * reach δ_cr under constant acceleration (conservative approximation):
- *   t_cr ≈ sqrt(2 × M × (δ_cr - δ₀) / (Pm - Pmax_fault×sin(δ₀)))
- *
- * Note: this is an approximation valid for small machines. Use numerical
- * simulation for final results.
+ * Set them equal and solve numerically for δ_cr, then integrate the during-fault
+ * swing equation to find the time at which the faulted rotor reaches δ_cr. The result
+ * agrees with the bisection CCT of findCriticalClearingTime (same model).
  *
  * @param {object} params
  * @param {number} params.Pm
@@ -319,15 +367,11 @@ export function equalAreaCriterion(params) {
   }
   const deltaCr = (lo + hi) / 2;
 
-  // Time to reach δ_cr under constant (initial) net acceleration — approximation
-  const netAccelInitial = (Pm - Pmax_fault * Math.sin(delta0)) / M;
-  let eac_cct_s;
-  if (netAccelInitial <= 0) {
-    // No acceleration during fault (fault Pmax ≥ Pm): system is always stable
-    eac_cct_s = Infinity;
-  } else {
-    eac_cct_s = Math.sqrt(2 * (deltaCr - delta0) / netAccelInitial);
-  }
+  // Time for the faulted rotor to reach δ_cr, by integrating the during-fault swing equation
+  // (net torque Pm − Pmax_fault·sin δ varies with δ, so a constant-acceleration formula is
+  // only exact when Pmax_fault = 0). Infinity when the faulted swing never reaches δ_cr,
+  // which is when a sustained fault would still keep the rotor below the critical angle.
+  const eac_cct_s = timeToReachAngle({ M, Pm, Pmax: Pmax_fault, delta0, target: deltaCr });
 
   return {
     delta0_deg:     Math.round((delta0  * 180 / Math.PI) * 100) / 100,
@@ -337,7 +381,7 @@ export function equalAreaCriterion(params) {
     eac_cct_cycles: isFinite(eac_cct_s) ? Math.round(eac_cct_s * f * 10) / 10 : Infinity,
     feasible: true,
     note: isFinite(eac_cct_s)
-      ? `EAC estimate (approximation). Use numerical simulation for final CCT.`
-      : `System stable for any clearing time (fault Pmax ≥ Pm).`,
+      ? 'Equal-area critical clearing time for the classical one-machine infinite-bus model (no damping, constant Pm and E′).'
+      : 'The faulted swing never reaches the critical angle, so the system is stable for any clearing time.',
   };
 }

@@ -328,3 +328,38 @@ function threeBusSys() {
 // Summary
 // ---------------------------------------------------------------------------
 console.log('\nAll voltageStability tests passed.');
+
+// ---------------------------------------------------------------------------
+// Review regressions
+// ---------------------------------------------------------------------------
+{
+  const assert = (await import('node:assert/strict')).default;
+  const { buildPVCurve, runVoltageStabilityStudy } = await import('../analysis/voltageStability.mjs');
+  // Radial lossless line, X = 0.5 pu (Zbase = 10^2/100 = 1 ohm), load P pu at unity pf, slack 1.0 pu.
+  // Closed form: V^2 = 0.5 + sqrt(0.25 - (P X)^2)  (nose at P X = 0.5)
+  const line = (pMW) => [
+    { id: 'S', type: 'slack', baseKV: 10, Vm: 1, Pd: 0, Qd: 0, connections: [{ target: 'L', r: 0, x: 0.5 }] },
+    { id: 'L', type: 'PQ', baseKV: 10, Pd: pMW * 1000, Qd: 0, connections: [] },
+  ];
+  const pv = buildPVCurve(line(20), { lambdaStart: 1, lambdaMax: 1.5, lambdaStep: 0.25 });
+  const v1 = pv.points[0].buses.find(b => b.id === 'L').Vm;
+  const expected = Math.sqrt(0.5 + Math.sqrt(0.25 - (0.2 * 0.5) ** 2));
+  assert.ok(Math.abs(v1 - expected) < 1e-5, `V ${v1} vs ${expected}`);
+
+  // Loads on non-PQ buses are not scaled, so they must not be scaled in the margin either
+  const withPvLoad = [
+    { id: 'S', type: 'slack', baseKV: 10, Vm: 1, Pd: 10000, Qd: 0, connections: [{ target: 'L', r: 0, x: 0.5 }] },
+    { id: 'L', type: 'PQ', baseKV: 10, Pd: 20000, Qd: 0, connections: [] },
+  ];
+  const r = buildPVCurve(withPvLoad, { lambdaStart: 1, lambdaMax: 1.5, lambdaStep: 0.25 });
+  const last = [...r.points].reverse().find(p => p.converged);
+  assert.ok(Math.abs(r.maxLoadMW - last.totalLoadMW) < 1e-9, 'max load comes from the evaluated point');
+  assert.ok(Math.abs(last.totalLoadMW - (10 + 20 * last.lambda)) < 1e-9, 'slack-bus load stays fixed');
+
+  // Voltage-limited margin: V = 0.9 pu at P X: V^2 = .81 -> (PX)^2 = .25 - (.81-.5)^2 = .1539 -> PX = .3923 -> P = .7846 pu
+  const study = runVoltageStabilityStudy({ buses: line(40), lambdaMax: 2.0, lambdaStep: 0.05 });
+  assert.ok(study.summary.voltageLimitLambda !== null && Math.abs(study.summary.voltageLimitLambda * 0.4 - 0.7846) < 0.05 + 0.4 * 0.05,
+    `limit at λ ${study.summary.voltageLimitLambda}`);
+  assert.ok(study.summary.voltageLimitedMarginMW <= study.summary.loadabilityMarginMW);
+  assert.ok(study.warnings.some(w => /below 0\.9 pu/.test(w)));
+}

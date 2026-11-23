@@ -1,3 +1,4 @@
+import { showModal } from './src/components/modal.js';
 import {
   runInsulationCoordinationStudy,
   IEC60071_RANGE_I,

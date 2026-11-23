@@ -176,7 +176,7 @@ async function loadUsers() {
     const { users } = await res.json();
     renderUsersTable(users);
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" class="table-empty table-error">Failed to load users: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="table-empty table-error">Failed to load users: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -273,7 +273,7 @@ async function loadAuditLog() {
     renderAuditTable(entries);
     countEl.textContent = `Showing ${entries.length} of ${total} entries`;
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" class="table-empty table-error">Failed to load audit log: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="table-empty table-error">Failed to load audit log: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 

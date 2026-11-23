@@ -198,3 +198,65 @@ describe('checkCompliance', () => {
     assert.ok(!c50.generalPublic.pass);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Review regressions: compact cable sets, input validation, independent phasor check
+// ---------------------------------------------------------------------------
+function phasorRms(conductors, p) {
+  // Analytical time-average: B_rms² = 0.5 (|Bx|² + |By|²) for peak phasors Bx, By
+  let bxRe = 0, bxIm = 0, byRe = 0, byIm = 0;
+  for (const c of conductors) {
+    const dx = p.x - c.x, dy = p.y - c.y, d = Math.hypot(dx, dy);
+    const peak = (4e-7 * Math.PI / (2 * Math.PI)) * c.currentA * Math.SQRT2 / d * 1e6;
+    const th = c.phaseAngleDeg * Math.PI / 180;
+    bxRe += peak * (dy / d) * Math.cos(th); bxIm += peak * (dy / d) * Math.sin(th);
+    byRe += peak * (-dx / d) * Math.cos(th); byIm += peak * (-dx / d) * Math.sin(th);
+  }
+  return Math.sqrt(0.5 * (bxRe * bxRe + bxIm * bxIm + byRe * byRe + byIm * byIm));
+}
+
+describe('compact cable-set layout', () => {
+  it('phases of one set sit one cable diameter apart, centred in the tray', () => {
+    const c = buildThreePhaseConductors(100, 1, 0.3048, 0.0254);
+    assert.ok(Math.abs(c[1].x - 0) < 1e-12, 'middle phase on the tray centreline');
+    assert.ok(Math.abs(c[1].x - c[0].x - 0.0254) < 1e-12 && Math.abs(c[2].x - c[1].x - 0.0254) < 1e-12);
+  });
+
+  it('sets are spread evenly and phase spacing shrinks when the tray is full', () => {
+    const c = buildThreePhaseConductors(100, 10, 0.3048, 0.0254);
+    assert.strictEqual(c.length, 30);
+    const xs = c.map(v => v.x);
+    assert.ok(Math.max(...xs) < 0.3048 / 2 && Math.min(...xs) > -0.3048 / 2, 'all conductors inside the tray');
+    assert.ok(Math.abs(c[1].x - c[0].x) <= 0.0254 + 1e-12);
+  });
+
+  it('RMS field matches an independent analytical phasor sum', () => {
+    const c = buildThreePhaseConductors(300, 3, 0.4572, 0.0381);
+    const p = { x: 0.4572 / 2 + 0.9144, y: 0.6096 };
+    const sampled = fieldFromConductorArray(c, p).bRms_uT;
+    assert.ok(Math.abs(sampled - phasorRms(c, p)) / sampled < 1e-3, `${sampled} vs ${phasorRms(c, p)}`);
+  });
+
+  it('a compact set gives a much smaller far field than phases spread across the tray', () => {
+    // Trefoil-like far field scales with phase spacing: 1 in vs 3 in (old spread) is ~3x
+    const compact = buildThreePhaseConductors(100, 1, 0.3048, 0.0254);
+    const p = { x: 0.3048 / 2 + 0.9144, y: 0.6096 };
+    const spread = [-0.0762, 0, 0.0762].map((x, i) => ({ x, y: 0.0127, currentA: 100, phaseAngleDeg: i * 120 }));
+    const ratio = fieldFromConductorArray(spread, p).bRms_uT / fieldFromConductorArray(compact, p).bRms_uT;
+    assert.ok(ratio > 2.5 && ratio < 3.5, `ratio ${ratio}`);
+  });
+});
+
+describe('invalid inputs are rejected rather than reported as 0 uT', () => {
+  it('non-finite current throws', () => {
+    assert.throws(() => buildThreePhaseConductors(NaN, 1, 0.3, 0.025), /Current/);
+    assert.throws(() => fieldFromSingleConductor(NaN, 1), /finite/);
+  });
+  it('zero tray width or cable diameter throws', () => {
+    assert.throws(() => buildThreePhaseConductors(100, 1, 0, 0.025), /Tray width/);
+    assert.throws(() => buildThreePhaseConductors(100, 1, 0.3, 0), /diameter/);
+  });
+  it('fieldProfile propagates errors instead of returning zeros', () => {
+    assert.throws(() => fieldProfile([{ x: 0, y: 0, currentA: NaN, phaseAngleDeg: 0 }], 0.3, [1]), /finite/);
+  });
+});

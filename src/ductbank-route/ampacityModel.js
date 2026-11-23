@@ -147,43 +147,77 @@ export function createDuctbankAmpacityModel({
     return resistance;
   }
 
-  function calcRcaComponents(cable, params) {
+  // Outer diameter (mm) of one cable: insulated conductor, times 2.16 for a
+  // three-conductor cable (IEC 60287-1-1 cabled-core factor).
+  function cableOuterDiameterMm(cable) {
+    const property = conductorProperties()[normalizeSizeKey(cable?.conductor_size)];
+    if (!property) return 0;
+    const conductorRadius = Math.sqrt(property.area_cm * 5.067e-10 / Math.PI);
+    const insulation = (Number.parseFloat(cable.insulation_thickness) || property.insulation_thickness || 0) * 0.0254;
+    const core = 2 * (conductorRadius + insulation) * 1000;
+    const conductors = cableCurrentCarryingConductors(cable);
+    return conductors >= 3 ? core * 2.16 : conductors === 2 ? core * 2 : core;
+  }
+
+  // Air gap between the cable(s) and the inside of the duct, IEC 60287-2-1
+  // section 4.2.7.2 for PVC/PE ducts in earth:
+  //   T4' = U / (1 + 0.1 (V + Y theta_m) D_e),  U = 1.87, V = 0.312, Y = 0.0037
+  // with D_e the diameter of the cable, or of the bundle when several cables
+  // share the conduit. The duct-wall table alone (0.05-0.12 K.m/W) omitted it,
+  // which rated a single cable in a duct roughly 40% too high.
+  function ductAirGapResistance(conduit, cablesInConduit = []) {
+    const cables = Array.isArray(cablesInConduit) ? cablesInConduit : [];
+    const diameters = cables.map(cableOuterDiameterMm).filter(d => d > 0);
+    if (!diameters.length) return 0;
+    const single = Math.max(...diameters);
+    const insideDiameterMm = conduitEquivalentDiameterMeters(conduit) * 1000;
+    let bundle = single * Math.sqrt(diameters.length);
+    if (insideDiameterMm > 0) bundle = Math.min(bundle, insideDiameterMm);
+    const thetaM = 60; // C, mean temperature of the gap medium
+    return 1.87 / (1 + 0.1 * (0.312 + 0.0037 * thetaM) * bundle);
+  }
+
+  function calcRcaComponents(cable, params, count = 1) {
     const { Rcond, Rins } = conductorThermalResistance(cable);
     const conduit = findConduit(cable.conduit_id) || {};
     const Rduct = getDuctThermalResistance(conduit, params);
-    const soilResistivity = Math.min(150, Math.max(40, params.soilResistivity || 90)) / 100;
+    const Rgap = ductAirGapResistance(conduit, Array.from({ length: Math.max(1, count) }, () => cable));
+    // No upper clamp: dry sand and rock backfill exceed 150 C-cm/W, and capping the
+    // entered value would silently understate the temperature rise.
+    const soilResistivity = Math.max(20, params.soilResistivity || 90) / 100;
     const burialDepth = (params.ductbankDepth || 0) * 0.0254;
     const conduitDiameter = conduitEquivalentDiameterMeters(conduit);
     const Rsoil = burialDepth > 0 && conduitDiameter > 0
       ? (soilResistivity / (2 * Math.PI)) * Math.log(4 * burialDepth / conduitDiameter)
       : 0;
-    return { Rcond, Rins, Rduct, Rsoil, Rca: Rcond + Rins + Rduct + Rsoil };
+    return { Rcond, Rins, Rduct, Rgap, Rsoil, Rca: Rcond + Rins + Rduct + Rgap + Rsoil };
   }
 
-  function ampacityDetails(cable, params) {
+  function ampacityDetails(cable, params, count = 1) {
     const areaCircularMils = sizeToArea(cable.conductor_size);
     if (!areaCircularMils) return { ampacity: 0 };
     const rating = getCableTemperatureRating(cable);
     const Rdc = dcResistance(cable.conductor_size, cable.conductor_material, rating);
     const Yc = skinEffect(cable.conductor_size);
     const deltaTd = dielectricRise(cable.voltage_rating);
-    const components = calcRcaComponents(cable, params);
+    const components = calcRcaComponents(cable, params, count);
     const ambient = Math.max(Number.isFinite(params.earthTemp) ? params.earthTemp : 20, Number.isNaN(Number(params.airTemp)) ? -Infinity : params.airTemp);
     const temperatureMargin = rating - (ambient + deltaTd);
     const conductorFactor = cableCurrentCarryingConductors(cable);
     const ampacity = temperatureMargin <= 0 || !Number.isFinite(Rdc) || Rdc <= 0 || !Number.isFinite(components.Rca) || components.Rca <= 0
       ? 0
       : Math.sqrt(temperatureMargin / (Rdc * (1 + Yc) * components.Rca * conductorFactor));
-    return { Rdc, Yc, deltaTd, ...components, ampacity, rating, conductorFactor };
+    // The reported raceway resistance is the duct wall plus the cable-to-duct air gap.
+    return { Rdc, Yc, deltaTd, ...components, Rduct: components.Rduct + components.Rgap, ampacity, rating, conductorFactor };
   }
 
-  function estimateAmpacity(cable, params) {
+  function estimateAmpacity(cable, params, count = 1) {
     const rating = getCableTemperatureRating(cable);
     const resistance = dcResistance(cable.conductor_size, cable.conductor_material, rating);
     const skinEffectFactor = skinEffect(cable.conductor_size);
     const dielectricTemperatureRise = dielectricRise(cable.voltage_rating);
-    const components = calcRcaComponents(cable, params);
-    const thermalResistance = components.Rcond + components.Rins + components.Rduct + components.Rsoil;
+    const components = calcRcaComponents(cable, params, count);
+    const thermalResistance = components.Rcond + components.Rins + components.Rduct + components.Rgap + components.Rsoil;
     if (!Number.isFinite(thermalResistance) || thermalResistance <= 0) return { ampacity: Number.NaN };
     const ambient = Math.max(Number.isFinite(params.earthTemp) ? params.earthTemp : 20, Number.isNaN(Number(params.airTemp)) ? -Infinity : params.airTemp);
     const temperatureMargin = rating - (ambient + dielectricTemperatureRise);
@@ -225,7 +259,9 @@ export function createDuctbankAmpacityModel({
     cableConductorTemperature,
     cableHeatLoss,
     cableSelfThermalResistance,
-    calcRca: (cable, params) => calcRcaComponents(cable, params).Rca,
+    calcRca: (cable, params, count) => calcRcaComponents(cable, params, count).Rca,
+    cableOuterDiameterMm,
+    ductAirGapResistance,
     calcRcaComponents,
     conductorThermalResistance,
     conduitTemperatureLimit,

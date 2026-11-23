@@ -812,16 +812,16 @@ function findParentInfo(comp, comps, compMap, visited) {
   return null;
 }
 
-function loadTccSettings(explicit = null) {
-  if (explicit && typeof explicit === 'object') {
-    return {
-      devices: Array.isArray(explicit.devices) ? explicit.devices : [],
-      settings: explicit.settings && typeof explicit.settings === 'object' ? explicit.settings : {},
-      componentOverrides: explicit.componentOverrides && typeof explicit.componentOverrides === 'object' ? explicit.componentOverrides : {}
-    };
-  }
+/**
+ * Resolve TCC settings for a study run. Callers holding a project snapshot
+ * (e.g. the REST API) pass `opts.tccSettings` explicitly — including `null`
+ * for "none saved" — so the run never falls back to shared storage.
+ */
+function loadTccSettings(opts = {}) {
   try {
-    const stored = getItem('tccSettings', DEFAULT_TCC_SETTINGS);
+    const stored = Object.prototype.hasOwnProperty.call(opts, 'tccSettings')
+      ? opts.tccSettings
+      : getItem('tccSettings', DEFAULT_TCC_SETTINGS);
     if (stored && typeof stored === 'object') {
       return {
         devices: Array.isArray(stored.devices) ? stored.devices : [],
@@ -974,6 +974,27 @@ function resolveUpstreamImpedance(comp, comps, compMap, cache, cableResolver, co
   return null;
 }
 
+/**
+ * Squared turns ratio (V_out / V_in)^2 used to refer an impedance chain that
+ * sits on a transformer's input side to the winding feeding the child bus.
+ * Ohms measured at the primary voltage must be multiplied by this factor
+ * before they are added to secondary-side impedance. Returns 1 when either
+ * winding voltage is unknown so behaviour is unchanged for incomplete data.
+ */
+function transformerReferralFactor(xfmr, outPort, inPort) {
+  const outKV = toKV(getTransformerVoltageForPort(xfmr, outPort));
+  const inKV = toKV(getTransformerVoltageForPort(xfmr, inPort));
+  if (!Number.isFinite(outKV) || !Number.isFinite(inKV) || outKV <= 0 || inKV <= 0) return 1;
+  return (outKV / inKV) ** 2;
+}
+
+/** Winding port of a transformer through which it is fed by its own parent. */
+function transformerInputPort(xfmr, comps, compMap, visited) {
+  const feed = findParentInfo(xfmr, comps, compMap, new Set(visited));
+  if (!feed?.connection) return 0;
+  return normalizePortIndex(feed.reversed ? feed.connection.sourcePort : feed.connection.targetPort);
+}
+
 function computeImpedance(comp, comps, compMap, cache, visited = new Set(), cableResolver = null, corrections = null) {
   if (!comp?.id) return { r: 0, x: 0 };
   if (cache.has(comp.id)) return cache.get(comp.id);
@@ -1003,6 +1024,8 @@ function computeImpedance(comp, comps, compMap, cache, visited = new Set(), cabl
         return total;
       }
     }
+    // Transformer parents are handled above, where the upstream impedance is
+    // referred through the winding voltages before it is added.
     total = add(total, computeImpedance(upstream, comps, compMap, cache, visited, cableResolver, corrections));
   }
   visited.delete(comp.id);
@@ -1064,6 +1087,14 @@ function buildImpedancePath(comp, comps, compMap, cableResolver, corrections = n
   const requiredInputs = [];
   const visited = new Set();
   let current = comp;
+  // Cumulative factor referring segments found further upstream (above each
+  // transformer crossed so far) to the study bus voltage.
+  let referral = 1;
+  const referred = segment => (referral === 1 ? segment : {
+    ...segment,
+    rOhm: (segment.rOhm || 0) * referral,
+    xOhm: (segment.xOhm || 0) * referral
+  });
 
   while (current?.id && !visited.has(current.id)) {
     visited.add(current.id);
@@ -1072,18 +1103,18 @@ function buildImpedancePath(comp, comps, compMap, cableResolver, corrections = n
     const { component: upstream, connection, reversed } = parent;
     if (connection) {
       const resolved = cableResolver?.resolve(connection, upstream, current);
-      if (resolved?.segment) segments.unshift(resolved.segment);
+      if (resolved?.segment) segments.unshift(referred(resolved.segment));
       if (!resolved?.segment && upstream?.type === 'cable') {
         const cableImpedance = extractComponentImpedance(upstream);
         if (hasImpedance(cableImpedance)) {
-          segments.unshift({
+          segments.unshift(referred({
             type: 'cable',
             tag: componentIdentity(upstream),
             source: 'One-Line cable data',
             method: 'component-impedance',
             rOhm: cableImpedance.r,
             xOhm: cableImpedance.x
-          });
+          }));
         }
       }
       (resolved?.assumptions || []).forEach(message => {
@@ -1099,7 +1130,7 @@ function buildImpedancePath(comp, comps, compMap, cableResolver, corrections = n
           requiredInputs.push('Transformer winding voltages are required to refer upstream impedance to the fault-bus base.');
         }
         if (hasImpedance(impedance)) {
-          segments.unshift({
+          segments.unshift(referred({
             type: 'transformer',
             tag: componentIdentity(upstream),
             source: 'One-Line transformer data',
@@ -1111,8 +1142,11 @@ function buildImpedancePath(comp, comps, compMap, cableResolver, corrections = n
             referralRatioSquared: ports.upstreamVoltageKV && ports.currentVoltageKV
               ? (ports.currentVoltageKV / ports.upstreamVoltageKV) ** 2
               : null
-          });
+          }));
         }
+        const outPort = normalizePortIndex(reversed ? connection?.targetPort : connection?.sourcePort);
+        const inPort = transformerInputPort(upstream, comps, compMap, visited);
+        referral *= transformerReferralFactor(upstream, outPort, inPort);
       }
     }
     current = upstream;
@@ -1121,7 +1155,7 @@ function buildImpedancePath(comp, comps, compMap, cableResolver, corrections = n
   if (current && isSourceComponent(current)) {
     const impedance = getSourceImpedance(current, corrections);
     if (hasImpedance(impedance)) {
-      segments.unshift({
+      segments.unshift(referred({
         type: 'source',
         tag: componentIdentity(current),
         source: 'One-Line source data',
@@ -1129,7 +1163,7 @@ function buildImpedancePath(comp, comps, compMap, cableResolver, corrections = n
         rOhm: impedance.r,
         xOhm: impedance.x,
         sourceVoltageKV: directNominalVoltageKV(current)
-      });
+      }));
     }
   }
 
@@ -1278,7 +1312,7 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
   const voltageCache = new Map();
   const protectiveLookupCache = new Map();
   const scaledDeviceCache = new Map();
-  const tccSettings = loadTccSettings(opts.tccSettings);
+  const tccSettings = loadTccSettings(opts);
   const protectiveDeviceLibrary = Array.isArray(opts.deviceCatalog)
     ? opts.deviceCatalog
     : defaultProtectiveDeviceCatalog;

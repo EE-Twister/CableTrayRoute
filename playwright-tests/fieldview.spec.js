@@ -33,7 +33,7 @@ test('field view captures a cable observation into the project queue', async ({ 
     localStorage.setItem('base:cableSchedule', JSON.stringify(cables));
   });
 
-  await page.goto(pageUrl('fieldview.html#cable=C-101'));
+  await page.goto(pageUrl('fieldview.html?e2e=1#cable=C-101'));
   await page.waitForFunction(() => Boolean(window.dataStore));
   await expect(page.getByRole('heading', { name: 'Field observation / punch item' })).toBeVisible();
   await page.selectOption('[data-field-observation="type"]', 'punch');

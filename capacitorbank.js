@@ -1,3 +1,4 @@
+import { showModal } from './src/components/modal.js';
 import { runCapacitorBankAnalysis } from './analysis/capacitorBank.mjs';
 import { getStudies, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';

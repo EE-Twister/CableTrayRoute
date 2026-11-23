@@ -13,7 +13,8 @@ import {
   formatPanelSelectorLabel,
   generatePanelId,
   getPanelDisplayName,
-  getPanelIdentifierCandidates
+  getPanelIdentifierCandidates,
+  panelMatchesIdentifier
 } from "./panel-schedule/panelModel.js";
 import {
   DC_PHASE_LABELS,

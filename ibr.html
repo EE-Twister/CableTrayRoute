@@ -411,12 +411,13 @@ P<sub>dispatch</sub> = P<sub>max</sub> &times; (1 &minus; curtail)</pre>
                 <button type="button" class="helpBtn" aria-label="Help — VV category">?</button>
               </label>
               <select id="vv-category" aria-describedby="vv-category-hint">
-                <option value="B" selected>Category B (default — broader deadband: 0.98–1.02 pu)</option>
-                <option value="A">Category A (tighter deadband: 0.98–1.02 pu, wider voltage range)</option>
+                <option value="B" selected>Category B (default — ±44 % reactive support, 0.92 / 0.98 / 1.02 / 1.08 pu)</option>
+                <option value="A">Category A (±25 % reactive support, 0.90 / 1.00 / 1.10 pu)</option>
               </select>
               <p id="vv-category-hint" class="field-hint">
-                IEEE 1547-2018 Table 8 defines two default Volt-VAR curves. Category B is the default
-                for most distributed resources. Category A applies to larger utility-interactive resources.
+                IEEE 1547-2018 Table 8 defines two default Volt-VAR curves. Category B requires the higher
+                reactive-power capability (44 % of rating) and is the default here; Category A is the
+                minimum capability (25 %). Use the category and curve your utility specifies.
               </p>
             </div>
           </fieldset>

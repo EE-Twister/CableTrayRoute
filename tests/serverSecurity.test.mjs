@@ -35,12 +35,15 @@ async function check(name, fn) {
   }
 }
 
+const SESSION_TTL_MS = 2000;
+
 async function authScenario() {
   console.log('server security - hashing, CSRF, and expiry');
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ctr-auth-'));
   const { server, port } = await startServer({
     dataDir: tmpDir,
-    tokenTtlMs: 250,
+    // Long enough that a slow CI runner cannot expire the session between steps.
+    tokenTtlMs: SESSION_TTL_MS,
     rateLimit: { windowMs: 60000, max: 100 },
     enforceHttps: false
   });
@@ -307,7 +310,7 @@ async function authScenario() {
       assert.strictEqual(payload.data.value, 2);
     });
 
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise(resolve => setTimeout(resolve, SESSION_TTL_MS + 200));
 
     await check('invalidates expired sessions', async () => {
       const res = await fetch(`${baseUrl}/projects/test`, {

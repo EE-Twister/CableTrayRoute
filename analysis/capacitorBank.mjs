@@ -47,9 +47,9 @@ const CAUTION_BAND = 1.0;
  * @returns {{ kvarRequired: number, tanDeltaExisting: number, tanDeltaTarget: number }}
  */
 export function requiredKvar({ pKw, pfExisting, pfTarget }) {
-  if (pKw <= 0) throw new Error('Real power pKw must be greater than zero');
-  if (pfExisting <= 0 || pfExisting > 1) throw new Error('pfExisting must be in (0, 1]');
-  if (pfTarget <= 0 || pfTarget > 1) throw new Error('pfTarget must be in (0, 1]');
+  if (!(pKw > 0)) throw new Error('Real power pKw must be greater than zero');
+  if (!(pfExisting > 0 && pfExisting <= 1)) throw new Error('pfExisting must be in (0, 1]');
+  if (!(pfTarget > 0 && pfTarget <= 1)) throw new Error('pfTarget must be in (0, 1]');
 
   const tanExisting = Math.tan(Math.acos(Math.min(pfExisting, 1)));
   const tanTarget = Math.tan(Math.acos(Math.min(pfTarget, 1)));
@@ -78,12 +78,13 @@ export function requiredKvar({ pKw, pfExisting, pfTarget }) {
  * @param {object} params
  * @param {number} params.kvaScMva  Short-circuit MVA at the bus (> 0)
  * @param {number} params.kvarCap   Capacitor bank kVAR rating (> 0)
+ * @param {number[]} [params.dominantHarmonics] Harmonic orders to screen against (default 5, 7, 11, 13)
  * @returns {{ harmonicOrder: number, riskLevel: 'safe'|'caution'|'danger',
  *             nearestDominant: number|null }}
  */
-export function resonanceOrder({ kvaScMva, kvarCap }) {
-  if (kvaScMva <= 0) throw new Error('kvaScMva must be greater than zero');
-  if (kvarCap <= 0) throw new Error('kvarCap must be greater than zero');
+export function resonanceOrder({ kvaScMva, kvarCap, dominantHarmonics = DOMINANT_HARMONICS }) {
+  if (!(kvaScMva > 0)) throw new Error('kvaScMva must be greater than zero');
+  if (!(kvarCap > 0)) throw new Error('kvarCap must be greater than zero');
 
   const kvaScKva = kvaScMva * 1000;
   const hr = Math.sqrt(kvaScKva / kvarCap);
@@ -91,7 +92,7 @@ export function resonanceOrder({ kvaScMva, kvarCap }) {
   let riskLevel = 'safe';
   let nearestDominant = null;
 
-  for (const h of DOMINANT_HARMONICS) {
+  for (const h of dominantHarmonics) {
     const dist = Math.abs(hr - h);
     if (dist <= DANGER_BAND) {
       riskLevel = 'danger';
@@ -152,23 +153,26 @@ export function detuningRecommendation(harmonicOrder, riskLevel) {
   } else if (harmonicOrder < 6) {
     // Near 5th harmonic
     detuningPct = 5.67;
-    tunedToOrder = 4.30;
+    tunedToOrder = 4.20;
     rationale = `Resonance order ${harmonicOrder} is near the 5th harmonic. ` +
-      `Specify a 5.67% detuned reactor (h_tune = 4.30) to shift resonance below h=5.`;
+      `Specify a 5.67% detuned reactor (h_tune = 4.20) to shift resonance below h=5.`;
   } else if (harmonicOrder < 9) {
     // Near 7th harmonic
     detuningPct = 7;
     tunedToOrder = 3.78;
     rationale = `Resonance order ${harmonicOrder} is near the 7th harmonic. ` +
-      `Specify a 7% detuned reactor (h_tune = 3.78) to shift resonance below h=7.`;
+      `Specify a 7% detuned reactor (h_tune = 3.78): it moves the parallel resonance below the 5th harmonic, ` +
+      `clear of both the 5th and 7th.`;
   } else {
     // Higher order — 5.67% is sufficient for most practical cases above 9th harmonic
     detuningPct = 5.67;
-    tunedToOrder = 4.30;
+    tunedToOrder = 4.20;
     rationale = `Resonance order ${harmonicOrder} is near a higher harmonic. ` +
       `A 5.67% detuned reactor provides adequate protection in most cases.`;
   }
 
+  rationale += ` Rate the capacitors for the higher voltage across a detuned cell (V_cap = V / (1 − p), about ` +
+    `${(100 / (1 - detuningPct / 100) - 100).toFixed(0)}% above system voltage) and size the reactor for the harmonic current.`;
   return { needed: true, detuningPct, tunedToOrder, rationale };
 }
 
@@ -337,19 +341,10 @@ export function runCapacitorBankAnalysis(inputs) {
     rationale: 'Short-circuit MVA not provided — resonance check skipped.' };
 
   if (kvaScMva > 0) {
-    resonance = resonanceOrder({ kvaScMva, kvarCap: bankResult.recommended });
+    // Screen against the caller's dominant harmonics (the default list is only a fallback)
+    const harmonics = Array.isArray(dominantHarmonics) && dominantHarmonics.length ? dominantHarmonics : DOMINANT_HARMONICS;
+    resonance = resonanceOrder({ kvaScMva, kvarCap: bankResult.recommended, dominantHarmonics: harmonics });
     detuning = detuningRecommendation(resonance.harmonicOrder, resonance.riskLevel);
-
-    // Override risk using caller-supplied dominant harmonics list
-    const customRisk = dominantHarmonics.some(h => Math.abs(resonance.harmonicOrder - h) <= DANGER_BAND)
-      ? 'danger'
-      : dominantHarmonics.some(h => Math.abs(resonance.harmonicOrder - h) <= CAUTION_BAND)
-        ? 'caution'
-        : null;
-    if (customRisk && customRisk !== resonance.riskLevel) {
-      resonance = { ...resonance, riskLevel: customRisk };
-      detuning = detuningRecommendation(resonance.harmonicOrder, customRisk);
-    }
 
     if (resonance.riskLevel === 'danger') {
       warnings.push(

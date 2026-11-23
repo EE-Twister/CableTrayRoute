@@ -87,7 +87,7 @@ Catenary sag  D = (H/w)·(cosh(w·S / 2H) − 1)</pre>
         <p><strong>NESC loading (IEEE C2 §250):</strong> radial ice (57 lb/ft³) plus transverse wind pressure combine into a resultant unit load, with a district constant added: Heavy (0.50 in ice, 4 psf, K=0.30, 0 °F), Medium (0.25 in, 4 psf, K=0.20, 15 °F), Light (0 in, 9 psf, K=0.05, 30 °F).</p>
         <p><strong>Change of state</strong> relates the horizontal tension at two conditions:</p>
         <pre>H₂²·[H₂ − H₁ + αEA(t₂−t₁) + EA·w₁²S²/24H₁²] = EA·w₂²S²/24</pre>
-        <p>The design (limiting) tension is set as a percentage of the conductor's rated strength (UTS) at the selected loading district, and the stringing table is back-calculated for the bare conductor at each installation temperature.</p>
+        <p>The design (limiting) maximum tension, which occurs at the support, is set as a percentage of the conductor's rated strength (UTS) at the selected loading district, and the stringing table is back-calculated for the bare conductor at each installation temperature.</p>
         <p><strong>References:</strong> IEEE Std 524; NESC (IEEE C2) §250; ASCE Manual 74.</p>
       </details>
 
@@ -124,9 +124,9 @@ Catenary sag  D = (H/w)·(cosh(w·S / 2H) − 1)</pre>
           </div>
           <div class="field-row">
             <label for="design-pct">Design tension</label>
-            <input type="number" id="design-pct" min="1" max="99" step="any" value="33.3" required aria-describedby="design-hint">
+            <input type="number" id="design-pct" min="1" max="99" step="any" value="50" required aria-describedby="design-hint">
             <span class="field-unit">% UTS</span>
-            <p id="design-hint" class="field-hint">Maximum tension as a percentage of rated strength at the loaded condition (NESC final tension limit is typically 60% loaded / 35% unloaded).</p>
+            <p id="design-hint" class="field-hint">Maximum tension at the support as a percentage of rated strength under the selected NESC loading (NESC limit: 60%). The study also checks the unloaded 60 °F tension against the usual 35% / 25% limits.</p>
           </div>
         </fieldset>
 

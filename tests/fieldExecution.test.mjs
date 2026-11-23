@@ -35,3 +35,16 @@ test('field execution summary reports accepted, blocked, and punch records', () 
   assert.equal(summary.blocked, 1);
   assert.equal(summary.punchOpen, 1);
 });
+
+test('status text is forgiving about case and spacing, and duplicate keys count once', () => {
+  assert.equal(normalizeFieldExecutionRecord({ sourceId: 'C-1', status: 'Installed' }).status, 'installed');
+  assert.equal(normalizeFieldExecutionRecord({ sourceId: 'C-1', status: 'Not Started' }).status, 'not-started');
+  assert.equal(normalizeFieldExecutionRecord({ sourceId: 'C-1', status: 'bogus' }).status, 'not-started');
+  const summary = summarizeFieldExecution([
+    { recordType: 'cable', sourceId: 'C-1', status: 'accepted' },
+    { recordType: 'cable', sourceId: 'c-1', status: 'staged' },
+    { recordType: 'cable', sourceId: 'C-2', status: 'blocked' },
+  ]);
+  assert.equal(summary.total, 2);
+  assert.equal(summary.complete, 1, 'the newest (first) record for C-1 wins');
+});

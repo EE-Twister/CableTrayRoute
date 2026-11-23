@@ -23,12 +23,12 @@
  *        Single-phase (2 conductors):
  *          F = (μ₀/2π) × i_peak² / d  =  2×10⁻⁷ × i_peak² / d   [N/m]
  *
- *        Three-phase balanced fault (trefoil or flat arrangement):
- *          F = √3×10⁻⁷ × i_peak² / d   [N/m]
+ *        Three-phase balanced fault, trefoil (IEC 61914 / IEC 60865-1):
+ *          F = (√3/2)×(μ₀/2π) × i_peak² / d = √3×10⁻⁷ × i_peak² / d   [N/m]
+ *        Three-phase balanced fault, flat (single layer, equal spacing):
+ *          F = 0.75×(μ₀/2π) × i_peak² / d = 1.5×10⁻⁷ × i_peak² / d    [N/m]
  *
- *      where d is the centre-to-centre spacing (m).  For the flat
- *      three-phase case, this is the analytically derived maximum force
- *      on the centre conductor; trefoil yields the same peak magnitude.
+ *      where d is the centre-to-centre spacing (m).
  *
  *   3. Cleat tensile load over its tributary span L:
  *
@@ -46,6 +46,7 @@
 
 /** μ₀ / (2π)  =  2×10⁻⁷  T·m/A  (magnetic permeability constant) */
 const MU0_OVER_2PI = 2e-7;
+const SQRT3 = Math.sqrt(3);
 
 /**
  * IEC 60909-0 §4.3.1.1 peak factor κ.
@@ -87,17 +88,19 @@ export function calcPeakCurrent(iScRms_A, peakFactor) {
  * For single-phase (two conductors):
  *   F = 2×10⁻⁷ × i_peak² / d
  *
- * For three-phase balanced fault (flat or trefoil):
- *   F = √3×10⁻⁷ × i_peak² / d
+ * For a three-phase balanced fault:
+ *   trefoil  F = √3×10⁻⁷ × i_peak² / d
+ *   flat     F = 1.5×10⁻⁷ × i_peak² / d   (0.75 × μ₀/2π, IEC 60865-1 / 61914)
  *
  * These represent the instantaneous peak force over the fault cycle.
  *
  * @param {number} iPeak_A          – Peak fault current (A)
  * @param {number} spacing_m        – Centre-to-centre cable spacing (m, > 0)
  * @param {'three-phase'|'single-phase'} systemType
+ * @param {'trefoil'|'flat'} [arrangement='trefoil'] three-phase cable arrangement
  * @returns {number} Force per unit length (N/m)
  */
-export function calcEmfForcePerMeter(iPeak_A, spacing_m, systemType) {
+export function calcEmfForcePerMeter(iPeak_A, spacing_m, systemType, arrangement = 'trefoil') {
   if (!Number.isFinite(iPeak_A) || iPeak_A <= 0) {
     throw new Error('Peak current must be positive');
   }
@@ -105,15 +108,13 @@ export function calcEmfForcePerMeter(iPeak_A, spacing_m, systemType) {
     throw new Error('Cable spacing must be a positive number');
   }
 
-  const coeff = systemType === 'single-phase'
-    ? MU0_OVER_2PI           // 2×10⁻⁷
-    : Math.SQRT3 * 1e-7;    // √3×10⁻⁷ ≈ 1.732×10⁻⁷
+  let coeff;
+  if (systemType === 'single-phase') coeff = MU0_OVER_2PI;           // 2×10⁻⁷
+  else if (arrangement === 'flat') coeff = 0.75 * MU0_OVER_2PI;      // 1.5×10⁻⁷
+  else coeff = SQRT3 * 1e-7;                                          // √3×10⁻⁷ ≈ 1.732×10⁻⁷
 
   return coeff * (iPeak_A ** 2) / spacing_m;
 }
-
-/** √3 — defined once to avoid repeated computation */
-Math.SQRT3 = Math.sqrt(3);
 
 /**
  * Tensile load on a cleat over its tributary span.
@@ -153,7 +154,7 @@ export function nmToLbfFt(n_per_m) {
  * @param {number} params.xrRatio            – X/R ratio at the fault point
  * @param {'three-phase'|'single-phase'} params.systemType
  * @param {'trefoil'|'flat'} [params.arrangement='trefoil']
- *   Cable arrangement in the raceway (informational; both use √3×10⁻⁷ coefficient).
+ *   Cable arrangement in the raceway (trefoil: √3×10⁻⁷; flat: 1.5×10⁻⁷).
  * @param {number} params.spacing_mm         – Centre-to-centre cable spacing (mm)
  * @param {number} params.cleatSpacing_mm    – Centre-to-centre cleat spacing (mm)
  * @param {number} [params.safetyFactor=2.5] – IEC 61914 design safety factor
@@ -207,7 +208,7 @@ export function calcCableFaultBracing(params) {
 
   const kappa         = calcPeakFactor(xrRatio);
   const iPeak_A       = calcPeakCurrent(iSc_A, kappa);
-  const fPerM         = calcEmfForcePerMeter(iPeak_A, spacing_m, systemType);
+  const fPerM         = calcEmfForcePerMeter(iPeak_A, spacing_m, systemType, arrangement);
   const cleatLoad_N   = calcCleatLoad(fPerM, cleat_m);
   const reqStrength_N = cleatLoad_N * safetyFactor;
 

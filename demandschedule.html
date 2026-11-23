@@ -123,6 +123,14 @@
             <option value="marina">Marina / Shore Power</option>
           </select>
         </label>
+        <label for="lighting-occupancy-select">Lighting occupancy (Table 220.42):
+          <select id="lighting-occupancy-select">
+            <option value="general">All other occupancies (100%)</option>
+            <option value="warehouse">Warehouse (12.5 kVA at 100%, rest 50%)</option>
+            <option value="hospital">Hospital (50 kVA at 40%, rest 20%)</option>
+            <option value="hotel">Hotel / motel (20 kVA at 50%, to 100 kVA 40%, rest 30%)</option>
+          </select>
+        </label>
         <button id="run-btn" type="button">Run Demand Schedule</button>
         <button id="export-btn" type="button" disabled>Export CSV</button>
       </div>

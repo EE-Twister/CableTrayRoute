@@ -29,6 +29,12 @@ export const PST_PASS_THRESHOLD = 0.8;
 /** Mandatory Pst limit at the PCC per IEC 61000-3-3 / IEEE 1453. */
 export const PST_LIMIT = 1.0;
 
+/** IEC 61000-3-3 long-term flicker limit (Plt, 2-hour) at the PCC. */
+export const PLT_LIMIT = 0.65;
+
+/** Default load power factor for step voltage-change calculations (lagging). */
+export const DEFAULT_LOAD_POWER_FACTOR = 0.9;
+
 /** Number of 10-minute Pst periods in a standard 2-hour Plt observation. */
 export const PLT_OBSERVATION_PERIODS = 12;
 
@@ -80,20 +86,36 @@ function round(v, d = 4) {
 /**
  * Compute the single-event voltage dip at the PCC for a rectangular load step.
  *
- * Uses the IEC 61000-3-3 §4 simplified Thevenin formula:
- *   ΔV% = (ΔP_kW / S_sc_kVA) × 100
+ * Two forms:
+ *
+ *  - With `powerFactor` (lagging), the Thevenin relative voltage change
+ *      d = (ΔP·R + ΔQ·X) / V² = (ΔS / S_sc) · cos(ψ − φ)
+ *    with ψ = atan(X/R) the source impedance angle and φ = acos(pf) the load angle.
+ *    A resistive step on a stiff X/R = 10 source changes the voltage ~10× less than
+ *    ΔP / S_sc; a low-power-factor motor start changes it ~3× more.
+ *  - Without `powerFactor`, the simplified ΔV% = ΔP / S_sc × 100, which is exact only when
+ *    the load angle equals the source angle. It understates low-pf steps.
  *
  * @param {number} loadKw       Step change in active power (kW, > 0)
  * @param {number} systemKva    Short-circuit kVA at the PCC (> 0)
- * @param {number} [xrRatio=10] Source X/R ratio (informational, not used in simplified formula)
+ * @param {number} [xrRatio=10] Source X/R ratio (used when powerFactor is given)
+ * @param {number} [powerFactor] Load power factor of the step, lagging (0 < pf ≤ 1)
  * @returns {{ deltaVPercent: number, dipPu: number }}
  */
-export function calcVoltageDip(loadKw, systemKva, xrRatio = 10) {
+export function calcVoltageDip(loadKw, systemKva, xrRatio = 10, powerFactor) {
   if (!Number.isFinite(loadKw) || loadKw <= 0) throw new Error('loadKw must be greater than zero');
   if (!Number.isFinite(systemKva) || systemKva <= 0) throw new Error('systemKva must be greater than zero');
   if (!Number.isFinite(xrRatio) || xrRatio <= 0) throw new Error('xrRatio must be a positive number');
 
-  const dipPu = loadKw / systemKva;
+  let dipPu = loadKw / systemKva;
+  if (powerFactor !== undefined && powerFactor !== null) {
+    if (!Number.isFinite(powerFactor) || powerFactor <= 0 || powerFactor > 1) {
+      throw new Error('powerFactor must be in (0, 1]');
+    }
+    const psi = Math.atan(xrRatio);
+    const phi = Math.acos(powerFactor);
+    dipPu = (loadKw / powerFactor / systemKva) * Math.cos(psi - phi);
+  }
   const deltaVPercent = round(dipPu * 100, 4);
   return { deltaVPercent, dipPu: round(dipPu, 6) };
 }
@@ -171,11 +193,13 @@ export function pltFromPst(pstValues) {
  * Classify flicker severity against IEC 61000-3-3 / IEEE 1453 thresholds.
  *
  * @param {number} pst Pst or Plt value
+ * @param {number} [limit=PST_LIMIT] Applicable limit (PST_LIMIT for Pst, PLT_LIMIT for Plt)
  * @returns {'pass' | 'marginal' | 'fail'}
  */
-export function classifyFlickerRisk(pst) {
-  if (pst <= PST_PASS_THRESHOLD) return 'pass';
-  if (pst <= PST_LIMIT)          return 'marginal';
+export function classifyFlickerRisk(pst, limit = PST_LIMIT) {
+  // The planning level is 80% of the limit (0.8 for Pst, 0.52 for Plt).
+  if (pst <= limit * (PST_PASS_THRESHOLD / PST_LIMIT)) return 'pass';
+  if (pst <= limit)                                   return 'marginal';
   return 'fail';
 }
 
@@ -202,6 +226,7 @@ export function runVoltageFlickerStudy(inputs) {
     nominalVoltageKv = null,
     systemKva,
     xrRatio = 10,
+    loadPowerFactor = DEFAULT_LOAD_POWER_FACTOR,
     loadSteps,
     pstSeriesForPlt,
   } = inputs;
@@ -210,7 +235,7 @@ export function runVoltageFlickerStudy(inputs) {
   const loadStepResults = [];
 
   for (const step of loadSteps) {
-    const { deltaVPercent } = calcVoltageDip(step.loadKw, systemKva, xrRatio);
+    const { deltaVPercent } = calcVoltageDip(step.loadKw, systemKva, xrRatio, step.powerFactor ?? loadPowerFactor);
     const pst = pstFromTable(deltaVPercent, step.repetitionsPerHour);
     const pstRisk = classifyFlickerRisk(pst);
     const pstLimitPct = round((pst / PST_LIMIT) * 100, 1);
@@ -242,7 +267,11 @@ export function runVoltageFlickerStudy(inputs) {
       'Plt is estimated from the worst-case Pst (conservative). Enter a series of 12 measured Pst values for an accurate long-term assessment.'
     );
   }
-  const pltRisk = classifyFlickerRisk(plt);
+  const pltRisk = classifyFlickerRisk(plt, PLT_LIMIT);
+  if (plt > PLT_LIMIT) {
+    warnings.push(`Plt = ${plt} exceeds the IEC 61000-3-3 long-term limit of ${PLT_LIMIT}.`);
+  }
+  warnings.push('Pst is read from an approximate iso-Pst matrix that has not been verified against IEC 61000-4-15 Table 5; treat it as a screening estimate and confirm with a flickermeter measurement or the utility flicker study.');
 
   if (worstPst > PST_LIMIT) {
     warnings.push(
@@ -255,7 +284,7 @@ export function runVoltageFlickerStudy(inputs) {
   }
 
   return {
-    inputs: { studyLabel, nominalVoltageKv, systemKva, xrRatio, loadSteps, pstSeriesForPlt: pstSeriesForPlt || null },
+    inputs: { studyLabel, nominalVoltageKv, systemKva, xrRatio, loadPowerFactor, loadSteps, pstSeriesForPlt: pstSeriesForPlt || null },
     loadStepResults,
     worstPst,
     worstPstRisk,
@@ -273,6 +302,9 @@ function validateInputs(inputs) {
   }
   if (!Number.isFinite(inputs.systemKva) || inputs.systemKva <= 0) {
     throw new Error('systemKva must be greater than zero');
+  }
+  if (inputs.loadPowerFactor != null && (!Number.isFinite(inputs.loadPowerFactor) || inputs.loadPowerFactor <= 0 || inputs.loadPowerFactor > 1)) {
+    throw new Error('loadPowerFactor must be in (0, 1]');
   }
   if (inputs.xrRatio != null && (!Number.isFinite(inputs.xrRatio) || inputs.xrRatio <= 0)) {
     throw new Error('xrRatio must be a positive number');

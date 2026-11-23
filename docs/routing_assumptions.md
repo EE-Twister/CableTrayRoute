@@ -16,3 +16,13 @@ Routing calculations simplify the physical environment to speed analysis.
 - Coordinates are treated as planar and use consistent units.
 
 These assumptions suit early design estimates; field conditions may require adjustment.
+
+## Tray fill limits
+
+The router limits each tray (or slot) to a percentage of its cross-section (width × depth, default 40%). This is a planning limit, not an NEC determination. NEC 392.22(A)(1) caps multiconductor cable area by tray width alone (for example 14.0 in² for a 12 in ladder tray, 11.0 in² for solid-bottom), so a deep tray can plan more fill than the code allows. The routing readiness panel flags trays whose planning limit exceeds the Table 392.22(A)(1) area (ladder is assumed when construction is not set). Confirm final fill on the Tray Fill page.
+
+Tray IDs may contain underscores (for example `TR_1`); the router tracks which tray each graph node belongs to rather than parsing node names.
+
+## Conduit Fill page
+
+Cable OD must be greater than 0 and a conduit may hold at most 500 conductors. When the fill exceeds the NEC Chapter 9 limit (53% / 31% / 40%), the results list the smallest size of the selected conduit type that passes.

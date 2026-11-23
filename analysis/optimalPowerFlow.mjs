@@ -175,14 +175,32 @@ export function economicDispatch(units, target, opts = {}) {
 
   let lambda = (lo + hi) / 2;
   let outputs = list.map(u => dispatchUnitAtLambda(u, lambda));
+  // Outputs at the current bracket ends, used to split a linear-cost step below.
+  let outputsLo = list.map(u => dispatchUnitAtLambda(u, lo));
+  let outputsHi = list.map(u => dispatchUnitAtLambda(u, hi));
   let iterations = 0;
   for (; iterations < maxIterations; iterations++) {
     lambda = (lo + hi) / 2;
     outputs = list.map(u => dispatchUnitAtLambda(u, lambda));
     const total = outputs.reduce((s, p) => s + p, 0);
     if (Math.abs(total - target) <= tolerance) break;
-    if (total > target) hi = lambda;
-    else lo = lambda;
+    if (total > target) { hi = lambda; outputsHi = outputs; }
+    else { lo = lambda; outputsLo = outputs; }
+  }
+
+  // A linear-cost (c = 0) unit jumps from Pmin to Pmax at its breakpoint, so Σ P(λ)
+  // can step over the target and the bisection never lands within tolerance. The
+  // marginal unit(s) share one incremental cost, so split the remaining gap across
+  // them between the two bracket dispatches.
+  let totalNow = outputs.reduce((s, p) => s + p, 0);
+  if (Math.abs(totalNow - target) > tolerance) {
+    const totLo = outputsLo.reduce((s, p) => s + p, 0);
+    const totHi = outputsHi.reduce((s, p) => s + p, 0);
+    if (totHi > totLo && target >= totLo && target <= totHi) {
+      const t = (target - totLo) / (totHi - totLo);
+      outputs = outputsLo.map((pLo, i) => pLo + t * (outputsHi[i] - pLo));
+      lambda = hi;
+    }
   }
 
   const totalGen = outputs.reduce((s, p) => s + p, 0);
