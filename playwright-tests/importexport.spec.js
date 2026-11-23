@@ -24,7 +24,7 @@ async function openToolbarMenu(page, label) {
 test.describe('Cable Schedule export', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(pageUrl('cableschedule.html?e2e=1&e2e_reset=1'));
-    await page.waitForFunction('window.__CableScheduleInitOK === true');
+    await page.waitForFunction(() => window.__CableScheduleInitOK === true);
   });
 
   test('loads sample cables and exports an XLSX workbook', async ({ page }) => {

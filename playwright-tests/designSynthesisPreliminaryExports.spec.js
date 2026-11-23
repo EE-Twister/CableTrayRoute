@@ -33,7 +33,7 @@ test('ordinary schedules and one-line exports retain the preliminary motor notic
   });
 
   await page.goto(server.url('cableschedule.html'));
-  await page.waitForFunction('window.__CableScheduleInitOK === true');
+  await page.waitForFunction(() => window.__CableScheduleInitOK === true);
   const menu = page.locator('details.toolbar-menu').filter({ has: page.locator('summary:has-text("Import / Export")') });
   if (!(await menu.evaluate(element => element.open))) await menu.locator('summary').click();
   await page.locator('#open-report-options-btn').click();

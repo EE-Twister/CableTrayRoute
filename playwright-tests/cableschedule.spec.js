@@ -100,7 +100,7 @@ async function writeCableImportFixture(filePath) {
 test.describe('cableschedule buttons', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(pageUrl('cableschedule.html?e2e=1&e2e_reset=1'));
-    await page.waitForFunction('window.__CableScheduleInitOK === true');
+    await page.waitForFunction(() => window.__CableScheduleInitOK === true);
   });
 
   test('save and load schedule', async ({ page }) => {
@@ -108,7 +108,7 @@ test.describe('cableschedule buttons', () => {
     await page.click('#save-schedule-btn');
 
     await page.goto(pageUrl('cableschedule.html?e2e=1'));
-    await page.waitForFunction('window.__CableScheduleInitOK === true');
+    await page.waitForFunction(() => window.__CableScheduleInitOK === true);
     await expect(page.locator('#cableScheduleTable tbody tr')).toHaveCount(1);
     await expect(page.locator('#cableScheduleTable tbody tr:first-child input[name="tag"]')).toHaveValue('C1');
 
@@ -249,7 +249,7 @@ test.describe('cableschedule buttons', () => {
       window.projectStorage.writeScenarioValue('cableSchedule', rows);
     });
     await page.reload();
-    await page.waitForFunction('window.__CableScheduleInitOK === true');
+    await page.waitForFunction(() => window.__CableScheduleInitOK === true);
     const vfd = await rowWithInputValue(page, 'tag', 'VFD-102');
     await expect(vfd.locator('select[name="cable_type"]')).toHaveValue('VFD Power');
     const other = await rowWithInputValue(page, 'tag', 'OTHER-1');
@@ -271,7 +271,7 @@ test.describe('cableschedule buttons', () => {
       window.projectStorage.writeScenarioValue('traySchedule', [{ tray_id: 'R1' }]);
     });
     await page.reload();
-    await page.waitForFunction('window.__CableScheduleInitOK === true');
+    await page.waitForFunction(() => window.__CableScheduleInitOK === true);
 
     const vfd = await rowWithInputValue(page, 'tag', 'VFD-200');
     await expect(vfd).toHaveAttribute('data-row-id', /.+/);
@@ -318,7 +318,7 @@ test.describe('cableschedule buttons', () => {
     ]));
 
     await page.reload();
-    await page.waitForFunction('window.__CableScheduleInitOK === true');
+    await page.waitForFunction(() => window.__CableScheduleInitOK === true);
     await expect(page.locator('#cableScheduleTable tbody tr[data-row-id="i8-vfd"] input[name="tag"]')).toHaveValue('VFD-201');
     await expect(page.locator('#cableScheduleTable tbody tr[data-row-id="i8-vfd"] select[name="cable_type"]')).toHaveValue('VFD Power');
     await expect(page.locator('#cableScheduleTable tbody tr[data-row-id="i8-vfd"] select[name="insulation_type"]')).toHaveValue('VFD Cable XLPE');
