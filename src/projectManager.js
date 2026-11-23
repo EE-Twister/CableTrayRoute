@@ -699,8 +699,11 @@ async function saveProject(options = {}) {
     message = `Project "${name}" successfully saved.`;
     const savedAt = new Date().toISOString();
     writeProjectSaveStatus(name, { localSavedAt: savedAt, cloudSavedAt: savedAt });
+    // The cloud chip reports server sync on its own; the local chip carries
+    // the saved-at time.
     dispatchProjectSyncStatus({
-      ...getProjectSaveStatusPresentation(name),
+      label: 'Synced',
+      state: 'saved',
       detail: `${message} ${getProjectSaveStatusPresentation(name).detail}`
     });
   }

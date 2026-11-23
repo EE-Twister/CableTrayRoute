@@ -132,7 +132,7 @@ test('backend-unavailable browser recovery preserves two scenarios, unknown fiel
     const trayId = `TRAY-${cableTag}`;
     return {
       cables: cableRows,
-      loads: [{ id: `LOAD-${tag}`, tag: `LOAD-${tag}`, source: `EQ-${tag}`, kw: 1, voltage: 120, powerFactor: 1, phases: ['A'] }],
+      loads: [{ id: `LOAD-${tag}`, tag: `LOAD-${tag}`, source: `EQ-${tag}`, kw: 1, voltage: 120, powerFactor: 1, phases: 1 }],
       trays: [{ id: trayId, tray_id: trayId, tag: trayId, width: 12, depth: 4, length: 100, start_x: 0, start_y: 0, start_z: 0, end_x: 100, end_y: 0, end_z: 0 }],
       conduits: [],
       ductbanks: [],

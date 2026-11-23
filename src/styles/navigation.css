@@ -940,25 +940,20 @@
         order: 2;
     }
 
+    /* Collapse to the icon; the project name and save status are shown in
+       the menu heading (#project-actions-heading). */
     .project-actions-trigger {
-        width: min(12rem, 42vw);
-        min-width: 0;
+        min-width: 44px;
         min-height: 44px;
-        max-width: min(18rem, 42vw);
-        justify-content: flex-start;
-        padding: 0.35rem 0.55rem;
+        max-width: 44px;
+        justify-content: center;
+        padding: 0;
     }
 
-    .project-actions-trigger::after {
-        display: none;
-    }
-
+    .project-actions-trigger::after,
+    .project-actions-trigger .project-sync-status,
     .project-actions-trigger .project-display-chip {
-        display: inline-block;
-    }
-
-    .project-actions-trigger .project-sync-status {
-        display: inline-block;
+        display: none;
     }
 
     .project-actions-icon {

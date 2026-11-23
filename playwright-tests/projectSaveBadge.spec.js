@@ -156,9 +156,13 @@ test('importing a file into an open project keeps the import after the reload', 
   const file = path.join(dataDir, 'import-target.ctr.json');
   await fs.writeFile(file, JSON.stringify(exported));
 
-  const reloaded = page.waitForEvent('load');
   await page.locator('#import-project-input').setInputFiles(file);
-  await reloaded;
+  const importDialog = page.getByRole('dialog', { name: 'Review project import' });
+  await expect(importDialog).toBeVisible();
+  await Promise.all([
+    page.waitForEvent('load'),
+    importDialog.getByRole('button', { name: /Import project/i }).click(),
+  ]);
   await scheduleReady(page);
   await expect(page.locator('#cableScheduleTable tbody tr')).toHaveCount(2);
   await expectSaved(page);

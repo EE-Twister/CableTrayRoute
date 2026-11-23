@@ -173,9 +173,13 @@ test('create, edit, reload, study, export, and re-import a project in fresh brow
     importer.on('pageerror', error => importerErrors.push(error.message));
     await importer.goto(`${base}/cableschedule.html`);
     await waitForCableSchedule(importer);
-    const importReload = importer.waitForEvent('load');
     await importer.locator('#import-project-input').setInputFiles(projectFile);
-    await importReload;
+    const importDialog = importer.getByRole('dialog', { name: 'Review project import' });
+    await expect(importDialog).toBeVisible();
+    await Promise.all([
+      importer.waitForEvent('load'),
+      importDialog.getByRole('button', { name: /Import project/i }).click(),
+    ]);
     await waitForCableSchedule(importer);
     await expect(importer.locator('#cableScheduleTable tbody tr')).toHaveCount(1);
     const imported = importer.locator('#cableScheduleTable tbody tr').first();
