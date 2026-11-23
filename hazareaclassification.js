@@ -12,9 +12,10 @@ import {
   buildHazAreaMapModel,
   normalizeHazAreaLayout,
 } from './analysis/hazAreaClassification.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getStudies, getStudyAssessments, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { studyLifecycleMetadataRows } from './analysis/studyExportMetadata.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -525,7 +526,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderEquipResults(result);
     renderMapPreview(result);
     enableExport();
-    setStudies({ ...getStudies(), hazAreaClassification: result });
+    saveStudyResult('hazAreaClassification', result, captureStudyRunContext('hazAreaClassification', { inputs, options: {} }));
   }
 
   function checkEquipment() {
@@ -544,7 +545,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderEquipResults(result);
     renderMapPreview(result);
     enableExport();
-    setStudies({ ...getStudies(), hazAreaClassification: result });
+    saveStudyResult('hazAreaClassification', result, captureStudyRunContext('hazAreaClassification', { inputs, options: {} }));
   }
 
   function statusBadge(status) {
@@ -1337,7 +1338,14 @@ document.addEventListener('DOMContentLoaded', () => {
       }),
     ];
 
-    const csv = [...layoutLines, ...areaLines, ...equipLines].join('\n');
+    const lifecycleLines = [
+      '',
+      'Lifecycle Field,Value',
+      ...studyLifecycleMetadataRows(saved, { assessment: getStudyAssessments().hazAreaClassification })
+        .map(([key, value]) => [key, value].map(csvCell).join(',')),
+    ];
+
+    const csv = [...layoutLines, ...areaLines, ...equipLines, ...lifecycleLines].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);

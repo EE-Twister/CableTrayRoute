@@ -41,6 +41,8 @@ async function seedProject(page, firstPage = 'battery.html') {
   await page.goto(pageUrl(firstPage));
   await page.evaluate(({ equipment, loads, cables, trays, projectMeta }) => {
     localStorage.clear();
+    localStorage.setItem('ctr_current_scenario_v1', 'base');
+    localStorage.setItem('ctr_scenarios_v1', JSON.stringify(['base']));
     localStorage.setItem('base:equipment', JSON.stringify(equipment));
     localStorage.setItem('base:loadList', JSON.stringify(loads));
     localStorage.setItem('base:cableSchedule', JSON.stringify(cables));
@@ -48,7 +50,25 @@ async function seedProject(page, firstPage = 'battery.html') {
     localStorage.setItem('base:projectMeta', JSON.stringify(projectMeta));
     localStorage.setItem('base:designBasis', JSON.stringify({ sizingDefaults: { defaultPowerFactor: 0.92, insulationType: 'THWN-2', installationType: 'conduit' } }));
     localStorage.setItem('base:studyResults', JSON.stringify({ shortCircuit: { availableFaultKa: 22.4, xrRatio: 12 } }));
+    // Keep the legacy alias in sync for the standalone page bundle.  The
+    // lifecycle sidecar below is then created from the same result object the
+    // page will read after startup.
+    localStorage.setItem('studyResults', JSON.stringify({ shortCircuit: { availableFaultKa: 22.4, xrRatio: 12 } }));
   }, { equipment, loads, cables, trays, projectMeta });
+  await page.reload();
+  // Seed the fixture through the lifecycle API so downstream studies can
+  // consume the short-circuit value as a qualified current result.  A raw
+  // studyResults payload intentionally remains unqualified and is withheld.
+  await page.evaluate(async () => {
+    const store = await import('./dataStore.mjs');
+    const result = store.getStudies().shortCircuit;
+    const context = store.captureStudyRunContext('shortCircuit', {
+      inputs: { fixture: 'project-integration' },
+      options: { method: 'fixture' },
+      dependencies: [],
+    });
+    store.saveStudyResult('shortCircuit', result, context);
+  });
   await page.reload();
 }
 
@@ -178,12 +198,17 @@ test.describe('shared project data integration', () => {
 
     await page.evaluate(() => {
       const studies = window.dataStore.getStudies();
-      studies.batterySizing = {
+      const result = {
         selectedBankKwh: 250,
         chemistry: 'lead-acid-agm',
         rackLayoutInputs: { cellsPerModule: 12, modulesPerRack: 40 },
       };
-      window.dataStore.setStudies(studies);
+      const context = window.dataStore.captureStudyRunContext('batterySizing', {
+        inputs: { fixture: 'project-integration-battery' },
+        options: { method: 'fixture' },
+        dependencies: [],
+      });
+      window.dataStore.saveStudyResult('batterySizing', result, context);
     });
     await page.goto(pageUrl('bessHazard.html'));
     await expect(page.locator('#rated-kwh')).toHaveValue('250');

@@ -465,7 +465,10 @@ const approx = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg} (go
     systemKvLL: 13.8,
     grounding: 'solid',
   });
-  const metric = buildLightningProtectionReportModel(result, 'metric', new Date('2026-07-28T12:00:00Z'));
+  const metric = buildLightningProtectionReportModel(result, 'metric', new Date('2026-07-28T12:00:00Z'), {
+    validity: { state: 'evaluated' }, freshness: 'current', eligible: true,
+    provenance: { calculationRevision: 'calc-v2', capturedAt: '2026-07-28T12:00:00Z', assumptions: ['screening'] },
+  });
   const imperial = buildLightningProtectionReportModel(result, 'imperial', new Date('2026-07-28T12:00:00Z'));
 
   assert.equal(metric.summary[1].value, '8 point terminals', 'PDF summarizes the complete roof array');
@@ -480,6 +483,8 @@ const approx = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg} (go
   assert.ok(!imperial.warnings.some(item => /\d+(?:\.\d+)? m\b/.test(item)),
     'imperial PDF design-check statements do not leak metre values');
   assert.ok(metric.limitations.some(item => /not a complete IEC 62305-2/i.test(item)), 'PDF states the screening limitation');
+  assert.equal(metric.lifecycle.find(item => item.label === 'Eligibility')?.value, 'eligible', 'PDF retains lifecycle eligibility');
+  assert.equal(metric.lifecycle.find(item => item.label === 'Calculation version')?.value, 'calc-v2', 'PDF retains calculation revision');
 })();
 
 // ---------------------------------------------------------------------------

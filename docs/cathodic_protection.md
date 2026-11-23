@@ -7,6 +7,8 @@ This guide documents the engineering basis used by the Cathodic Protection sizin
 
 ## Page Workflow
 
+Layout labels retain their literal text when imported, selected, and edited in the canvas properties panel, including quotation marks and angle brackets.
+
 The page presents the sizing tool before its supporting engineering workspace:
 
 1. Describe the asset and environment.

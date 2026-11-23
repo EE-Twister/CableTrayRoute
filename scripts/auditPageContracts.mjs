@@ -98,6 +98,12 @@ const dataStoreCalls = {
   restoreRevision: ['write', 'oneLineDiagram'],
   getStudies: ['read', 'studyResults'],
   setStudies: ['write', 'studyResults'],
+  captureStudyRunContext: ['read', 'project-snapshot|settings.studyProvenance'],
+  saveStudyResult: ['write', 'studyResults|settings.studyProvenance'],
+  getStudyAssessment: ['read', 'studyResults|settings.studyProvenance'],
+  getStudyAssessments: ['read', 'studyResults|settings.studyProvenance'],
+  getEligibleStudies: ['read', 'studyResults|settings.studyProvenance'],
+  getStudySourceSnapshot: ['read', 'project-snapshot|settings.projectMeta|settings.studyProvenance'],
   getLoads: ['read', 'loadList'],
   setLoads: ['write', 'loadList'],
   addLoad: ['write', 'loadList'],
@@ -575,6 +581,13 @@ function compareRoute(route, pageContract, reads, writes) {
   const declaredKeys = uniqueSorted([...inputKeys, ...outputKeys]);
   const readKeys = [...reads.keys()];
   const writeKeys = [...writes.keys()];
+  // saveStudyResult writes the lifecycle sidecar together with studyResults. The
+  // sidecar is declared as a project input because consumers read its saved
+  // provenance, so pair that write with the study output for audit coverage.
+  const writesStudyResults = writeKeys.some(key => key === 'studyResults' || key.startsWith('studyResults.'));
+  const documentedOutputKeys = writesStudyResults && inputKeys.includes('settings.studyProvenance')
+    ? [...outputKeys, 'settings.studyProvenance']
+    : outputKeys;
   const inputsWithoutEvidence = pageContract.projectInputs.filter(item => (
     !keyCoveredBy(item.key, readKeys) && !keyCoveredBy(item.key, writeKeys)
   ));
@@ -582,7 +595,7 @@ function compareRoute(route, pageContract, reads, writes) {
   const unreadInputs = inputsWithoutEvidence.filter(item => item.audit?.expectRead !== false);
   const declaredOutputsNotWritten = outputKeys.filter(key => !keyCoveredBy(key, writeKeys));
   const undocumentedReads = readKeys.filter(key => !keyCoveredBy(key, declaredKeys));
-  const undocumentedWrites = writeKeys.filter(key => !keyCoveredBy(key, outputKeys));
+  const undocumentedWrites = writeKeys.filter(key => !keyCoveredBy(key, documentedOutputKeys));
 
   return {
     declaredInputsNotRead: unreadInputs.map(item => item.key),

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en" class="design-synthesis-page">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Preliminary electrical design synthesis workspace for equipment, supply, corridors, and design criteria.">
+  <title>Design Synthesis — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/designsynthesis.js" defer></script>
+</head>
+<body data-report-title="Design Synthesis">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary"><div id="nav-links" class="nav-links" role="list"></div></nav>
+  <div class="container"><main id="main-content" class="main-content">
+    <nav aria-label="Breadcrumb"><ol class="breadcrumb-trail"><li><a href="index.html">Home</a></li><li>Electrical design</li><li aria-current="page">Design Synthesis</li></ol></nav>
+    <header class="page-header"><h1>Design Synthesis</h1><p>Assemble a preliminary distribution proposal from equipment locations, supply limits, permitted corridors, and explicit criteria.</p></header>
+    <section class="card" aria-labelledby="synthesis-notice"><h2 id="synthesis-notice">Screening workspace</h2><p>This produces a traceable proposal for qualified human review. Protective requirements and any library candidate records are screening outputs; they do not approve a manufacturer device, certify code compliance, or replace coordination, field verification, or stamped design.</p></section>
+    <p id="synthesis-initializing" role="status">Preparing the project and draft…</p>
+    <div id="synthesis-workspace-inputs" inert>
+    <div class="synthesis-toolbar">
+      <button id="synthesis-load-sample" class="btn">Load 30-load industrial sample</button>
+      <button id="synthesis-load-capacity-sample" class="btn">Load tray congestion sample</button>
+      <button id="synthesis-load-existing-tray-sample" class="btn">Load existing tray screening sample</button>
+      <button id="synthesis-load-mixed-sample" class="btn">Load mixed 480/208 V sample</button>
+      <button id="synthesis-load-motor-sample" class="btn">Load motor starter sample</button>
+      <button id="synthesis-load-motor-breaker-sample" class="btn">Load motor breaker research sample</button>
+      <button id="synthesis-load-motor-fault-sample" class="btn">Load motor fault network sample</button>
+      <button id="synthesis-load-motor-fault-evolution-sample" class="btn">Load fault evolution example</button>
+      <button id="synthesis-load-motor-acceleration-sample" class="btn">Load motor acceleration sample</button>
+      <button id="synthesis-load-motor-thermal-sample" class="btn">Load motor thermal relay sample</button>
+      <button id="synthesis-load-motor-protection-timing-sample" class="btn">Load protection timing example</button>
+      <button id="synthesis-load-motor-stall-range-sample" class="btn">Load stall-range example</button>
+      <button id="synthesis-load-fault-scenarios-sample" class="btn">Load fault scenarios sample</button>
+      <button id="synthesis-load-manufacturer-motor-sample" class="btn">Load manufacturer motor example</button>
+      <label class="btn" for="synthesis-import">Import JSON</label><input id="synthesis-import" type="file" accept="application/json,.json" hidden>
+      <button id="synthesis-generate" class="btn primary-btn" disabled>Generate proposal</button>
+      <button id="synthesis-download-json" class="btn" disabled>Download proposal JSON</button>
+      <button id="synthesis-download-cable-schedule" class="btn" disabled>Download preliminary cable schedule CSV</button>
+      <button id="synthesis-download-panel-schedule" class="btn" disabled>Download preliminary panel schedule CSV</button>
+      <button id="synthesis-download-raceway-schedule" class="btn" disabled>Download preliminary raceway schedule CSV</button>
+      <span id="synthesis-raceway-schedule-status" class="field-hint" aria-live="polite">Generate a complete routed proposal to download the raceway schedule.</span>
+      <button id="synthesis-download-report" class="btn" disabled>Download human-readable report</button>
+      <button id="synthesis-download-oneline" class="btn" disabled>Download preliminary one-line SVG</button>
+      <button id="synthesis-create-review-project" class="btn" disabled>Create separate review project</button>
+      <span id="synthesis-review-project-status" class="field-hint" aria-live="polite">A review project keeps the generated design separate and cannot be issued. Full study histories remain in the proposal downloads.</span>
+      <button id="synthesis-apply" class="btn btn-accent" disabled>Apply to schedules</button>
+      <span id="synthesis-status" class="synthesis-status" aria-live="polite">Draft not run.</span>
+    </div>
+    <section class="synthesis-grid" aria-label="Design synthesis inputs">
+      <article class="card synthesis-card"><h2>Supply</h2><p class="field-hint">Voltage is V line-to-line; capacity is kVA; available source fault current is kA; frequency is Hz; x/y/z are feet. The bundled industrial case is a synthetic example.</p><div id="synthesis-supply-controls" class="synthesis-controls"></div><details><summary>Advanced supply JSON</summary><textarea id="synthesis-supply" aria-label="Supply JSON"></textarea></details></article>
+      <article class="card synthesis-card"><h2>Criteria</h2><p class="field-hint">Limits are explicit project criteria; voltage drop is percent.</p><div id="synthesis-criteria-controls" class="synthesis-controls"></div><section aria-labelledby="synthesis-thermal-heading"><h3 id="synthesis-thermal-heading">Cable ampacity screening</h3><p class="field-hint">This is tabulated ampacity screening using ambient and grouping assumptions. It is separate from detailed direct-burial IEC temperature prediction.</p><div id="synthesis-thermal-controls" class="synthesis-controls"></div></section><details><summary>Advanced criteria JSON</summary><textarea id="synthesis-criteria" aria-label="Criteria JSON"></textarea></details></article>
+      <article class="card synthesis-card"><h2>Motor starter basis</h2><p class="field-hint">Used for motor starter candidates. Blank values remain unknown.</p><div id="synthesis-starter-basis-controls" class="synthesis-controls"></div></article>
+      <article class="card synthesis-card"><h2>Motor acceleration criterion</h2><p class="field-hint">Optional explicit maximum acceleration time in seconds. Blank means no duration limit was supplied; it is not treated as a pass.</p><div id="synthesis-motor-acceleration-controls" class="synthesis-controls"></div></article>
+      <article class="card synthesis-card"><h2>Optional motor fault network</h2><p class="field-hint">Enter explicit source equivalents for an initial symmetrical RMS three-phase bolted-fault screen. Source inventory completeness is supplied metadata, not verified evidence. This study does not complete motor protection or enable Apply.</p><details><summary>Advanced fault network JSON</summary><textarea id="synthesis-fault-study" aria-label="Fault network JSON" spellcheck="false"></textarea><p class="field-hint">Leave blank to omit. Source impedances are ohms per phase on each source bus base. Every source requires an explicit EMF, impedance, in-service state, equipment ID, and reference.</p></details></article>
+      <article class="card synthesis-card synthesis-card--wide"><h2>Optional fault source-profile history</h2><p class="field-hint">Requires the exact explicit fault network above. Supply a piecewise-linear real EMF multiplier history for every modeled source from 1 at time zero to one common horizon. This is a quasi-steady balanced RMS phasor history; it is not a measured motor decay, dynamic waveform, DC peak, clearing-time, thermal-damage, or device-rating model. Multipliers change source EMF while retaining source impedance and in-service state; zero suppresses source EMF without opening the source.</p><details><summary>Advanced fault evolution JSON</summary><textarea id="synthesis-fault-evolution" aria-label="Fault evolution JSON" spellcheck="false"></textarea><p class="field-hint">All profiles and conditions are supplied, unverified evidence. Do not infer actual motor decay from nameplate data or use these results to establish protection adequacy.</p></details></article>
+      <article class="card synthesis-card synthesis-card--wide"><h2>Optional cable fault thermal screen</h2><p class="field-hint">Requires a complete fault network and supplied source-history comparison. This conditional single-event screen compares both terminal exposures through a supplied maximum total-clearing time. Choose continuous coverage to check every selected conductor against all generated bus faults and the full length of every generated cable, including faults in other cables. The time and all-source applicability claim are supplied and unverified. Its 90 °C to 250 °C copper thermoset basis assumes one event after adequate recovery. It does not calculate actual device clearing or let-through, retains a visibly limited bus-only legacy mode, does not qualify the cable, and does not complete protection. An evaluated numeric failure triggers bounded next-size conductor trials under the shared load-flow revision budget (set <code>criteria.loadFlow.maxRevisions</code> to 0 for evaluation only). Incomplete evidence, an infeasible candidate, or exhausted revisions blocks Apply.</p><details><summary>Advanced cable fault-withstand JSON</summary><textarea id="synthesis-cable-fault-withstand" aria-label="Cable fault withstand JSON" spellcheck="false"></textarea><p class="field-hint">Use schemaVersion 1.0.0, <code>cableSelection</code> mode <code>all-modeled</code> or <code>selected</code> with exact cableIds, <code>faultSelection</code> mode <code>all-generated-bus-and-cable-span-faults</code> for full continuous coverage, or <code>all-generated-bus-fault-cases</code> for legacy bus-only coverage, <code>clearing</code> with maximumTotalClearingTimeS 0.1–5, separate reference and applicabilityReference, and appliesToAllModeledSources true. <code>thermal</code> must state copper, maximumInitialTemperatureC no greater than 90, finalTemperatureC 250, singleEvent true, adequateRecoveryBeforeEvent true, and a reference.</p></details></article>
+      <article class="card synthesis-card synthesis-card--wide"><h2>Fault operating scenarios</h2><p class="field-hint">Supply two to four named operating conditions, each with a complete explicit fault network. Reported envelopes describe the supplied cases only and do not verify true fault minima or maxima or protection adequacy.</p><details><summary>Advanced fault scenarios JSON</summary><textarea id="synthesis-fault-scenarios" aria-label="Fault scenarios JSON" spellcheck="false"></textarea><p class="field-hint">Each row contains a unique id, unique reference, and study object using the fault network JSON contract. This is mutually exclusive with the single fault network input.</p></details></article>
+      <article class="card synthesis-card synthesis-card--wide"><h2>Equipment</h2><p class="field-hint">Editable equipment table. kW, V line-to-line, phases, power factor, duty, and x/y/z in feet. Optional motor.rem610Thermal inputs are entered in Advanced equipment JSON; they are ABB REM610 setting-screen inputs, not a generic relay model. Optional motor.protectionTiming accepts the bounded v1 reference-current screen or v2 supplied stall-current range comparison; neither is complete motor protection, and supplied evidence remains unverified.</p><section aria-labelledby="synthesis-project-equipment-heading"><h3 id="synthesis-project-equipment-heading">Use existing project equipment</h3><div id="synthesis-project-equipment"></div></section><div id="synthesis-equipment-table" class="synthesis-table-wrap"></div><details><summary>Advanced equipment JSON / CSV-ready structure</summary><textarea id="synthesis-equipment" aria-label="Equipment JSON"></textarea></details></article>
+      <article class="card synthesis-card synthesis-card--wide"><h2>Motor acceleration curves and inertia</h2><p class="field-hint">Optional JSON object keyed by equipment ID. Enter referenced motor speed/current/power-factor/torque and load-torque curves, target speed, and motor/load inertia. The supplied values are not independently authenticated.</p><details><summary>Advanced motor acceleration JSON</summary><textarea id="synthesis-motor-acceleration" aria-label="Motor acceleration JSON" spellcheck="false"></textarea></details></article>
+      <div id="synthesis-motor-nameplates" class="card synthesis-card synthesis-card--wide" hidden></div>
+      <article class="card synthesis-card synthesis-card--wide"><h2>Panel location overrides</h2><p class="field-hint">Optional requested panel locations in feet. The engine reports requested, automatic, and effective positions; removing a row restores automatic placement.</p><div id="synthesis-panel-overrides" class="synthesis-table-wrap"></div><button id="synthesis-add-panel-override" type="button" class="btn">Add panel override</button></article>
+      <article class="card synthesis-card"><h2>Permitted corridors</h2><p class="field-hint">Node coordinates are feet; edge width/depth are inches.</p><section aria-labelledby="synthesis-project-trays-heading"><h3 id="synthesis-project-trays-heading">Review existing project trays</h3><div id="synthesis-project-trays"></div></section><div id="synthesis-corridor-editor"></div><div id="synthesis-corridor-thermal-controls"></div><details open><summary>Corridor graph JSON</summary><textarea id="synthesis-corridors" aria-label="Corridors JSON"></textarea></details></article>
+    </section>
+    </div>
+    <section id="synthesis-output" class="card synthesis-output" aria-labelledby="synthesis-output-heading"><h2 id="synthesis-output-heading">Proposal</h2><p class="text-muted">No proposal generated. Load a sample or enter JSON, then generate.</p></section>
+    <div id="synthesis-saved-curve-source-container"></div>
+    <div id="synthesis-saved-fault-evolution-container"></div>
+  </main></div>
+</body>
+</html>

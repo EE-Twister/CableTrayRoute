@@ -49,6 +49,9 @@ const project = {
       'comp-mcc-101': { equipmentTag: 'MCC-101', method: 'ANSI', threePhaseKA: 22.4 }
     }
   },
+  studyAssessments: {
+    shortCircuit: { eligible: true, freshness: 'current', validity: { state: 'evaluated' } }
+  },
   cables: [
     {
       tag: 'CBL-SWBD-MCC-101',
@@ -156,6 +159,13 @@ assert.equal(mccProjectFieldSource(preserved.lineup, 'systemRequirements.availab
 const forced = applyMccProjectInputSuggestions(preserved.lineup, changedSuggestions, { force: true });
 assert.equal(forced.lineup.systemRequirements.availableFaultCurrentKa, 24.1, 'explicit refresh should restore project-linked value');
 assert.equal(mccProjectFieldSource(forced.lineup, 'systemRequirements.availableFaultCurrentKa').state, 'linked');
+
+const staleStudy = applyMccProjectInputSuggestions(forced.lineup, {
+  values: {},
+  bindings: {},
+});
+assert.equal(staleStudy.lineup.systemRequirements.availableFaultCurrentKa, '', 'ineligible linked duty must be withheld');
+assert.equal(mccProjectFieldSource(staleStudy.lineup, 'systemRequirements.availableFaultCurrentKa').state, 'manual');
 
 const standalone = buildMccProjectInputSuggestions({ lineup: { tag: 'MCC-X' } });
 assert.ok(standalone.missing.some(message => /Equipment List or One-Line/.test(message)));

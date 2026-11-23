@@ -37,27 +37,49 @@ export function runBenchmark(bm) {
 
   try {
     actual = bm.run();
+    if (!actual || typeof actual !== 'object' || Array.isArray(actual)) {
+      throw new Error('Benchmark returned an invalid result object.');
+    }
   } catch (err) {
+    actual = {};
     error = err.message || String(err);
   }
 
-  const checks = bm.checks.map(check => {
-    const { key, description, expectedVal, tolerance = 0, type = 'numeric' } = check;
+  const checks = Array.isArray(bm.checks) ? bm.checks.map(check => {
+    if (!check || typeof check !== 'object' || Array.isArray(check)) {
+      return { key: null, description: '', expectedVal: null, actualVal: undefined, tolerance: null, deviation: null, pass: false };
+    }
+    const {
+      key,
+      description,
+      expectedVal,
+      tolerance = 0,
+      type = 'numeric',
+      unit = null,
+      toleranceBasis = null,
+    } = check;
     const actualVal = actual[key];
+    const invalidCheck = !['numeric', 'boolean'].includes(type)
+      || typeof tolerance !== 'number' || !Number.isFinite(tolerance) || tolerance < 0;
 
     let deviation = null;
     let pass = false;
 
-    if (error !== null) {
+    if (error !== null || invalidCheck) {
       pass = false;
       deviation = null;
     } else if (type === 'boolean') {
-      pass = Boolean(actualVal) === Boolean(expectedVal);
+      pass = Object.prototype.hasOwnProperty.call(actual, key)
+        && typeof actualVal === 'boolean'
+        && typeof expectedVal === 'boolean'
+        && actualVal === expectedVal;
       deviation = pass ? 0 : 1;
     } else {
-      const a = Number(actualVal);
-      const e = Number(expectedVal);
-      if (!Number.isFinite(a) || !Number.isFinite(e)) {
+      const a = actualVal;
+      const e = expectedVal;
+      if (!Object.prototype.hasOwnProperty.call(actual, key)
+        || typeof a !== 'number' || typeof e !== 'number'
+        || !Number.isFinite(a) || !Number.isFinite(e)) {
         pass = false;
         deviation = null;
       } else {
@@ -66,8 +88,8 @@ export function runBenchmark(bm) {
       }
     }
 
-    return { key, description, expectedVal, actualVal, tolerance, deviation, pass };
-  });
+    return { key, description, expectedVal, actualVal, tolerance, deviation, pass, type, unit, toleranceBasis };
+  }) : [];
 
   return {
     id: bm.id,
@@ -76,8 +98,18 @@ export function runBenchmark(bm) {
     standardRef: bm.standardRef,
     sourceUrl: bm.sourceUrl || null,
     fixtureId: bm.fixtureId || null,
+    inputs: bm.inputs || null,
+    inputUnits: bm.inputUnits || null,
+    source: bm.source || null,
+    inputSource: bm.inputSource || null,
+    additionalSources: Array.isArray(bm.additionalSources) ? bm.additionalSources : [],
+    assumptions: Array.isArray(bm.assumptions) ? bm.assumptions : [],
+    limitations: Array.isArray(bm.limitations) ? bm.limitations : [],
+    independentDerivation: bm.independentDerivation || bm.derivation || null,
+    evidenceClass: bm.evidenceClass || null,
+    knownIssue: bm.knownIssue === true,
     description: bm.description,
-    pass: error === null && checks.every(c => c.pass),
+    pass: error === null && checks.length > 0 && checks.every(c => c.pass),
     error,
     checks,
   };

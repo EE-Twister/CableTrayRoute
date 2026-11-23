@@ -5,6 +5,7 @@ import {
   applyShortCircuitResultsToDiagram,
   createStudyExecutionController
 } from '../src/one-line/studyExecutionController.mjs';
+import { fingerprintStudyValue } from '../analysis/studyLifecycle.mjs';
 
 describe('One-Line study execution controller', () => {
   it('applies bus voltage and line loading results to canonical diagram records', () => {
@@ -65,5 +66,53 @@ describe('One-Line study execution controller', () => {
     assert.equal(studies.meta, 'shortCircuit');
     assert.deepEqual(calls.map(call => call[0]), ['oneLine', 'studies', 'renderResults', 'render']);
     assert.deepEqual(applyShortCircuitResultsToDiagram({ sheets: [] }, {}), { diagram: [], sheets: [] });
+  });
+
+  it('rejects a load-flow completion when a manual source edit occurs during the solve', async () => {
+    const oneLine = { activeSheet: 0, sheets: [{ components: [{ id: 'bus', voltage_kv: 0.48, connections: [] }] }] };
+    let finish;
+    let writes = 0;
+    const sourceHash = () => fingerprintStudyValue({ oneLine });
+    const controller = createStudyExecutionController({
+      buttons: {},
+      getOneLine: () => oneLine,
+      setOneLine: value => Object.assign(oneLine, value),
+      getStudies: () => ({}),
+      setStudies: () => { writes += 1; },
+      captureStudyRunContext: () => ({ studyKey: 'loadFlow', projectSnapshotHash: sourceHash(), scenario: 'base', projectIdentity: { projectId: 'p1' } }),
+      saveStudyResult: () => { writes += 1; },
+      getStudySourceSnapshot: () => ({ oneLine }),
+      fingerprintStudyValue,
+      getStudySettings: () => ({ loadFlow: {}, shortCircuit: {} }),
+      getActiveSheet: () => 0,
+      getProtectiveDeviceCatalog: () => ({}),
+      loadReferencedProtectiveDevices: async () => ({}),
+      runLoadFlow: () => new Promise(resolve => { finish = resolve; }),
+      runShortCircuitOffMain: async () => ({}),
+      runShortCircuit: () => ({}),
+      runArcFlash: async () => ({}),
+      runHarmonics: () => ({}),
+      runNetworkHarmonics: () => ({}),
+      runMotorStart: () => ({}),
+      runReliability: async () => ({}),
+      assertSheetsUnchanged: () => oneLine,
+      getSheetsRevision: () => 'revision',
+      recordProvenance: () => {},
+      updateCableOperatingVoltages: () => {},
+      markScheduleReconcilePending: () => {},
+      renderStudyResults: () => {},
+      renderLoadFlowResults: () => {},
+      render: () => {},
+      generateArcFlashReport: () => {},
+      openLabelPrintWindow: () => {},
+      highlightSPF: () => {},
+      showAlertModal: () => {},
+      windowRef: { open() {} },
+    });
+    const pending = controller.runLoadFlowStudy();
+    oneLine.sheets[0].components[0].voltage_kv = 0.415;
+    finish({ buses: [], lines: [] });
+    await assert.rejects(pending, /inputs changed/);
+    assert.equal(writes, 0);
   });
 });

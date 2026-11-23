@@ -71,6 +71,9 @@ export function bindProjectField(element, binding, overrides, fieldName) {
   element.dataset.projectSource = binding.sourcePath || '';
   element.dataset.projectSourceLabel = binding.sourceLabel || '';
   element.dataset.projectInputState = overrides.has(fieldName) ? 'override' : 'linked';
+  if (element.dataset.projectLinkedValueAssigned === undefined) {
+    element.dataset.projectLinkedValueAssigned = 'false';
+  }
   if (element.dataset.projectBindingReady === 'true') return;
   element.dataset.projectBindingReady = 'true';
   element.addEventListener('input', event => {
@@ -95,12 +98,36 @@ export function attachProjectSourceBadge(element, label) {
 }
 
 export function applyLinkedValue(element, value, overrides, fieldName, binding, { force = false } = {}) {
-  if (!element || value === null || value === undefined || value === '') return false;
+  if (!element) return false;
   bindProjectField(element, binding, overrides, fieldName);
   if (overrides.has(fieldName) && !force) return false;
   if (force) overrides.delete(fieldName);
+  if (value === null || value === undefined || value === '') {
+    // Preserve the authored/manual value until this field has actually been
+    // populated from a project source.  This matters on an empty project:
+    // the HTML form default remains a legitimate manual input.  Once a
+    // linked value was assigned, however, a missing source must clear it so a
+    // stale value cannot be captured against newer provenance.
+    if (element.dataset.projectLinkedValueAssigned !== 'true') {
+      if (binding && typeof binding === 'object') {
+        binding.sourcePath = `manual.${fieldName}`;
+        binding.sourceLabel = 'Manual input';
+      }
+      element.dataset.projectInputState = 'manual';
+      delete element.dataset.projectSource;
+      delete element.dataset.projectSourceLabel;
+      element.title = 'Manual value; no project source is currently available.';
+      return false;
+    }
+    element.dataset.projectApplying = 'true';
+    element.value = '';
+    element.dataset.projectInputState = 'linked';
+    delete element.dataset.projectApplying;
+    return false;
+  }
   element.dataset.projectApplying = 'true';
   element.value = value;
+  element.dataset.projectLinkedValueAssigned = 'true';
   element.dataset.projectInputState = 'linked';
   element.title = `Linked to ${binding?.sourceLabel || binding?.sourcePath || 'project data'}`;
   delete element.dataset.projectApplying;

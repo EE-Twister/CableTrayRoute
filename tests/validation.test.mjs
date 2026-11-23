@@ -1252,7 +1252,11 @@ describe('runValidation - TCC duty violations', () => {
         'comp-B': ['Upstream device slower than downstream']
       }
     };
-    const issues = runValidation([], studies);
+    const issues = runValidation([], studies, {
+      assessments: {
+        duty: { freshness: 'current', validity: { state: 'evaluated' }, eligible: true }
+      }
+    });
     assert.strictEqual(issues.length, 3);
     const compAIssues = issues.filter(i => i.component === 'comp-A');
     assert.strictEqual(compAIssues.length, 2);
@@ -1270,6 +1274,62 @@ describe('runValidation - TCC duty violations', () => {
     const issues = runValidation([]);
     assert.deepStrictEqual(issues, []);
   });
+
+  it('withholds legacy or stale duty caches from current validation', () => {
+    const studies = { duty: { 'comp-A': ['Historical coordination issue'] } };
+    const legacyIssues = runValidation([], studies);
+    assert.strictEqual(legacyIssues.filter(issue => issue.component === 'comp-A').length, 0);
+    assert.match(legacyIssues[0].message, /historical or unevaluated/);
+    const staleIssues = runValidation([], studies, {
+      assessments: {
+        duty: {
+          freshness: 'stale',
+          validity: { state: 'evaluated' },
+          eligible: true,
+          reasons: ['project_inputs_changed']
+        }
+      }
+    });
+    assert.strictEqual(staleIssues.filter(issue => issue.component === 'comp-A').length, 0);
+    assert.match(staleIssues[0].message, /stale/);
+    const stalePassIssues = runValidation([], { duty: { 'comp-A': [] } }, {
+      assessments: {
+        duty: { freshness: 'stale', validity: { state: 'evaluated' }, eligible: true }
+      }
+    });
+    assert.strictEqual(stalePassIssues.length, 1);
+    assert.match(stalePassIssues[0].message, /stale/);
+  });
+
+  it('requires current lifecycle evidence for reliability failures', () => {
+    const studies = {
+      reliability: {
+        n1Failures: ['load-A'],
+        n1FailureDetails: { 'load-A': { isolatedLoads: ['load-B'] } }
+      }
+    };
+    const legacyIssues = runValidation([], studies);
+    assert.strictEqual(legacyIssues.filter(issue => issue.component === 'load-A').length, 0);
+    assert.match(legacyIssues[0].message, /reliability/);
+    const dependencyBlockedIssues = runValidation([], studies, {
+      assessments: {
+        reliability: {
+          freshness: 'current',
+          validity: { state: 'evaluated' },
+          eligible: false,
+          reasons: ['dependency_ineligible']
+        }
+      }
+    });
+    assert.strictEqual(dependencyBlockedIssues.filter(issue => issue.component === 'load-A').length, 0);
+    const issues = runValidation([], studies, {
+      assessments: {
+        reliability: { freshness: 'current', validity: { state: 'evaluated' }, eligible: true }
+      }
+    });
+    assert.strictEqual(issues.length, 1);
+    assert.match(issues[0].message, /Single point of failure/);
+  });
 });
 
 describe('runValidation - multiple simultaneous violations', () => {
@@ -1280,7 +1340,11 @@ describe('runValidation - multiple simultaneous violations', () => {
       { id: 'brk-ov', type: 'breaker', fault_current: 60000, interrupt_rating: 42000 }
     ];
     const studies = { duty: { 'brk-ov': ['TCC coordination issue'] } };
-    const issues = runValidation(components, studies);
+    const issues = runValidation(components, studies, {
+      assessments: {
+        duty: { freshness: 'current', validity: { state: 'evaluated' }, eligible: true }
+      }
+    });
     assert.strictEqual(issues.length, 4);
     const ids = issues.map(i => i.component);
     assert.ok(ids.includes('isolated'));

@@ -1,5 +1,5 @@
 const d3 = globalThis.d3;
-import { getOneLine, getStudies, setStudies } from '../dataStore.mjs';
+import { getOneLine, getStudies, captureStudyRunContext, assertStudyRunContextCurrent, saveStudyResult } from '../dataStore.mjs';
 import { resolveCtForComponent } from './ctMetadata.mjs';
 
 const loadNetworkHarmonics = () => import('../src/harmonicNetwork.lazy.js');
@@ -502,13 +502,23 @@ export function frequencyScan({
 }
 
 async function ensureHarmonicResults() {
-  const studies = getStudies();
+  const sourceRunContext = captureStudyRunContext('harmonics', {
+    inputs: getOneLine(),
+    options: {},
+    assumptions: ['Harmonic source and impedance results are evaluated from the active One-Line model.'],
+  });
+  const networkRunContext = captureStudyRunContext('harmonicNetwork', {
+    inputs: getOneLine(),
+    options: {},
+    assumptions: ['Network harmonic results use the same active One-Line topology and source data.'],
+  });
   const res = runHarmonics();
   const { runNetworkHarmonics } = await loadNetworkHarmonics();
   const network = runNetworkHarmonics();
-  studies.harmonics = res;
-  studies.harmonicNetwork = network;
-  setStudies(studies);
+  assertStudyRunContextCurrent(sourceRunContext);
+  assertStudyRunContextCurrent(networkRunContext);
+  saveStudyResult('harmonics', res, sourceRunContext);
+  saveStudyResult('harmonicNetwork', network, networkRunContext);
   return { sourceResults: res, network, runNetworkHarmonics };
 }
 
@@ -539,9 +549,14 @@ function renderNetworkHarmonicResults(network, runNetworkHarmonics) {
     const next = runNetworkHarmonics({
       maximumDemandCurrentA: maximumDemandCurrentA > 0 ? maximumDemandCurrentA : undefined
     });
-    const studies = getStudies();
-    studies.harmonicNetwork = next;
-    setStudies(studies);
+    try {
+      saveStudyResult('harmonicNetwork', next, captureStudyRunContext('harmonicNetwork', {
+        inputs: { maximumDemandCurrentA },
+        options: { maximumDemandCurrentA },
+      }));
+    } catch (error) {
+      console.warn('[harmonics] network result was not persisted:', error?.message || error);
+    }
     renderNetworkHarmonicResults(next, runNetworkHarmonics);
   };
   if (!network || network.calculationStatus === 'unsupported') {
@@ -685,6 +700,6 @@ if (typeof document !== 'undefined') {
         .map(([id, result]) => ({ id, thd: result.vthd, limit: result.limit }));
       renderChart(chartEl, data);
       renderNetworkHarmonicResults(network, runNetworkHarmonics);
-    }).catch(error => console.error('[harmonics] network initialization failed', error));
+    }).catch(error => console.warn('[harmonics] network initialization skipped:', error?.message || error));
   }
 }

@@ -47,19 +47,22 @@ async function ensureJsPDF() {
  * @returns {string}
  */
 function sanitizeCsvCell(value) {
-  const raw = value ?? '';
+  let raw = value ?? '';
+  if (raw && typeof raw === 'object') {
+    try { raw = JSON.stringify(raw); } catch (_) { raw = String(raw); }
+  }
   let cell = String(raw);
   if (typeof raw === 'string' && /^[\s]*[=+\-@]/.test(cell)) {
     cell = `'${cell}`;
   }
-  if (cell.includes(',') || cell.includes('"')) {
+  if (/[",\r\n]/.test(cell)) {
     cell = '"' + cell.replace(/"/g, '""') + '"';
   }
   return cell;
 }
 
 export function toCSV(headers = [], rows = []) {
-  const lines = [headers.join(',')];
+  const lines = [headers.map(sanitizeCsvCell).join(',')];
   rows.forEach(r => {
     const line = headers.map(h => sanitizeCsvCell(r[h])).join(',');
     lines.push(line);
@@ -81,12 +84,29 @@ export async function toPDF(title = 'Report', headers = [], rows = []) {
   doc.text(title, 10, 10);
   let y = 20;
   doc.setFontSize(10);
-  doc.text(headers.join(' | '), 10, y);
-  y += 10;
+  const drawWrapped = line => {
+    const wrapped = typeof doc.splitTextToSize === 'function'
+      ? doc.splitTextToSize(String(line), 180)
+      : [String(line)];
+    wrapped.forEach(textLine => {
+      if (y + 5 > 280) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.text(textLine, 10, y);
+      y += 5;
+    });
+    y += 5;
+  };
+  drawWrapped(headers.join(' | '));
+  const pdfCell = value => {
+    if (value == null) return '';
+    if (typeof value !== 'object') return String(value);
+    try { return JSON.stringify(value); } catch (_) { return String(value); }
+  };
   rows.forEach(r => {
-    const line = headers.map(h => r[h] ?? '').join(' | ');
-    doc.text(String(line), 10, y);
-    y += 10;
+    const line = headers.map(h => pdfCell(r[h])).join(' | ');
+    drawWrapped(line);
   });
   return doc.output('arraybuffer');
 }

@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'node:fs/promises';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pageUrl = file => 'file://' + path.join(__dirname, '..', file);
@@ -57,5 +58,9 @@ test('One-Line stores read-only live telemetry configuration', async ({ page }) 
   await expect(exportButton).toBeEnabled();
   const downloadPromise = page.waitForEvent('download');
   await exportButton.click();
-  expect((await downloadPromise).suggestedFilename()).toBe('BUS-1-kw-24h-live-trend.csv');
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('BUS-1-kw-24h-live-trend.csv');
+  const csv = await fs.readFile(await download.path(), 'utf8');
+  expect(csv).toContain('timestamp,kw');
+  expect(csv).toContain('2450');
 });

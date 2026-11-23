@@ -203,7 +203,7 @@
 
 .home-next-action__label {
     display: block;
-    color: var(--color-primary);
+    color: #1e3a8a;
     font-size: 0.68rem;
     font-weight: 800;
     letter-spacing: 0.05em;
@@ -238,7 +238,7 @@
 
 .home-next-action a {
     margin-top: 0.2rem;
-    color: var(--color-primary);
+    color: #1e3a8a;
     font-size: 0.82rem;
     font-weight: 800;
     text-decoration: none;
@@ -251,6 +251,11 @@
 
 .home-next-action a:hover {
     text-decoration: underline;
+}
+
+body.dark-mode .home-next-action__label,
+body.dark-mode .home-next-action a {
+    color: #bfdbfe;
 }
 
 .home-command__panel {

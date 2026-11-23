@@ -43,6 +43,16 @@ async function startStaticServer() {
   return instance;
 }
 
+async function waitForRenderSettle(page) {
+  await page.evaluate(async () => {
+    if (document.fonts?.ready) {
+      await document.fonts.ready;
+    }
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+  await expect(page.locator('body')).toHaveCSS('opacity', '1');
+}
+
 async function openCathodicProtectionPage(page) {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -61,6 +71,7 @@ async function openCathodicProtectionPage(page) {
   await page.goto(`${baseUrl}/cathodicprotection.html?e2e=1&e2e_reset=1`);
   await expect(page.locator('#cp-form')).toBeVisible();
   await expect(page.locator('#calculation-basis-content .cp-basis-card')).toHaveCount(6);
+  await waitForRenderSettle(page);
   return errors;
 }
 
@@ -75,7 +86,7 @@ test.afterAll(async () => {
 });
 
 test.describe('Cathodic protection desktop buildout', () => {
-  test.use({ viewport: { width: 1440, height: 1000 } });
+  test.use({ viewport: { width: 1440, height: 1000 }, colorScheme: 'light', reducedMotion: 'reduce' });
 
   test('passes a WCAG 2.1 AA desktop scan before and after results render', async ({ page }) => {
     const errors = await openCathodicProtectionPage(page);
@@ -87,6 +98,7 @@ test.describe('Cathodic protection desktop buildout', () => {
 
     await page.locator('#cp-form button[type="submit"]').click();
     await expect(page.locator('#cp-result-kpis')).toBeVisible();
+    await waitForRenderSettle(page);
     const resultScan = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
       .exclude('[data-noaxe]')
@@ -101,6 +113,7 @@ test.describe('Cathodic protection desktop buildout', () => {
     await page.locator('#settings-btn').click();
     await page.selectOption('#theme-select', 'dark');
     await expect(page.locator('body')).toHaveClass(/dark-mode/);
+    await waitForRenderSettle(page);
 
     const formPresentation = await page.evaluate(() => {
       const parseRgb = (value) => {

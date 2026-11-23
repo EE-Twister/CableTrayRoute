@@ -1,10 +1,11 @@
 import { runVoltageStabilityStudy } from './analysis/voltageStability.mjs';
-import { getOneLine, getStudies, setStudies } from './dataStore.mjs';
+import { getOneLine, getStudies, getStudyAssessments, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
 import { showAlertModal } from './src/components/modal.js';
 import { buildVoltageStabilityProjectInputs } from './analysis/advancedStudyProjectInputs.mjs';
 import { createStudyRunMetadata, isStudyResultStale } from './analysis/studyResultReadiness.mjs';
+import { studyLifecycleMetadataRows } from './analysis/studyExportMetadata.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -85,9 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
       { source: importedSourceFingerprint ? 'project-one-line' : 'manual', persisted: valid }
     );
     if (valid) {
-      const studies = getStudies();
-      studies.voltageStability = result;
-      setStudies(studies);
+      saveStudyResult('voltageStability', result, captureStudyRunContext('voltageStability', { inputs, options: {} }));
     } else {
       errorsDiv.hidden = false;
       errorsDiv.textContent = 'The base P-V or Q-V operating point did not converge. This result was not saved or enabled for export.';
@@ -477,6 +476,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------------------------------------------------------------------------
   function exportCSV(result) {
     const rows = [['Type', 'Lambda', 'Total Load MW', 'Bus ID', 'Vm (pu)', 'Va (deg)', 'Converged']];
+    studyLifecycleMetadataRows(result, { assessment: getStudyAssessments().voltageStability }).forEach(([key, value]) => rows.push(['Lifecycle', key, value]));
     result.pvCurve.points.forEach(p => {
       p.buses.forEach(b => {
         rows.push(['PV', p.lambda, p.totalLoadMW.toFixed(4), b.id, b.Vm.toFixed(6), b.Va.toFixed(4), p.converged]);

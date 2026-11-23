@@ -26,7 +26,7 @@ Roles are stored in `server_data/users.json`. An existing deployment can bootstr
 Navigate to **Support → Admin** (visible only to `admin` role users) to:
 
 - View all users, their roles, auth method (Password or SSO), and last-login time
-- Change any user's role (takes effect on their next login)
+- Change any user's role (checked on subsequent HTTP requests and collaboration messages)
 - Browse and filter the audit log
 - Export the audit log as CSV
 
@@ -117,6 +117,27 @@ On subsequent logins, the existing account is reused (matched by the OIDC `sub` 
 | `POST` | `/auth/oidc/logout` | Revokes the server-side session (requires auth + CSRF) |
 
 All three routes are rate-limited to 20 requests per window (same window as other auth endpoints).
+
+## Collaboration protocol input handling
+
+Collaboration rooms use the authenticated account and project name together,
+matching private project storage. Tabs signed into the same account can exchange
+updates; matching project names in different accounts remain isolated. The server
+uses the authenticated username in presence and patch messages. A username supplied
+by a client cannot select another account's room or impersonate another user.
+Only engineer and admin roles may publish patches. Sessions and roles are checked
+again for incoming messages and outgoing broadcasts, so logout, session expiry,
+and role changes apply to existing connections. Cross-account editing requires an
+explicit project-sharing grant model and is not enabled by a matching name.
+
+The collaboration server accepts JSON message objects with a string `type`.
+Malformed JSON and invalid message envelopes receive an error response without
+changing room membership. A `join` requires a string `projectId` of at most 200
+characters and an optional string `username`; omitted or empty usernames display
+as `Anonymous`, and displayed usernames retain the 100-character limit. Invalid
+join fields are rejected before leaving the current room. Unexpected message
+handler failures close the affected connection rather than escaping into the
+shared server process.
 
 ---
 

@@ -188,6 +188,7 @@ function mccProjectSuggestions(lineup) {
     equipment: dataStore.getEquipment(),
     oneLine: dataStore.getOneLine(),
     studies: dataStore.getStudies(),
+    studyAssessments: dataStore.getStudyAssessments(),
     cables: dataStore.getCables()
   });
 }

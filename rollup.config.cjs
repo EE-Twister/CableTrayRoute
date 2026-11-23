@@ -6,6 +6,7 @@ const { nodeResolve } = require('@rollup/plugin-node-resolve');
 const entries = {
   index: 'src/index.js',
   workflowdashboard: 'src/workflowDashboard.js',
+  designsynthesis: 'src/designSynthesis.js',
   datamanager: 'src/oneLineDataManager.js',
   switchingprocedures: 'src/switchingProcedures.js',
   cableschedule: 'src/cableschedule.js',

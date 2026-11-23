@@ -27,13 +27,18 @@ function caseToDiagram(data){
     };
     if (b.Pd || b.Qd) comp.load = { kw: (b.Pd || 0) * 1000, kvar: (b.Qd || 0) * 1000 };
     if (b.Pg || b.Qg) comp.generation = { kw: (b.Pg || 0) * 1000, kvar: (b.Qg || 0) * 1000 };
+    if (b.Bs) comp.shunt = { b: b.Bs / (b.baseKV * b.baseKV) };
     return comp;
   });
   data.branches.forEach(br => {
     const from = components.find(c => c.id === br.from.toString());
     if (!from) return;
-    const conn = { target: br.to.toString(), impedance: { r: br.r, x: br.x } };
-    if (br.b && br.b !== 0) conn.shunt = { from: { b: br.b/2 }, to: { b: br.b/2 } };
+    const baseKV = from.baseKV || 1;
+    const baseZ = (baseKV * baseKV) / data.baseMVA;
+    const baseY = data.baseMVA / (baseKV * baseKV);
+    const conn = { target: br.to.toString(), impedance: { r: br.r * baseZ, x: br.x * baseZ } };
+    if (br.b && br.b !== 0) conn.shunt = { from: { b: br.b / 2 * baseY }, to: { b: br.b / 2 * baseY } };
+    if (br.ratio && br.ratio !== 1) conn.tap = { ratio: br.ratio, angle: br.angle || 0 };
     from.connections.push(conn);
   });
   return [{ name: 'case', components }];
@@ -49,8 +54,16 @@ function caseToDiagram(data){
   describe('IEEE load flow benchmarks', () => {
     it('solves IEEE 14-bus case', () => {
       setOneLine({ activeSheet: 0, sheets: caseToDiagram(case14) });
-      const res = runLoadFlow({ baseMVA: case14.baseMVA });
-      assert(res.buses.length === case14.buses.length);
+      const res = runLoadFlow({ baseMVA: case14.baseMVA, radialOptimization: false, maxIterations: 50 });
+      assert.strictEqual(res.converged, true);
+      assert(Number.isFinite(res.maxMismatch) && res.maxMismatch < 1e-6);
+      assert.strictEqual(res.buses.length, case14.buses.length);
+      for (const [id, expected] of Object.entries(case14.expected)) {
+        const bus = res.buses.find(row => row.id === id);
+        assert(bus, `Missing bus ${id}`);
+        assert(Math.abs(bus.Vm - expected.Vm) < 1e-4, `Vm mismatch at ${id}`);
+        assert(Math.abs(bus.Va - expected.Va) < 1e-3, `Va mismatch at ${id}`);
+      }
     });
 
     it('loads IEEE 57-bus placeholder', () => {

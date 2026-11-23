@@ -1,6 +1,6 @@
 import ampacity from '../../ampacity.mjs';
-import { sizeConductor } from '../../sizing.js';
-import { calculateVoltageDrop } from '../voltageDrop.js';
+import { sizeConductor, calculateAmpacityResult } from '../../sizing.js';
+import { calculateVoltageDropResult } from '../voltageDrop.js';
 import { normalizeCablePhases } from '../../utils/cablePhases.js';
 
 const { sizeToArea } = ampacity;
@@ -36,7 +36,7 @@ export function applyCableSizingHighlight({ tbody, table, tableData = [], limit 
       || {};
     const row = { ...storedRow, ...renderedRow };
     const phaseLabels = normalizeCablePhases(row);
-    const phaseCount = phaseLabels.length || 3;
+    const phaseCount = phaseLabels.length || parseInt(row.phases, 10) || 0;
     const impedanceOverride = row.impedance_per_1000ft ?? row.impedance;
     const conduitMaterial = row.conduit_material || row.raceway_material || row.conduit_type;
     const rawVoltage = parseFloat(voltIn?.value);
@@ -67,7 +67,13 @@ export function applyCableSizingHighlight({ tbody, table, tableData = [], limit 
       maxVoltageDrop: limit
     };
     const recommendation = sizeConductor(load, params);
-    const selectedVoltageDrop = calculateVoltageDrop({
+    const selectedAmpacityResult = calculateAmpacityResult({
+      ...row,
+      conductor_size: sizeSel.value,
+      conductor_material: matSel?.value || row.conductor_material,
+      insulation_rating: rawInsulation,
+    }, { ambient: params.ambient, conductors });
+    const selectedVoltageDropResult = calculateVoltageDropResult({
       ...row,
       conductor_size: sizeSel.value,
       conductor_material: matSel?.value || row.conductor_material,
@@ -82,8 +88,9 @@ export function applyCableSizingHighlight({ tbody, table, tableData = [], limit 
       conduit_material: conduitMaterial,
       conduit_type: row.conduit_type
     }, lenIn?.value, phaseCount);
+    const selectedVoltageDrop = selectedVoltageDropResult.value;
 
-    if (ampIn) ampIn.value = recommendation.ampacity ? recommendation.ampacity.toFixed(2) : '';
+    if (ampIn) ampIn.value = Number.isFinite(selectedAmpacityResult.value) ? selectedAmpacityResult.value.toFixed(2) : '';
     if (vdIn) {
       vdIn.value = Number.isFinite(selectedVoltageDrop) ? selectedVoltageDrop.toFixed(2) : '';
       vdIn.classList.toggle(

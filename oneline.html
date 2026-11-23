@@ -22,7 +22,7 @@
   <script src="dist/vendor/handlebars.min.js"></script>
   <script type="module" src="./dataStore.mjs"></script>
   <script type="module" src="./oneline.js"></script>
-  <script type="module" src="./dist/scenarios.js"></script>
+  <script type="module" src="./src/scenarios.js"></script>
 </head>
 <body class="oneline-page" data-report-title="One-Line Diagram">
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -258,6 +258,10 @@
                 <label class="icon-button" title="Show protection zone overlays" aria-label="Toggle protection zone overlays">
                   <input type="checkbox" id="toggle-protection-zones" class="hidden-input">
                   Zones
+                </label>
+                <label class="icon-button" title="Show evidence-linked proposed device candidates on cable labels">
+                  <input type="checkbox" id="toggle-device-candidates" class="hidden-input">
+                  Proposed device candidates
                 </label>
                 <label class="icon-button" title="Show hazardous-area classification overlays" aria-label="Toggle hazardous area overlays">
                   <input type="checkbox" id="toggle-haz-area" class="hidden-input">
@@ -591,6 +595,6 @@
     <li data-action="toggle-favorite" role="menuitem">Add to Favorites</li>
     <li data-action="edit" role="menuitem">Edit Component</li>
   </ul>
-  <script type="module" src="./dist/projectManager.js"></script>
+  <script type="module" src="./src/projectManagerEntry.js"></script>
 </body>
 </html>

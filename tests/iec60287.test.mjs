@@ -422,14 +422,14 @@ describe('calcAmpacity — input validation', () => {
   it('throws for missing sizeMm2', () => {
     assert.throws(
       () => calcAmpacity({ sizeMm2: 0, insulThickMm: 1.6 }),
-      /sizeMm2 must be a positive number/
+      /sizeMm2 must be a finite positive number/
     );
   });
 
   it('throws for missing insulThickMm', () => {
     assert.throws(
       () => calcAmpacity({ sizeMm2: 95 }),
-      /insulThickMm must be a positive number/
+      /insulThickMm must be a finite positive number/
     );
   });
 
@@ -445,6 +445,35 @@ describe('calcAmpacity — input validation', () => {
       () => calcAmpacity({ sizeMm2: 95, insulThickMm: 1.6, insulation: 'PVC', ambientTempC: 70 }),
       /≥ max conductor temperature/
     );
+  });
+
+  it('rejects non-finite physical inputs and impossible conduit geometry', () => {
+    const nominal = {
+      sizeMm2: 95, material: 'Cu', insulation: 'XLPE', insulThickMm: 1.6,
+      installMethod: 'direct-burial', burialDepthMm: 800, soilResistivity: 1,
+      ambientTempC: 20, frequencyHz: 50, U0_kV: 0,
+    };
+    assert.throws(() => calcAmpacity({ ...nominal, ambientTempC: NaN }), /ambientTempC must be finite/);
+    assert.throws(() => calcAmpacity({ ...nominal, ambientTempC: null }), /ambientTempC must be finite/);
+    assert.throws(() => calcAmpacity({ ...nominal, sizeMm2: '' }), /sizeMm2 must be a finite positive/);
+    assert.throws(() => calcAmpacity({ ...nominal, nCables: true }), /nCables must be a positive integer/);
+    assert.throws(() => calcAmpacity({ ...nominal, frequencyHz: Infinity }), /frequencyHz must be a finite positive/);
+    assert.throws(() => calcAmpacity({ ...nominal, soilResistivity: 0 }), /soilResistivity must be a finite positive/);
+    assert.throws(() => calcAmpacity({ ...nominal, installMethod: 'conduit', conduitOD_mm: 20 }), /Conduit outer diameter must exceed/);
+  });
+
+  it('preserves finite nominal output across supported installation methods', () => {
+    for (const installMethod of ['direct-burial', 'conduit', 'tray', 'air']) {
+      const result = calcAmpacity({
+        sizeMm2: 95, material: 'Cu', insulation: 'XLPE', insulThickMm: 1.6,
+        installMethod, conduitOD_mm: installMethod === 'conduit' ? 100 : 0,
+        burialDepthMm: 800, soilResistivity: 1, ambientTempC: 20,
+        frequencyHz: 50, U0_kV: 0,
+      });
+      assert.ok(Number.isFinite(result.I_rated));
+      assert.ok(Number.isFinite(result.thetaConductorActual));
+      assert.ok(Object.values(result.thermalResistances).every(Number.isFinite));
+    }
   });
 });
 

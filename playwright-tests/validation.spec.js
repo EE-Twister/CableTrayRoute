@@ -92,6 +92,18 @@ test.describe('Validation & Standards — benchmarks list', () => {
     expect(count).toBeGreaterThanOrEqual(6);
   });
 
+  test('renders the catalog count and evidence metadata from the manifest', async ({ page }) => {
+    await page.goto(e2ePage('validation.html#thermal-direct-burial-95-cu-xlpe'));
+    await page.waitForSelector('#benchmarks-list details', { timeout: 5000 });
+    const expectedCount = await page.evaluate(async () => (await (await fetch('data/validationBenchmarks.json')).json()).benchmarks.length);
+    await expect(page.locator('#benchmarks-list details.validation-item')).toHaveCount(expectedCount);
+    const fixture = page.locator('#thermal-direct-burial-95-cu-xlpe');
+    await expect(fixture).toContainText('Executable inputs');
+    await expect(fixture).toContainText('Evidence source');
+    await expect(fixture).toContainText('Tolerance basis');
+    await expect(fixture).toContainText('Known Limitations');
+  });
+
   test('contains IEEE 1584 arc flash benchmark', async ({ page }) => {
     await page.goto(e2ePage('validation.html'));
     await page.waitForSelector('#benchmarks-list details', { timeout: 5000 });

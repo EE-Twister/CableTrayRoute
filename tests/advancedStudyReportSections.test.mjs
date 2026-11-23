@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { buildAdvancedStudySections } from '../analysis/projectReport.mjs';
 import { getAvailableSections, PRESET_CONFIGS } from '../analysis/reportPackage.mjs';
+import { buildStudyProvenance, captureStudyRunContext } from '../analysis/studyLifecycle.mjs';
 
 const runMetadata = {
   valid: true,
@@ -44,7 +45,20 @@ const studies = {
   },
 };
 
-const sections = buildAdvancedStudySections(studies, {});
+const studyProvenance = {};
+const currentStudyContexts = {};
+for (const [studyKey, result] of Object.entries(studies)) {
+  const context = captureStudyRunContext(studyKey, {
+    projectSnapshot: { project: 'advanced-report-test' },
+    inputs: { studyKey, revision: 1 },
+    options: { mode: 'test' },
+    scenario: 'Base',
+    projectIdentity: { projectId: 'advanced-report-test', projectName: 'Advanced Report Test' },
+  });
+  currentStudyContexts[studyKey] = context;
+  studyProvenance[studyKey] = buildStudyProvenance(studyKey, result, context, { validity: 'evaluated' });
+}
+const sections = buildAdvancedStudySections(studies, {}, { studyProvenance, currentStudyContexts });
 assert.equal(sections.quasiDynamic.readiness.valid, true);
 assert.equal(sections.quasiDynamic.rows[0].risk, 'warning');
 assert.equal(sections.contingency.rows[0].violations, 2);

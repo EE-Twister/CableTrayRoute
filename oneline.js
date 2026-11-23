@@ -12,11 +12,13 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
-import { getOneLine, setOneLine, getEquipment, setEquipment, getPanels, setPanels, getLoads, setLoads, getCables, getOneLineScheduleCollections, setCables, setProjectEntityCollections, addRaceway, getItem, setItem, migrateLegacyItem, getStudies, setStudies, on, getCurrentScenario, switchScenario, STORAGE_KEYS, loadProject, saveProject } from './dataStore.mjs';
+import { getOneLine, setOneLine, getEquipment, setEquipment, getPanels, setPanels, getLoads, setLoads, getCables, getOneLineScheduleCollections, setCables, setProjectEntityCollections, addRaceway, getItem, setItem, migrateLegacyItem, getStudies, setStudies, getStudyAssessment, getStudyAssessments, captureStudyRunContext, saveStudyResult, getStudySourceSnapshot, getStudyProjectIdentity, on, getCurrentScenario, switchScenario, STORAGE_KEYS, loadProject, saveProject } from './dataStore.mjs';
+import { buildStudyProvenance, fingerprintStudyValue, normalizeStudySourceSnapshot } from './analysis/studyLifecycle.mjs';
 import { previewScheduleReconcile, applyScheduleReconcilePreview, synchronizeCanonicalSchedules } from './analysis/scheduleReconcile.mjs';
 import { runLoadFlow } from './analysis/loadFlow.js';
 import { renderLoadFlowResultsHtml } from './analysis/loadFlowResultsRenderer.js';
 import { applyTapRatioToOneLine, evaluateTransformerTapOptimization } from './analysis/transformerTapOptimization.mjs';
+import { createTransformerTapReviewStaleNotice, formatTapReviewNumber, formatTapReviewPercent, formatTapReviewPu, isCurrentTransformerTapReview } from './src/one-line/transformerTapReviewGuard.mjs';
 import { runShortCircuit } from './analysis/shortCircuit.mjs';
 import { runArcFlash } from './analysis/arcFlash.mjs';
 import { runHarmonics } from './analysis/harmonics.js';
@@ -53,6 +55,7 @@ import { computeImpedanceFromPerKm } from './utils/cableImpedance.js';
 import { normalizeCablePhases, formatCablePhases } from './utils/cablePhases.js';
 import { compatibleProtectiveDevices, componentProtectionKind } from './src/one-line/protectiveDeviceCompatibility.mjs';
 import { normalizeComponentElectricalProperties } from './src/one-line/componentElectricalSchema.mjs';
+import { createConnectionProtectionController } from './src/one-line/connectionProtection.mjs';
 import {
   computeProtectionZoneBounds,
   createProtectionZone as createProtectionZoneModel,
@@ -163,15 +166,11 @@ import {
 } from './utils/transformerProperties.js';
 import './site.js';
 import { getAuthRole, getProjectState, readAppSetting, writeAppSetting } from './projectStorage.js';
-
 const ONE_LINE_READINESS_COPY = getContractReadinessCopy('oneline.html');
-
 let componentMeta = {};
-
 document.querySelectorAll('.oneline-canvas-scroll > .prop-modal').forEach(modal => {
   document.body.appendChild(modal);
 });
-
 function ensurePropModal() {
   let modal = document.getElementById('prop-modal');
   if (!modal) {
@@ -656,14 +655,20 @@ let cachedStudyResults = getStudies();
 const studyAttributeResolvers = {
   arcFlash: comp => {
     if (!comp) return null;
+    const assessment = getStudyAssessment('arcFlash');
+    if (!assessment.eligible) return null;
     return cachedStudyResults?.arcFlash?.[comp.id] || null;
   },
   shortCircuit: comp => {
     if (!comp) return null;
+    const assessment = getStudyAssessment('shortCircuit');
+    if (!assessment.eligible) return null;
     return cachedStudyResults?.shortCircuit?.[comp.id] || null;
   },
   reliability: comp => {
     if (!comp) return null;
+    const assessment = getStudyAssessment('reliability');
+    if (!assessment.eligible) return null;
     return cachedStudyResults?.reliability?.componentStats?.[comp.id] || null;
   }
 };
@@ -3418,7 +3423,8 @@ function autoLinkComponentToSchedule(comp, { createIfMissing = true } = {}) {
 
 function selectedConnectionContext() {
   if (!selectedConnection?.component) return null;
-  const source = selectedConnection.component;
+  const source = components.find(component => component.id === selectedConnection.component.id);
+  if (!source) return null;
   const index = selectedConnection.index;
   const conn = Array.isArray(source.connections) ? source.connections[index] : null;
   if (!conn) return null;
@@ -3724,8 +3730,6 @@ function getComponentReviewState(comp) {
   return { key: 'complete', label: 'Complete', color: '#16a34a' };
 }
 
-const oneLineStudyMetaKey = '_oneLineMeta';
-
 function studyApprovalStatus(studyKey) {
   const project = getProjectState() || {};
   const approval = project.studyApprovals?.[studyKey]
@@ -3738,17 +3742,16 @@ function studyApprovalStatus(studyKey) {
 function getStudyProvenance(studyKey) {
   const result = cachedStudyResults?.[studyKey];
   if (!result) return { status: 'none', scenario: getCurrentScenario() || 'default', approval: 'pending', runAt: null };
-  const meta = cachedStudyResults?.[oneLineStudyMetaKey]?.[studyKey] || null;
   const currentScenario = getCurrentScenario() || 'default';
   const approval = studyApprovalStatus(studyKey);
-  if (!meta) return { status: 'unknown', scenario: currentScenario, approval, runAt: null };
-  const scenarioMatches = !meta.scenario || meta.scenario === currentScenario;
-  const revisionMatches = !meta.oneLineRevision || meta.oneLineRevision === getOneLineSheetsRevision(getOneLine());
+  const assessment = getStudyAssessment(studyKey);
   return {
-    status: scenarioMatches && revisionMatches ? 'current' : 'stale',
-    scenario: meta.scenario || currentScenario,
+    status: assessment.freshness,
+    scenario: currentScenario,
     approval,
-    runAt: meta.runAt || null
+    runAt: assessment.provenance?.capturedAt || null,
+    validity: assessment.validity,
+    evaluation: assessment.evaluation,
   };
 }
 
@@ -3757,19 +3760,11 @@ function withStudyProvenance(state, studyKey) {
   if (provenance.status === 'stale') {
     return { key: 'stale', label: `${state.label} · stale result`, color: '#7c3aed', provenance };
   }
-  if (profile === 'transferSwitch') {
-    return {
-      width: 72,
-      height: 72,
-      ports: [
-        { x: 18, y: 0 },
-        { x: 54, y: 0 },
-        { x: 36, y: 72 }
-      ]
-    };
-  }
   if (provenance.status === 'unknown') {
     return { key: 'unknown', label: `${state.label} · freshness unknown`, color: '#64748b', provenance };
+  }
+  if (provenance.validity?.state !== 'evaluated') {
+    return { key: 'unknown', label: `${state.label} · result incomplete`, color: '#64748b', provenance };
   }
   return { ...state, provenance };
 }
@@ -3978,6 +3973,7 @@ function refineOneLineCommandSurface() {
   appendIfPresent(viewMenu.panel, normalizeMenuLabel(document.getElementById('minimap-toggle')?.closest('label')));
   appendIfPresent(viewMenu.panel, normalizeMenuLabel(document.getElementById('toggle-energized')?.closest('label')));
   appendIfPresent(viewMenu.panel, normalizeMenuLabel(document.getElementById('toggle-protection-zones')?.closest('label')));
+  appendIfPresent(viewMenu.panel, normalizeMenuLabel(document.getElementById('toggle-device-candidates')?.closest('label')));
   appendIfPresent(viewMenu.panel, normalizeMenuLabel(document.getElementById('toggle-haz-area')?.closest('label')));
   appendIfPresent(viewMenu.panel, document.getElementById('bg-image-input'));
   appendIfPresent(viewMenu.panel, normalizeCommandButton(document.getElementById('bg-image-btn'), 'Background Image'));
@@ -4061,8 +4057,6 @@ function setupToolbarMenus() {
     if (event.key !== 'Escape') return;
     closeCommandMenus();
   });
-  window.setTimeout(() => closeCommandMenus(), 0);
-  window.setTimeout(() => closeCommandMenus(), 150);
 }
 
 function closeCommandMenus(except = null) {
@@ -4206,19 +4200,6 @@ function assertOneLineSheetsUnchanged(expectedRevision, studyName) {
   return currentOneLineData;
 }
 
-function recordOneLineStudyProvenance(studies, studyKey) {
-  if (!studies || typeof studies !== 'object' || !studyKey) return;
-  const meta = studies[oneLineStudyMetaKey] && typeof studies[oneLineStudyMetaKey] === 'object'
-    ? studies[oneLineStudyMetaKey]
-    : {};
-  meta[studyKey] = {
-    scenario: getCurrentScenario() || 'default',
-    runAt: new Date().toISOString(),
-    oneLineRevision: getOneLineSheetsRevision(getOneLine())
-  };
-  studies[oneLineStudyMetaKey] = meta;
-}
-
 const studyExecutionController = createStudyExecutionController({
   buttons: {
     loadFlow: runLFBtn,
@@ -4233,7 +4214,16 @@ const studyExecutionController = createStudyExecutionController({
   setOneLine,
   getStudies,
   setStudies,
+  captureStudyRunContext,
+  saveStudyResult,
+  getStudySourceSnapshot,
+  fingerprintStudyValue,
+  normalizeStudySourceSnapshot,
+  getStudyProjectIdentity,
+  getCurrentScenario,
+  buildStudyProvenance,
   getStudySettings: () => studySettings,
+  getStudyAssessment,
   getActiveSheet: () => activeSheet,
   getProtectiveDeviceCatalog: () => protectiveDeviceCatalog,
   loadReferencedProtectiveDevices,
@@ -4247,7 +4237,6 @@ const studyExecutionController = createStudyExecutionController({
   runReliability: runReliabilityOffMain,
   assertSheetsUnchanged: assertOneLineSheetsUnchanged,
   getSheetsRevision: getOneLineSheetsRevision,
-  recordProvenance: recordOneLineStudyProvenance,
   updateCableOperatingVoltages,
   markScheduleReconcilePending,
   renderStudyResults,
@@ -4273,20 +4262,6 @@ function renderLoadFlowResults(res) {
 
 export { renderLoadFlowResults };
 
-function formatTapReviewNumber(value, digits = 3) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return '—';
-  return numeric.toFixed(digits).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
-}
-
-function formatTapReviewPu(value) {
-  return Number.isFinite(Number(value)) ? `${formatTapReviewNumber(value, 4)} pu` : '—';
-}
-
-function formatTapReviewPercent(value) {
-  return Number.isFinite(Number(value)) ? `${formatTapReviewNumber(value, 3)}%` : '—';
-}
-
 function appendTapReviewCell(row, text, className = '') {
   const cell = document.createElement('td');
   if (className) cell.className = className;
@@ -4309,6 +4284,11 @@ function renderTransformerTapReview(review = transformerTapReview) {
   const intro = document.createElement('p');
   intro.textContent = 'What-if load-flow cases are evaluated only at the configured LTC steps and range. No transformer setting changes until you approve a recommendation.';
   transformerTapReviewEl.append(heading, intro);
+  const assessment = getStudyAssessments()?.transformerTapOptimization;
+  const reviewCurrent = isCurrentTransformerTapReview(review, assessment, getOneLineSheetsRevision(getOneLine()));
+  if (!reviewCurrent) {
+    transformerTapReviewEl.appendChild(createTransformerTapReviewStaleNotice(document));
+  }
 
   const generated = document.createElement('p');
   generated.className = 'tap-review-meta';
@@ -4391,7 +4371,7 @@ function renderTransformerTapReview(review = transformerTapReview) {
         button.type = 'button';
         button.className = 'btn btn-sm primary-btn';
         button.textContent = record.appliedTapRatio === candidate.tapRatio ? 'Applied' : 'Approve & Apply';
-        button.disabled = record.appliedTapRatio === candidate.tapRatio;
+        button.disabled = !reviewCurrent || record.appliedTapRatio === candidate.tapRatio;
         button.dataset.testid = 'tap-approve-apply';
         button.dataset.tapApply = '1';
         button.dataset.transformerId = record.transformerId;
@@ -4429,6 +4409,10 @@ function refreshLocalOneLineAfterStudyApply() {
 
 async function applyTransformerTapRecommendation(transformerId, tapRatio) {
   const review = transformerTapReview;
+  if (!isCurrentTransformerTapReview(review, getStudyAssessments()?.transformerTapOptimization, getOneLineSheetsRevision(getOneLine()))) {
+    showAlertModal('Tap Review Stale', 'This review is missing current calculation evidence or uses a previous solver version. Rerun Transformer Tap Review before approving a setting.');
+    return;
+  }
   const record = review?.transformers?.find(item => item.transformerId === transformerId);
   const candidate = record?.cases?.find(item => Math.abs(Number(item.tapRatio) - Number(tapRatio)) <= 1e-8);
   if (!record || !candidate || !candidate.feasible || record.recommendedTapRatio === null || Math.abs(record.recommendedTapRatio - candidate.tapRatio) > 1e-8) {
@@ -4446,6 +4430,10 @@ async function applyTransformerTapRecommendation(transformerId, tapRatio) {
     { primaryText: 'Approve & Apply' }
   );
   if (!approved) return;
+  if (transformerTapReview !== review || !isCurrentTransformerTapReview(review, getStudyAssessments()?.transformerTapOptimization, getOneLineSheetsRevision(getOneLine()))) {
+    showAlertModal('Tap Review Stale', 'The tap review changed while approval was open. Rerun Transformer Tap Review before applying a setting.');
+    return;
+  }
   const currentOneLineData = assertOneLineSheetsUnchanged(review.sourceOneLineRevision, 'Transformer tap review');
   const updatedOneLine = applyTapRatioToOneLine(currentOneLineData, transformerId, candidate.tapRatio);
   if (!updatedOneLine) {
@@ -4463,7 +4451,6 @@ async function applyTransformerTapRecommendation(transformerId, tapRatio) {
   }
   savedReview.status = 'applied';
   savedStudies.transformerTapOptimization = savedReview;
-  recordOneLineStudyProvenance(savedStudies, 'transformerTapOptimization');
   setStudies(savedStudies);
   transformerTapReview = savedReview;
   refreshLocalOneLineAfterStudyApply();
@@ -4475,23 +4462,25 @@ async function runTransformerTapOptimizationFromButton() {
   if (!runTapOptimizationBtn) return;
   const oneLineData = getOneLine();
   const oneLineRevision = getOneLineSheetsRevision(oneLineData);
+  const runContext = captureStudyRunContext('transformerTapOptimization', {
+    inputs: { oneLine: oneLineData },
+    options: studySettings.loadFlow,
+  });
   runTapOptimizationBtn.disabled = true;
   runTapOptimizationBtn.textContent = 'Reviewing…';
   try {
-    const result = await evaluateTransformerTapOptimization(oneLineData, {
+    let result = await evaluateTransformerTapOptimization(oneLineData, {
       baseMVA: studySettings.loadFlow.baseMVA,
       balanced: studySettings.loadFlow.balanced,
       maxIterations: studySettings.loadFlow.maxIterations,
       runStudy: (snapshot, options) => runLoadFlowOffMain(snapshot, options)
     });
     assertOneLineSheetsUnchanged(oneLineRevision, 'Transformer tap review');
-    const studies = getStudies();
+    result = JSON.parse(JSON.stringify(result));
     result.sourceOneLineRevision = oneLineRevision;
     result.scenario = getCurrentScenario() || 'default';
     result.status = 'review';
-    studies.transformerTapOptimization = result;
-    recordOneLineStudyProvenance(studies, 'transformerTapOptimization');
-    setStudies(studies);
+    saveStudyResult('transformerTapOptimization', result, runContext);
     transformerTapReview = result;
     renderStudyResults();
     renderTransformerTapReview(result);
@@ -5243,9 +5232,12 @@ function appendConnectionInspector(root, context) {
     createHandoffLink('Raceway Schedule', `racewayschedule.html?tag=${tag}`),
     createHandoffLink('Routing', `optimalRoute.html?tag=${tag}`)
   );
-  section.append(heading, summary, form, handoff);
+  const protection = connectionProtectionController.build(context);
+  section.append(heading, summary, ...(protection ? [protection] : []), form, handoff);
   root.appendChild(section);
 }
+
+const connectionProtectionController = createConnectionProtectionController({ documentRef: document, on, cableEvent: STORAGE_KEYS.cables, getCables, getEvidence: () => getItem('designSynthesisDeviceEvidence', {}), getContext: selectedConnectionContext, toggle: document.getElementById('toggle-device-candidates'), render });
 
 function appendOperatingStatePanel(root, comp) {
   if (!root || !comp) return;
@@ -9586,7 +9578,7 @@ function render() {
     routeConnection,
     isHiddenByLayer,
     includePoint,
-    getCableForConnection,
+    getCableForConnection, getProtectionLabel: connectionProtectionController.forRender(),
     getVoltageRange,
     usedVoltageRanges,
     parseCablePhases,
@@ -10162,6 +10154,8 @@ function renderArcFlashLabelOverlays(svg) {
   svg.querySelectorAll('.af-label-badge').forEach(el => el.remove());
   const afResults = cachedStudyResults?.arcFlash;
   if (!afResults || typeof afResults !== 'object') return;
+  const arcFlashAssessment = getStudyAssessment('arcFlash');
+  if (!arcFlashAssessment.eligible) return;
 
   const BADGE_W = 124;
   const BANNER_H = 18;
@@ -12422,7 +12416,8 @@ function validateDiagram(options = {}) {
   });
 
   // Run additional validation rules
-  validationIssues.push(...runValidation(components, getStudies()));
+  const studyAssessments = getStudyAssessments();
+  validationIssues.push(...runValidation(components, getStudies(), { assessments: studyAssessments }));
 
   if (isEngineeringPrintMode()) {
     resetValidationIssueMarkers(svg);
@@ -13058,14 +13053,17 @@ function exportOneLineDiagnostics() {
   getDiagramFileController().exportDiagnostics();
 }
 async function shareDiagram() {
+  let storedToken = readAppSetting('gistToken') || '';
+  try { storedToken = JSON.parse(storedToken); } catch { /* Older app values may already be plain strings. */ }
+  if (typeof storedToken !== 'string') storedToken = '';
   const token = await promptDialog(
     'Share Diagram',
     'GitHub personal access token (gist scope)',
-    getItem('gistToken', ''),
+    storedToken,
     { helperText: 'Create a classic token at github.com/settings/tokens with the gist scope. Stored locally.' }
   );
   if (!token) return;
-  setItem('gistToken', token);
+  writeAppSetting('gistToken', token);
   const body = {
     public: true,
     files: {
@@ -13165,7 +13163,7 @@ async function __oneline_init() {
 
 bootstrapPage({
   bodyReadyDataset: 'onelineReady',
-  openDetailsInE2E: true,
+  openDetailsInE2E: 'details:not(.command-menu)',
   beacon: {
     id: 'oneline-ready-beacon',
     attr: 'data-oneline-ready',

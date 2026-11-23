@@ -278,8 +278,8 @@ R_dc_θ = R_20 × [1 + α·(θ − 20)]</pre>
             </select>
             <p id="install-hint" class="field-hint">
               Determines the external thermal resistance T4.
-              Direct burial in good soil (ρ ≤ 1.0 K·m/W) often gives higher ratings than free air
-              due to the large thermal mass of soil.
+              Direct burial rating depends on the modeled external thermal resistance and site
+              conditions; use measured or documented soil data for project decisions.
             </p>
           </div>
 
@@ -307,7 +307,7 @@ R_dc_θ = R_20 × [1 + α·(θ − 20)]</pre>
               <p id="soil-hint" class="field-hint">
                 Thermal resistivity of the surrounding soil. The IEC reference value is 1.0 K·m/W
                 (moist loam). Typical ranges: well-irrigated/clay 0.5–0.8; average loam 1.0–1.5;
-                dry sand/gravel 2.0–3.0; rock 1.5–2.5. Measure per IEEE 442 / IEC 60287-3-2
+                dry sand/gravel 2.0–3.0; rock 1.5–2.5. Measure per IEEE 442
                 for critical projects. Consider thermal backfill (ρ ≤ 0.8 K·m/W) for high-load cables.
               </p>
             </div>
@@ -411,6 +411,12 @@ R_dc_θ = R_20 × [1 + α·(θ − 20)]</pre>
       </form>
 
       <div id="results" role="region" aria-live="polite" aria-label="Cable ampacity results"></div>
+
+      <section id="cable-thermal-detailed" class="card" aria-labelledby="cable-thermal-detailed-heading">
+        <h2 id="cable-thermal-detailed-heading">Detailed direct-burial cable thermal screen</h2>
+        <p class="field-hint">Thermal-only screening with specified AC resistance, dielectric loss, sheath loss factor, and insulation layers. Values remain editable and must be supported by project sources before qualified engineering review.</p>
+        <form id="cable-thermal-detailed-form" hidden><button id="thermal-export-csv-btn" type="button" disabled>Export CSV</button></form>
+      </section>
 
       <section class="card">
         <div id="study-basis-panel"></div>

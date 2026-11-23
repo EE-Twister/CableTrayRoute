@@ -70,6 +70,10 @@ function listFingerprintCandidates(baseDir) {
 copy(path.join(root, 'icons'), path.join(dist, 'icons'));
 copy(path.join(root, 'assets'), path.join(dist, 'assets'));
 copy(path.join(root, 'data'), path.join(dist, 'data'));
+['design-synthesis-industrial.json', 'design-synthesis-voltage-revision.json', 'design-synthesis-tray-congestion.json', 'design-synthesis-existing-tray.json'].forEach(file => {
+  copy(path.join(root, 'samples', file), path.join(dist, 'samples', file));
+  copy(path.join(root, 'samples', file), path.join(docs, 'samples', file));
+});
 copy(path.join(root, 'examples', 'sample_oneline.json'), path.join(dist, 'examples', 'sample_oneline.json'));
 copy(path.join(root, 'icons'), path.join(docs, 'icons'));
 copy(path.join(root, 'assets'), path.join(docs, 'assets'));

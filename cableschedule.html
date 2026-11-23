@@ -287,7 +287,10 @@
             </div>
           </div>
         </div>
-        <div id="routing-readiness-panel" class="routing-readiness-panel" aria-live="polite" data-no-print>
+        <details class="cable-guidance-disclosure" data-no-print>
+          <summary>Workflow guidance and readiness</summary>
+          <div class="cable-guidance-disclosure__body">
+        <div id="routing-readiness-panel" class="routing-readiness-panel" aria-live="polite">
           <div class="readiness-item readiness-total">
             <span class="readiness-value" data-metric="total">0</span>
             <span class="readiness-label">Total Cables</span>
@@ -321,7 +324,9 @@
             <span class="readiness-label">Last Change</span>
           </div>
         </div>
-        <div id="cable-workflow-next-action" class="workflow-next-action" aria-live="polite" data-no-print></div>
+        <div id="cable-workflow-next-action" class="workflow-next-action" aria-live="polite"></div>
+          </div>
+        </details>
         <div class="table-search-container">
           <label for="table-search">Search cables</label>
           <div class="table-search-field">

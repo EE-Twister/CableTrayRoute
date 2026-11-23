@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { buildRouteSceneModel } from '../routeSceneModel.mjs';
+import { renderRouteTooltip } from './routeTooltipView.mjs';
 
 const COLORS = {
   background: 0xf4f7fb,
@@ -1589,12 +1590,7 @@ export class RouteViewer3D {
       return;
     }
     this.canvas.style.cursor = 'pointer';
-    const description = data.kind === 'raceway'
-      ? `${data.label}<small>${data.racewayKind} · ${Number(data.utilizationPct || 0).toFixed(0)}% utilized${data.routeCount ? ` · ${data.routeCount} route${data.routeCount === 1 ? '' : 's'}` : ''}${data.geometrySource === 'inferred-arrangement' ? ' · inferred arrangement' : ''}</small>`
-      : `${data.label}<small>${data.containmentType || 'route'} segment</small>`;
-    this.tooltip.innerHTML = data.kind === 'raceway'
-      ? `${data.label}<small>${data.racewayKind} &middot; ${data.allowedGroup || 'OPEN'} cable class &middot; ${Number(data.utilizationPct || 0).toFixed(0)}% utilized${data.routeCount ? ` &middot; ${data.routeCount} route${data.routeCount === 1 ? '' : 's'}` : ''}${data.geometrySource === 'inferred-arrangement' ? ' &middot; inferred arrangement' : ''}</small>`
-      : description;
+    renderRouteTooltip(this.tooltip, data);
     this.tooltip.style.left = `${event.offsetX + 14}px`;
     this.tooltip.style.top = `${event.offsetY + 14}px`;
     this.tooltip.hidden = false;

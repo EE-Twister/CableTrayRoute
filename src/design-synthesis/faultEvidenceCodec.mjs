@@ -1,0 +1,1 @@
+export { encodeBase64, decodeBase64, encodeDesignSynthesisFaultScenarioBytes, decodeDesignSynthesisFaultScenarioBytes, compressFaultBytes, decompressFaultBytes } from '../../utils/evidenceBinaryCodec.mjs';

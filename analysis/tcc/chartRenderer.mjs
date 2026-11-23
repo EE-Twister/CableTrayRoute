@@ -1,8 +1,11 @@
+import { renderDutyResult } from './dutyLifecycle.mjs';
+
 export async function renderTccChart(dependencies = {}) {
   const {
     state = {},
     activeRangePreset,
     activeViewOptions,
+    getDutyOptions,
     applySelectionSet,
     arcFlashOverlayComponentId,
     arcFlashOverlayControls,
@@ -63,7 +66,10 @@ export async function renderTccChart(dependencies = {}) {
     selectedDeviceIds,
     setItem,
     setPlotAvailability,
-    setStudies,
+    saveStudyResult,
+    assertStudyRunContextCurrent,
+    dutyRunContext,
+    dutyContextId,
     settingsDiv,
     shouldRenderCalloutForEntry,
     showCurveContextMenu,
@@ -1023,19 +1029,8 @@ export async function renderTccChart(dependencies = {}) {
     });
   };
 
-  const updateDutyResults = violations => {
-    if (violations.length) {
-      violationDiv.innerHTML = violations.map(v => `<p>${escapeHtml(v)}</p>`).join('');
-    } else {
-      violationDiv.textContent = '';
-    }
-    const contextIdForDuty = getActiveComponentId();
-    if (!contextIdForDuty) return;
-    const res = getStudies();
-    res.duty = res.duty || {};
-    res.duty[contextIdForDuty] = violations;
-    setStudies(res);
-  };
+  const dutyResultDependencies = { violationDiv, escapeHtml, getActiveComponentId, dutyContextId, dutyRunContext, selectedDeviceIds, getDutyOptions, saveStudyResult, assertStudyRunContextCurrent };
+  const updateDutyResults = violations => renderDutyResult(violations, dutyResultDependencies);
 
   const updateCurves = () => {
     const contextIdForFault = getActiveComponentId();

@@ -1,5 +1,5 @@
 import { runGeneratorSizingAnalysis, NFPA110_TYPES } from './analysis/generatorSizing.mjs';
-import { getStudies, setStudies, getLoads, getEquipment, getProjectMeta } from './dataStore.mjs';
+import { getStudies, getStudyAssessments, getLoads, getEquipment, getProjectMeta, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import {
   buildGeneratorProjectInputs,
@@ -35,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
       loads: getLoads(),
       equipment: getEquipment(),
       studies: getStudies(),
+      studyAssessments: getStudyAssessments(),
       projectMeta: getProjectMeta(),
     });
   }
@@ -115,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Form submission ---
   form.addEventListener('submit', e => {
     e.preventDefault();
+    applyProjectInputs(false);
     const inputs = readFormInputs();
     if (!inputs) return;
 
@@ -131,9 +133,13 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const studies = getStudies();
-    studies.generatorSizing = result;
-    setStudies(studies);
+    const usesMotorStart = ['motorHp', 'motorPf', 'motorEff']
+      .some(fieldName => projectInputModel?.bindings?.[fieldName]?.sourcePath?.startsWith('studyResults.motorStart'));
+    saveStudyResult('generatorSizing', result, captureStudyRunContext('generatorSizing', {
+      inputs,
+      options: inputs,
+      ...(usesMotorStart ? {} : { dependencies: [] }),
+    }));
 
     renderResults(result);
   });

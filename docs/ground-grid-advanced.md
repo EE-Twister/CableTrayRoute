@@ -116,14 +116,28 @@ The **"Run Screening"** button calls `analyzeIrregularGrid()`, which:
 3. Applies the IEEE 80 mesh voltage, step voltage, and grid resistance formulas using
    the actual conductor length from the polygon geometry
 
-**Limitation:** The irregularity correction factor (`Ki = 0.644 + 0.148 × n`) in
-IEEE 80 §B.4.2 was derived for rectangular grids. For markedly non-rectangular shapes
-the mesh voltage estimate carries additional uncertainty (±20–30%).
+**Limitation:** The irregularity correction factor (`Ki = 0.644 + 0.148 × n`)
+comes from the rectangular-grid calculation basis. Applying it to markedly
+non-rectangular shapes adds uncertainty that these benchmarks do not quantify.
 
 ### Standards Reference
 
-- IEEE 80-2013 §B.4 — Grid resistance and mesh/step voltage formulas
-- IEEE 80-2013 Annex B — Sverak simplified formula for grid resistance
+- IEEE 80-2000, Equation (52), printed page 65 (PDF page 73):
+  Sverak grid-resistance equation.
+- IEEE 80-2000, printed pages 93–94 (PDF pages 101–102): grid geometry,
+  effective conductor lengths, and mesh/step-voltage relationships.
+
+These locations were checked in the
+[available original text](https://www.armada.mil.co/sites/default/files/normograma_arc/mantenimiento1/IEEE%2080.pdf).
+The previous 2013-edition Annex B clause mapping was not substantiated and is
+not used as verification evidence.
+
+The rectangular solver uses the rod-length relationships verified in the
+accessible IEEE 80-2000 text (PDF pages 101–102, printed pages 93–94): the
+horizontal conductor length is used for `n`, perimeter/corner rods contribute
+to `Lm` using the individual rod length term, and `Ls = 0.75 Lc + 0.85 Lr`.
+The current standards edition and any edition differences require qualified
+engineering review; this software remains a screening model.
 
 ---
 
@@ -222,7 +236,7 @@ suitable for pasting into project risk registers or study reports.
 |------------|--------|-----------------|
 | Simplified superposition hazard map | ±20 % on hazard zone extent | Always confirm with CDEGS/XGSLab before construction |
 | Two-layer soil only | Multi-layer / anisotropic soils not fitted | Sites with deep clay or weathered rock profiles |
-| Polygon irregularity factor from IEEE 80 rectangular basis | ±25 % on Em for L-shaped or T-shaped grids | Grids with aspect ratio > 4:1 or concave shapes |
+| Polygon irregularity factor from IEEE 80 rectangular basis | Mesh-voltage uncertainty is not quantified by these benchmarks | Elongated or concave grids |
 | No transferred voltage check | Risk from remote earthing not assessed | Sites near pipelines, fences, or remote neutrals |
 | No fault-current distribution modelling | Ig is user-supplied | Must ensure Ig includes all parallel earth-return paths |
 
@@ -232,12 +246,12 @@ suitable for pasting into project risk registers or study reports.
 
 | Standard | Scope |
 |----------|-------|
-| IEEE 80-2013 | Guide for Safety in AC Substation Grounding |
+| IEEE 80-2000 | Inspected equation basis; differences from the project's adopted edition require review |
 | IEEE 81-2012 | Guide for Measuring Earth Resistivity |
 | ASTM G57 | Wenner four-electrode soil resistivity test method |
 | EPRI TR-100622 | Substation grounding design guide |
 | Sunde (1968) | Image-method two-layer soil formula |
-| Sverak (1980) | Simplified grid resistance formula (IEEE 80 Annex B) |
+| Sverak | Grid resistance equation reproduced in IEEE 80-2000, Equation (52) |
 
 ---
 
@@ -256,4 +270,4 @@ XGSLab, or SKM GroundMat when any of the following apply:
 
 ---
 
-*Last updated: 2026-05-03. Implements Gap #74 of the CableTrayRoute competitor gap analysis.*
+*Last updated: 2026-09-17. Implements Gap #74 of the CableTrayRoute competitor gap analysis.*

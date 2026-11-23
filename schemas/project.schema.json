@@ -94,6 +94,7 @@
       "properties": {
         "schemaVersion": { "$ref": "#/definitions/schemaVersion" },
         "meta": { "$ref": "#/definitions/interchangeMeta" },
+        "scenarioData": { "type": "object", "additionalProperties": { "type": "object" } },
         "ductbanks": { "$ref": "#/definitions/recordArray" },
         "conduits": { "$ref": "#/definitions/recordArray" },
         "trays": { "$ref": "#/definitions/recordArray" },

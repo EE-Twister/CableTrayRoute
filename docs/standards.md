@@ -1,9 +1,11 @@
 # Engineering References
 
+> **Evidence status — 2026-09-17 UTC:** These are reference families used by the application, not a compliance or validation certificate. Adopted editions, implemented scope, input completeness, and independently sourced numerical evidence must be assessed separately. See the [calculation review](calculation-feature-review-2026-09-16.md) and subsequent [correction verification](calculation-correction-verification-2026-09-17.md). The overall classification remains **Screening only**; [validation coverage](validation-evidence-coverage.md) identifies the available evidence classes.
+
 This project relies on several established standards and publications for its electrical calculations.
 
 - **NEC 310‑15(C)** – National Electrical Code\, 2023 edition. This section outlines how conductor ampacity must be adjusted when more than three current‑carrying conductors are installed together. The same article points to Chapter 9 for conduit fill requirements used in this tool.
-- **IEEE Std 835** – *IEEE Standard Power Cable Ampacity Tables*. The thermal modeling approach implemented here reflects the guidelines and example calculations provided in this standard.
+- **IEEE Std 835** – *IEEE Standard Power Cable Ampacity Tables*. This is a cable-rating reference; a citation alone does not establish agreement between the application's simplified thermal model and its tables. See the [IEC 60287 guide](iec60287.md) for implemented assumptions and limits.
 - **Neher‑McGrath Paper** – *The Calculation of the Temperature Rise and Load Capability of Cable Systems* by J. H. Neher and M. H. McGrath (AIEE Transactions, 1957). The simplified ampacity and thermal resistance equations in this app stem from this seminal work.
 
 - **IEC 60255‑151** – *Measuring relays and protection equipment – Part 151: Functional requirements for over/under‑current protection* (Edition 1.0, 2009‑12). The TCC module implements the four standard inverse‑time overcurrent relay curve families — Normal Inverse (NI), Very Inverse (VI), Extremely Inverse (EI), and Long‑Time Inverse (LTI) — using the parametric formula **t = TMS × k / [(I/Is)^α − 1]** with the constants defined in Table 1 of the standard. Operating‑time tolerance follows Class E1 (±5%). Implemented in `analysis/iecRelayCurves.mjs`; integrated into the TCC coordination engine via `analysis/tccUtils.js` (`scaleCurve`) and `analysis/tccAutoCoord.mjs` (`findCoordinatingTimeDial`, `greedyCoordinate`).

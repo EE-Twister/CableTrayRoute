@@ -1,11 +1,15 @@
 import { bootstrapPage } from './src/lifecycle/pageBootstrap.js';
 import {
   getCathodicProtectionDraft,
+  captureStudyRunContext,
   getStudies,
+  getStudyAssessments,
   getStudyApprovals,
+  saveStudyResult,
   setCathodicProtectionDraft,
   setStudies
 } from './dataStore.mjs';
+import { studyExportMetadata } from './analysis/studyExportMetadata.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import {
   CP_STANDARDS_PROFILE,
@@ -1430,10 +1434,13 @@ bootstrapPage({
         return;
       }
       if (actionButton.dataset.cpAction === 'download-report-data') {
-        const reportData = activeStudy.reportExport || buildReportExportData(
+        const reportData = {
+          ...(activeStudy.reportExport || buildReportExportData(
           activeStudy,
           getStudyApprovals().cathodicProtection || null
-        );
+          )),
+          lifecycle: studyExportMetadata(activeStudy, { assessment: getStudyAssessments().cathodicProtection }),
+        };
         const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
         const downloadUrl = URL.createObjectURL(blob);
         const downloadLink = document.createElement('a');
@@ -1656,6 +1663,10 @@ bootstrapPage({
   async function runSubmitCalculation(input) {
     const inputFingerprint = buildCalculationInputFingerprint(input);
     const formValues = captureCpFormValues(form);
+    const runContext = captureStudyRunContext('cathodicProtection', {
+      inputs: input,
+      options: { unitSystem: displayedUnitSystem },
+    });
     const result = await runCathodicProtectionAnalysisOffMain(input);
     errorsDiv.hidden = true;
     errorsDiv.textContent = '';
@@ -1676,7 +1687,7 @@ bootstrapPage({
       compliance: complianceRecord.compliance,
       complianceHistory: complianceRecord.complianceHistory
     };
-    setStudies(studies);
+    saveStudyResult('cathodicProtection', studies.cathodicProtection, runContext);
     const changeNote = document.getElementById('design-change-note');
     if (changeNote) {
       changeNote.value = '';
@@ -2742,23 +2753,10 @@ function buildReportExportData(result, approval = null) {
           designBasis: result.standardsBasis || CP_STANDARD_BASIS,
           verificationPlan,
           chartData: profileData,
-          resultsSummary: {
-            requiredCurrentA: result.requiredCurrentA,
-            minimumAnodeMassKg: result.minimumAnodeMassKg,
-            predictedLifeYears: result.predictedLifeYears,
-            safetyMarginYears: result.safetyMarginYears,
-            iccpSizing: result.iccpSizing || null
-          }
+          resultsSummary: { requiredCurrentA: result.requiredCurrentA, minimumAnodeMassKg: result.minimumAnodeMassKg, predictedLifeYears: result.predictedLifeYears, safetyMarginYears: result.safetyMarginYears, iccpSizing: result.iccpSizing || null }
         }
       },
-      pdf: {
-        title: 'Cathodic Protection Design Basis + Verification Plan',
-        sections: [
-          { heading: 'Design Basis', contentKey: 'designBasis' },
-          { heading: 'Verification Plan', contentKey: 'verificationPlan' },
-          { heading: 'Sizing Results Summary', contentKey: 'resultsSummary' }
-        ]
-      }
+      pdf: { title: 'Cathodic Protection Design Basis + Verification Plan', sections: [{ heading: 'Design Basis', contentKey: 'designBasis' }, { heading: 'Verification Plan', contentKey: 'verificationPlan' }, { heading: 'Sizing Results Summary', contentKey: 'resultsSummary' }] }
     }
   };
 }

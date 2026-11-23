@@ -48,6 +48,9 @@ import { recordStartupMeasurement, startPerformanceMeasurement } from './src/per
 import { appendHtmlChunks } from './src/components/incrementalDom.js';
 import { bindRouteDetailActions, buildRouteDetailMarkup } from './src/routing/routeDetailView.mjs';
 import { createRouteBreakdown } from './src/routing/routeBreakdown.mjs';
+import { downloadRouteWorkbook } from './src/routing/routeExportDownload.mjs';
+import { renderSharedRouteMetrics } from './src/routing/sharedRoutesView.mjs';
+import { mergeCanonicalCableRoutes, persistCanonicalCableEdit, removeCanonicalCable } from './src/routing/canonicalCableRouteMerge.mjs';
 import { createPullOptionElements, getPullAnalysisInputs, readPullCheckOptions, restorePullCheckOptions } from './src/routing/pullOptionsController.mjs';
 
 const getParallelCount = value => Math.max(1, Number.parseInt(value, 10) || 1);
@@ -2104,7 +2107,7 @@ const renderBatchResults = async (results) => {
         elements.routeBreakdownContainer.__ctrSetRouteDetailVisibility = setRouteDetailVisibility;
         if (elements.routeBreakdownContainer.dataset.routeEventsBound !== '1') {
             elements.routeBreakdownContainer.dataset.routeEventsBound = '1';
-            elements.routeBreakdownContainer.addEventListener('click', event => {
+            elements.routeBreakdownContainer.addEventListener('click', async event => {
                 const button = event.target.closest('button');
                 const row = event.target.closest('tr[data-route-index]');
                 if (button?.classList.contains('view-map-btn')) {
@@ -2124,12 +2127,14 @@ const renderBatchResults = async (results) => {
                     const idx = Number.parseInt(button.dataset.idx, 10);
                     if (!Number.isFinite(idx) || !state.cableList[idx]) return;
                     state.cableList[idx].locked = true;
+                    persistCanonicalCableEdit({ sampleDataMode: state.sampleDataMode, getCables, setCables,
+                        cable: state.cableList[idx], field: 'locked', value: true });
                     saveSession();
                     if (state.latestRouteData && state.latestRouteData[idx]) {
                         state.latestRouteData[idx].mode = 'Locked';
                     }
                     updateCableListDisplay();
-                    renderBatchResults(state.latestRouteData);
+                    await renderBatchResults(state.latestRouteData);
                     setRouteReviewMode(false);
                     elements.calculateBtn?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     return;
@@ -2166,30 +2171,42 @@ const renderBatchResults = async (results) => {
             onFieldChange: ({ index, field, coordinate, value }) => {
                 const cable = state.cableList[index];
                 if (!cable) return;
+                const previousCable = { ...cable };
+                if (Array.isArray(cable.start)) previousCable.start = [...cable.start];
+                if (Array.isArray(cable.end)) previousCable.end = [...cable.end];
                 if (field === 'start' || field === 'end') cable[field][coordinate] = value;
                 else cable[field] = value;
+                persistCanonicalCableEdit({ sampleDataMode: state.sampleDataMode, getCables, setCables,
+                    cable, field, coordinate, value, previousCable });
                 saveSession();
             },
             onDuplicate: index => {
                 const copy = structuredClone(state.cableList[index]);
+                delete copy.id;
                 copy.name = nextCableName(copy.name);
                 state.cableList.splice(index + 1, 0, copy);
                 updateCableListDisplay();
                 saveSession();
             },
             onDelete: index => {
-                state.cableList.splice(index, 1);
+                const [deletedCable] = state.cableList.splice(index, 1);
+                if (!state.sampleDataMode && deletedCable) {
+                    setCables(removeCanonicalCable(getCables(), deletedCable));
+                }
                 updateCableListDisplay();
                 saveSession();
             },
-            onLockChange: (index, locked) => {
+            onLockChange: async (index, locked) => {
                 state.cableList[index].locked = locked;
+                persistCanonicalCableEdit({ sampleDataMode: state.sampleDataMode, getCables, setCables,
+                    cable: state.cableList[index], field: 'locked', value: locked });
                 if (state.latestRouteData?.[index]) {
                     state.latestRouteData[index].mode = locked ? 'Locked' : 'Unlocked';
                 }
                 saveSession();
                 updateCableListDisplay();
-                renderBatchResults(state.latestRouteData);
+                await renderBatchResults(state.latestRouteData);
+                setRouteReviewMode(false);
             }
         });
         updateTableCounts();
@@ -2458,7 +2475,7 @@ const renderBatchResults = async (results) => {
             const ws3 = XLSX.utils.json_to_sheet(sharedRoutes);
             XLSX.utils.book_append_sheet(wb, ws3, 'Shared Field Routes');
         }
-        XLSX.writeFile(wb, 'route_data.xlsx');
+        downloadRouteWorkbook(wb, XLSX.write.bind(XLSX), 'route_data.xlsx');
     };
 
     const exportBOMXLSX = async () => {
@@ -2477,7 +2494,7 @@ const renderBatchResults = async (results) => {
         state.latestRouteData.forEach(res => {
             createRouteBreakdown(res, formatPoint, getSegmentType).forEach(seg => {
                 if (!seg.tray_id) return;
-                const cable = state.cableList.find(c => (c.tag || c.cable_tag) === res.cable);
+                const cable = state.cableList.find(c => (c.tag || c.cable_tag || c.name) === res.cable);
                 const w = cable
                     ? parseFloat(cable.weight_lb_ft != null ? cable.weight_lb_ft : cable.weight) || 0
                     : 0;
@@ -2517,10 +2534,23 @@ const renderBatchResults = async (results) => {
             const wsSec = XLSX.utils.json_to_sheet(sections);
             XLSX.utils.book_append_sheet(wb, wsSec, 'Tray Sections');
         }
-        XLSX.writeFile(wb, 'bom.xlsx');
+        downloadRouteWorkbook(wb, XLSX.write.bind(XLSX), 'bom.xlsx');
     };
 
     const formatPoint = (p) => `(${p[0].toFixed(1)}, ${p[1].toFixed(1)}, ${p[2].toFixed(1)})`;
+
+    function renderSharedFieldRoutes() {
+        renderSharedRouteMetrics(elements.metrics, state.sharedFieldRoutes, {
+            formatPoint,
+            onHighlight: highlightSharedRoute,
+            onFill: index => {
+                const route = state.sharedFieldRoutes[index];
+                if (!route) return;
+                const cables = route.cables.map(name => state.cableList.find(cable => cable.name === name)).filter(Boolean);
+                openConduitFill(cables);
+            }
+        });
+    }
 
     const getSegmentType = (seg) => {
         if (seg.type !== 'tray') return seg.type;
@@ -2839,6 +2869,12 @@ const renderBatchResults = async (results) => {
         };
 
         if (state.cableList.length > 0) {
+            const originalCanonicalCables = getCables().map(cable => ({
+                id: cable.id,
+                tag: cable.tag,
+                name: cable.name,
+                cable_tag: cable.cable_tag,
+            }));
             const projectHash = computeRoutingProjectHash({ trays: trayDataForRun, cables: state.cableList, options });
             currentProjectHash = projectHash;
             const cacheKey = `route-${projectHash}`;
@@ -2867,7 +2903,7 @@ const renderBatchResults = async (results) => {
                 await renderBatchResults(cachedBatchResults);
                 state.trayCableMap = cache.trayCableMap || {};
                 state.sharedFieldRoutes = cache.sharedRoutes || [];
-                elements.metrics.innerHTML = cache.metricsHtml || '<p>No common field routes detected.</p>';
+                renderSharedFieldRoutes();
                 elements.progressBar.style.width = '100%';
                 elements.progressBar.setAttribute('aria-valuenow', '100');
                 elements.progressLabel.textContent = `Complete (${(cache.wallTime/1000).toFixed(2)}s, cached)`;
@@ -2929,9 +2965,10 @@ const renderBatchResults = async (results) => {
                             showManualPathError(index, result.message, result.error && result.error.tray_id);
                         }
                         cable.route_segments = result.success ? result.route_segments : [];
+                        cable.voltage_drop_pct = result.success ? cable.voltage_drop_pct : null;
                         let vd = 0;
                         if (result.success) {
-                            vd = calculateVoltageDrop(cable, result.total_length, cable.phase);
+                            vd = calculateVoltageDrop(cable, result.total_length, cable.phase ?? cable.phases ?? 3);
                             cable.voltage_drop_pct = vd;
                         }
                         const pullCheck = result.success && state.pullChecksEnabled
@@ -2951,7 +2988,7 @@ const renderBatchResults = async (results) => {
                             segments_count: result.success ? result.route_segments.length : 0,
                             tray_segments: result.success ? result.tray_segments : [],
                             route_segments: result.success ? result.route_segments : [],
-                            voltage_drop_pct: result.success ? vd.toFixed(2) : 'N/A',
+                            voltage_drop_pct: result.success && Number.isFinite(vd) ? vd.toFixed(2) : null,
                             ...(pullCheck ? { pull_check: pullCheck } : {}),
                             exclusions: result.exclusions || [],
                         };
@@ -2960,7 +2997,12 @@ const renderBatchResults = async (results) => {
                     msg.results = null;
 
                     buildFieldSegmentCableMap(batchResults);
-                    if (!state.sampleDataMode) setCables(state.cableList, { captureUndo: false });
+                    if (!state.sampleDataMode) {
+                        setCables(mergeCanonicalCableRoutes(getCables(), state.cableList, {
+                            allowAdd: true,
+                            originalCables: originalCanonicalCables,
+                        }), { captureUndo: false });
+                    }
                     state.latestRouteData = batchResults;
                     await renderBatchResults(batchResults);
                     await new Promise(resolve => requestAnimationFrame(resolve));
@@ -3005,47 +3047,7 @@ const renderBatchResults = async (results) => {
                         return { ...r, total_area: totalArea, cable_count: count, recommendation, trade_size: tradeSize, tray_size: traySize };
                     });
                     state.sharedFieldRoutes = common;
-                    if (common.length > 0) {
-                        let html = '<details><summary>Potential Shared Field Routes</summary><ul>';
-                        common.forEach((c, idx) => {
-                            const group = c.allowed_cable_group ? ` (Group ${c.allowed_cable_group})` : '';
-                            let recText = c.recommendation;
-                            if (c.recommendation === 'conduit' && c.trade_size && c.trade_size !== 'N/A') {
-                                recText = `Recommended: ${c.trade_size}" Conduit`;
-                            } else if ((c.recommendation === 'tray' || c.recommendation === 'channel') && c.tray_size) {
-                                const label = c.recommendation === 'tray' ? 'Tray' : 'Channel';
-                                recText = `Recommended: ${c.tray_size}" ${label}`;
-                            } else {
-                                const label = c.recommendation.charAt(0).toUpperCase() + c.recommendation.slice(1);
-                                recText = `Recommended: ${label}`;
-                            }
-                            let fillLink = '';
-                            if (c.recommendation === 'conduit') {
-                                fillLink = ` <a href="#" class="conduit-fill-link" data-route-index="${idx}">Fill</a>`;
-                            }
-                            html += `<li class="shared-route-item" data-route-index="${idx}">${escapeHtml(c.name)}${escapeHtml(group)}: ${escapeHtml(formatPoint(c.start))} to ${escapeHtml(formatPoint(c.end))} - ${escapeHtml(c.cables.join(', '))} | ${escapeHtml(recText)}${fillLink}</li>`;
-                        });
-                        html += '</ul></details>';
-                        elements.metrics.innerHTML = html;
-                        elements.metrics.querySelectorAll('.shared-route-item').forEach(li => {
-                            li.style.cursor = 'pointer';
-                            li.addEventListener('click', () => highlightSharedRoute(parseInt(li.dataset.routeIndex, 10)));
-                        });
-                        elements.metrics.querySelectorAll('.conduit-fill-link').forEach(link => {
-                            link.addEventListener('click', (e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                const idx = parseInt(link.dataset.routeIndex, 10);
-                                const route = state.sharedFieldRoutes[idx];
-                                if (route) {
-                                    const cables = route.cables.map(n => state.cableList.find(c => c.name === n)).filter(Boolean);
-                                    openConduitFill(cables);
-                                }
-                            });
-                        });
-                    } else {
-                        elements.metrics.innerHTML = '<p>No common field routes detected.</p>';
-                    }
+                    renderSharedFieldRoutes();
                     const finalUtilization = msg.utilization;
                     const utilData = buildUtilizationRows(finalUtilization, trayDataForRun);
                     state.finalTrays = msg.finalTrays;
@@ -3078,7 +3080,6 @@ const renderBatchResults = async (results) => {
                             utilization: finalUtilization,
                             finalTrays: msg.finalTrays,
                             sharedRoutes: state.sharedFieldRoutes,
-                            metricsHtml: elements.metrics.innerHTML,
                             wallTime: msg.wallTime
                         });
                     }

@@ -22,6 +22,15 @@ const PAGES = [
   'login.html',
 ];
 
+async function waitForRenderSettle(page) {
+  await page.evaluate(async () => {
+    if (document.fonts?.ready) {
+      await document.fonts.ready;
+    }
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+}
+
 for (const page of PAGES) {
   test(`WCAG 2.1 AA: ${page}`, async ({ page: pw }) => {
     await pw.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
@@ -34,6 +43,10 @@ for (const page of PAGES) {
     // suite fixes the media scheme above so browser defaults cannot change
     // the theme while computed colors are being measured.
     await pw.waitForLoadState('domcontentloaded');
+    if (page === 'oneline.html') {
+      await expect(pw.locator('#oneline-ready-beacon')).toHaveAttribute('data-oneline-ready', '1');
+    }
+    await waitForRenderSettle(pw);
 
     const results = await new AxeBuilder({ page: pw })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
@@ -44,7 +57,7 @@ for (const page of PAGES) {
     // Report all violations for easier debugging
     if (results.violations.length > 0) {
       const summary = results.violations
-        .map(v => `  [${v.impact}] ${v.id}: ${v.description}\n    ${v.nodes.map(n => n.target.join(', ')).join('\n    ')}`)
+        .map(v => `  [${v.impact}] ${v.id}: ${v.description}\n    ${v.nodes.map(n => `${n.target.join(', ')}: ${n.failureSummary || 'No node details returned'}`).join('\n    ')}`)
         .join('\n');
       throw new Error(`Accessibility violations found on ${page}:\n${summary}`);
     }

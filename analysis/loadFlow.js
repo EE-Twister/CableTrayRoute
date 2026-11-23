@@ -1,6 +1,7 @@
 import { getOneLine } from '../dataStore.mjs';
 import { buildLoadFlowModel, cloneData, isBusComponent, isIBRDevice, deriveIBRProfile } from './loadFlowModel.js';
 import { ibrPQCapability } from './ibrModeling.mjs';
+import { contractIdealCableTies, getIdealCableTieCurrent, recoverIdealCableTieCurrents } from './idealCableTieContraction.mjs';
 
 const IGNORED_TYPES = new Set(['annotation', 'dimension']);
 const MIN_COMPLEX_MAG = 1e-12;
@@ -124,6 +125,11 @@ function isCableConnection(conn = {}) {
   const subtype = String(conn.componentSubtype || '').toLowerCase();
   return type === 'cable' || subtype.includes('cable');
 }
+function hasExplicitFiniteImpedance(conn = {}) {
+  const impedance = conn.impedance || conn.cable;
+  const explicit = value => value !== null && value !== undefined && !(typeof value === 'string' && value.trim() === '') && Number.isFinite(Number(value));
+  return explicit(impedance?.r) && explicit(impedance?.x);
+}
 
 /** Basic complex number helpers used by the load-flow solver */
 function toComplex(re = 0, im = 0) {
@@ -142,6 +148,12 @@ function inv(a) {
     return toComplex(LARGE_ADMITTANCE, 0);
   }
   return { re: a.re / mag2, im: -a.im / mag2 };
+}
+function invNonzero(a) {
+  const mag2 = a.re * a.re + a.im * a.im;
+  return mag2 > 0 && Number.isFinite(mag2)
+    ? { re: a.re / mag2, im: -a.im / mag2 }
+    : inv(a);
 }
 function conj(a) { return { re: a.re, im: -a.im }; }
 
@@ -169,7 +181,12 @@ function buildYBus(buses, baseMVA) {
       const Z = toPerUnitZ(conn.impedance || { r: 0, x: 0 }, bus.baseKV || 1, baseMVA);
       const mag2 = Z.re * Z.re + Z.im * Z.im;
       let treatAsIdealTie = false;
-      if (mag2 < MIN_COMPLEX_MAG) {
+      const exactCableZero = isCableConnection(conn)
+        && Number.isFinite(Number(conn.impedance?.r)) && conn.impedance?.r !== null && conn.impedance?.r !== undefined
+        && Number.isFinite(Number(conn.impedance?.x)) && conn.impedance?.x !== null && conn.impedance?.x !== undefined
+        && Number(conn.impedance.r) === 0 && Number(conn.impedance.x) === 0;
+      const legacyCableFallback = isCableConnection(conn) && !hasExplicitFiniteImpedance(conn);
+      if (mag2 < MIN_COMPLEX_MAG && (exactCableZero || legacyCableFallback || !isCableConnection(conn))) {
         warnings.push({
           type: 'zero_impedance_branch',
           fromBus: bus.id,
@@ -183,14 +200,16 @@ function buildYBus(buses, baseMVA) {
           rating: conn.rating,
           componentPort: conn.componentPort,
           connectionSide: conn.connectionSide,
-          connectionConfig: conn.connectionConfig
+          connectionConfig: conn.connectionConfig,
+          phaseShiftModel: conn.phaseShiftModel,
+          magnetizingKvar: conn.magnetizingKvar
         });
-        treatAsIdealTie = isCableConnection(conn);
+        treatAsIdealTie = exactCableZero || legacyCableFallback;
       }
       if (treatAsIdealTie) {
         conn.idealTie = true;
       }
-      const y = treatAsIdealTie ? toComplex(LARGE_ADMITTANCE, 0) : inv(toComplex(Z.re, Z.im));
+      const y = treatAsIdealTie ? toComplex(LARGE_ADMITTANCE, 0) : (isCableConnection(conn) && mag2 > 0 ? invNonzero(toComplex(Z.re, Z.im)) : inv(toComplex(Z.re, Z.im)));
       const tapMag = conn.tap?.ratio || conn.tap || 1;
       const tapAng = (conn.tap?.angle || 0) * Math.PI / 180;
       const t = toComplex(tapMag * Math.cos(tapAng), tapMag * Math.sin(tapAng));
@@ -198,7 +217,9 @@ function buildYBus(buses, baseMVA) {
       const tmag2 = t.re * t.re + t.im * t.im || 1e-12;
       const yFromSh = conn.shunt?.from ? toPerUnitY(conn.shunt.from, bus.baseKV || 1, baseMVA) : toComplex(0, 0);
       const yToSh = conn.shunt?.to ? toPerUnitY(conn.shunt.to, buses[j].baseKV || 1, baseMVA) : toComplex(0, 0);
-      Y[i][i] = add(Y[i][i], add(div(y, toComplex(tmag2, 0)), yFromSh));
+      // Branch shunts are referenced on the internal side of the ideal tap,
+      // matching MATPOWER's Yff = (y + ysh) / |tap|^2 convention.
+      Y[i][i] = add(Y[i][i], add(div(y, toComplex(tmag2, 0)), div(yFromSh, toComplex(tmag2, 0))));
       Y[j][j] = add(Y[j][j], add(y, yToSh));
       Y[i][j] = sub(Y[i][j], div(y, tconj));
       Y[j][i] = sub(Y[j][i], div(y, t));
@@ -411,7 +432,7 @@ function solvePhase(buses, baseMVA, options = {}) {
     ? Math.floor(options.maxIterations)
     : null;
   const warnings = [];
-  const working = buses.map(b => {
+  const originalWorking = buses.map(b => {
     const clone = {
       ...b,
       connections: Array.isArray(b.connections) ? b.connections.map(conn => ({ ...conn })) : []
@@ -429,6 +450,18 @@ function solvePhase(buses, baseMVA, options = {}) {
     clone.Qg = Number(b.Qg) || 0;
     return clone;
   });
+  const tiePlan = contractIdealCableTies(originalWorking);
+  const unsupportedTieReason = tiePlan.status === 'unsupported' ? tiePlan.reason : null;
+  const working = tiePlan.status === 'contracted' ? tiePlan.buses : originalWorking;
+  const transformerBranches = working.flatMap(bus => bus.connections.map(connection => connection.componentType === 'transformer' ? connection : null)).filter(Boolean);
+  if (transformerBranches.length) {
+    if (transformerBranches.some(connection => connection.phaseShiftModel === 'magnitude-only-zero-angle-assumption')) {
+      warnings.push('Synthesized transformer load-flow uses a balanced positive-sequence magnitude-only model; physical winding phase displacement is not inferred from connection labels or claimed to be zero.');
+    } else {
+      warnings.push('Transformer load-flow uses a balanced positive-sequence model; winding phase displacement is not inferred from connection labels.');
+    }
+    if (transformerBranches.some(connection => connection.magnetizingKvar === null || connection.magnetizingKvar === undefined || !Number.isFinite(Number(connection.magnetizingKvar)))) warnings.push('Transformer magnetizing current/reactive power is not modeled because sourced magnetizing data is unavailable.');
+  }
   if (!working.some(b => (b.type || '').toLowerCase() === 'slack')) {
     warnings.push('No slack/source bus detected. Select a source or set a bus type to "slack".');
   }
@@ -494,7 +527,7 @@ function solvePhase(buses, baseMVA, options = {}) {
           const G = Y[i][j].re;
           const B = Y[i][j].im;
           const theta = Va[i] - Va[j];
-          J[a][bIdx] = Vm[i] * Vm[j] * (-G * Math.sin(theta) + B * Math.cos(theta));
+          J[a][bIdx] = Vm[i] * Vm[j] * (G * Math.sin(theta) - B * Math.cos(theta));
         }
       }
       for (let bIdx = 0; bIdx < PQ.length; bIdx++) {
@@ -571,12 +604,72 @@ function solvePhase(buses, baseMVA, options = {}) {
     const mismatchKW = maxMis * baseMVA * 1000;
     warnings.push(`Solution did not converge after ${maxIter} iterations. Last mismatch ${maxMis.toFixed(4)} pu (${mismatchKW.toFixed(1)} kW).`);
   }
+  if (unsupportedTieReason) {
+    converged = false;
+    warnings.push(`Unsupported exact zero-ohm cable-tie topology: ${unsupportedTieReason} The approximate legacy network result is diagnostic only and cannot pass.`);
+  }
 
-  const { P: PcalcFinal, Q: QcalcFinal } = radialModel
-    ? calcRadialPQ(radialModel, Vm, Va)
-    : calcPQ(working, Y, Vm, Va);
+  let outputVm = Vm;
+  let outputVa = Va;
+  let outputAdmittance = admittance;
+  let tieCurrents = new Map();
+  let PcalcFinal = radialModel ? calcRadialPQ(radialModel, Vm, Va).P : calcPQ(working, Y, Vm, Va).P;
+  let QcalcFinal = radialModel ? calcRadialPQ(radialModel, Vm, Va).Q : calcPQ(working, Y, Vm, Va).Q;
+  let outputWorking = working;
+  if (tiePlan.status === 'contracted') {
+    const indexByRepresentative = new Map(working.map((bus, index) => [String(bus.id), index]));
+    const memberIndex = tiePlan.representativeById;
+    outputWorking = originalWorking;
+    outputVm = originalWorking.map(bus => Vm[indexByRepresentative.get(memberIndex.get(String(bus.id)))]);
+    outputVa = originalWorking.map(bus => Va[indexByRepresentative.get(memberIndex.get(String(bus.id)))]);
+    outputAdmittance = buildYBus(originalWorking, baseMVA);
+    const originalInjectionP = originalWorking.map(bus => bus.ibrProfile
+      ? Pspec[indexByRepresentative.get(memberIndex.get(String(bus.id)))]
+      : (toMW(bus.Pg) - toMW(bus.Pd)) / baseMVA);
+    const originalInjectionQ = originalWorking.map(bus => bus.ibrProfile
+      ? Qspec[indexByRepresentative.get(memberIndex.get(String(bus.id)))]
+      : (toMW(bus.Qg) - toMW(bus.Qd)) / baseMVA);
+    const recovered = recoverIdealCableTieCurrents(tiePlan, originalWorking, outputVm, outputVa, originalInjectionP, originalInjectionQ, baseMVA);
+    if (recovered.issues.length) {
+      converged = false;
+      warnings.push(...recovered.issues.map(item => `Exact cable-tie current recovery failed: ${item.message}`));
+    } else tieCurrents = recovered.currents;
+    const tieIds = new Set(tiePlan.ties.map(edge => edge.componentId));
+    const nonTieBuses = originalWorking.map(bus => ({
+      ...bus,
+      connections: bus.connections.filter(connection => !tieIds.has(String(connection.componentId || connection.id || `${bus.id}->${connection.target}`))),
+    }));
+    const nonTieAdmittance = buildYBus(nonTieBuses, baseMVA);
+    const injections = calcPQ(nonTieBuses, nonTieAdmittance.matrix, outputVm, outputVa);
+    PcalcFinal = injections.P;
+    QcalcFinal = injections.Q;
+    const indexById = new Map(originalWorking.map((bus, index) => [String(bus.id), index]));
+    for (const edge of tiePlan.ties) {
+      const current = getIdealCableTieCurrent(tieCurrents, edge.from, edge.to, edge.componentId);
+      if (!current) continue;
+      const fromIndex = indexById.get(edge.from);
+      const toIndex = indexById.get(edge.to);
+      const fromVoltage = toComplex(outputVm[fromIndex] * Math.cos(outputVa[fromIndex]), outputVm[fromIndex] * Math.sin(outputVa[fromIndex]));
+      const toVoltage = toComplex(outputVm[toIndex] * Math.cos(outputVa[toIndex]), outputVm[toIndex] * Math.sin(outputVa[toIndex]));
+      const fromPower = mul(fromVoltage, conj(toComplex(current.re, current.im)));
+      const toPower = mul(toVoltage, conj(toComplex(-current.re, -current.im)));
+      PcalcFinal[fromIndex] += fromPower.re;
+      QcalcFinal[fromIndex] += fromPower.im;
+      PcalcFinal[toIndex] += toPower.re;
+      QcalcFinal[toIndex] += toPower.im;
+    }
+    for (const edge of tiePlan.ties) {
+      const description = describeComponentMetadata(edge.connection) || edge.componentId;
+      warnings.push(`Zero-impedance cable ${description} is treated as an ideal tie; its current is recovered by KCL over the supported tie forest.`);
+    }
+    for (const warning of outputAdmittance.warnings || []) {
+      if (warning.componentId && tieIds.has(String(warning.componentId))) continue;
+      warnings.push(`Ignored zero-impedance data for ${warning.componentId || 'connection'} between ${warning.fromBus} and ${warning.toBus}; treating it as an ideal tie.`);
+    }
+    warnings.push(`Contracted ${tiePlan.ties.length} exact zero-ohm cable tie(s) for load-flow solution and recovered their branch currents from KCL over the supported tie forest.`);
+  }
   const baseKW = baseMVA * 1000;
-  const actualGeneration = working.map((bus, i) => {
+  const actualGeneration = outputWorking.map((bus, i) => {
     const netP = Number.isFinite(PcalcFinal[i]) ? PcalcFinal[i] * baseKW : 0;
     const netQ = Number.isFinite(QcalcFinal[i]) ? QcalcFinal[i] * baseKW : 0;
     const Pg = netP + (bus.Pd || 0);
@@ -584,9 +677,9 @@ function solvePhase(buses, baseMVA, options = {}) {
     return { Pg, Qg };
   });
 
-  const busRes = working.map((b, i) => {
-    const angleDeg = Va[i] * 180 / Math.PI;
-    const voltageKV = b.baseKV * Vm[i];
+  const busRes = outputWorking.map((b, i) => {
+    const angleDeg = outputVa[i] * 180 / Math.PI;
+    const voltageKV = b.baseKV * outputVm[i];
     const voltageV = voltageKV * 1000;
     const name = normalizeIdentifier(b.name);
     const label = normalizeIdentifier(b.label);
@@ -598,7 +691,7 @@ function solvePhase(buses, baseMVA, options = {}) {
       label,
       ref,
       displayLabel,
-      Vm: Vm[i],
+      Vm: outputVm[i],
       Va: angleDeg,
       baseKV: b.baseKV,
       voltageKV,
@@ -636,71 +729,91 @@ function solvePhase(buses, baseMVA, options = {}) {
   // line flows and losses
   const flows = [];
   const branchLossMap = new Map();
-  working.forEach((bus, i) => {
-    const Vi = toComplex(Vm[i] * Math.cos(Va[i]), Vm[i] * Math.sin(Va[i]));
+  outputWorking.forEach((bus, i) => {
+    const Vi = toComplex(outputVm[i] * Math.cos(outputVa[i]), outputVm[i] * Math.sin(outputVa[i]));
     (bus.connections || []).forEach(conn => {
-      const j = working.findIndex(b => b.id === conn.target);
+      const j = outputWorking.findIndex(b => b.id === conn.target);
       if (j < 0) return;
-      const Vj = toComplex(Vm[j] * Math.cos(Va[j]), Vm[j] * Math.sin(Va[j]));
+      const Vj = toComplex(outputVm[j] * Math.cos(outputVa[j]), outputVm[j] * Math.sin(outputVa[j]));
       const Z = toPerUnitZ(conn.impedance || { r: 0, x: 0 }, bus.baseKV || 1, baseMVA);
       const mag2 = Z.re * Z.re + Z.im * Z.im;
       let treatAsIdealTie = false;
+      const exactCableZero = isCableConnection(conn)
+        && Number.isFinite(Number(conn.impedance?.r)) && conn.impedance?.r !== null && conn.impedance?.r !== undefined
+        && Number.isFinite(Number(conn.impedance?.x)) && conn.impedance?.x !== null && conn.impedance?.x !== undefined
+        && Number(conn.impedance.r) === 0 && Number(conn.impedance.x) === 0;
       if (mag2 < MIN_COMPLEX_MAG) {
-        treatAsIdealTie = isCableConnection(conn);
+        treatAsIdealTie = exactCableZero || (isCableConnection(conn) && !hasExplicitFiniteImpedance(conn));
       }
       if (treatAsIdealTie) {
         conn.idealTie = true;
       }
-      const y = treatAsIdealTie ? toComplex(LARGE_ADMITTANCE, 0) : inv(toComplex(Z.re, Z.im));
+      const y = treatAsIdealTie ? toComplex(LARGE_ADMITTANCE, 0) : (isCableConnection(conn) && mag2 > 0 ? invNonzero(toComplex(Z.re, Z.im)) : inv(toComplex(Z.re, Z.im)));
       const tapMag = conn.tap?.ratio || conn.tap || 1;
       const tapAng = (conn.tap?.angle || 0) * Math.PI / 180;
       const t = toComplex(tapMag * Math.cos(tapAng), tapMag * Math.sin(tapAng));
       const ViPrime = div(Vi, t);
       const yShFrom = conn.shunt?.from ? toPerUnitY(conn.shunt.from, bus.baseKV || 1, baseMVA) : toComplex(0, 0);
-      const yShTo = conn.shunt?.to ? toPerUnitY(conn.shunt.to, working[j].baseKV || 1, baseMVA) : toComplex(0, 0);
+      const yShTo = conn.shunt?.to ? toPerUnitY(conn.shunt.to, outputWorking[j].baseKV || 1, baseMVA) : toComplex(0, 0);
+      const recoveredTieCurrent = treatAsIdealTie
+        ? getIdealCableTieCurrent(tieCurrents, bus.id, outputWorking[j].id, conn.componentId || conn.id || `${bus.id}->${outputWorking[j].id}`)
+        : null;
       const Iseries = mul(sub(ViPrime, Vj), y);
-      const Iij = add(Iseries, mul(ViPrime, yShFrom));
+      const Iij = recoveredTieCurrent ? toComplex(recoveredTieCurrent.re, recoveredTieCurrent.im) : div(add(Iseries, mul(ViPrime, yShFrom)), conj(t));
+      const Iji = recoveredTieCurrent ? toComplex(-recoveredTieCurrent.re, -recoveredTieCurrent.im) : sub(mul(add(y, yShTo), Vj), mul(y, ViPrime));
       const Sij = mul(Vi, conj(Iij));
+      const Sji = mul(Vj, conj(Iji));
       const scale = baseMVA * 1000; // convert per-unit results to kW/kvar
       const P = Sij.re * scale;
       const Q = Sij.im * scale;
       const Ipu = Math.hypot(Iij.re, Iij.im);
-      const IseriesPu = Math.hypot(Iseries.re, Iseries.im);
-      const IseriesPu2 = IseriesPu * IseriesPu;
-      const baseKV = bus.baseKV || working[j].baseKV || 1;
+      const IjiPu = Math.hypot(Iji.re, Iji.im);
+      const baseKV = bus.baseKV || outputWorking[j].baseKV || 1;
       const baseCurrentKA = baseKV ? baseMVA / (Math.sqrt(3) * baseKV) : 0;
       const currentKA = Ipu * baseCurrentKA;
       const currentA = currentKA * 1000;
-      const fromKV = Vm[i] * (bus.baseKV || 0);
-      const toKV = Vm[j] * (working[j].baseKV || 0);
-      const dropKV = fromKV - toKV;
-      const dropPct = fromKV ? (dropKV / fromKV) * 100 : 0;
-      const lossKW = IseriesPu2 * (Z.re || 0) * scale;
-      const lossKVAR = IseriesPu2 * (Z.im || 0) * scale;
-      const ViPrimeMag2 = ViPrime.re * ViPrime.re + ViPrime.im * ViPrime.im;
-      const VjMag2 = Vj.re * Vj.re + Vj.im * Vj.im;
-      const shuntFromLossKW = ViPrimeMag2 * (yShFrom.re || 0) * scale;
-      const shuntToLossKW = VjMag2 * (yShTo.re || 0) * scale;
+      const toBaseKV = outputWorking[j].baseKV || bus.baseKV || 1;
+      const toBaseCurrentKA = toBaseKV ? baseMVA / (Math.sqrt(3) * toBaseKV) : 0;
+      const toCurrentKA = IjiPu * toBaseCurrentKA;
+      const toCurrentA = toCurrentKA * 1000;
+      const fromKV = outputVm[i] * (bus.baseKV || 0);
+      const toKV = outputVm[j] * (outputWorking[j].baseKV || 0);
+      const tapMagnitude = Math.abs(tapMag || 1);
+      const fromTerminalPu = outputVm[i] / tapMagnitude;
+      const toTerminalPu = outputVm[j];
+      const dropPu = fromTerminalPu - toTerminalPu;
+      const dropKV = dropPu * toBaseKV;
+      const dropPct = fromTerminalPu ? (dropPu / fromTerminalPu) * 100 : 0;
+      const lossKW = (Sij.re + Sji.re) * scale;
+      const lossKVAR = (Sij.im + Sji.im) * scale;
       flows.push({
-        id: conn.componentId || conn.id || `${bus.id}->${working[j].id}`,
+        id: conn.componentId || conn.id || `${bus.id}->${outputWorking[j].id}`,
         from: bus.id,
         fromLabel: getBusDisplayLabel(bus.id),
-        to: working[j].id,
-        toLabel: getBusDisplayLabel(working[j].id),
+        to: outputWorking[j].id,
+        toLabel: getBusDisplayLabel(outputWorking[j].id),
         P,
         Q,
+        fromPowerKW: P,
+        fromPowerKvar: Q,
+        toPowerKW: Sji.re * scale,
+        toPowerKvar: Sji.im * scale,
         Ipu,
         currentKA,
         amps: currentA,
+        fromCurrentA: currentA,
+        toCurrentA,
         fromKV,
         toKV,
         dropKV,
         dropPct,
-        componentId: conn.componentId || conn.id
+        dropBasis: { type: 'per-unit-terminal', fromPu: fromTerminalPu, toPu: toTerminalPu, deltaPu: dropPu },
+        componentId: conn.componentId || conn.id,
+        rating: conn.rating
       });
       const branchKeyParts = [];
       if (conn.componentId || conn.id) branchKeyParts.push(conn.componentId || conn.id);
-      branchKeyParts.push([bus.id, working[j].id].sort().join('->'));
+      branchKeyParts.push([bus.id, outputWorking[j].id].sort().join('->'));
       const branchKey = branchKeyParts.join('|');
       if (!branchLossMap.has(branchKey)) {
         branchLossMap.set(branchKey, {
@@ -708,35 +821,25 @@ function solvePhase(buses, baseMVA, options = {}) {
           componentName: conn.componentName,
           componentLabel: conn.componentLabel,
           componentRef: conn.componentRef,
+          rating: conn.rating,
           from: bus.id,
-          to: working[j].id,
+          to: outputWorking[j].id,
           P: 0,
           Q: 0,
-          _directions: new Set(),
-          _shuntSides: new Set()
+          _directions: new Set()
         });
       }
       const branchLoss = branchLossMap.get(branchKey);
-      const directionKey = `${bus.id}->${working[j].id}`;
+      const directionKey = `${bus.id}->${outputWorking[j].id}`;
       if (!branchLoss._directions.has(directionKey)) {
         if (Number.isFinite(lossKW)) branchLoss.P += lossKW;
         if (Number.isFinite(lossKVAR)) branchLoss.Q += lossKVAR;
         branchLoss._directions.add(directionKey);
       }
-      const shuntFromKey = `from:${bus.id}`;
-      if (!branchLoss._shuntSides.has(shuntFromKey) && Number.isFinite(shuntFromLossKW) && shuntFromLossKW !== 0) {
-        branchLoss.P += shuntFromLossKW;
-        branchLoss._shuntSides.add(shuntFromKey);
-      }
-      const shuntToKey = `to:${working[j].id}`;
-      if (!branchLoss._shuntSides.has(shuntToKey) && Number.isFinite(shuntToLossKW) && shuntToLossKW !== 0) {
-        branchLoss.P += shuntToLossKW;
-        branchLoss._shuntSides.add(shuntToKey);
-      }
     });
   });
   const branchLosses = Array.from(branchLossMap.values()).map(entry => {
-    const { _directions, _shuntSides, ...rest } = entry;
+    const { _directions, ...rest } = entry;
     return {
       ...rest,
       P: Number.isFinite(rest.P) ? rest.P : 0,
@@ -749,7 +852,7 @@ function solvePhase(buses, baseMVA, options = {}) {
   }), { P: 0, Q: 0 });
   losses.branches = branchLosses;
 
-  const sources = working.map((bus, i) => {
+  const sources = outputWorking.map((bus, i) => {
     const meta = busMetaById.get(bus.id);
     const name = normalizeIdentifier(meta?.name ?? bus.name);
     const label = normalizeIdentifier(meta?.label ?? bus.label);
@@ -765,16 +868,16 @@ function solvePhase(buses, baseMVA, options = {}) {
       Pg: actualGeneration[i].Pg,
       Qg: actualGeneration[i].Qg,
       baseKV: bus.baseKV,
-      Vm: Vm[i],
-      Va: Va[i] * 180 / Math.PI,
-      voltageKV: bus.baseKV * Vm[i],
-      voltageV: bus.baseKV * Vm[i] * 1000
+      Vm: outputVm[i],
+      Va: outputVa[i] * 180 / Math.PI,
+      voltageKV: bus.baseKV * outputVm[i],
+      voltageV: bus.baseKV * outputVm[i] * 1000
     };
   }).filter(src => Math.abs(src.Pg) > 1e-6 || Math.abs(src.Qg) > 1e-6 || (src.type || '').toLowerCase() === 'slack');
 
   const summary = {
-    totalLoadKW: working.reduce((sum, bus) => sum + (bus.Pd || 0), 0),
-    totalLoadKVAR: working.reduce((sum, bus) => sum + (bus.Qd || 0), 0),
+    totalLoadKW: outputWorking.reduce((sum, bus) => sum + (bus.Pd || 0), 0),
+    totalLoadKVAR: outputWorking.reduce((sum, bus) => sum + (bus.Qd || 0), 0),
     totalGenKW: actualGeneration.reduce((sum, gen) => sum + gen.Pg, 0),
     totalGenKVAR: actualGeneration.reduce((sum, gen) => sum + gen.Qg, 0),
     totalLossKW: Number.isFinite(losses.P) ? losses.P : 0,
@@ -783,7 +886,7 @@ function solvePhase(buses, baseMVA, options = {}) {
 
   const branchConnections = [];
   const seenConnections = new Set();
-  working.forEach(bus => {
+  outputWorking.forEach(bus => {
     (bus.connections || []).forEach(conn => {
       if (!conn || !conn.target) return;
       const componentId = conn.componentId || conn.id || null;
@@ -817,6 +920,8 @@ function solvePhase(buses, baseMVA, options = {}) {
     });
   });
   summary.branchConnections = branchConnections;
+  if (tiePlan.status === 'contracted') solver = `${solver}-exact-ideal-cable-tie-contraction`;
+  else if (unsupportedTieReason) solver = `${solver}-unsupported-ideal-cable-ties`;
   summary.solver = solver;
 
   const mismatchPu = Number.isFinite(maxMis) ? maxMis : 0;
@@ -1258,7 +1363,9 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
           componentSubtype: branch.subtype,
           componentName: branch.name,
           componentLabel: branch.label,
-          componentRef: branch.ref
+          componentRef: branch.ref,
+          phaseShiftModel: branch.phaseShiftModel,
+          magnetizingKvar: branch.magnetizingKvar
         });
       });
     }
@@ -1312,7 +1419,9 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
           phases: conn.phases,
           componentPort: conn.componentPort,
           connectionSide: conn.connectionSide,
-          connectionConfig: conn.connectionConfig
+          connectionConfig: conn.connectionConfig,
+          phaseShiftModel: conn.phaseShiftModel,
+          magnetizingKvar: conn.magnetizingKvar
         }))
       };
     });

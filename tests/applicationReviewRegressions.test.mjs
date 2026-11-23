@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../server.mjs';
 import { calculateVoltageDrop, describeVoltageDropBasis } from '../src/voltageDrop.js';
+import { getCanonicalStudySourceSnapshot, validateAndNormalizeCanonicalProject } from '../src/canonicalProject.mjs';
+import { buildStudyProvenance, captureStudyRunContext } from '../analysis/studyLifecycle.mjs';
 import { normalizeSizeToken, table9Impedance } from '../src/necTable9.mjs';
 import { evaluateCable } from '../analysis/voltageDropStudy.mjs';
 
@@ -38,6 +40,7 @@ const cable = {
   est_load: 100,
   power_factor: 0.85,
   length: 500,
+  phases: 3,
 };
 
 assert.equal(normalizeSizeToken('10 mm2'), '');
@@ -103,19 +106,51 @@ try {
   assert.equal(concurrent.filter(result => result.status === 200).length, 1);
   assert.equal(concurrent.filter(result => result.status === 409).length, 7);
 
-  const projectResponse = await jsonRequest(base, '/projects/voltage-drop', {
-    data: {
-      cables: [{ ...cable, est_load: '', operating_voltage: '', to_tag: 'BUS-1' }],
-      loads: [],
-      settings: { studyResults: { loadFlow: { buses: [{ id: 'BUS-1', baseKV: 0.48, Pd: 83.138, Qd: 51.67 }] } } },
-    }
-  }, authHeaders);
+  const v2LoadFlow = { converged: true, buses: [{ id: 'BUS-1', baseKV: 0.48, Pd: 83.138, Qd: 51.67 }] };
+  const voltageDropProject = {
+    cables: [{ ...cable, est_load: '', operating_voltage: '', to_tag: 'BUS-1' }],
+    loads: [],
+    settings: {
+      projectMeta: { name: 'voltage-drop' },
+      studyResults: { loadFlow: v2LoadFlow },
+    },
+  };
+  const canonicalVoltageDropProject = validateAndNormalizeCanonicalProject(voltageDropProject);
+  const loadFlowContext = captureStudyRunContext('loadFlow', {
+    projectSnapshot: getCanonicalStudySourceSnapshot(canonicalVoltageDropProject, 'loadFlow'),
+    projectIdentity: { projectId: null, projectName: 'voltage-drop' },
+    scenario: 'base',
+    inputs: { oneLine: canonicalVoltageDropProject.oneLine },
+    options: { balanced: true },
+    settings: { studySettings: null },
+    dependencies: {},
+    capturedAt: '2026-09-17T00:00:00.000Z',
+  });
+  voltageDropProject.settings.studyProvenance = {
+    loadFlow: buildStudyProvenance('loadFlow', v2LoadFlow, loadFlowContext),
+  };
+  const projectResponse = await jsonRequest(base, '/projects/voltage-drop', { data: voltageDropProject }, authHeaders);
   assert.equal(projectResponse.status, 200);
   const studyResponse = await jsonRequest(base, '/api/v1/projects/voltage-drop/studies/voltage-drop', {}, authHeaders);
   assert.equal(studyResponse.status, 200);
   const studyBody = await studyResponse.json();
   assert.equal(studyBody.voltageDrop.summary.total, 1);
   assert.equal(studyBody.voltageDrop.summary.evaluated, 1);
+  assert.equal(studyBody.voltageDrop.results[0].inputSource.current, 'Load Flow');
+
+  const legacyProjectResponse = await jsonRequest(base, '/projects/voltage-drop-legacy', {
+    data: {
+      cables: [{ ...cable, est_load: '', operating_voltage: '', to_tag: 'BUS-1' }],
+      loads: [],
+      settings: { studyResults: { loadFlow: v2LoadFlow } },
+    },
+  }, authHeaders);
+  assert.equal(legacyProjectResponse.status, 200);
+  const legacyStudyResponse = await jsonRequest(base, '/api/v1/projects/voltage-drop-legacy/studies/voltage-drop', {}, authHeaders);
+  assert.equal(legacyStudyResponse.status, 200);
+  const legacyStudyBody = await legacyStudyResponse.json();
+  assert.equal(legacyStudyBody.voltageDrop.summary.evaluated, 0);
+  assert.equal(legacyStudyBody.voltageDrop.results[0].inputSource.current, 'missing');
 
   const staticResponse = await fetch(`${base}/style.css`, { headers: { 'Accept-Encoding': 'gzip' } });
   assert.equal(staticResponse.status, 200);

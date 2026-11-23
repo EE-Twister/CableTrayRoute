@@ -1,5 +1,6 @@
 import { runFrequencyScan } from './analysis/frequencyScan.mjs';
-import { getCables, getOneLine, getStudies, setStudies } from './dataStore.mjs';
+import { getCables, getOneLine, getStudies, getStudyAssessments, getStudyProvenance, getStudySourceSnapshot, captureStudyRunContext, assertStudyRunContextCurrent, saveStudyResult } from './dataStore.mjs';
+import { fingerprintStudyValue } from './analysis/studyLifecycle.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
 import { showAlertModal } from './src/components/modal.js';
@@ -20,13 +21,42 @@ document.addEventListener('DOMContentLoaded', () => {
   const errorsDiv = document.getElementById('calc-errors');
   const sourceDiv = document.getElementById('frequency-input-source');
   let importedSourceFingerprint = null;
+  let importedSourceStudyKey = null;
+  let importedSourceSnapshot = null;
+  let importedSourceDependencies = null;
+  let importedExpectedContext = null;
+  let importedContextUnavailable = false;
+
+  function captureImportedSource(imported) {
+    importedSourceFingerprint = imported.sourceFingerprint;
+    importedSourceStudyKey = imported.sourceStudyKey;
+    importedSourceSnapshot = getStudySourceSnapshot('frequencyScan');
+    const studies = getStudies();
+    const provenance = getStudyProvenance();
+    importedSourceDependencies = importedSourceStudyKey && studies[importedSourceStudyKey]
+      ? {
+        [importedSourceStudyKey]: {
+          resultHash: fingerprintStudyValue(studies[importedSourceStudyKey]),
+          provenanceHash: provenance?.[importedSourceStudyKey]
+            ? fingerprintStudyValue(provenance[importedSourceStudyKey]) : null,
+        },
+      }
+      : {};
+    importedContextUnavailable = false;
+    importedExpectedContext = captureStudyRunContext('frequencyScan', {
+      inputs: imported.inputs,
+      options: {},
+      projectSnapshot: importedSourceSnapshot,
+      dependencies: importedSourceDependencies,
+    });
+  }
 
   // Dynamic row buttons
   document.getElementById('add-cap-bank-btn').addEventListener('click', () => addCapBankRow());
   document.getElementById('add-filter-btn').addEventListener('click', () => addFilterRow());
   document.getElementById('add-cable-btn').addEventListener('click', () => addCableRow());
   document.getElementById('import-frequency-project-btn').addEventListener('click', () => {
-    const imported = buildFrequencyScanProjectInputs(getOneLine(), getStudies(), getCables());
+    const imported = buildFrequencyScanProjectInputs(getOneLine(), getStudies(), getCables(), { studyAssessments: getStudyAssessments() });
     if (!imported.ready) {
       sourceDiv.className = 'result-fail';
       sourceDiv.textContent = imported.warnings.join(' ');
@@ -34,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     restoreForm(imported.inputs);
-    importedSourceFingerprint = imported.sourceFingerprint;
+    captureImportedSource(imported);
     sourceDiv.className = imported.warnings.length ? 'result-warn' : 'result-ok';
     sourceDiv.textContent = `Imported project source data, ${imported.inputs.capacitorBanks.length} capacitor bank(s), ${imported.inputs.filters.length} filter(s), and ${imported.inputs.cables.length} cable(s). ${imported.warnings.join(' ')}`;
   });
@@ -43,8 +73,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const saved = getStudies().frequencyScan;
   if (saved) {
     restoreForm(saved.inputs);
+    if (saved.runMetadata?.source === 'project-data') {
+      importedSourceFingerprint = saved.runMetadata.sourceFingerprint || 'saved-project-source';
+      const provenance = getStudyProvenance()?.frequencyScan;
+      importedSourceStudyKey = saved.runMetadata.sourceStudyKey
+        || provenance?.dependencies?.[0]?.studyKey
+        || 'shortCircuit';
+      importedSourceDependencies = provenance?.dependencies || [];
+      importedExpectedContext = provenance || null;
+      importedContextUnavailable = !provenance;
+    }
     renderResults(saved);
-    const currentFingerprint = buildFrequencyScanProjectInputs(getOneLine(), getStudies(), getCables()).sourceFingerprint;
+    const currentFingerprint = buildFrequencyScanProjectInputs(getOneLine(), getStudies(), getCables(), { studyAssessments: getStudyAssessments() }).sourceFingerprint;
     const stale = isStudyResultStale(saved, currentFingerprint);
     sourceDiv.className = stale ? 'result-warn' : 'field-hint';
     sourceDiv.textContent = stale
@@ -57,30 +97,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
   form.addEventListener('submit', e => {
     e.preventDefault();
-    let result;
+    const inputs = readInputs();
     try {
-      result = runFrequencyScan(readInputs());
+      if (importedContextUnavailable) {
+        throw new Error('Saved project source has no run context. Import the project inputs again before rerunning frequency scan.');
+      }
+      if (importedExpectedContext) {
+        // Compare the current project snapshot and dependencies with the
+        // context captured at import. The original input/options
+        // snapshots are deliberately used by the guard so manual tuning of
+        // the imported scan remains allowed; the current project and recorded
+        // dependency hashes are still checked independently.
+        assertStudyRunContextCurrent(importedExpectedContext);
+      }
+      const runContext = captureStudyRunContext('frequencyScan', {
+        inputs,
+        options: {},
+        dependencies: importedSourceFingerprint ? (importedSourceDependencies || {}) : [],
+      });
+      const result = runFrequencyScan(inputs);
+      errorsDiv.hidden = true;
+      errorsDiv.textContent = '';
+
+      result.runMetadata = createStudyRunMetadata(
+        'frequencyScan',
+        { ready: true, sourceFingerprint: importedSourceFingerprint, counts: { points: result.points?.length || 0 } },
+        { valid: (result.points?.length || 0) > 0, convergedCount: result.points?.length || 0, totalCount: result.points?.length || 0 },
+        {
+          source: importedSourceFingerprint ? 'project-data' : 'manual',
+          sourceStudyKey: importedSourceStudyKey,
+          persisted: true,
+        }
+      );
+      saveStudyResult('frequencyScan', result, runContext);
+
+      renderResults(result);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unable to run frequency scan.';
+      const sourceChanged = /changed while the study was running|run context|project inputs changed|study dependencies changed|scenario changed/i.test(msg)
+        && Boolean(importedSourceFingerprint);
       errorsDiv.hidden = false;
-      errorsDiv.textContent = msg;
-      showAlertModal('Input Error', msg, { variant: 'danger' });
-      return;
+      errorsDiv.textContent = sourceChanged
+        ? 'Saved project source is stale. Import project inputs again before rerunning frequency scan.'
+        : msg;
+      if (sourceChanged) {
+        sourceDiv.className = 'result-warn';
+        sourceDiv.textContent = 'Project source changed since import. Import project inputs again before rerunning.';
+      }
+      showAlertModal(sourceChanged ? 'Project Source Changed' : 'Input Error', errorsDiv.textContent, { variant: 'danger' });
     }
-    errorsDiv.hidden = true;
-    errorsDiv.textContent = '';
-
-    result.runMetadata = createStudyRunMetadata(
-      'frequencyScan',
-      { ready: true, sourceFingerprint: importedSourceFingerprint, counts: { points: result.points?.length || 0 } },
-      { valid: (result.points?.length || 0) > 0, convergedCount: result.points?.length || 0, totalCount: result.points?.length || 0 },
-      { source: importedSourceFingerprint ? 'project-data' : 'manual', persisted: true }
-    );
-    const studies = getStudies();
-    studies.frequencyScan = result;
-    setStudies(studies);
-
-    renderResults(result);
   });
 
   // -----------------------------------------------------------------------

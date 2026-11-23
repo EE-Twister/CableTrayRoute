@@ -97,4 +97,13 @@ const loadedOneLine = projectStorage.readScenarioValue('oneLineDiagram', null, '
 assert.equal(loadedOneLine.sheets[0].id, 'sheet-main');
 assert.equal(loadedOneLine.sheets[0].components[0].description, undefined);
 
+assert.equal(dataStore.importProject({
+  schemaVersion: 1,
+  meta: { scenario: 'base', scenarios: ['base'] },
+  ductbanks: [], conduits: [], trays: [], cables: [], cableTypicals: [],
+  panels: [], equipment: [], loads: [], mccLineups: [],
+  oneLine: { activeSheet: 0, sheets: [] }, settings: {}
+}), true, dataStore.getLastProjectImportError());
+assert.deepEqual(dataStore.getLoads(), [], 'Canonical empty import must not create a blank load row.');
+
 console.log('✓ saved project roundtrip preserves raw One-Line data and isolates project settings');

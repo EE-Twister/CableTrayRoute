@@ -32,7 +32,18 @@ This is a review aid only. It does not calculate a replacement result, prove stu
 
 ## Export
 
-**Export Comparison CSV** produces one portable register containing domain summaries, record changes, study-result changes, and study-impact review rows. It does not modify either scenario.
+**Export Comparison CSV** produces one portable register containing record changes with their domain labels, study-result changes, and study-impact review rows. It does not modify either scenario.
+
+Saved-study comparisons also show validity, freshness, and eligibility against
+each scenario's own project inputs and settings. A current result requires a
+matching versioned run context and current, evaluated upstream results. Cloning
+or importing historical results does not count as a calculation. The comparison
+retains run time, options, assumptions, warnings, and provenance so historical
+values can be reviewed without treating them as current inputs. These lifecycle
+checks are separate from the study-impact checklist above and do not confer
+engineering approval.
+
+The CSV uses populated columns for row type, domain or study, status, record, details, and both scenario names; cells containing commas or other delimiter characters remain escaped for spreadsheet import.
 
 ## Limitations
 

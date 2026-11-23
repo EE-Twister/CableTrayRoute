@@ -5,9 +5,10 @@ import {
   trayCO2eFactor,
   conduitCO2eFactor,
 } from './analysis/sustainabilityFootprint.mjs';
-import { getCables, getTrays, getConduits, getStudies, setStudies } from './dataStore.mjs';
+import { getCables, getTrays, getConduits, getStudies, getStudyAssessments, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { studyLifecycleMetadataRows } from './analysis/studyExportMetadata.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -108,9 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const result  = buildSustainabilityReport(bom, options);
 
     const toStore = { _inputs: inputs, _result: result, _bom: bom };
-    const studies = getStudies();
-    studies.sustainabilityFootprint = toStore;
-    setStudies(studies);
+    saveStudyResult('sustainabilityFootprint', toStore, captureStudyRunContext('sustainabilityFootprint', { inputs, options }));
 
     lastResult = result;
     lastBom    = bom;
@@ -545,6 +544,7 @@ document.addEventListener('DOMContentLoaded', () => {
     rows.push(['Screening library lines', lastResult.factorCoverage?.libraryLines ?? '']);
     rows.push(['Skipped BOM lines', lastResult.factorCoverage?.skippedLines ?? '']);
     rows.push(['Project life (years)', lastResult.projectLifeYears]);
+    studyLifecycleMetadataRows(lastResult, { assessment: getStudyAssessments().sustainabilityFootprint }).forEach(([key, value]) => rows.push(['Lifecycle', key, value]));
 
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

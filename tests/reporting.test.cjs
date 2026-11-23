@@ -18,6 +18,8 @@ function it(name, fn){
   global.window = { jspdf: { jsPDF: class {
     setFontSize() {}
     text() {}
+    splitTextToSize(value) { return String(value).split('\\n'); }
+    addPage() {}
     output() { return new ArrayBuffer(1); }
   } } };
   const { toCSV, toPDF } = await import('../reports/reporting.mjs');
@@ -53,6 +55,18 @@ function it(name, fn){
       const csv = toCSV(headers, rows);
       assert(csv.includes('-5'));
       assert(!csv.includes("'-5"));
+    });
+
+    it('quotes lifecycle metadata with embedded newlines', () => {
+      const csv = toCSV(['key', 'value'], [{ key: 'assumptions', value: { note: 'first\nsecond' } }]);
+      assert(csv.includes('"{""note"":""first\\nsecond""}"'));
+    });
+
+    it('keeps long lifecycle rows paginatable in PDF output', async () => {
+      const pdf = await toPDF('Lifecycle', ['key', 'value'], [
+        { key: 'provenance', value: Array.from({ length: 70 }, (_, index) => `line ${index}`).join('\\n') },
+      ]);
+      assert(pdf.byteLength > 0);
     });
   });
 

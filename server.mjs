@@ -8,6 +8,12 @@ import { fileURLToPath } from 'url';
 import { attachCollaborationServer } from './src/collaborationServer.mjs';
 import { validateLibraryPayload } from './src/validation/librarySchema.mjs';
 import { appendAuditEntry, queryAuditLog } from './analysis/auditLog.mjs';
+import {
+  assessCanonicalStudy,
+  getCanonicalProjectInputFingerprint,
+  getCanonicalStudyProvenance,
+  validateAndNormalizeCanonicalProject,
+} from './src/canonicalProject.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -1971,27 +1977,6 @@ When answering queries:
    * @param {object} projectData  Raw project data blob from storage.
    * @param {function} fn  Called with ({ setOneLine, setStudies }); must be synchronous.
    */
-  async function withAnalysisStore(projectData, fn) {
-    const store = {};
-    const mockLS = {
-      getItem:    k   => (Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null),
-      setItem:    (k, v) => { store[k] = String(v); },
-      removeItem: k   => { delete store[k]; },
-      clear:      ()  => { for (const k of Object.keys(store)) delete store[k]; },
-    };
-    const prev = globalThis.localStorage;
-    globalThis.localStorage = mockLS;
-    try {
-      const { setOneLine, setStudies } = await import('./dataStore.mjs');
-      const oneLine = projectData.oneLine || projectData.oneLineData || { activeSheet: 0, sheets: [] };
-      setOneLine(oneLine);
-      setStudies({});
-      return fn();
-    } finally {
-      globalThis.localStorage = prev;
-    }
-  }
-
   // GET /api/v1/projects/:project/cables
   app.get(
     '/api/v1/projects/:project/cables',
@@ -2021,8 +2006,14 @@ When answering queries:
     asyncHandler(async (req, res) => {
       const data = await loadProjectData(req, res);
       if (!data) return;
+      const canonical = validateAndNormalizeCanonicalProject(data);
       const { runShortCircuit } = await import('./analysis/shortCircuit.mjs');
-      const result = await withAnalysisStore(data, () => runShortCircuit());
+      const oneLine = canonical.oneLine;
+      const result = runShortCircuit({
+        oneLine,
+        cables: canonical.cables,
+        tccSettings: data.settings?.tccSettings || data.tccSettings || {},
+      });
       res.json({ shortCircuit: result });
     })
   );
@@ -2033,6 +2024,7 @@ When answering queries:
     asyncHandler(async (req, res) => {
       const data = await loadProjectData(req, res);
       if (!data) return;
+      const canonical = validateAndNormalizeCanonicalProject(data);
       // analysis/motorStart.js imports d3 from a CDN URL which fails in Node.js.
       // Import the pure calculation module (motorStartCalc.mjs) for server-side use.
       let runMotorStart;
@@ -2050,8 +2042,17 @@ When answering queries:
           throw err;
         }
       }
-      const result = await withAnalysisStore(data, () => runMotorStart());
-      res.json({ motorStart: result });
+      const oneLine = canonical.oneLine;
+      try {
+        const result = runMotorStart({ oneLine });
+        res.json({ motorStart: result });
+      } catch (err) {
+        if (err.code === 'MOTOR_START_WORK_LIMIT' || err.code === 'MOTOR_START_CURVE_INVALID') {
+          res.status(422).json({ error: err.message, code: err.code });
+          return;
+        }
+        throw err;
+      }
     })
   );
 
@@ -2061,19 +2062,31 @@ When answering queries:
     asyncHandler(async (req, res) => {
       const data = await loadProjectData(req, res);
       if (!data) return;
+      const canonical = validateAndNormalizeCanonicalProject(data);
       const { runVoltageDropStudy } = await import('./analysis/voltageDropStudy.mjs');
-      const cables = Array.isArray(data.cables)
-        ? data.cables
-        : Array.isArray(data.cableSchedule) ? data.cableSchedule : [];
+      const cables = canonical.cables;
       // Canonical project exports persist study results under settings. Keep
       // legacy shapes as a compatibility fallback for older saved projects.
-      const loadFlow = data.settings?.studyResults?.loadFlow
-        || data.studies?.loadFlow
-        || data.studyResults?.loadFlow
+      const canonicalLoadFlow = canonical.settings?.studyResults?.loadFlow
+        || canonical.studies?.loadFlow
+        || canonical.studyResults?.loadFlow
         || null;
+      const studyProvenance = getCanonicalStudyProvenance(canonical, 'loadFlow');
+      const studyAssessment = assessCanonicalStudy(canonical, 'loadFlow', {
+        projectName: req.params.project,
+      });
+      // Lifecycle v2 is the authority for cached Load Flow data. Legacy,
+      // missing, stale, or unevaluated provenance is withheld and the study
+      // falls back to direct cable/load inputs below.
+      const loadFlow = studyAssessment.eligible ? canonicalLoadFlow : null;
       const result = runVoltageDropStudy(cables, {
-        loads: Array.isArray(data.loads) ? data.loads : [],
+        loads: canonical.loads,
         loadFlow,
+        source: {
+          inputHash: getCanonicalProjectInputFingerprint(canonical),
+          studyProvenance,
+          studyAssessment,
+        },
       });
       res.json({ voltageDrop: result });
     })
@@ -2590,7 +2603,22 @@ When answering queries:
   });
 
 
+  function bindCollaborationIdentity(request, sessionToken, session) {
+    const username = session.username;
+    request.collaborationIdentity = Object.freeze({
+      username,
+      async authorize() {
+        const current = await sessionStore.get(sessionToken);
+        if (!current || current.username !== username || !users[username]) return null;
+        const role = getUserRole(username);
+        return { canWrite: role === 'engineer' || role === 'admin' };
+      },
+    });
+    return true;
+  }
+
   app.set('collabUpgradeValidator', async (request) => {
+    delete request.collaborationIdentity;
     const origin = String(request.headers.origin || '');
     const host = String(request.headers.host || '');
     if (!origin || !host) return false;
@@ -2620,7 +2648,8 @@ When answering queries:
       wsTicketStore.delete(ticket); // single-use
       if (entry.expiresAt <= Date.now()) return false;
       const session = await sessionStore.get(entry.sessionToken);
-      return Boolean(session);
+      if (!session) return false;
+      return bindCollaborationIdentity(request, entry.sessionToken, session);
     }
 
     // Legacy path (deprecated): auth.<base64-token> + csrf.<hex>.
@@ -2648,7 +2677,8 @@ When answering queries:
     }
     const expected = Buffer.from(session.csrfToken, 'hex');
     if (provided.length !== expected.length) return false;
-    return crypto.timingSafeEqual(provided, expected);
+    if (!crypto.timingSafeEqual(provided, expected)) return false;
+    return bindCollaborationIdentity(request, token, session);
   });
 
   return app;

@@ -4,13 +4,14 @@ import {
   fleetToCsv,
   DEFAULT_FLEET,
 } from './analysis/optimalPowerFlow.mjs';
-import { getOneLine, getStudies, setStudies } from './dataStore.mjs';
+import { getOneLine, getStudies, getStudyAssessments, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
 import { showAlertModal } from './src/components/modal.js';
 import { buildOpfProjectInputs } from './analysis/advancedStudyProjectInputs.mjs';
 import { createStudyRunMetadata, isStudyResultStale } from './analysis/studyResultReadiness.mjs';
+import { studyLifecycleMetadataLines } from './analysis/studyExportMetadata.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -217,9 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
       { source: importedSourceFingerprint ? 'project-one-line' : 'manual', persisted: result.feasible === true }
     );
     if (result.feasible) {
-      const studies = getStudies();
-      studies.optimalPowerFlow = result;
-      setStudies(studies);
+      saveStudyResult('optimalPowerFlow', result, captureStudyRunContext('optimalPowerFlow', { inputs: result.inputs || {}, options: {} }));
     } else {
       errorsDiv.hidden = false;
       errorsDiv.textContent = 'Dispatch is infeasible. The screening result is shown, but it was not saved or enabled for export.';
@@ -373,6 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
     lines.push(`# Losses (MW),${r.lossesMW.toFixed(2)}`);
     lines.push(`# Total cost ($/h),${r.totalCostPerHr.toFixed(2)}`);
     lines.push(`# Savings vs naive ($/h),${r.savingsPerHr.toFixed(2)}`);
+    lines.push(...studyLifecycleMetadataLines(r, { assessment: getStudyAssessments().optimalPowerFlow }));
     lines.push('Unit,Pmin_MW,Pmax_MW,Output_MW,Loading_pct,IncrCost_$/MWh,Cost_$/h,Status');
     r.dispatch.forEach(d => {
       lines.push([

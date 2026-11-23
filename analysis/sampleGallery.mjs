@@ -9,6 +9,42 @@ import { normalizeRouteResultState } from './routeResults.mjs';
 
 export const SCHEMA_VERSION = 1;
 
+// Human-facing labels for checklist destinations. Keep these in the pure
+// gallery model so the browser renderer and unit tests share the same route
+// vocabulary without depending on DOM navigation code.
+export const SAMPLE_PAGE_LABELS = Object.freeze({
+  'equipmentlist.html': 'Equipment List',
+  'loadlist.html': 'Load List',
+  'oneline.html': 'One-Line',
+  'cableschedule.html': 'Cable Schedule',
+  'racewayschedule.html': 'Raceway Schedule',
+  'workflowdashboard.html': 'Project Dashboard',
+  'projectreport.html': 'Project Report',
+  'shortCircuit.html': 'Short Circuit Study',
+  'arcFlash.html': 'Arc Flash Study',
+  'loadFlow.html': 'Load Flow Study',
+  'motorStart.html': 'Motor Start Study',
+  'voltagedropstudy.html': 'Voltage Drop Study',
+  'groundgrid.html': 'Ground Grid Study',
+  'heattracesizing.html': 'Heat Trace Sizing',
+  'cabletrayfill.html': 'Tray Fill',
+  'conduitfill.html': 'Conduit Fill',
+  'ductbankroute.html': 'Ductbank',
+  'optimalRoute.html': 'Optimal Route',
+  'tcc.html': 'Time-Current Curves',
+  'iec60287.html': 'IEC 60287 Ampacity',
+});
+
+export function getSamplePageLabel(page = '') {
+  const route = String(page).split(/[?#]/)[0];
+  if (SAMPLE_PAGE_LABELS[route]) return SAMPLE_PAGE_LABELS[route];
+  const filename = route.split('/').pop()?.replace(/\.html?$/i, '') || 'page';
+  return filename
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase());
+}
+
 export function getSampleProjectCopies(title, existingNames = []) {
   const base = `${String(title || 'Untitled').trim() || 'Untitled'} — Sample`;
   const sampleBase = repairMojibake(base);

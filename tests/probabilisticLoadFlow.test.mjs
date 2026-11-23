@@ -199,9 +199,29 @@ function fixtureModel() {
 // High load variability raises violation probability
 // ---------------------------------------------------------------------------
 (function testViolationProbability() {
-  // A wide, high-load distribution should drive undervoltage violations.
-  const r = runMonteCarloLoadFlow(
+  // The normal fixture has a very stiff source: at 3x loading its minimum
+  // voltage remains above 0.999 pu, so it is not a valid undervoltage stress
+  // case. Clone it with a deliberately long/high-impedance feeder. An
+  // independent first-order estimate for the mean and upper-tail loading is
+  // approximately 3.4657% and 5.1985% voltage drop respectively, so the
+  // upper tail crosses the 0.95 pu lower limit before the nonlinear solver is
+  // consulted.
+  const stressModel = structuredClone(fixtureModel());
+  stressModel.buses[1].connections[0].impedance = { r: 1.0, x: 5.0 };
+  stressModel.buses[2].connections[0].impedance = { r: 1.0, x: 5.0 };
+  const meanDropPu = ((2.4e6 * 1 + 0.48e6 * 5) + (0.9e6 * 1 + 0.18e6 * 5)) / (13_800 ** 2);
+  const upperTailDropPu = meanDropPu * 4.5 / 3;
+  assert.ok(meanDropPu > 0.034 && meanDropPu < 0.036, 'mean stress estimate should be about 3.47%');
+  assert.ok(upperTailDropPu > 0.05, 'upper-tail stress estimate should cross the 0.95 pu limit');
+  const nominal = runMonteCarloLoadFlow(
     fixtureModel(),
+    { samples: 500, seed: 314, loadDist: { type: 'normal', mean: 3.0, sd: 0.5, clampMin: 0 } },
+    { baseMVA: 1, balanced: true }
+  );
+  assert.ok(nominal.convergedCount > 0, 'nominal scenarios must converge');
+  assert.equal(nominal.probabilityOfViolation, 0, 'nominal feeder should remain within voltage limits');
+  const r = runMonteCarloLoadFlow(
+    stressModel,
     { samples: 500, seed: 314, loadDist: { type: 'normal', mean: 3.0, sd: 0.5, clampMin: 0 } },
     { baseMVA: 1, balanced: true }
   );

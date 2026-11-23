@@ -455,7 +455,7 @@ export function simulateLoadProfile(caseResult, profile) {
   if (!iec) return null;
 
   const { T1, T2, T3, T4 } = iec.thermalResistances;
-  const nCores = iec.iec60287Raw?.nCores ?? 3;
+  const nCores = iec.nCores ?? 3;
   const R_ac = iec.R_ac;
   const ambientC = iec.ambientTempC;
   const thetaMax = iec.thetaMax;
@@ -464,9 +464,18 @@ export function simulateLoadProfile(caseResult, profile) {
   // Specific heat of copper: ~385 J/(kg·K); density: 8960 kg/m³
   // For 1 m of cable with cross-section A (mm² → m²): C = ρ · V · cp
   const sizeM2 = iec.sizeMm2 * 1e-6;
-  const cv_per_metre = (iec.material === 'Al' ? 2400 : 3450) * sizeM2 * nCores; // J/(K·m), approx
-  const Rth_total = T1 + nCores * (T2 + T3 + T4);
-  const tau_s = Math.max(60, Rth_total * cv_per_metre); // floor of 1 minute
+  // Volumetric heat capacity (J/m³·K) × conductor area (m²) gives J/(m·K).
+  // The previous constants were smaller by 1000 and produced an unrealistically
+  // short time constant for large conductors.
+  const cv_per_metre = (iec.material === 'Al' ? 2.4e6 : 3.45e6) * sizeM2 * nCores;
+  const lambda1 = iec.lossFactors?.lambda1 ?? 0;
+  const lambda2 = iec.lossFactors?.lambda2 ?? 0;
+  const Rth_total = T1 + nCores * (1 + lambda1) * T2 + nCores * (1 + lambda1 + lambda2) * (T3 + T4);
+  const dielectricRth = 0.5 * T1 + nCores * (T2 + T3 + T4);
+  // Rth_total is the temperature-rise coefficient for the complete conductor
+  // loss balance. For the lumped time constant, use its per-core radial path
+  // with the total cable heat capacity so core count is not applied twice.
+  const tau_s = Math.max(60, (Rth_total / nCores) * cv_per_metre); // floor of 1 minute
 
   // Convert hourly samples to absolute amps
   const peak = profile.peakAmps ?? caseResult.deratedAmpacity_A ?? 1;
@@ -486,7 +495,7 @@ export function simulateLoadProfile(caseResult, profile) {
 
   for (let i = 0; i < ampsArray.length; i++) {
     const I = ampsArray[i];
-    const rise = (I ** 2) * R_ac * Rth_total;
+    const rise = (I ** 2) * R_ac * Rth_total + (iec.W_d ?? 0) * dielectricRth;
     const thetaSs = ambientC + rise;
     theta = theta + (thetaSs - theta) * alpha;
     timeline.push({ hour: i, currentA: round1(I), tempC: round1(theta) });

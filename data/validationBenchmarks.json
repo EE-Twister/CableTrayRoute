@@ -2,7 +2,11 @@
   "version": "2",
   "evidenceMethodology": {
     "schemaVersion": 1,
-    "publishedEvidenceClasses": ["published_worked_example", "manufacturer_data", "recognized_test_case"],
+    "publishedEvidenceClasses": [
+      "published_worked_example",
+      "manufacturer_data",
+      "recognized_test_case"
+    ],
     "classes": {
       "published_worked_example": "Expected outputs are stated in an identified published worked example.",
       "manufacturer_data": "Expected outputs or source geometry are published by the equipment manufacturer.",
@@ -14,20 +18,235 @@
     "notice": "Published benchmark coverage is narrower than automated regression coverage. Passing tests do not constitute standards compliance, licensed-engineer approval, or project-specific design acceptance."
   },
   "evidenceLedger": {
-    "ieee1584-arc-flash": { "evidenceClass": "published_worked_example", "sourceAccess": "paywalled_primary", "evidenceStrength": "strong", "implementationModules": ["analysis/ieee1584.mjs", "analysis/arcFlash.mjs"], "executableBenchmarkId": null },
-    "ieee1584-arc-flash-lv": { "evidenceClass": "published_worked_example", "sourceAccess": "paywalled_primary", "evidenceStrength": "strong", "implementationModules": ["analysis/ieee1584.mjs", "analysis/arcFlash.mjs"], "executableBenchmarkId": null },
-    "ieee3002-load-flow-radial": { "evidenceClass": "independent_analytical", "sourceAccess": "public_primary_context_only", "evidenceStrength": "moderate", "implementationModules": ["analysis/loadFlow.js"], "executableBenchmarkId": "LFLOW-001" },
-    "ansi-short-circuit-thevenin": { "evidenceClass": "independent_analytical", "sourceAccess": "public_primary_context_only", "evidenceStrength": "moderate", "implementationModules": ["analysis/shortCircuit.mjs"], "executableBenchmarkId": "ANSI-SC-001" },
-    "nec2023-conduit-fill-count": { "evidenceClass": "independent_analytical", "sourceAccess": "paywalled_primary", "evidenceStrength": "moderate", "implementationModules": ["analysis/conduitFill.mjs"], "executableBenchmarkId": null },
-    "nec2023-tray-fill-mixed-boundary": { "evidenceClass": "independent_analytical", "sourceAccess": "public_primary", "evidenceStrength": "moderate", "implementationModules": ["analysis/trayFill.mjs"], "executableBenchmarkId": "TRAY-NEC-001" },
-    "iec60909-short-circuit": { "evidenceClass": "independent_analytical", "sourceAccess": "paywalled_primary", "evidenceStrength": "moderate", "implementationModules": ["analysis/iec60909.mjs"], "executableBenchmarkId": "IEC60909-001" },
-    "iec60287-cable-rating": { "evidenceClass": "screening_fixture", "sourceAccess": "source_record_incomplete", "evidenceStrength": "limited", "implementationModules": ["analysis/iec60287.mjs"], "executableBenchmarkId": "IEC60287-001" },
-    "ieee80-ground-grid": { "evidenceClass": "published_worked_example", "sourceAccess": "paywalled_primary", "evidenceStrength": "moderate", "implementationModules": ["analysis/groundGrid.mjs"], "executableBenchmarkId": null },
-    "heat-trace-screening": { "evidenceClass": "screening_fixture", "sourceAccess": "source_record_incomplete", "evidenceStrength": "limited", "implementationModules": ["analysis/heatTraceSizing.mjs"], "executableBenchmarkId": null },
-    "ductbank-thermal": { "evidenceClass": "cross_tool_comparison", "sourceAccess": "source_record_incomplete", "evidenceStrength": "limited", "implementationModules": ["analysis/iec60287.mjs", "analysis/cableThermalEnvironment.mjs"], "executableBenchmarkId": null },
-    "cable-thermal-env-unified": { "evidenceClass": "screening_fixture", "sourceAccess": "internal_cross_check", "evidenceStrength": "limited", "implementationModules": ["analysis/cableThermalEnvironment.mjs"], "executableBenchmarkId": null },
-    "sc-smu20-tcc-source-points": { "evidenceClass": "manufacturer_data", "sourceAccess": "public_primary", "evidenceStrength": "strong", "implementationModules": ["analysis/timeCurrentCurve.mjs"], "executableBenchmarkId": "TCC-SC-001" },
-    "abb-fpm2555ts-motor-current": { "evidenceClass": "manufacturer_data", "sourceAccess": "public_primary", "evidenceStrength": "strong", "implementationModules": ["analysis/motorStartCalc.mjs"], "executableBenchmarkId": "MSTART-ABB-001" }
+    "eaton-system-a-x1-1500kva-480v": {
+      "evidenceClass": "published_worked_example",
+      "sourceAccess": "public_primary",
+      "evidenceStrength": "strong",
+      "implementationModules": [
+        "analysis/shortCircuit.mjs"
+      ],
+      "executableBenchmarkId": "FAULT-EATON-X1-1500KVA"
+    },
+    "iec60909-unequal-sequence-13k8kv": {
+      "evidenceClass": "independent_analytical",
+      "sourceAccess": "paywalled_primary",
+      "evidenceStrength": "moderate",
+      "implementationModules": [
+        "analysis/iec60909.mjs"
+      ],
+      "executableBenchmarkId": "FAULT-IEC-UNEQUAL-SEQUENCE"
+    },
+    "sc-smu20-25e-minimum-melting-vertical-segment": {
+      "evidenceClass": "manufacturer_data",
+      "sourceAccess": "public_primary",
+      "evidenceStrength": "strong",
+      "implementationModules": [
+        "analysis/timeCurrentCurve.mjs"
+      ],
+      "executableBenchmarkId": "PROTECTION-SC-SMU20-25E"
+    },
+    "generator-13k8kv-transformer-480v-voltage-base": {
+      "evidenceClass": "independent_analytical",
+      "sourceAccess": "mixed_public_and_paywalled_primary",
+      "evidenceStrength": "moderate",
+      "implementationModules": [
+        "analysis/shortCircuit.mjs",
+        "analysis/iec60909.mjs"
+      ],
+      "executableBenchmarkId": "FAULT-GENERATOR-TRANSFORMER-LV-BASE"
+    },
+    "thermal-prysmian-95-cu-dc-resistance": {
+      "evidenceClass": "manufacturer_data",
+      "sourceAccess": "public_primary",
+      "evidenceStrength": "strong",
+      "implementationModules": [
+        "analysis/iec60287.mjs"
+      ],
+      "executableBenchmarkId": "TGE-THERM-001"
+    },
+    "thermal-direct-burial-95-cu-xlpe": {
+      "evidenceClass": "independent_analytical",
+      "sourceAccess": "paywalled_primary",
+      "evidenceStrength": "strong",
+      "implementationModules": [
+        "analysis/iec60287.mjs"
+      ],
+      "executableBenchmarkId": "TGE-THERM-002"
+    },
+    "thermal-installation-variant-95-cu-xlpe": {
+      "evidenceClass": "independent_analytical",
+      "sourceAccess": "paywalled_primary",
+      "evidenceStrength": "strong",
+      "implementationModules": [
+        "analysis/iec60287.mjs"
+      ],
+      "executableBenchmarkId": "TGE-THERM-003"
+    },
+    "ground-sverak-resistance-100rho": {
+      "evidenceClass": "independent_analytical",
+      "sourceAccess": "public_primary_mirror",
+      "evidenceStrength": "strong",
+      "implementationModules": [
+        "analysis/groundGrid.mjs"
+      ],
+      "executableBenchmarkId": "TGE-GROUND-001"
+    },
+    "ground-mesh-step-touch-eit-appendix-e-inputs": {
+      "evidenceClass": "independent_analytical",
+      "sourceAccess": "public_primary_mirror",
+      "evidenceStrength": "strong",
+      "implementationModules": [
+        "analysis/groundGrid.mjs"
+      ],
+      "executableBenchmarkId": "TGE-GROUND-002"
+    },
+    "ieee1584-arc-flash": {
+      "evidenceClass": "published_worked_example",
+      "sourceAccess": "paywalled_primary",
+      "evidenceStrength": "strong",
+      "implementationModules": [
+        "analysis/ieee1584.mjs",
+        "analysis/arcFlash.mjs"
+      ],
+      "executableBenchmarkId": null
+    },
+    "ieee1584-arc-flash-lv": {
+      "evidenceClass": "published_worked_example",
+      "sourceAccess": "paywalled_primary",
+      "evidenceStrength": "strong",
+      "implementationModules": [
+        "analysis/ieee1584.mjs",
+        "analysis/arcFlash.mjs"
+      ],
+      "executableBenchmarkId": null
+    },
+    "ieee3002-load-flow-radial": {
+      "evidenceClass": "independent_analytical",
+      "sourceAccess": "public_primary_context_only",
+      "evidenceStrength": "moderate",
+      "implementationModules": [
+        "analysis/loadFlow.js"
+      ],
+      "executableBenchmarkId": "LFLOW-001"
+    },
+    "ansi-short-circuit-thevenin": {
+      "evidenceClass": "independent_analytical",
+      "sourceAccess": "public_primary_context_only",
+      "evidenceStrength": "moderate",
+      "implementationModules": [
+        "analysis/shortCircuit.mjs"
+      ],
+      "executableBenchmarkId": "ANSI-SC-001"
+    },
+    "nec2023-conduit-fill-count": {
+      "evidenceClass": "independent_analytical",
+      "sourceAccess": "paywalled_primary",
+      "evidenceStrength": "moderate",
+      "implementationModules": [
+        "analysis/conduitFill.mjs"
+      ],
+      "executableBenchmarkId": null
+    },
+    "nec2023-tray-fill-mixed-boundary": {
+      "evidenceClass": "independent_analytical",
+      "sourceAccess": "public_primary",
+      "evidenceStrength": "moderate",
+      "implementationModules": [
+        "analysis/trayFill.mjs"
+      ],
+      "executableBenchmarkId": "TRAY-NEC-001"
+    },
+    "iec60909-short-circuit": {
+      "evidenceClass": "independent_analytical",
+      "sourceAccess": "paywalled_primary",
+      "evidenceStrength": "moderate",
+      "implementationModules": [
+        "analysis/iec60909.mjs"
+      ],
+      "executableBenchmarkId": "IEC60909-001"
+    },
+    "iec60287-cable-rating": {
+      "evidenceClass": "screening_fixture",
+      "sourceAccess": "source_record_incomplete",
+      "evidenceStrength": "limited",
+      "implementationModules": [
+        "analysis/iec60287.mjs"
+      ],
+      "executableBenchmarkId": "IEC60287-001"
+    },
+    "ieee80-ground-grid": {
+      "evidenceClass": "screening_fixture",
+      "sourceAccess": "source_record_incomplete",
+      "evidenceStrength": "limited",
+      "implementationModules": [
+        "analysis/groundGrid.mjs"
+      ],
+      "executableBenchmarkId": null
+    },
+    "heat-trace-screening": {
+      "evidenceClass": "screening_fixture",
+      "sourceAccess": "source_record_incomplete",
+      "evidenceStrength": "limited",
+      "implementationModules": [
+        "analysis/heatTraceSizing.mjs"
+      ],
+      "executableBenchmarkId": null
+    },
+    "ductbank-thermal": {
+      "evidenceClass": "cross_tool_comparison",
+      "sourceAccess": "source_record_incomplete",
+      "evidenceStrength": "limited",
+      "implementationModules": [
+        "analysis/iec60287.mjs",
+        "analysis/cableThermalEnvironment.mjs"
+      ],
+      "executableBenchmarkId": null
+    },
+    "cable-thermal-env-unified": {
+      "evidenceClass": "screening_fixture",
+      "sourceAccess": "internal_cross_check",
+      "evidenceStrength": "limited",
+      "implementationModules": [
+        "analysis/cableThermalEnvironment.mjs"
+      ],
+      "executableBenchmarkId": null
+    },
+    "sc-smu20-tcc-source-points": {
+      "evidenceClass": "manufacturer_data",
+      "sourceAccess": "public_primary",
+      "evidenceStrength": "strong",
+      "implementationModules": [
+        "analysis/timeCurrentCurve.mjs"
+      ],
+      "executableBenchmarkId": "TCC-SC-001"
+    },
+    "abb-fpm2555ts-motor-current": {
+      "evidenceClass": "manufacturer_data",
+      "sourceAccess": "public_primary",
+      "evidenceStrength": "strong",
+      "implementationModules": [
+        "analysis/motorStartCalc.mjs"
+      ],
+      "executableBenchmarkId": "MSTART-ABB-001"
+    },
+    "CABLE-THERMAL-001": {
+      "evidenceClass": "cross_tool_comparison",
+      "sourceAccess": "public_primary",
+      "evidenceStrength": "moderate",
+      "implementationModules": [
+        "analysis/cableThermalModel.mjs"
+      ],
+      "executableBenchmarkId": "CABLE-THERMAL-001"
+    },
+    "CABLE-THERMAL-002": {
+      "evidenceClass": "cross_tool_comparison",
+      "sourceAccess": "public_primary",
+      "evidenceStrength": "moderate",
+      "implementationModules": [
+        "analysis/cableThermalModel.mjs"
+      ],
+      "executableBenchmarkId": "CABLE-THERMAL-002"
+    }
   },
   "benchmarks": [
     {
@@ -50,12 +269,841 @@
         "arcDurationS": 0.197
       },
       "expectedOutputs": {
-        "arcingCurrentKA": { "value": 12.98, "tolerance": 0.1 },
-        "incidentEnergyCalCm2": { "value": 2.9, "tolerance": 0.1 },
-        "arcFlashBoundaryMm": { "value": 1606, "tolerance": 20 }
+        "arcingCurrentKA": {
+          "value": 12.98,
+          "tolerance": 0.1
+        },
+        "incidentEnergyCalCm2": {
+          "value": 2.9,
+          "tolerance": 0.1
+        },
+        "arcFlashBoundaryMm": {
+          "value": 1606,
+          "tolerance": 20
+        }
       },
       "reference": "IEEE 1584-2018 Annex D.1 (steps D.9, D.17, D.32, D.42)",
       "sampleFile": "samples/benchmark-ieee1584-arc-flash.json"
+    },
+    {
+      "id": "eaton-system-a-x1-1500kva-480v",
+      "title": "Eaton System A X1 — 1,500 kVA, 480 V transformer fault current",
+      "studyPage": "iec60909.html",
+      "standard": "Eaton Bussmann short-circuit current ratings application note",
+      "clause": "Eaton Bussmann short-circuit current ratings application note",
+      "description": "The production ANSI path is checked against the Eaton worked value after the source transformer percentage and allowance are independently converted to an ohmic sequence impedance.",
+      "inputs": {
+        "model": [
+          {
+            "id": "EATON-X1",
+            "type": "bus",
+            "subtype": "Bus",
+            "kV": 0.48,
+            "z1": {
+              "r": 0,
+              "x": 0.0048384
+            },
+            "z2": {
+              "r": 0,
+              "x": 0.0048384
+            },
+            "z0": {
+              "r": 0,
+              "x": 0.0048384
+            },
+            "v_factor": 1,
+            "method": "ANSI"
+          }
+        ],
+        "options": {
+          "method": "ANSI"
+        }
+      },
+      "inputUnits": {
+        "model[0].kV": "kV line-to-line",
+        "model[0].z1.r": "ohm at 480 V fault bus",
+        "model[0].z1.x": "ohm at 480 V fault bus",
+        "model[0].z2": "ohm at 480 V fault bus",
+        "model[0].z0": "ohm at 480 V fault bus",
+        "model[0].v_factor": "per unit",
+        "options.method": "method name"
+      },
+      "expectedOutputs": {
+        "three_phase_ka": {
+          "value": 57.279,
+          "tolerance": 0.01,
+          "unit": "kA RMS",
+          "toleranceBasis": "0.01 kA covers the source whole-amp rounding and the production two-decimal display rounding."
+        }
+      },
+      "independentDerivation": "Zbase = V²/S = 0.48²/1.5 = 0.1536 Ω; effective Zpu = 0.035×0.90 = 0.0315; Z = 0.1536×0.0315 = 0.0048384 Ω; I3 = 0.48/(√3×0.0048384) = 57.2768 kA. The published 57,279 A uses 1.732 for √3 and is retained within the stated tolerance.",
+      "reference": "Zbase = V²/S = 0.48²/1.5 = 0.1536 Ω; effective Zpu = 0.035×0.90 = 0.0315; Z = 0.1536×0.0315 = 0.0048384 Ω; I3 = 0.48/(√3×0.0048384) = 57.2768 kA. The published 57,279 A uses 1.732 for √3 and is retained within the stated tolerance.",
+      "source": {
+        "title": "Eaton Bussmann Electrical protection handbook, System A Fault X1",
+        "url": "https://www.eaton.com/content/dam/eaton/products/electrical-circuit-protection/fuses/short-circuit-current-ratings/bus-ele-an-3002-spd.pdf",
+        "locator": "printed page 238, System A / Fault X1: 1,500 kVA, 480 V, 3.5% impedance, 0.9 impedance allowance; 57,279 A",
+        "accessedOn": "2026-09-17",
+        "kind": "published_values"
+      },
+      "sourceUrl": "https://www.eaton.com/content/dam/eaton/products/electrical-circuit-protection/fuses/short-circuit-current-ratings/bus-ele-an-3002-spd.pdf",
+      "limitations": [
+        "The Eaton case is a transformer/source fault-current example; it does not validate motor contribution, breaker asymmetry, arc-flash energy, or installation-specific conductor impedance.",
+        "The source uses a 0.9 impedance allowance; this fixture records that allowance explicitly and does not generalize it to other equipment."
+      ]
+    },
+    {
+      "id": "iec60909-unequal-sequence-13k8kv",
+      "title": "IEC 60909 unequal-sequence fault-current case",
+      "studyPage": "iec60909.html",
+      "standard": "IEC 60909-0:2016, §§4.2–4.5 and §4.3.1.1",
+      "clause": "IEC 60909-0:2016, §§4.2–4.5 and §4.3.1.1",
+      "description": "Unequal positive-, negative-, and zero-sequence impedances exercise the sequence-specific denominators instead of relying on the equal-sequence shortcut.",
+      "inputs": {
+        "z1": {
+          "r": 0.01,
+          "x": 0.1
+        },
+        "z2": {
+          "r": 0.02,
+          "x": 0.12
+        },
+        "z0": {
+          "r": 0.03,
+          "x": 0.3
+        },
+        "prefaultKV": 13.8,
+        "cMode": "max",
+        "faultDurationS": 1,
+        "freqHz": 50,
+        "xrOverride": null
+      },
+      "inputUnits": {
+        "z1": "ohm at the fault bus",
+        "z2": "ohm at the fault bus",
+        "z0": "ohm at the fault bus",
+        "prefaultKV": "kV line-to-line",
+        "cMode": "IEC voltage-factor mode",
+        "faultDurationS": "s",
+        "freqHz": "Hz",
+        "xrOverride": "dimensionless; null means derive X/R from z1"
+      },
+      "expectedOutputs": {
+        "ik3_ka": {
+          "value": 87.21,
+          "tolerance": 0.01,
+          "unit": "kA RMS",
+          "toleranceBasis": "0.01 kA exceeds only the production two-decimal rounding residual."
+        },
+        "ik2_ka": {
+          "value": 68.37,
+          "tolerance": 0.01,
+          "unit": "kA RMS",
+          "toleranceBasis": "0.01 kA exceeds only the production two-decimal rounding residual."
+        },
+        "ik1_ka": {
+          "value": 50.23,
+          "tolerance": 0.01,
+          "unit": "kA RMS",
+          "toleranceBasis": "0.01 kA exceeds only the production two-decimal rounding residual."
+        },
+        "peak_ka": {
+          "value": 215.33,
+          "tolerance": 0.02,
+          "unit": "kA peak",
+          "toleranceBasis": "0.02 kA covers production rounding after the independently evaluated κ equation."
+        }
+      },
+      "independentDerivation": "V = c·Un/√3 = 1.10×13.8/√3 = 8.764177 kV; |Z1| = 0.100499 Ω; I″k3 = V/|Z1| = 87.2068 kA; I″k2 = √3V/|Z1+Z2| = 68.3673 kA; I″k1 = 3V/|Z1+Z2+Z0| = 50.2293 kA; κ = 1.02 + 0.98e^(−3·R/X) = 1.7460; ip = κ√2I″k3 = 215.3328 kA.",
+      "reference": "V = c·Un/√3 = 1.10×13.8/√3 = 8.764177 kV; |Z1| = 0.100499 Ω; I″k3 = V/|Z1| = 87.2068 kA; I″k2 = √3V/|Z1+Z2| = 68.3673 kA; I″k1 = 3V/|Z1+Z2+Z0| = 50.2293 kA; κ = 1.02 + 0.98e^(−3·R/X) = 1.7460; ip = κ√2I″k3 = 215.3328 kA.",
+      "source": {
+        "title": "IEC 60909-0:2016 — Short-circuit currents in three-phase AC systems",
+        "url": "https://webstore.iec.ch/en/publication/24100",
+        "locator": "IEC publication abstract confirms the covered 50/60 Hz three-phase short-circuit scope; exact standard text and equations are not openly accessible here. Clause mapping is provisional and expected values are independently evaluated from the stated equations.",
+        "accessedOn": "2026-09-17",
+        "kind": "equation_basis"
+      },
+      "sourceUrl": "https://webstore.iec.ch/en/publication/24100",
+      "limitations": [
+        "This is an independent analytical fixture, not a published IEC worked-example output.",
+        "It covers the equivalent-voltage-source sequence calculation only; generator decay, transformer correction, network topology, and thermal integration are outside this fixture."
+      ]
+    },
+    {
+      "id": "sc-smu20-25e-minimum-melting-vertical-segment",
+      "title": "S&C SMU-20 25E minimum-melting vertical segment",
+      "studyPage": "protection.html",
+      "standard": "S&C TCC 153-2, 25E minimum-melting curve",
+      "clause": "S&C TCC 153-2, 25E minimum-melting curve",
+      "description": "The curve evaluator must preserve duplicate-current source geometry and select the lower or upper boundary explicitly.",
+      "inputs": {
+        "curvePoints": [
+          {
+            "current": 49.4486,
+            "time": 39.7197
+          },
+          {
+            "current": 49.4981,
+            "time": 49.0013
+          },
+          {
+            "current": 49.5476,
+            "time": 65.03
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 602.961
+          },
+          {
+            "current": 49.5972,
+            "time": 577.006
+          },
+          {
+            "current": 49.5972,
+            "time": 520.533
+          },
+          {
+            "current": 49.5972,
+            "time": 429.17
+          },
+          {
+            "current": 49.5972,
+            "time": 227.887
+          },
+          {
+            "current": 49.5972,
+            "time": 169.839
+          },
+          {
+            "current": 49.5972,
+            "time": 123.451
+          },
+          {
+            "current": 49.5972,
+            "time": 85.443
+          },
+          {
+            "current": 49.5972,
+            "time": 32.1639
+          },
+          {
+            "current": 49.6468,
+            "time": 306.081
+          },
+          {
+            "current": 49.9956,
+            "time": 26.4921
+          },
+          {
+            "current": 50.5991,
+            "time": 22.0397
+          }
+        ],
+        "currentA": 49.5972,
+        "interpolationCurrentA": 49.82089475390822
+      },
+      "inputUnits": {
+        "curvePoints": "A and s",
+        "currentA": "A RMS",
+        "interpolationCurrentA": "A RMS"
+      },
+      "expectedOutputs": {
+        "minimum_melting_s": {
+          "value": 32.1639,
+          "tolerance": 0.0001,
+          "unit": "s",
+          "toleranceBasis": "0.0001 s is below the source four-decimal time precision and catches boundary selection errors."
+        },
+        "maximum_source_time_s": {
+          "value": 602.961,
+          "tolerance": 0.001,
+          "unit": "s",
+          "toleranceBasis": "0.001 s matches the source three-decimal time precision."
+        },
+        "matching_points": {
+          "value": 28,
+          "tolerance": 0,
+          "unit": "points",
+          "toleranceBasis": "Exact integer count from the manufacturer workbook."
+        },
+        "boundary_preserved": {
+          "value": true,
+          "tolerance": 0,
+          "unit": "boolean",
+          "toleranceBasis": "Exact status assertion."
+        },
+        "interpolated_s": {
+          "value": 90.0485,
+          "tolerance": 0.001,
+          "unit": "s",
+          "toleranceBasis": "At geometric-mean current, log interpolation gives the geometric-mean time; 0.001 s is below source four-decimal precision."
+        }
+      },
+      "independentDerivation": "The manufacturer source has 28 points at exactly 49.5972 A. The lower boundary is the minimum time 32.1639 s; the upper boundary is 602.961 s. The separate interpolation check uses the published neighboring pairs (49.6468 A, 306.081 s) and (49.9956 A, 26.4921 s); at their geometric-mean current, log-current/log-time interpolation independently gives 90.0485 s.",
+      "reference": "The manufacturer source has 28 points at exactly 49.5972 A. The lower boundary is the minimum time 32.1639 s; the upper boundary is 602.961 s. The separate interpolation check uses the published neighboring pairs (49.6468 A, 306.081 s) and (49.9956 A, 26.4921 s); at their geometric-mean current, log-current/log-time interpolation independently gives 90.0485 s.",
+      "source": {
+        "title": "S&C Time-Current Characteristic Curves — TCC 153-2 workbook",
+        "url": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.xlsx",
+        "locator": "worksheet 153_2, source range P10:Q95; 25E minimum-melting curve, duplicate-current vertical segment at 49.5972 A",
+        "accessedOn": "2026-09-17",
+        "kind": "published_values"
+      },
+      "sourceUrl": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.xlsx",
+      "limitations": [
+        "This validates source geometry and boundary semantics only; it does not promote the device record, validate total-clearing behavior, or authorize coordination or arc-flash clearing-time use.",
+        "The source curve is for the identified S&C TCC 153-2 configuration; other fuse units, ratings, voltages, or curve families require their own source record."
+      ]
+    },
+    {
+      "id": "generator-13k8kv-transformer-480v-voltage-base",
+      "title": "Generator through transformer — LV fault-side base and μ ratio",
+      "studyPage": "iec60909.html",
+      "standard": "IEC 60909-0:2016, §§6.3.3, 6.6.1 Eq. 18, and 8.1.5.2",
+      "clause": "IEC 60909-0:2016, §§6.3.3, 6.6.1 Eq. 18, and 8.1.5.2",
+      "description": "This crosses a transformer voltage base and checks that source impedance and generator rated current are referred consistently to the fault-side winding before the near-generator ratio is evaluated.",
+      "inputs": {
+        "model": [
+          {
+            "id": "GEN-13K8",
+            "type": "generator",
+            "subtype": "synchronous",
+            "rated_kv": 13.8,
+            "rated_mva": 10,
+            "xdpp_pu": 0.2,
+            "pf": 0.8,
+            "xr_ratio": 20,
+            "connections": [
+              {
+                "target": "XF-13K8-480",
+                "sourcePort": 0,
+                "targetPort": 0
+              }
+            ]
+          },
+          {
+            "id": "XF-13K8-480",
+            "type": "transformer",
+            "subtype": "two_winding",
+            "percent_secondary": 5,
+            "kva_secondary": 10000,
+            "volts_primary": 13800,
+            "volts_secondary": 480,
+            "xr_ratio": 20,
+            "connections": [
+              {
+                "target": "BUS-480",
+                "sourcePort": 1,
+                "targetPort": 0
+              }
+            ]
+          },
+          {
+            "id": "BUS-480",
+            "type": "bus",
+            "subtype": "Bus",
+            "kV": 0.48
+          }
+        ],
+        "options": {
+          "method": "IEC",
+          "cMode": "max",
+          "minTimeDelayS": 0.05
+        }
+      },
+      "inputUnits": {
+        "model[0].rated_kv": "kV line-to-line",
+        "model[0].rated_mva": "MVA",
+        "model[0].xdpp_pu": "per unit",
+        "model[0].pf": "per unit",
+        "model[1].percent_secondary": "% impedance",
+        "model[1].kva_secondary": "kVA",
+        "model[1].volts_primary": "V line-to-line",
+        "model[1].volts_secondary": "V line-to-line",
+        "options.minTimeDelayS": "s"
+      },
+      "expectedOutputs": {
+        "three_phase_ka": {
+          "value": 53.53,
+          "tolerance": 0.02,
+          "unit": "kA RMS",
+          "toleranceBasis": "0.02 kA covers production display rounding after the independent ohmic referral arithmetic."
+        },
+        "generator_ratio": {
+          "value": 4.451,
+          "tolerance": 0.002,
+          "unit": "per unit ratio",
+          "toleranceBasis": "0.002 covers rounding of K_G, K_T, and the displayed three-decimal q."
+        },
+        "breaking_ka": {
+          "value": 45.19,
+          "tolerance": 0.02,
+          "unit": "kA RMS",
+          "toleranceBasis": "0.02 kA covers production display rounding after the independent μ equation."
+        },
+        "near_generator": {
+          "value": true,
+          "tolerance": 0,
+          "unit": "boolean",
+          "toleranceBasis": "Exact classification implied by q > 2."
+        }
+      },
+      "independentDerivation": "a = 13.8/0.48 = 28.75 and 1/a = 0.0347826. On the 10 MVA base, generator x″ = 0.2×13.8²/10 = 3.8088 Ω; after K_G = 1.1/(1+0.2×0.6) = 0.9821429 and referral by (0.48/13.8)², Z_G,LV = 0.0045257 Ω. Transformer |Z| = 0.05×0.48²/10 = 0.001152 Ω; with X/R = 20, x_T,pu = 0.05×20/√(1+20²) = 0.0499376 and K_T = 1.014599976998, giving Z_T,LV = 0.0011688 Ω. The independently summed |Z_total,LV| = 0.00569453345921647 Ω, I″k3 = 53.5322066883 kA. I_rG on the fault-side base is 12.0281306081 kA, q = 4.45058408762, μ = 0.844187154306 at 0.05 s, and Ib = 45.1912012279 kA.",
+      "reference": "a = 13.8/0.48 = 28.75 and 1/a = 0.0347826. On the 10 MVA base, generator x″ = 0.2×13.8²/10 = 3.8088 Ω; after K_G = 1.1/(1+0.2×0.6) = 0.9821429 and referral by (0.48/13.8)², Z_G,LV = 0.0045257 Ω. Transformer |Z| = 0.05×0.48²/10 = 0.001152 Ω; with X/R = 20, x_T,pu = 0.05×20/√(1+20²) = 0.0499376 and K_T = 1.014599976998, giving Z_T,LV = 0.0011688 Ω. The independently summed |Z_total,LV| = 0.00569453345921647 Ω, I″k3 = 53.5322066883 kA. I_rG on the fault-side base is 12.0281306081 kA, q = 4.45058408762, μ = 0.844187154306 at 0.05 s, and Ib = 45.1912012279 kA.",
+      "source": {
+        "title": "Schneider Electric Electrical Installation Guide — 3-phase short-circuit current at any point within a LV installation",
+        "url": "https://www.electrical-installation.org/enwiki/3-phase_short-circuit_current_(Isc)_at_any_point_within_a_LV_installation",
+        "locator": "Network upstream of MV/LV transformer, Fig. G36: Za = U20²/Psc for upstream source expressed at LV; transformer Z = U20²/Sn × Usc/100. These accessible equations support the voltage-base referral; IEC correction and μ terms remain provisional.",
+        "accessedOn": "2026-09-17",
+        "kind": "equation_basis"
+      },
+      "sourceUrl": "https://www.electrical-installation.org/enwiki/3-phase_short-circuit_current_(Isc)_at_any_point_within_a_LV_installation",
+      "additionalSources": [
+        {
+          "title": "IEC 60909-0:2016 — Short-circuit currents in three-phase AC systems",
+          "url": "https://webstore.iec.ch/en/publication/24100",
+          "locator": "Public abstract only; exact correction-factor and μ clauses are not openly accessible.",
+          "accessedOn": "2026-09-17",
+          "kind": "equation_basis"
+        }
+      ],
+      "limitations": [
+        "The expected values are independent analytical values; IEC TR 60909-4 comparison-network outputs are not used here.",
+        "The model contains one synchronous generator and one two-winding transformer; it does not validate multiple-source sharing, transformer phase shift, zero-sequence grounding paths, motor contribution, or time-domain generator decay.",
+        "IEC K_S/K_SO power-station-unit corrections are not implemented; the IEC correction coefficients and μ curve mapping remain provisional pending qualified review of the adopted edition.",
+        "The generator source path uses the existing magnitude-based reactance/X-over-R approximation; detailed generator R/X and sequence data require separate evidence.",
+        "The corrected implementation scope is bounded to explicit two-winding voltage referral and nominal fault-side generator current base; additional winding topologies require separate evidence."
+      ]
+    },
+    {
+      "id": "thermal-prysmian-95-cu-dc-resistance",
+      "title": "Prysmian manufacturer data — 95 mm² Cu DC resistance at 85 °C",
+      "studyPage": "iec60287.html",
+      "standard": "Prysmian Marine Cable Catalogue, Electrical Data",
+      "clause": "Prysmian Marine Cable Catalogue, Electrical Data",
+      "description": "Checks the production DC resistance conversion against Prysmian’s published 1×95 mm² copper conductor values at 20 °C and 85 °C.",
+      "inputs": {
+        "sizeMm2": 95,
+        "material": "Cu",
+        "operatingTempC": 85,
+        "frequencyHz": 50,
+        "shape": "round"
+      },
+      "inputUnits": {
+        "sizeMm2": "mm²",
+        "material": "material code",
+        "operatingTempC": "°C",
+        "frequencyHz": "Hz",
+        "shape": "geometry code"
+      },
+      "expectedOutputs": {
+        "rDc20OhmPerM": {
+          "value": 0.000193,
+          "tolerance": 5e-7,
+          "unit": "Ω/m",
+          "toleranceBasis": "Absolute 5e-7 Ω/m is half the manufacturer table resolution of 0.001 Ω/km after conversion to Ω/m."
+        },
+        "rDc85OhmPerM": {
+          "value": 0.000242,
+          "tolerance": 5e-7,
+          "unit": "Ω/m",
+          "toleranceBasis": "Absolute 5e-7 Ω/m is half the manufacturer table resolution of 0.001 Ω/km after conversion to Ω/m."
+        }
+      },
+      "independentDerivation": "Prysmian’s row 1×95 mm² lists Rdc = 0.193 Ω/km at +20 °C and 0.242 Ω/km at +85 °C. Convert by dividing by 1000: 0.000193 Ω/m and 0.000242 Ω/m. The production temperature model gives 0.000193·[1+0.00393·(85−20)] = 0.00024230185 Ω/m, within 5e-7 Ω/m of the published rounded value. This case does not validate the catalogue’s cable construction beyond the resistance row.",
+      "reference": "Prysmian’s row 1×95 mm² lists Rdc = 0.193 Ω/km at +20 °C and 0.242 Ω/km at +85 °C. Convert by dividing by 1000: 0.000193 Ω/m and 0.000242 Ω/m. The production temperature model gives 0.000193·[1+0.00393·(85−20)] = 0.00024230185 Ω/m, within 5e-7 Ω/m of the published rounded value. This case does not validate the catalogue’s cable construction beyond the resistance row.",
+      "source": {
+        "title": "Prysmian Group Marine Cable Catalogue, North Europe",
+        "url": "https://no.prysmian.com/sites/default/files/atoms/files/Marine%20Cable%20Catalogue_%20North%20Europe_web_2.pdf",
+        "locator": "PDF page 44, Electrical Data, TEMAR PHFX -U/-A/-UFR/-AFR, row 1×95 mm²; R (Ω/km) at +20 °C and +85 °C.",
+        "accessedOn": "2026-09-17",
+        "kind": "published_values"
+      },
+      "sourceUrl": "https://no.prysmian.com/sites/default/files/atoms/files/Marine%20Cable%20Catalogue_%20North%20Europe_web_2.pdf",
+      "assumptions": [
+        "The catalogue row is used only for DC resistance; no cable ampacity, AC skin effect, proximity, sheath, or installation claim is made.",
+        "Published 0.193 Ω/km at 20 °C and 0.242 Ω/km at 85 °C are converted to 0.000193 Ω/m and 0.000242 Ω/m.",
+        "The production temperature coefficient is evaluated at 85 °C; the manufacturer value is rounded to 0.001 Ω/km, so the allowed absolute error is 0.0005 Ω/km = 5e-7 Ω/m."
+      ],
+      "limitations": [
+        "The production proximity factor is a bounded three-core touching-trefoil approximation; this case does not validate arbitrary cable construction or sheath bonding."
+      ]
+    },
+    {
+      "id": "thermal-direct-burial-95-cu-xlpe",
+      "title": "IEC 60287 steady-state rating — 95 mm² Cu XLPE direct burial",
+      "studyPage": "iec60287.html",
+      "standard": "IEC 60287-1-1:2023 §3.1.1",
+      "clause": "IEC 60287-1-1:2023 §3.1.1",
+      "description": "Checks the direct-burial steady-state heat balance and reverse conductor-temperature check for a three-core XLPE cable.",
+      "inputs": {
+        "sizeMm2": 95,
+        "material": "Cu",
+        "insulation": "XLPE",
+        "insulThickMm": 1.6,
+        "nCores": 3,
+        "installMethod": "direct-burial",
+        "burialDepthMm": 800,
+        "soilResistivity": 1,
+        "ambientTempC": 20,
+        "frequencyHz": 50
+      },
+      "inputUnits": {
+        "sizeMm2": "mm²",
+        "material": "material code",
+        "insulation": "insulation code",
+        "insulThickMm": "mm",
+        "nCores": "load-carrying conductors",
+        "installMethod": "installation code",
+        "burialDepthMm": "mm",
+        "soilResistivity": "K·m/W",
+        "ambientTempC": "°C",
+        "frequencyHz": "Hz"
+      },
+      "expectedOutputs": {
+        "ampacityA": {
+          "value": 315.8,
+          "tolerance": 0.1,
+          "unit": "A RMS",
+          "toleranceBasis": "Absolute 0.1 A matches the production result display resolution; the independent heat-balance value is 315.8 A after one-decimal rounding."
+        },
+        "conductorTemperatureC": {
+          "value": 90,
+          "tolerance": 0.1,
+          "unit": "°C",
+          "toleranceBasis": "Absolute 0.1 °C matches the production reverse-check resolution and catches ambient/temperature-rise basis drift."
+        },
+        "totalThermalResistanceKmPerW": {
+          "value": 2.847887302708753,
+          "tolerance": 0.0002,
+          "unit": "K·m/W",
+          "toleranceBasis": "Absolute 2e-4 K·m/W covers the production four-decimal intermediate rounding (actual 2.8477) against the unrounded independent value 2.8478873 while catching installation geometry branch errors."
+        }
+      },
+      "independentDerivation": "With dc=2√(95/π) mm, T1=(3.5/2π)ln(1+2·1.6/dc), Dgroup=dc+3.2 mm, Dcable=2.16Dgroup, T3=(6/2π)ln(1+6/Dcable), De_mm=Dcable+6 mm, and De_m=De_mm/1000 before using T4=(1/2π)ln(2·0.8/De_m+√[(2·0.8/De_m)²−1]), the unrounded Rtotal is 2.8478873027 K·m/W. With Rac=0.00024654997977 Ω/m, I=√[70/(Rac·Rtotal)] = 315.7440 A. The production path rounds T1–T4 to four decimals before solving and returns 315.8 A; the declared 0.1 A tolerance covers this disclosed intermediate-rounding difference. The independent arithmetic is reproduced in tests/thermalGroundEvidence.test.mjs.",
+      "reference": "With dc=2√(95/π) mm, T1=(3.5/2π)ln(1+2·1.6/dc), Dgroup=dc+3.2 mm, Dcable=2.16Dgroup, T3=(6/2π)ln(1+6/Dcable), De_mm=Dcable+6 mm, and De_m=De_mm/1000 before using T4=(1/2π)ln(2·0.8/De_m+√[(2·0.8/De_m)²−1]), the unrounded Rtotal is 2.8478873027 K·m/W. With Rac=0.00024654997977 Ω/m, I=√[70/(Rac·Rtotal)] = 315.7440 A. The production path rounds T1–T4 to four decimals before solving and returns 315.8 A; the declared 0.1 A tolerance covers this disclosed intermediate-rounding difference. The independent arithmetic is reproduced in tests/thermalGroundEvidence.test.mjs.",
+      "source": {
+        "title": "IEC 60287-1-1:2023, Electric cables — Calculation of the current rating — Part 1-1",
+        "url": "https://webstore.iec.ch/en/publication/68118",
+        "locator": "Publisher catalogue entry; exact licensed equation pages are not publicly accessible (provisional mapping to current-rating and loss equation families)",
+        "accessedOn": "2026-09-17",
+        "kind": "equation_basis"
+      },
+      "sourceUrl": "https://webstore.iec.ch/en/publication/68118",
+      "assumptions": [
+        "Defaults used by calcAmpacity are outerSheathMm = 3 mm, armoured = false, U0_kV = 0, nCables = 1, and groupArrangement = flat.",
+        "XLPE insulation resistivity is 3.5 K·m/W; filler/bedding T2 = 0.02 K·m/W; jacket resistivity is 6 K·m/W; three-core cable diameter factor is 2.16.",
+        "The direct-burial external resistance uses 0.8 m centreline depth and soil resistivity 1.0 K·m/W; no soil dry-out or cyclic load is included."
+      ],
+      "limitations": [
+        "Soil is uniform and no soil drying-out, cyclic loading, crossing cables, or measured cable construction is represented.",
+        "The expected value is an independent heat-balance derivation using the fixture geometry and stated model assumptions, not a published worked-example value."
+      ]
+    },
+    {
+      "id": "thermal-installation-variant-95-cu-xlpe",
+      "title": "IEC 60287 installation variant — direct burial versus tray",
+      "studyPage": "iec60287.html",
+      "standard": "IEC 60287-1-1:2023 §3.1.1; steady-state installation equations",
+      "clause": "IEC 60287-1-1:2023 §3.1.1; steady-state installation equations",
+      "description": "Uses the same 95 mm² Cu XLPE cable to exercise two implemented installation branches and the expected change in heat rejection.",
+      "inputs": {
+        "directBurial": {
+          "sizeMm2": 95,
+          "material": "Cu",
+          "insulation": "XLPE",
+          "insulThickMm": 1.6,
+          "nCores": 3,
+          "installMethod": "direct-burial",
+          "burialDepthMm": 800,
+          "soilResistivity": 1,
+          "ambientTempC": 20,
+          "frequencyHz": 50
+        },
+        "tray": {
+          "sizeMm2": 95,
+          "material": "Cu",
+          "insulation": "XLPE",
+          "insulThickMm": 1.6,
+          "nCores": 3,
+          "installMethod": "tray",
+          "ambientTempC": 30,
+          "frequencyHz": 50
+        }
+      },
+      "inputUnits": {
+        "directBurial.sizeMm2": "mm²",
+        "directBurial.insulThickMm": "mm",
+        "directBurial.burialDepthMm": "mm",
+        "directBurial.soilResistivity": "K·m/W",
+        "directBurial.ambientTempC": "°C",
+        "tray.sizeMm2": "mm²",
+        "tray.insulThickMm": "mm",
+        "tray.ambientTempC": "°C"
+      },
+      "expectedOutputs": {
+        "directBurialAmpacityA": {
+          "value": 315.8,
+          "tolerance": 0.1,
+          "unit": "A RMS",
+          "toleranceBasis": "Absolute 0.1 A matches one-decimal production display and detects direct-burial T4/soil-unit drift."
+        },
+        "trayAmpacityA": {
+          "value": 247.6,
+          "tolerance": 0.1,
+          "unit": "A RMS",
+          "toleranceBasis": "Absolute 0.1 A matches one-decimal production display and detects tray convection/ambient-branch drift."
+        }
+      },
+      "independentDerivation": "The same unrounded IEC-style heat balance is evaluated for direct burial and tray, changing only external T4 and ambient temperature. Direct burial gives 315.7440 A unrounded; tray gives 247.5618 A unrounded. Production rounds thermal terms to four decimals and current to 0.1 A, yielding 315.8 A and 247.6 A; 0.1 A tolerances cover that documented rounding.",
+      "reference": "The same unrounded IEC-style heat balance is evaluated for direct burial and tray, changing only external T4 and ambient temperature. Direct burial gives 315.7440 A unrounded; tray gives 247.5618 A unrounded. Production rounds thermal terms to four decimals and current to 0.1 A, yielding 315.8 A and 247.6 A; 0.1 A tolerances cover that documented rounding.",
+      "source": {
+        "title": "IEC 60287-1-1:2023, Electric cables — Calculation of the current rating — Part 1-1",
+        "url": "https://webstore.iec.ch/en/publication/68118",
+        "locator": "Publisher catalogue entry; exact licensed equation pages are not publicly accessible (provisional mapping to current-rating and loss equation families)",
+        "accessedOn": "2026-09-17",
+        "kind": "equation_basis"
+      },
+      "sourceUrl": "https://webstore.iec.ch/en/publication/68118",
+      "assumptions": [
+        "Both variants use outerSheathMm = 3 mm, armoured = false, U0_kV = 0, nCables = 1, and groupArrangement = flat defaults.",
+        "Direct burial uses 0.8 m depth and 1.0 K·m/W soil; tray uses the implemented single-layer h = 8 W/(m²·K) free-air screen."
+      ],
+      "limitations": [
+        "The tray branch is a single-layer free-air screen with a fixed convection coefficient; tray geometry, wind, spacing, and mutual heating require project-specific review.",
+        "The direct-burial branch assumes homogeneous soil and does not validate manufacturer ampacity tables."
+      ]
+    },
+    {
+      "id": "ground-sverak-resistance-100rho",
+      "title": "IEEE 80 grid resistance — Sverak equation",
+      "studyPage": "groundGrid.html",
+      "standard": "IEEE Std 80-2000 Eq. (52)",
+      "clause": "IEEE Std 80-2000 Eq. (52)",
+      "description": "Checks the soil-resistivity, total-conductor-length, area, and burial-depth units in the implemented Sverak grid-resistance equation.",
+      "inputs": {
+        "rho": 100,
+        "L": 100,
+        "A": 400,
+        "h": 0.5
+      },
+      "inputUnits": {
+        "rho": "Ω·m",
+        "L": "m",
+        "A": "m²",
+        "h": "m"
+      },
+      "expectedOutputs": {
+        "gridResistanceOhm": {
+          "value": 3.1236380279902947,
+          "tolerance": 1e-9,
+          "unit": "Ω",
+          "toleranceBasis": "Absolute 1e-9 Ω is numerical-rounding scale for the closed-form equation and catches length/area unit errors."
+        }
+      },
+      "independentDerivation": "Rg = ρ/L + [ρ/√(20A)]·[1 + 1/(1 + h√(20/A))] = 3.1236380279902947 Ω. The arithmetic is reproduced independently in tests/thermalGroundEvidence.test.mjs.",
+      "reference": "Rg = ρ/L + [ρ/√(20A)]·[1 + 1/(1 + h√(20/A))] = 3.1236380279902947 Ω. The arithmetic is reproduced independently in tests/thermalGroundEvidence.test.mjs.",
+      "source": {
+        "title": "IEEE Std 80-2000, IEEE Guide for Safety in AC Substation Grounding",
+        "url": "https://www.armada.mil.co/sites/default/files/normograma_arc/mantenimiento1/IEEE%2080.pdf",
+        "locator": "Accessible 2000-edition copy: PDF p.73 (printed p.65), Eq. 52 for Sverak resistance; PDF pages 101–102 (printed pages 93–94), Eqs. 85, 91, and 93 for horizontal conductor length, rod-aware Lm, and rod-aware Ls",
+        "accessedOn": "2026-09-17",
+        "kind": "equation_basis"
+      },
+      "sourceUrl": "https://www.armada.mil.co/sites/default/files/normograma_arc/mantenimiento1/IEEE%2080.pdf",
+      "assumptions": [
+        "The four inputs are already normalized SI quantities; no rod, surface-layer, fault-current, or body-weight default is involved in this isolated resistance check."
+      ],
+      "limitations": [
+        "The uniform-soil Sverak approximation does not represent multilayer soil, transfer voltage, or field fall-of-potential measurements.",
+        "IEEE 80 Annex B.1 values in the existing registry were not accepted as published evidence because the exact primary page and value mapping were inaccessible."
+      ]
+    },
+    {
+      "id": "ground-mesh-step-touch-eit-appendix-e-inputs",
+      "title": "IEEE 80 mesh, step, and tolerable-voltage equations — EIT Appendix E input geometry",
+      "studyPage": "groundGrid.html",
+      "standard": "IEEE Std 80-2000 Eqs. (85), (91), (93); EIT Appendix E published input geometry",
+      "clause": "IEEE Std 80-2000 Eqs. (85), (91), (93); EIT Appendix E published input geometry",
+      "description": "Uses publicly stated Appendix E geometry and soil inputs, then independently evaluates the implemented rectangular-grid mesh, step, touch, step-limit, and resistance equations. The EIT output images are not claimed as expected values.",
+      "inputs": {
+        "rho": 300,
+        "gridLx": 90,
+        "gridLy": 50,
+        "nx": 6,
+        "ny": 7,
+        "h": 0.6,
+        "d": 0.01,
+        "Ig": 2000,
+        "tf": 0.15,
+        "hasRods": true,
+        "rodCount": 22,
+        "rodLength": 3,
+        "rhoS": 3000,
+        "hs": 0.1,
+        "bw": 70
+      },
+      "inputUnits": {
+        "rho": "Ω·m",
+        "gridLx": "m",
+        "gridLy": "m",
+        "nx": "conductors",
+        "ny": "conductors",
+        "h": "m",
+        "d": "m",
+        "Ig": "A RMS",
+        "tf": "s",
+        "hasRods": "boolean",
+        "rodCount": "rods",
+        "rodLength": "m",
+        "rhoS": "Ω·m",
+        "hs": "m",
+        "bw": "kg"
+      },
+      "expectedOutputs": {
+        "meshVoltageV": {
+          "value": 960.4084270521508,
+          "tolerance": 0.000001,
+          "unit": "V",
+          "toleranceBasis": "Absolute 1e-6 V is numerical-rounding scale for the independently reproduced closed-form factors."
+        },
+        "stepVoltageV": {
+          "value": 419.071168551245,
+          "tolerance": 0.000001,
+          "unit": "V",
+          "toleranceBasis": "Absolute 1e-6 V is numerical-rounding scale for the independent IEEE 80-2000 Eq. (93) effective step-length calculation."
+        },
+        "tolerableTouchV": {
+          "value": 1720.0364211006704,
+          "tolerance": 0.000001,
+          "unit": "V",
+          "toleranceBasis": "Absolute 1e-6 V is numerical-rounding scale; body-weight, fault-time, and surface-layer inputs are fixed."
+        },
+        "tolerableStepV": {
+          "value": 5664.028913693552,
+          "tolerance": 0.000001,
+          "unit": "V",
+          "toleranceBasis": "Absolute 1e-6 V is numerical-rounding scale; body-weight, fault-time, and surface-layer inputs are fixed."
+        },
+        "gridResistanceOhm": {
+          "value": 2.2753459929192146,
+          "tolerance": 1e-9,
+          "unit": "Ω",
+          "toleranceBasis": "Absolute 1e-9 Ω is numerical-rounding scale for the Sverak closed form."
+        },
+        "touchSafe": {
+          "value": true,
+          "tolerance": 0,
+          "unit": "boolean",
+          "toleranceBasis": "Exact boolean comparison; the independent values are 960.4 V mesh versus 1720.0 V tolerable touch."
+        },
+        "stepSafe": {
+          "value": true,
+          "tolerance": 0,
+          "unit": "boolean",
+          "toleranceBasis": "Exact boolean comparison; the independent values are 419.1 V step versus 5664.0 V tolerable step."
+        }
+      },
+      "independentDerivation": "A=90·50=4500 m², Lp=280 m, Lc=6·90+7·50=890 m, Lr=22·3=66 m, D=√[(90/6)(50/5)]=12.2474487 m. IEEE 80 Eq. (85) uses horizontal Lc for n, Eq. (91) uses Lm=Lc+[1.55+1.22·(rodLength/√(Lx²+Ly²))]Lr=994.6462381 m for mesh voltage, and Eq. (93) uses Ls=0.75Lc+0.85Lr=723.6 m for step voltage. The independent results are Rg=2.2753459929 Ω, Em=960.4084271 V, Es=419.0711686 V, Etouch=1720.0364211 V, Estep=5664.0289137 V. Tests reproduce the equations separately.",
+      "reference": "A=90·50=4500 m², Lp=280 m, Lc=6·90+7·50=890 m, Lr=22·3=66 m, D=√[(90/6)(50/5)]=12.2474487 m. IEEE 80 Eq. (85) uses horizontal Lc for n, Eq. (91) uses Lm=Lc+[1.55+1.22·(rodLength/√(Lx²+Ly²))]Lr=994.6462381 m for mesh voltage, and Eq. (93) uses Ls=0.75Lc+0.85Lr=723.6 m for step voltage. The independent results are Rg=2.2753459929 Ω, Em=960.4084271 V, Es=419.0711686 V, Etouch=1720.0364211 V, Estep=5664.0289137 V. Tests reproduce the equations separately.",
+      "source": {
+        "title": "IEEE Std 80-2000, IEEE Guide for Safety in AC Substation Grounding",
+        "url": "https://www.armada.mil.co/sites/default/files/normograma_arc/mantenimiento1/IEEE%2080.pdf",
+        "locator": "Accessible 2000-edition copy: PDF p.73 (printed p.65), Eq. 52 for Sverak resistance; PDF pages 101–102 (printed pages 93–94), Eqs. 85, 91, and 93 for horizontal conductor length, rod-aware Lm, and rod-aware Ls",
+        "accessedOn": "2026-09-17",
+        "kind": "equation_basis"
+      },
+      "sourceUrl": "https://www.armada.mil.co/sites/default/files/normograma_arc/mantenimiento1/IEEE%2080.pdf",
+      "inputSource": {
+        "title": "EIT, High Voltage Design and Installations Master Class, Appendix E worked-example input geometry",
+        "url": "https://www.eit.edu.au/resources/high-voltage-design-and-installations-master-class/",
+        "locator": "Appendix E input narrative; output pages are image-only and were not accessed",
+        "accessedOn": "2026-09-17",
+        "kind": "published_values"
+      },
+      "assumptions": [
+        "The EIT input narrative supplies the geometry and soil context: gridLx = 90 m, gridLy = 50 m, nx = 6, ny = 7, conductor length = 890 m, 22 rods × 3 m, and total effective length = 956 m.",
+        "Conductor diameter is 0.01 m because a conductor diameter is not provided; this is an explicit screening assumption, not a published EIT output.",
+        "Ig = 2,000 A is an explicit synthetic comparison current. The EIT example’s 3.1 kA current and decrement calculation are outside this fixture. Fault duration tf = 0.15 s, surface resistivity 3,000 Ω·m, surface thickness 0.1 m, and 70 kg body factor are explicit fixture assumptions."
+      ],
+      "limitations": [
+        "The rectangular IEEE 80 equations are a screening model; irregular grids, transferred voltage, multilayer soil, current split, and field measurements are outside this fixture.",
+        "The public EIT output images were unavailable during review; no EIT published output is claimed and the expected values are independent analytical results."
+      ]
     },
     {
       "id": "ieee1584-arc-flash-lv",
@@ -78,10 +1126,22 @@
         "reducedArcDurationS": 0.319
       },
       "expectedOutputs": {
-        "fullArcingCurrentKA": { "value": 28.793, "tolerance": 0.01 },
-        "reducedArcingCurrentKA": { "value": 25.244, "tolerance": 0.01 },
-        "reducedIncidentEnergyCalCm2": { "value": 12.705, "tolerance": 0.01 },
-        "arcFlashBoundaryMm": { "value": 2669, "tolerance": 3 }
+        "fullArcingCurrentKA": {
+          "value": 28.793,
+          "tolerance": 0.01
+        },
+        "reducedArcingCurrentKA": {
+          "value": 25.244,
+          "tolerance": 0.01
+        },
+        "reducedIncidentEnergyCalCm2": {
+          "value": 12.705,
+          "tolerance": 0.01
+        },
+        "arcFlashBoundaryMm": {
+          "value": 2669,
+          "tolerance": 3
+        }
       },
       "reference": "IEEE 1584-2018 Annex D.2 worked example",
       "sourceUrl": "https://standards.ieee.org/ieee/1584/5802/"
@@ -102,7 +1162,10 @@
         "branchXOhm": 0.04
       },
       "expectedOutputs": {
-        "receivingVoltagePU": { "value": 0.9998634, "tolerance": 0.000001 }
+        "receivingVoltagePU": {
+          "value": 0.9998634,
+          "tolerance": 0.000001
+        }
       },
       "reference": "Independent exact two-bus quadratic; IEEE 3002.2-2018 provides the current load-flow study-practice context",
       "sourceUrl": "https://standards.ieee.org/ieee/3002.2/4773/"
@@ -117,15 +1180,33 @@
       "inputs": {
         "systemKV": 13.8,
         "voltageFactor": 1,
-        "z1Ohm": { "r": 0.01, "x": 0.1 },
-        "z2Ohm": { "r": 0.01, "x": 0.1 },
-        "z0Ohm": { "r": 0.03, "x": 0.3 },
+        "z1Ohm": {
+          "r": 0.01,
+          "x": 0.1
+        },
+        "z2Ohm": {
+          "r": 0.01,
+          "x": 0.1
+        },
+        "z0Ohm": {
+          "r": 0.03,
+          "x": 0.3
+        },
         "xrRatio": 10
       },
       "expectedOutputs": {
-        "threePhaseKA": { "value": 79.28, "tolerance": 0.01 },
-        "lineToGroundKA": { "value": 47.57, "tolerance": 0.01 },
-        "asymmetricalPeakKA": { "value": 194.01, "tolerance": 0.01 }
+        "threePhaseKA": {
+          "value": 79.28,
+          "tolerance": 0.01
+        },
+        "lineToGroundKA": {
+          "value": 47.57,
+          "tolerance": 0.01
+        },
+        "asymmetricalPeakKA": {
+          "value": 194.01,
+          "tolerance": 0.01
+        }
       },
       "reference": "Independent Thevenin/symmetrical-component fixture; IEEE 3002.3-2018 provides the current short-circuit study-practice context",
       "sourceUrl": "https://standards.ieee.org/ieee/3002.3/4774/"
@@ -142,10 +1223,22 @@
         "cableOutsideDiameterIn": 0.4
       },
       "expectedOutputs": {
-        "oneCableLimitPercent": { "value": 53, "tolerance": 0 },
-        "twoCableLimitPercent": { "value": 31, "tolerance": 0 },
-        "threeOrMoreCableLimitPercent": { "value": 40, "tolerance": 0 },
-        "oneCableFillPercent": { "value": 41.3367, "tolerance": 0.0001 }
+        "oneCableLimitPercent": {
+          "value": 53,
+          "tolerance": 0
+        },
+        "twoCableLimitPercent": {
+          "value": 31,
+          "tolerance": 0
+        },
+        "threeOrMoreCableLimitPercent": {
+          "value": 40,
+          "tolerance": 0
+        },
+        "oneCableFillPercent": {
+          "value": 41.3367,
+          "tolerance": 0.0001
+        }
       },
       "reference": "NEC 2023 Chapter 9, Table 1; application raceway tables are edition-pinned to NEC 2023"
     },
@@ -164,10 +1257,22 @@
         "smallCableAreaAboveBoundaryIn2": 11.601
       },
       "expectedOutputs": {
-        "ladderColumn1AreaIn2": { "value": 14, "tolerance": 0 },
-        "mixedSmallCableAllowanceIn2": { "value": 11.6, "tolerance": 0.000000001 },
-        "boundaryPass": { "value": true, "tolerance": 0 },
-        "aboveBoundaryFails": { "value": true, "tolerance": 0 }
+        "ladderColumn1AreaIn2": {
+          "value": 14,
+          "tolerance": 0
+        },
+        "mixedSmallCableAllowanceIn2": {
+          "value": 11.6,
+          "tolerance": 1e-9
+        },
+        "boundaryPass": {
+          "value": true,
+          "tolerance": 0
+        },
+        "aboveBoundaryFails": {
+          "value": true,
+          "tolerance": 0
+        }
       },
       "reference": "NFPA 70 (NEC) 2023 development record for 392.22(A)(1) and Table 392.22(A)(1); independent boundary arithmetic",
       "sourceUrl": "https://docinfofiles.nfpa.org/files/AboutTheCodes/70/70_A2022_NEC_P08_FD_PIReport_rev_1008.pdf",
@@ -181,20 +1286,69 @@
       "clause": "§4.2 — Three-phase short-circuit, maximum current (c_max)",
       "description": "Version-pinned 10 kV sequence-impedance regression for the IEC 60909-0:2016 calculation path. It does not validate the 2026 edition.",
       "inputs": {
-        "systemKV": 10,
-        "scMvaSource": 500,
-        "xrRatio": 10,
-        "cFactorMode": "max",
-        "faultDurationS": 1.0
+        "z1": {
+          "r": 0.0397,
+          "x": 0.397
+        },
+        "z2": {
+          "r": 0.0397,
+          "x": 0.397
+        },
+        "z0": {
+          "r": 0.0397,
+          "x": 0.397
+        },
+        "prefaultKV": 10,
+        "cMode": "max",
+        "faultDurationS": 1
+      },
+      "inputUnits": {
+        "z1": "ohm",
+        "z2": "ohm",
+        "z0": "ohm",
+        "prefaultKV": "kV",
+        "cMode": "enum",
+        "faultDurationS": "s"
       },
       "expectedOutputs": {
-        "ikThreePhaseKA": { "value": 15.75, "tolerance": 0.5 },
-        "cFactor": { "value": 1.1, "tolerance": 0.01 },
-        "kappa": { "value": 1.809, "tolerance": 0.05 },
-        "ipKA": { "value": 40.3, "tolerance": 1.5 }
+        "c_factor": {
+          "value": 1.1,
+          "tolerance": 0.001,
+          "unit": "pu",
+          "toleranceBasis": "IEC 60909 factor rounded to 0.001"
+        },
+        "kappa": {
+          "value": 1.746,
+          "tolerance": 0.001,
+          "unit": "pu",
+          "toleranceBasis": "IEC 60909 factor rounded to 0.001"
+        },
+        "ik3_ka": {
+          "value": 15.92,
+          "tolerance": 0.02,
+          "unit": "kA",
+          "toleranceBasis": "0.02 kA reporting and floating-point tolerance"
+        },
+        "peak_ka": {
+          "value": 39.3,
+          "tolerance": 0.1,
+          "unit": "kA",
+          "toleranceBasis": "0.1 kA reporting and floating-point tolerance"
+        }
       },
       "reference": "Independent analytical fixture using IEC 60909-0:2016 equations; IEC 60909-0:2026 is not claimed",
       "sourceUrl": "https://webstore.iec.ch/en/publication/24100",
+      "source": {
+        "title": "IEC Webstore — IEC 60909-0:2016 Short-circuit currents in three-phase AC systems",
+        "url": "https://webstore.iec.ch/en/publication/24100",
+        "locator": "IEC 60909-0:2016, three-phase short-circuit current equations and voltage factor c_max",
+        "accessedOn": "2026-09-17",
+        "kind": "equation_basis"
+      },
+      "limitations": [
+        "Version-pinned to the implemented IEC 60909-0:2016 path; IEC 60909-0:2026 is not claimed.",
+        "This is a balanced three-phase maximum-current regression and does not establish complete installation-specific fault-duty compliance."
+      ],
       "sampleFile": "samples/benchmark-iec60909-short-circuit.json"
     },
     {
@@ -205,20 +1359,62 @@
       "clause": "§2.1 — Continuous current rating, direct buried installation",
       "description": "95 mm² Cu XLPE 11 kV, three-core cable directly buried 800 mm depth, soil ρ = 1.0 K·m/W, ambient 25 °C.",
       "inputs": {
-        "conductorMm2": 95,
-        "conductorMaterial": "copper",
+        "sizeMm2": 95,
+        "material": "Cu",
         "insulation": "XLPE",
-        "systemKV": 11,
-        "installMethod": "direct_burial",
-        "depthMm": 800,
-        "soilRho": 1.0,
-        "ambientC": 25,
-        "conductors": 3
+        "insulThickMm": 1.6,
+        "nCores": 3,
+        "installMethod": "direct-burial",
+        "burialDepthMm": 800,
+        "soilResistivity": 1,
+        "ambientTempC": 20,
+        "frequencyHz": 50
+      },
+      "inputUnits": {
+        "sizeMm2": "mm²",
+        "material": "enum",
+        "insulation": "enum",
+        "insulThickMm": "mm",
+        "nCores": "count",
+        "installMethod": "enum",
+        "burialDepthMm": "mm",
+        "soilResistivity": "K·m/W",
+        "ambientTempC": "°C",
+        "frequencyHz": "Hz"
       },
       "expectedOutputs": {
-        "ampacityA": { "value": 270, "tolerance": 15 }
+        "ampacity_a": {
+          "value": 315.8,
+          "tolerance": 0.2,
+          "unit": "A",
+          "toleranceBasis": "0.2 A reporting and floating-point tolerance"
+        },
+        "conductor_temp_c": {
+          "value": 90,
+          "tolerance": 0.2,
+          "unit": "°C",
+          "toleranceBasis": "0.2 °C reporting and floating-point tolerance"
+        },
+        "grouping_factor": {
+          "value": 1,
+          "tolerance": 0,
+          "unit": "pu",
+          "toleranceBasis": "Exact single-circuit factor"
+        }
       },
-      "reference": "IEC 60287-1-1:2023 §2.1; Nexans cable handbook Example 3",
+      "reference": "IEC 60287-1-1:2023 §2.1 steady-state equation basis; this executable fixture is independently derived.",
+      "sourceUrl": "https://webstore.iec.ch/en/publication/68118",
+      "source": {
+        "title": "IEC Webstore — IEC 60287-1-1:2023 Electric cables: calculation of the current rating",
+        "url": "https://webstore.iec.ch/en/publication/68118",
+        "locator": "IEC 60287-1-1:2023, steady-state current-rating equations for direct-buried cables",
+        "accessedOn": "2026-09-17",
+        "kind": "equation_basis"
+      },
+      "limitations": [
+        "Steady-state direct-burial screening only; installation-specific cable construction, screens, sheath losses, and thermal environment require review.",
+        "The benchmark does not establish ampacity for other cable sizes, formations, soil conditions, or correction-factor combinations."
+      ],
       "sampleFile": "samples/benchmark-iec60287-cable-rating.json"
     },
     {
@@ -235,16 +1431,25 @@
         "conductorDepthM": 0.6,
         "soilResistivityOhmM": 100,
         "faultCurrentA": 3000,
-        "faultDurationS": 1.0,
+        "faultDurationS": 1,
         "conductorDiameterM": 0.00953,
         "numberOfGroundRods": 20
       },
       "expectedOutputs": {
-        "meshVoltageV": { "value": 312, "tolerance": 40 },
-        "stepVoltageV": { "value": 168, "tolerance": 30 },
-        "gridResistanceOhm": { "value": 0.54, "tolerance": 0.1 }
+        "meshVoltageV": {
+          "value": 312,
+          "tolerance": 40
+        },
+        "stepVoltageV": {
+          "value": 168,
+          "tolerance": 30
+        },
+        "gridResistanceOhm": {
+          "value": 0.54,
+          "tolerance": 0.1
+        }
       },
-      "reference": "IEEE 80-2013 Annex B, Example B.1",
+      "reference": "IEEE 80-2013 screening equations; exact Annex B example mapping is not verified",
       "sampleFile": "samples/benchmark-ieee80-ground-grid.json"
     },
     {
@@ -255,7 +1460,7 @@
       "clause": "Simplified heat-loss balance method",
       "description": "2-inch nominal steel pipe, water service, maintain 5 °C, ambient −20 °C, 25 mm mineral wool insulation.",
       "inputs": {
-        "pipeDiameterIn": 2.0,
+        "pipeDiameterIn": 2,
         "pipeMaterial": "carbon_steel",
         "insulationThicknessMm": 25,
         "insulationConductivity": 0.04,
@@ -263,8 +1468,14 @@
         "ambientTempC": -20
       },
       "expectedOutputs": {
-        "heatLossWPerM": { "value": 18.5, "tolerance": 3.0 },
-        "requiredWPerM": { "value": 20, "tolerance": 5 }
+        "heatLossWPerM": {
+          "value": 18.5,
+          "tolerance": 3
+        },
+        "requiredWPerM": {
+          "value": 20,
+          "tolerance": 5
+        }
       },
       "reference": "nVent TraceCalc method; IEC 62395-2 §5 screening calculation",
       "sampleFile": "samples/benchmark-heat-trace-screening.json"
@@ -289,8 +1500,14 @@
         "insulationType": "XHHW"
       },
       "expectedOutputs": {
-        "groupDerating": { "value": 0.78, "tolerance": 0.05 },
-        "ampacityA": { "value": 285, "tolerance": 25 }
+        "groupDerating": {
+          "value": 0.78,
+          "tolerance": 0.05
+        },
+        "ampacityA": {
+          "value": 285,
+          "tolerance": 25
+        }
       },
       "reference": "IEEE 835-1994 Table B-75; ETAP Underground Raceway Systems validation",
       "sampleFile": "samples/benchmark-ductbank-thermal.json"
@@ -303,22 +1520,64 @@
       "clause": "Composite — tray, conduit, duct bank, direct burial",
       "description": "Same 95 mm² Cu XLPE 3-core cable run through tray (air ambient 30 °C), buried conduit, 2×3 duct bank at 200 mm spacing, and direct burial (soil ρ 1.0 K·m/W, 20 °C). Verifies that the orchestrator produces consistent ampacity across the four IEC 60287 install methods and that the derating waterfall identifies the limiting factor.",
       "inputs": {
-        "cable": { "sizeMm2": 95, "material": "Cu", "insulation": "XLPE", "nCores": 3 },
-        "ambient": { "tempC": 30, "soilTempC": 20 },
-        "grouping": { "nCables": 1, "arrangement": "flat" },
+        "cable": {
+          "sizeMm2": 95,
+          "material": "Cu",
+          "insulation": "XLPE",
+          "nCores": 3
+        },
+        "ambient": {
+          "tempC": 30,
+          "soilTempC": 20
+        },
+        "grouping": {
+          "nCables": 1,
+          "arrangement": "flat"
+        },
         "installations": {
-          "tray":            { "included": true },
-          "conduit":         { "included": true, "conduitOD_mm": 100, "burialDepthMm": 800 },
-          "duct-bank":       { "included": true, "ductCount": 6, "rows": 2, "cols": 3, "spacingMm": 200 },
-          "direct-burial":   { "included": true, "burialDepthMm": 800, "soilResistivity": 1.0 }
+          "tray": {
+            "included": true
+          },
+          "conduit": {
+            "included": true,
+            "conduitOD_mm": 100,
+            "burialDepthMm": 800
+          },
+          "duct-bank": {
+            "included": true,
+            "ductCount": 6,
+            "rows": 2,
+            "cols": 3,
+            "spacingMm": 200
+          },
+          "direct-burial": {
+            "included": true,
+            "burialDepthMm": 800,
+            "soilResistivity": 1
+          }
         }
       },
       "expectedOutputs": {
-        "trayAmpacityA":         { "value": 247, "tolerance": 30 },
-        "directBurialAmpacityA": { "value": 316, "tolerance": 35 },
-        "conduitAmpacityA":      { "value": 326, "tolerance": 35 },
-        "ductBankAmpacityA":     { "value": 226, "tolerance": 30 },
-        "ductBankLimitingFactorContains": { "value": "Grouping", "tolerance": 0 }
+        "trayAmpacityA": {
+          "value": 247,
+          "tolerance": 30
+        },
+        "directBurialAmpacityA": {
+          "value": 316,
+          "tolerance": 35
+        },
+        "conduitAmpacityA": {
+          "value": 326,
+          "tolerance": 35
+        },
+        "ductBankAmpacityA": {
+          "value": 226,
+          "tolerance": 30
+        },
+        "ductBankLimitingFactorContains": {
+          "value": "Grouping",
+          "tolerance": 0
+        }
       },
       "reference": "IEC 60287-2-1 Tables 1–8; NEC Table 310.16; cross-check against iec60287-cable-rating benchmark",
       "sampleFile": "samples/benchmark-cable-thermal-env.json"
@@ -330,11 +1589,24 @@
       "standard": "S&C TCC 153-2",
       "clause": "25E minimum-melting curve; spreadsheet range 153_2!P10:Q95",
       "description": "Manufacturer-published source points verify that the curve evaluator preserves the 49.5972 A vertical segment and selects the shortest time for the minimum-melting boundary. This validates curve-geometry handling only; it does not authorize coordination settings or calculation-ready device promotion.",
-      "inputs": { "currentA": 49.5972, "boundary": "lower", "matchingSourcePointCount": 28 },
+      "inputs": {
+        "currentA": 49.5972,
+        "boundary": "lower",
+        "matchingSourcePointCount": 28
+      },
       "expectedOutputs": {
-        "minimumMeltingTimeS": { "value": 32.1639, "tolerance": 0.0001 },
-        "maximumSourcePointTimeS": { "value": 602.961, "tolerance": 0.001 },
-        "matchingPointCount": { "value": 28, "tolerance": 0 }
+        "minimumMeltingTimeS": {
+          "value": 32.1639,
+          "tolerance": 0.0001
+        },
+        "maximumSourcePointTimeS": {
+          "value": 602.961,
+          "tolerance": 0.001
+        },
+        "matchingPointCount": {
+          "value": 28,
+          "tolerance": 0
+        }
       },
       "reference": "S&C Electric Company TCC 153-2 source spreadsheet, 25E curve",
       "sourceUrl": "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.xlsx"
@@ -346,13 +1618,284 @@
       "standard": "ABB/Baldor manufacturer performance data",
       "clause": "FPM2555TS 100 hp, 460 V, 60 Hz performance-data sheet",
       "description": "Published 100 hp, 460 V, 0.85 power-factor, 94.1% efficiency data independently checks the application's three-phase full-load-current conversion against the listed 117 A value. The 680 A starting-current check verifies application of the published current ratio; source-impedance voltage sag and acceleration time are outside this benchmark's scope.",
-      "inputs": { "horsepower": 100, "voltageV": 460, "powerFactor": 0.85, "efficiency": 0.941, "publishedStartingCurrentA": 680 },
+      "inputs": {
+        "horsepower": 100,
+        "voltageV": 460,
+        "powerFactor": 0.85,
+        "efficiency": 0.941,
+        "publishedStartingCurrentA": 680
+      },
       "expectedOutputs": {
-        "fullLoadCurrentA": { "value": 117, "tolerance": 0.5 },
-        "startingCurrentA": { "value": 680, "tolerance": 1 }
+        "fullLoadCurrentA": {
+          "value": 117,
+          "tolerance": 0.5
+        },
+        "startingCurrentA": {
+          "value": 680,
+          "tolerance": 1
+        }
       },
       "reference": "ABB/Baldor FPM2555TS performance-data sheet",
       "sourceUrl": "https://library.e.abb.com/public/ad9edd95b42f44ddac04b5e6ee921429/FPM2555TS.pdf"
+    },
+    {
+      "id": "CABLE-THERMAL-001",
+      "title": "132 kV, 630 mm² Cu — published both-end bonding losses",
+      "studyPage": "iec60287.html",
+      "standard": "Cableizer/CIGRE TB 880 published cross-tool reference",
+      "description": "Thermal-only cross-tool comparison; not complete IEC/CIGRE validation.",
+      "sourceUrl": "https://www.cableizer.com/static/pdf/tb880/CIGRE_TB_880_Case_0-1.284dc317ccef.pdf",
+      "executableBenchmarkId": "CABLE-THERMAL-001",
+      "productionModule": "analysis/cableThermalModel.mjs",
+      "inputs": {
+        "cable": {
+          "id": "tb880-case0-both-ends",
+          "name": "Cableizer TB 880 Case 0 reference cable",
+          "sizeMm2": 630,
+          "material": "Cu",
+          "maxTempC": 90,
+          "acResistanceOhmPerKm": 0.039522,
+          "acResistanceTempC": 90,
+          "acResistanceFrequencyHz": 50,
+          "dielectricLossWPerM": 0.385,
+          "lambdaSheath": 0.2939,
+          "outerDiameterMm": 75.5,
+          "insulationLayers": [
+            {
+              "name": "Conductor screen",
+              "innerDiameterMm": 30.3,
+              "outerDiameterMm": 33.3,
+              "resistivityKmPerW": 2.5
+            },
+            {
+              "name": "XLPE insulation",
+              "innerDiameterMm": 33.3,
+              "outerDiameterMm": 64.3,
+              "resistivityKmPerW": 3.5
+            },
+            {
+              "name": "Insulation screen",
+              "innerDiameterMm": 64.3,
+              "outerDiameterMm": 66.9,
+              "resistivityKmPerW": 2.5
+            }
+          ],
+          "jacketInnerDiameterMm": 68.5,
+          "jacketResistivityKmPerW": 3.5,
+          "metallicSheath": true,
+          "source": {
+            "id": "cableizer-tb880-0-1",
+            "url": "https://www.cableizer.com/static/pdf/tb880/CIGRE_TB_880_Case_0-1.284dc317ccef.pdf",
+            "pages": "3-5, 8-12",
+            "retrievedAt": "2026-09-18",
+            "voltageBasis": "132 kV line-to-line; supplied dielectric loss per cable",
+            "bondingBasis": "Both-end bonding; published total screen/sheath loss factor"
+          },
+          "assumptions": [
+            "AC resistance, dielectric loss and sheath loss factor are supplied reference inputs, not recalculated electromagnetic losses.",
+            "The metallic sheath between 66.9 and 68.5 mm is thermally neglected."
+          ]
+        },
+        "installation": {
+          "formation": "trefoil-touching",
+          "burialDepthMm": 1000,
+          "spacingMm": null,
+          "soilResistivityKmPerW": 1,
+          "ambientTempC": 20,
+          "frequencyHz": 50
+        }
+      },
+      "inputUnits": {
+        "cable.sizeMm2": "mm²",
+        "cable.acResistanceOhmPerKm": "Ω/km",
+        "cable.dielectricLossWPerM": "W/m",
+        "cable.outerDiameterMm": "mm",
+        "installation.burialDepthMm": "mm",
+        "installation.soilResistivityKmPerW": "K·m/W"
+      },
+      "source": {
+        "title": "Cableizer/CIGRE TB 880 published case study",
+        "url": "https://www.cableizer.com/static/pdf/tb880/CIGRE_TB_880_Case_0-1.284dc317ccef.pdf",
+        "locator": "Profile tb880-case0-both-ends; source pages 3-5, 8-12",
+        "accessedOn": "2026-09-18",
+        "kind": "published_values"
+      },
+      "assumptions": [
+        "AC resistance, dielectric loss, and sheath loss factor are supplied at stated temperature/frequency and are not recalculated.",
+        "Thermal-only cross-tool comparison; not independent validation of electromagnetic loss equations or full IEC/CIGRE implementation."
+      ],
+      "limitations": [
+        "Thermal-circuit comparison with published loss inputs. Not independent validation of electrical-loss equations or the complete IEC/CIGRE method."
+      ],
+      "independentDerivation": "T1, T3, touching-trefoil T4, and current rating are evaluated from literal supplied layer geometry and fixed losses; published outputs are rounded.",
+      "expectedOutputs": {
+        "ampacityA": {
+          "value": 821.78,
+          "tolerance": 0.05,
+          "unit": "A RMS",
+          "toleranceBasis": "Allows rounding of published four-decimal loss factors and thermal resistances; no tuning to the production solver."
+        },
+        "T1KmPerW": {
+          "value": 0.4199,
+          "tolerance": 0.00005,
+          "unit": "K·m/W",
+          "toleranceBasis": "Allows rounding of published four-decimal loss factors and thermal resistances; no tuning to the production solver."
+        },
+        "T3BaseKmPerW": {
+          "value": 0.0542,
+          "tolerance": 0.00005,
+          "unit": "K·m/W",
+          "toleranceBasis": "Allows rounding of published four-decimal loss factors and thermal resistances; no tuning to the production solver."
+        },
+        "T3EffectiveKmPerW": {
+          "value": 0.0867,
+          "tolerance": 0.00005,
+          "unit": "K·m/W",
+          "toleranceBasis": "Allows rounding of published four-decimal loss factors and thermal resistances; no tuning to the production solver."
+        },
+        "T4EffectiveKmPerW": {
+          "value": 1.5947,
+          "tolerance": 0.00005,
+          "unit": "K·m/W",
+          "toleranceBasis": "Allows rounding of published four-decimal loss factors and thermal resistances; no tuning to the production solver."
+        },
+        "limitingConductorTempC": {
+          "value": 90,
+          "tolerance": 1e-9,
+          "unit": "°C",
+          "toleranceBasis": "Supplied loss balance is evaluated at maximum conductor temperature."
+        }
+      }
+    },
+    {
+      "id": "CABLE-THERMAL-002",
+      "title": "132 kV, 630 mm² Cu — published single-point bonding losses",
+      "studyPage": "iec60287.html",
+      "standard": "Cableizer/CIGRE TB 880 published cross-tool reference",
+      "description": "Thermal-only cross-tool comparison; not complete IEC/CIGRE validation.",
+      "sourceUrl": "https://www.cableizer.com/static/pdf/tb880/CIGRE_TB_880_Case_0-1_4.6.3_ssb.aa98687bf91c.pdf",
+      "executableBenchmarkId": "CABLE-THERMAL-002",
+      "productionModule": "analysis/cableThermalModel.mjs",
+      "inputs": {
+        "cable": {
+          "id": "tb880-case0-single-point",
+          "name": "Cableizer TB 880 Case 0 single-point reference cable",
+          "sizeMm2": 630,
+          "material": "Cu",
+          "maxTempC": 90,
+          "acResistanceOhmPerKm": 0.039522,
+          "acResistanceTempC": 90,
+          "acResistanceFrequencyHz": 50,
+          "dielectricLossWPerM": 0.385,
+          "lambdaSheath": 0.0777,
+          "outerDiameterMm": 75.5,
+          "insulationLayers": [
+            {
+              "name": "Conductor screen",
+              "innerDiameterMm": 30.3,
+              "outerDiameterMm": 33.3,
+              "resistivityKmPerW": 2.5
+            },
+            {
+              "name": "XLPE insulation",
+              "innerDiameterMm": 33.3,
+              "outerDiameterMm": 64.3,
+              "resistivityKmPerW": 3.5
+            },
+            {
+              "name": "Insulation screen",
+              "innerDiameterMm": 64.3,
+              "outerDiameterMm": 66.9,
+              "resistivityKmPerW": 2.5
+            }
+          ],
+          "jacketInnerDiameterMm": 68.5,
+          "jacketResistivityKmPerW": 3.5,
+          "metallicSheath": true,
+          "source": {
+            "id": "cableizer-tb880-0-1-single-point",
+            "url": "https://www.cableizer.com/static/pdf/tb880/CIGRE_TB_880_Case_0-1_4.6.3_ssb.aa98687bf91c.pdf",
+            "pages": "3-5, 8-12",
+            "retrievedAt": "2026-09-18",
+            "voltageBasis": "132 kV line-to-line; supplied dielectric loss per cable",
+            "bondingBasis": "Single-point bonding: circulating loss zero; eddy-current loss factor 0.0777"
+          },
+          "assumptions": [
+            "Single-point bonding does not imply zero total sheath loss; the published eddy-current contribution is retained.",
+            "AC resistance and all loss inputs remain fixed when installation parameters change.",
+            "The metallic sheath between 66.9 and 68.5 mm is thermally neglected."
+          ]
+        },
+        "installation": {
+          "formation": "trefoil-touching",
+          "burialDepthMm": 1000,
+          "spacingMm": null,
+          "soilResistivityKmPerW": 1,
+          "ambientTempC": 20,
+          "frequencyHz": 50
+        }
+      },
+      "inputUnits": {
+        "cable.sizeMm2": "mm²",
+        "cable.acResistanceOhmPerKm": "Ω/km",
+        "cable.dielectricLossWPerM": "W/m",
+        "cable.outerDiameterMm": "mm",
+        "installation.burialDepthMm": "mm",
+        "installation.soilResistivityKmPerW": "K·m/W"
+      },
+      "source": {
+        "title": "Cableizer/CIGRE TB 880 published case study",
+        "url": "https://www.cableizer.com/static/pdf/tb880/CIGRE_TB_880_Case_0-1_4.6.3_ssb.aa98687bf91c.pdf",
+        "locator": "Profile tb880-case0-single-point; source pages 3-5, 8-12",
+        "accessedOn": "2026-09-18",
+        "kind": "published_values"
+      },
+      "assumptions": [
+        "AC resistance, dielectric loss, and sheath loss factor are supplied at stated temperature/frequency and are not recalculated.",
+        "Thermal-only cross-tool comparison; not independent validation of electromagnetic loss equations or full IEC/CIGRE implementation."
+      ],
+      "limitations": [
+        "Thermal-circuit comparison with published loss inputs; no full electrical-loss or standards validation."
+      ],
+      "independentDerivation": "T1, T3, touching-trefoil T4, and current rating are evaluated from literal supplied layer geometry and fixed losses; published outputs are rounded.",
+      "expectedOutputs": {
+        "ampacityA": {
+          "value": 886.18,
+          "tolerance": 0.05,
+          "unit": "A RMS",
+          "toleranceBasis": "Published-input rounding, not empirical calibration."
+        },
+        "T1KmPerW": {
+          "value": 0.4199,
+          "tolerance": 0.00005,
+          "unit": "K·m/W",
+          "toleranceBasis": "Published-input rounding, not empirical calibration."
+        },
+        "T3BaseKmPerW": {
+          "value": 0.0542,
+          "tolerance": 0.00005,
+          "unit": "K·m/W",
+          "toleranceBasis": "Published-input rounding, not empirical calibration."
+        },
+        "T3EffectiveKmPerW": {
+          "value": 0.0867,
+          "tolerance": 0.00005,
+          "unit": "K·m/W",
+          "toleranceBasis": "Published-input rounding, not empirical calibration."
+        },
+        "T4EffectiveKmPerW": {
+          "value": 1.5947,
+          "tolerance": 0.00005,
+          "unit": "K·m/W",
+          "toleranceBasis": "Published-input rounding, not empirical calibration."
+        },
+        "limitingConductorTempC": {
+          "value": 90,
+          "tolerance": 1e-9,
+          "unit": "°C",
+          "toleranceBasis": "Supplied loss balance is evaluated at maximum conductor temperature."
+        }
+      }
     }
   ],
   "standards": [
@@ -403,7 +1946,7 @@
         "Cables in trefoil or flat formation (no transposition modeled)"
       ],
       "limitations": [
-        "Cyclic/daily load profiles not yet supported (use IEC 60287-2-2 method)",
+        "Cyclic/daily load profiles are not implemented; IEC 60853-1/-2 are relevant cyclic-rating standards, while this RC timeline is only a screening approximation and is not an implementation or validation of those standards",
         "Soil drying-out (critical isotherm) model not implemented",
         "Cable crossings and mutual heating from parallel routes require manual input"
       ]
@@ -538,13 +2081,34 @@
       "description": "Synthetic two-layer soil with ρ₁ = 100 Ω·m, ρ₂ = 400 Ω·m, h = 3 m. Seven Wenner measurements (a = 1–30 m). Expected: fitted ρ₁ within 5 % of 100, fitted ρ₂ within 10 % of 400, fitted h within 15 % of 3 m. Rectangular polygon (20 × 15 m) screening check: GPR, mesh voltage, and step voltage consistent with analyzeGroundGrid baseline.",
       "inputs": {
         "soilMeasurements": [
-          {"a": 1,  "rhoA": 104},
-          {"a": 2,  "rhoA": 118},
-          {"a": 3,  "rhoA": 138},
-          {"a": 5,  "rhoA": 175},
-          {"a": 10, "rhoA": 253},
-          {"a": 20, "rhoA": 341},
-          {"a": 30, "rhoA": 380}
+          {
+            "a": 1,
+            "rhoA": 104
+          },
+          {
+            "a": 2,
+            "rhoA": 118
+          },
+          {
+            "a": 3,
+            "rhoA": 138
+          },
+          {
+            "a": 5,
+            "rhoA": 175
+          },
+          {
+            "a": 10,
+            "rhoA": 253
+          },
+          {
+            "a": 20,
+            "rhoA": 341
+          },
+          {
+            "a": 30,
+            "rhoA": 380
+          }
         ],
         "trueRho1": 100,
         "trueRho2": 400,
@@ -560,10 +2124,28 @@
         "bw": 0.08
       },
       "expectedOutputs": {
-        "fittedRho1": {"value": 100, "tolerance": 0.05, "unit": "Ω·m", "toleranceType": "relative"},
-        "fittedRho2": {"value": 400, "tolerance": 0.10, "unit": "Ω·m", "toleranceType": "relative"},
-        "fittedH":    {"value": 3,   "tolerance": 0.15, "unit": "m",    "toleranceType": "relative"},
-        "fitError":   {"max": 5,     "unit": "%"}
+        "fittedRho1": {
+          "value": 100,
+          "tolerance": 0.05,
+          "unit": "Ω·m",
+          "toleranceType": "relative"
+        },
+        "fittedRho2": {
+          "value": 400,
+          "tolerance": 0.1,
+          "unit": "Ω·m",
+          "toleranceType": "relative"
+        },
+        "fittedH": {
+          "value": 3,
+          "tolerance": 0.15,
+          "unit": "m",
+          "toleranceType": "relative"
+        },
+        "fitError": {
+          "max": 5,
+          "unit": "%"
+        }
       },
       "reference": "Sunde (1968) Earth Conduction Effects §3-3; ASTM G57 §7; IEEE 80-2013 §12.4",
       "sampleFile": "samples/benchmark-ground-grid-advanced.json"

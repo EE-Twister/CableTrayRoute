@@ -3,7 +3,7 @@ import {
   PST_LIMIT,
   PST_PASS_THRESHOLD,
 } from './analysis/voltageFlicker.mjs';
-import { getStudies, setStudies, getLoads, getEquipment, getCables } from './dataStore.mjs';
+import { getStudies, getStudyAssessments, getLoads, getEquipment, getCables, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function readProjectInputModel() {
     return buildVoltageFlickerProjectInputs({
-      loads: getLoads(), equipment: getEquipment(), cables: getCables(), studies: getStudies(),
+      loads: getLoads(), equipment: getEquipment(), cables: getCables(), studies: getStudies(), studyAssessments: getStudyAssessments(),
     });
   }
 
@@ -113,6 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   form.addEventListener('submit', e => {
     e.preventDefault();
+    applyProjectInputs(false);
     let result;
     try {
       const inputs = readInputs();
@@ -129,9 +130,15 @@ document.addEventListener('DOMContentLoaded', () => {
     errorsDiv.hidden = true;
     errorsDiv.textContent = '';
 
-    const studies = getStudies();
-    studies.voltageFlicker = result;
-    setStudies(studies);
+    const usesShortCircuit = ['systemKva', 'xrRatio'].some(fieldName => (
+      !projectOverrides.has(fieldName)
+      && projectInputModel?.bindings?.[fieldName]?.sourcePath?.startsWith('studyResults.shortCircuit')
+    ));
+    saveStudyResult('voltageFlicker', result, captureStudyRunContext('voltageFlicker', {
+      inputs: result.inputs || {},
+      options: {},
+      ...(usesShortCircuit ? {} : { dependencies: [] }),
+    }));
 
     renderResults(result);
   });

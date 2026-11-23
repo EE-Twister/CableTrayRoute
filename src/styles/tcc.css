@@ -1,3 +1,15 @@
+.is-selected-device .tcc-context-chip-label,
+.is-selected-device .selected-device-role,
+.is-selected-device .component-selection-role {
+    color: #1e3a8a;
+}
+
+body.dark-mode .is-selected-device .tcc-context-chip-label,
+body.dark-mode .is-selected-device .selected-device-role,
+body.dark-mode .is-selected-device .component-selection-role {
+    color: #bfdbfe;
+}
+
 .tcc-readiness-summary {
     display: grid;
     grid-template-columns: minmax(18rem, 1fr) auto auto;

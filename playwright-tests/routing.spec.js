@@ -3,6 +3,7 @@
  * Covers: page structure, tray/cable data loading, routing action, 3D view.
  */
 import { test, expect } from '@playwright/test';
+import fsp from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -57,7 +58,16 @@ test.describe('Optimal Route', () => {
 
     const downloadPromise = page.waitForEvent('download', { timeout: 5000 });
     await page.click('#export-trays-btn');
-    await downloadPromise;
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe('tray_list.csv');
+    const stream = await download.createReadStream();
+    const chunks = [];
+    for await (const chunk of stream) chunks.push(chunk);
+    const csv = Buffer.concat(chunks).toString('utf8');
+    expect(csv.split(/\r?\n/)[0]).toContain('tray_id');
+    const trayIds = await page.locator('.tray-id-input').evaluateAll(inputs => inputs.map(input => input.value));
+    expect(trayIds.length).toBeGreaterThan(0);
+    for (const trayId of trayIds) expect(csv).toContain(trayId);
   });
 
   test('3D view container is present', async ({ page }) => {
@@ -93,6 +103,19 @@ test.describe('Optimal Route', () => {
       && window.__routeViewerDebug.routeCount > 0
     ), null, { timeout: 30000 });
 
+    const savedRouting = await page.evaluate(() => {
+      const saved = window.dataStore?.getItem?.('latestRouteResults', null) || {};
+      return {
+        rows: Array.isArray(saved.batchResults) ? saved.batchResults : [],
+      };
+    });
+    expect(savedRouting.rows).toHaveLength(30);
+    expect(savedRouting.rows.every(row => row.status === 'Routed')).toBe(true);
+    expect(savedRouting.rows.every(row => Number.isFinite(Number(row.total_length)) && Number(row.total_length) > 0)).toBe(true);
+    expect(savedRouting.rows.every(row => row.voltage_drop_pct === null)).toBe(true);
+    expect(savedRouting.rows.some(row => row.cable === 'Cable 01')).toBe(true);
+    expect(savedRouting.rows.some(row => row.cable === 'Cable 30')).toBe(true);
+
     const debug = await page.evaluate(() => window.__routeViewerDebug);
     expect(debug.routeCount).toBe(30);
     expect(debug.racewayKinds.tray).toBeGreaterThan(0);
@@ -114,6 +137,11 @@ test.describe('Optimal Route', () => {
     expect(debug.pullEquipment.sheaves).toBeGreaterThan(0);
     expect(debug.pullEquipment.rollers).toBeGreaterThan(0);
     expect(debug.render.calls).toBeGreaterThan(0);
+    await fsp.mkdir(path.join(process.cwd(), 'output', 'routing-workflow-2026-09-17'), { recursive: true });
+    await page.screenshot({
+      path: path.join(process.cwd(), 'output', 'routing-workflow-2026-09-17', 'luna-route-viewer-30.png'),
+      fullPage: true,
+    });
 
     await expect(page.locator('#route-viewer-route-list .route-viewer-route-button')).toHaveCount(30);
     await expect(page.locator('#route-inspector-title')).toContainText('Cable 01');

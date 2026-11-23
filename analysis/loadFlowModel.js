@@ -414,6 +414,94 @@ function addPQ(target, addition) {
   return out;
 }
 
+function transformerNamedValue(comp, key) {
+  if (comp && Object.prototype.hasOwnProperty.call(comp, key)) return comp[key];
+  if (comp?.props && Object.prototype.hasOwnProperty.call(comp.props, key)) return comp.props[key];
+  if (comp?.parameters && Object.prototype.hasOwnProperty.call(comp.parameters, key)) return comp.parameters[key];
+  return undefined;
+}
+
+function parseStrictTransformerNumber(raw) {
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+  if (typeof raw !== 'string') return null;
+  const text = raw.trim();
+  if (!/^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/.test(text)) return null;
+  const value = Number(text);
+  return Number.isFinite(value) ? value : null;
+}
+
+function finiteNonnegativeTransformerValue(comp, key) {
+  const raw = transformerNamedValue(comp, key);
+  if (raw === undefined) return null;
+  const value = parseStrictTransformerNumber(raw);
+  if (value === null || value < 0) throw new TypeError(`Transformer ${key} must be a finite non-negative number.`);
+  return value;
+}
+
+function normalizeTransformerTap(tap) {
+  if (tap === undefined) return undefined;
+  if (tap === null) throw new TypeError('Transformer tap must be a positive finite ratio or object.');
+  if (typeof tap === 'number' || typeof tap === 'string') {
+    const ratio = parseStrictTransformerNumber(tap);
+    if (ratio === null || ratio <= 0) throw new TypeError('Transformer tap ratio must be a positive finite number.');
+    return ratio;
+  }
+  if (typeof tap !== 'object' || Array.isArray(tap)) throw new TypeError('Transformer tap must be a positive finite ratio or object.');
+  const normalized = { ...tap };
+  if (Object.prototype.hasOwnProperty.call(tap, 'ratio')) {
+    normalized.ratio = parseStrictTransformerNumber(tap.ratio);
+    if (normalized.ratio === null || normalized.ratio <= 0) throw new TypeError('Transformer tap ratio must be a positive finite number.');
+  } else normalized.ratio = 1;
+  if (Object.prototype.hasOwnProperty.call(tap, 'angle')) {
+    normalized.angle = parseStrictTransformerNumber(tap.angle);
+    if (normalized.angle === null || normalized.angle < -360 || normalized.angle > 360) throw new TypeError('Transformer tap angle must be finite and within -360 through 360 degrees.');
+  }
+  return normalized;
+}
+
+function transformerTapValue(comp) {
+  for (const key of ['tap', 'tap_ratio', 'tapRatio']) {
+    if (comp && Object.prototype.hasOwnProperty.call(comp, key)) return comp[key];
+    if (comp?.props && Object.prototype.hasOwnProperty.call(comp.props, key)) return comp.props[key];
+    if (comp?.parameters && Object.prototype.hasOwnProperty.call(comp.parameters, key)) return comp.parameters[key];
+  }
+  return undefined;
+}
+
+function transformerElectricalExtras(comp, fromBus) {
+  if (!isTransformerComponent(comp)) return { shunt: cloneData(comp?.shunt), tap: cloneData(comp?.tap ?? comp?.tap_ratio ?? comp?.tapRatio ?? comp?.props?.tap ?? comp?.props?.tap_ratio ?? comp?.props?.tapRatio) };
+  const coreLossKw = finiteNonnegativeTransformerValue(comp, 'coreLossKw');
+  const magnetizingKvar = finiteNonnegativeTransformerValue(comp, 'magnetizingKvar');
+  const phaseShiftRaw = transformerNamedValue(comp, 'phaseShiftDeg');
+  const phaseShiftDeg = phaseShiftRaw === undefined ? null : parseStrictTransformerNumber(phaseShiftRaw);
+  if (phaseShiftRaw !== undefined && (phaseShiftDeg === null || phaseShiftDeg < -180 || phaseShiftDeg > 180)) throw new TypeError('Transformer phaseShiftDeg must be finite and within -180 through 180 degrees.');
+  const explicitShunt = comp.shunt ?? comp.props?.shunt ?? comp.parameters?.shunt;
+  if ((coreLossKw !== null || magnetizingKvar !== null) && explicitShunt && typeof explicitShunt === 'object' && Object.keys(explicitShunt).length) throw new TypeError('Transformer named losses cannot be combined with an explicit shunt.');
+  const explicitTap = transformerTapValue(comp);
+  if (phaseShiftDeg !== null && explicitTap && typeof explicitTap === 'object' && explicitTap.angle !== undefined) throw new TypeError('Transformer phaseShiftDeg cannot be combined with an explicit tap angle.');
+  let shunt = cloneData(explicitShunt);
+  if (coreLossKw !== null || magnetizingKvar !== null) {
+    const baseKV = Number(fromBus?.baseKV);
+    if (!Number.isFinite(baseKV) || baseKV <= 0) throw new TypeError('Transformer named losses require a positive primary bus baseKV.');
+    const baseV2 = baseKV * baseKV;
+    // Named no-load losses are represented on the transformer's internal
+    // post-tap side; the branch solver applies the 1/|tap|² conversion.
+    shunt = {
+      from: {
+        ...(coreLossKw !== null ? { g: coreLossKw / (1000 * baseV2) } : {}),
+        ...(magnetizingKvar !== null ? { b: -magnetizingKvar / (1000 * baseV2) } : {})
+      }
+    };
+  }
+  let tap = normalizeTransformerTap(explicitTap);
+  if (phaseShiftDeg !== null) {
+    if (tap === undefined || tap === null) tap = { ratio: 1 };
+    else if (typeof tap !== 'object' || Array.isArray(tap)) throw new TypeError('Transformer tap must be a number or object when phaseShiftDeg is supplied.');
+    tap = { ...tap, angle: -phaseShiftDeg };
+  }
+  return { shunt, tap, coreLossKw, magnetizingKvar, phaseShiftDeg };
+}
+
 function phaseAssignmentForComponent(comp) {
   const props = comp?.props && typeof comp.props === 'object' ? comp.props : {};
   const value = comp?.phase
@@ -783,6 +871,7 @@ function findNearestBusId(comp, busMap, adjacency, options) {
 
 export function isBusComponent(comp) {
   if (!comp) return false;
+  if (typeof comp.busType === 'string' && comp.busType.trim()) return true;
   if (comp.type === 'bus' || comp.subtype === 'Bus') return true;
   const subtype = typeof comp.subtype === 'string' ? comp.subtype : '';
   const type = typeof comp.type === 'string' ? comp.type : '';
@@ -903,7 +992,7 @@ function deriveLinearSegmentImpedance(comp) {
   let xPerKft = null;
   for (const container of containers) {
     if (lengthFt === null) {
-      const val = Number(container.length_ft ?? container.length);
+      const val = Number(container.length_ft ?? container.lengthFt ?? container.length);
       if (Number.isFinite(val) && val > 0) lengthFt = val;
     }
     if (rPerKft === null) {
@@ -933,7 +1022,7 @@ function extractImpedance(comp) {
     comp?.parameters?.impedance
   ];
   for (const cand of candidates) {
-    if (cand && typeof cand === 'object') return normalizeImpedance(cand);
+    if (cand && typeof cand === 'object' && ['r', 'x', 'y', 'g', 'b'].some(key => cand[key] !== undefined)) return normalizeImpedance(cand);
   }
   if (comp?.y === undefined && (typeof comp?.r === 'number' || typeof comp?.x === 'number')) {
     return normalizeImpedance({ r: comp.r, x: comp.x });
@@ -969,6 +1058,10 @@ function cloneBusComponent(comp) {
     clone.baseKV = base;
   } else if (!Number.isFinite(clone.baseKV) || clone.baseKV <= 0) {
     clone.baseKV = 0.48;
+  }
+  if (!clone.load) {
+    const load = extractLoadPQ(comp);
+    if (load) clone.load = load;
   }
   return clone;
 }
@@ -1065,6 +1158,41 @@ export function buildLoadFlowModel(oneLine = {}) {
   });
 
   const branches = [];
+  const explicitCableBranchIds = new Set();
+  // Design-synthesis one-line connections are already bus-to-bus circuit
+  // records. Materialize each exactly once instead of treating multi-terminal
+  // source/panel bus components as branch devices.
+  connections.forEach(link => {
+    const fromId = connectionEndpointId(link?.from);
+    const toId = connectionEndpointId(link?.to || link?.target);
+    const cable = link?.cable && typeof link.cable === 'object' ? link.cable : null;
+    const id = String(link?.cableId || link?.cableRef || cable?.id || '');
+    if (!fromId || !toId || !id || !cable || !busMap.has(fromId) || !busMap.has(toId) || explicitCableBranchIds.has(id)) return;
+    explicitCableBranchIds.add(id);
+    const impedance = extractImpedance(cable);
+    branches.push({
+      id,
+      type: 'cable',
+      subtype: cable.conductor_size || cable.conductorSize,
+      from: fromId,
+      to: toId,
+      impedance,
+      rating: cable.ampacityA ?? link.rating ?? link.ampacityA,
+      phases: cable.phases,
+      name: cable.tag || id,
+      label: cable.tag || id,
+      ref: id,
+      idealTie: isZeroImpedance(impedance)
+    });
+    const fromBus = busMap.get(fromId);
+    if (fromBus) {
+      if (!Array.isArray(fromBus.connections)) fromBus.connections = [];
+      const existing = fromBus.connections.find(conn => conn.target === toId && String(conn.componentId || conn.id || '').toLowerCase() === id.toLowerCase());
+      const rating = cable.ampacityA ?? link.rating ?? link.ampacityA;
+      if (existing) Object.assign(existing, { impedance: cloneData(impedance), rating, phases: cable.phases, componentId: id, componentType: 'cable', idealTie: isZeroImpedance(impedance) });
+      else fromBus.connections.push({ target: toId, impedance: cloneData(impedance), rating, phases: cable.phases, componentId: id, componentType: 'cable', idealTie: isZeroImpedance(impedance) });
+    }
+  });
   components.forEach(comp => {
     if (!isBranchDevice(comp)) return;
     const connList = Array.isArray(comp.connections) ? comp.connections : [];
@@ -1199,15 +1327,9 @@ export function buildLoadFlowModel(oneLine = {}) {
         }
       }
       const explicitTie = zeroImpedance;
-      const tap = cloneData(
-        comp.tap
-        ?? comp.tap_ratio
-        ?? comp.tapRatio
-        ?? comp.props?.tap
-        ?? comp.props?.tap_ratio
-        ?? comp.props?.tapRatio
-      );
-      const shunt = cloneData(comp.shunt);
+      const electricalExtras = transformerElectricalExtras(comp, fromBus);
+      const tap = electricalExtras.tap;
+      const shunt = electricalExtras.shunt;
       const rating = comp.rating ?? comp.ampacity ?? comp.currentRating;
       const phases = comp.phases ? cloneData(comp.phases) : undefined;
       const componentName = typeof comp.name === 'string' ? comp.name : undefined;
@@ -1229,6 +1351,18 @@ export function buildLoadFlowModel(oneLine = {}) {
         ref: componentRef,
         idealTie: explicitTie
       };
+      if (electricalExtras.coreLossKw !== null && electricalExtras.coreLossKw !== undefined) branch.coreLossKw = electricalExtras.coreLossKw;
+      if (electricalExtras.magnetizingKvar !== null && electricalExtras.magnetizingKvar !== undefined) branch.magnetizingKvar = electricalExtras.magnetizingKvar;
+      if (electricalExtras.phaseShiftDeg !== null && electricalExtras.phaseShiftDeg !== undefined) branch.phaseShiftDeg = electricalExtras.phaseShiftDeg;
+      if (isTransformerComponent(comp)) {
+        branch.phaseShiftModel = comp.phaseShiftModel ?? comp.props?.phaseShiftModel ?? null;
+        branch.screeningWarnings = [
+          branch.phaseShiftModel === 'magnitude-only-zero-angle-assumption'
+            ? 'Synthesized transformer uses a balanced positive-sequence magnitude-only model; physical winding phase displacement is not inferred from connection labels or claimed to be zero.'
+            : 'Transformer uses a balanced positive-sequence model; winding phase displacement is not inferred from connection labels.',
+          electricalExtras.magnetizingKvar === null ? 'Magnetizing current/reactive power is excluded because sourced magnetizing data is unavailable.' : null
+        ].filter(Boolean);
+      }
       branches.push(branch);
       if (fromBus) {
         if (!Array.isArray(fromBus.connections)) fromBus.connections = [];
@@ -1254,6 +1388,8 @@ export function buildLoadFlowModel(oneLine = {}) {
             componentPort: portIndex,
             connectionSide,
             connectionConfig,
+            phaseShiftModel: branch.phaseShiftModel,
+            magnetizingKvar: branch.magnetizingKvar,
             idealTie: explicitTie
           };
           fromBus.connections.push(busConn);

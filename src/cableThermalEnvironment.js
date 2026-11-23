@@ -11,7 +11,7 @@ import {
   runThermalEnvironment,
   INSTALLATION_KEYS,
 } from '../analysis/cableThermalEnvironment.mjs';
-import { getStudies, setStudies } from '../dataStore.mjs';
+import { getStudies, captureStudyRunContext, saveStudyResult } from '../dataStore.mjs';
 import { initStudyBasisPanel } from './components/studyBasis.js';
 import { initStudyApprovalPanel } from './components/studyApproval.js';
 
@@ -72,11 +72,14 @@ document.addEventListener('DOMContentLoaded', () => {
   runBtn.addEventListener('click', () => {
     try {
       const rawInputs = readForm();
+      const runContext = captureStudyRunContext(STUDY_KEY, {
+        inputs: rawInputs,
+        options: rawInputs,
+        assumptions: ['Steady-state thermal equilibrium at the selected operating point.'],
+      });
       const study = runThermalEnvironment(rawInputs);
       lastStudy = study;
-      const studies = getStudies() || {};
-      studies[STUDY_KEY] = study;
-      setStudies(studies);
+      saveStudyResult(STUDY_KEY, study, runContext);
       renderAll(study);
     } catch (err) {
       alert(`Cable Thermal Environment error: ${err.message}`);

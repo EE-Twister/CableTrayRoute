@@ -1,5 +1,7 @@
-export function buildDiagramExportData(sheets = []) {
+import { preliminaryMotorNotice } from '../design-synthesis/preliminaryProjectNotice.mjs';
+export function buildDiagramExportData(sheets = [], reviewNotice = '') {
   return {
+    ...(reviewNotice ? { reviewNotice } : {}),
     sheets: sheets.map(sheet => ({
       name: sheet.name,
       components: (sheet.components || []).map(component => ({ ...component })),
@@ -8,7 +10,6 @@ export function buildDiagramExportData(sheets = []) {
     }))
   };
 }
-
 export function sanitizeDiagramExport(value, seen = new WeakSet(), windowRef = null) {
   if (value === undefined) return undefined;
   const type = typeof value;
@@ -49,7 +50,6 @@ export function sanitizeDiagramExport(value, seen = new WeakSet(), windowRef = n
   });
   return output;
 }
-
 export function migrateOneLineDiagram(data, diagramVersion) {
   let migrated = Array.isArray(data)
     ? { version: 0, templates: [], sheets: [{ name: 'Sheet 1', components: data }] }
@@ -86,7 +86,6 @@ export function migrateOneLineDiagram(data, diagramVersion) {
   migrated.version = diagramVersion;
   return migrated;
 }
-
 export function createDiagramFileController({
   documentRef,
   windowRef,
@@ -125,7 +124,8 @@ export function createDiagramFileController({
   };
 
   const exportDiagram = () => {
-    downloadJson(buildDiagramExportData(getSheets()), 'oneline.json');
+    const sheets = getSheets();
+    downloadJson(buildDiagramExportData(sheets, preliminaryMotorNotice({ oneLine: { sheets } })), 'oneline.json');
   };
 
   const exportDiagnostics = () => {

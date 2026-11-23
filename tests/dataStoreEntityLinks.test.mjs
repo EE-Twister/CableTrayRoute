@@ -4,7 +4,6 @@ import {
   getEquipment,
   getLoads,
   getOneLine,
-  getProjectInputFingerprint,
   getScenarioSnapshot,
   getStudyProvenance,
   setCables,
@@ -67,10 +66,9 @@ secondDataStore.setOneLine({
 assert.equal(getOneLine().sheets[0].name, 'Shared cache update',
   'normalized One-Line cache invalidation must be shared across module instances');
 
-const studyInputHash = getProjectInputFingerprint();
 setStudies({ integrationTest: { value: 1 } });
-assert.equal(getStudyProvenance().integrationTest.inputHash, studyInputHash);
+assert.equal(getStudyProvenance().integrationTest.reason, 'bulk_restore_without_run_context');
 setLoads([{ tag: 'PMP-101', source: 'MCC-101', loadType: 'Motor', kw: 25 }]);
-assert.notEqual(getProjectInputFingerprint(), getStudyProvenance().integrationTest.inputHash);
+assert.equal(getStudyProvenance().integrationTest.freshness, 'unknown');
 
 console.log('✓ data store assigns stable entity IDs and one-line references');

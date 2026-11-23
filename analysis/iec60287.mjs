@@ -105,7 +105,14 @@ export function conductorAcResistance({
   frequencyHz = 50,
   shape = 'round',
 }) {
-  const R20_table = material === 'Al' ? R20_AL : R20_CU;
+  const mat = String(material);
+  if (mat !== 'Al' && mat !== 'Cu') throw new Error(`Unsupported conductor material: ${material}. Use Cu or Al.`);
+  if (!finitePositive(sizeMm2)) throw new Error('Conductor cross-section must be a finite positive number.');
+  if (!Number.isInteger(Number(sizeMm2))) throw new Error('Conductor cross-section must be a supported whole-number size in mm².');
+  if (!finiteNumber(operatingTempC)) throw new Error('Operating conductor temperature must be finite.');
+  if (!finitePositive(frequencyHz)) throw new Error('System frequency must be a finite positive number.');
+  if (shape !== 'round' && shape !== 'sector') throw new Error(`Unsupported conductor shape: ${shape}. Use round or sector.`);
+  const R20_table = mat === 'Al' ? R20_AL : R20_CU;
   const R20 = R20_table[sizeMm2];
   if (R20 == null) {
     throw new Error(`No R20 data for ${sizeMm2} mm² ${material}. Supported sizes: ${Object.keys(R20_table).join(', ')} mm²`);
@@ -171,6 +178,12 @@ export function dielectricLoss({
   epsilonR = 2.5,
   frequencyHz = 50,
 }) {
+  if (!finiteNumber(U0_kV) || U0_kV < 0) throw new Error('U0_kV must be a finite non-negative number.');
+  if (!finitePositive(sizeMm2)) throw new Error('Conductor cross-section must be a finite positive number.');
+  if (!finitePositive(insulThickMm)) throw new Error('Insulation thickness must be a finite positive number.');
+  if (!finiteNumber(tanDelta) || tanDelta < 0) throw new Error('Dielectric loss tangent must be finite and non-negative.');
+  if (!finitePositive(epsilonR)) throw new Error('Relative permittivity must be a finite positive number.');
+  if (!finitePositive(frequencyHz)) throw new Error('System frequency must be a finite positive number.');
   if (U0_kV <= 18) return 0; // negligible for LV/MV cables
   const EPSILON_0 = 8.854e-12; // F/m
   // Approximate conductor outer diameter from cross-section
@@ -180,7 +193,9 @@ export function dielectricLoss({
   const C = (2 * Math.PI * EPSILON_0 * epsilonR) / Math.log(D_i_mm / d_c_mm);
   const omega = 2 * Math.PI * frequencyHz;
   const U0_V = U0_kV * 1000;
-  return omega * C * U0_V ** 2 * tanDelta;
+  const loss = omega * C * U0_V ** 2 * tanDelta;
+  if (!Number.isFinite(loss)) throw new Error('Dielectric-loss calculation produced a non-finite result; check voltage and insulation inputs.');
+  return loss;
 }
 
 // ---------------------------------------------------------------------------
@@ -220,6 +235,20 @@ export function thermalResistances({
   nCores = 3,
   armoured = false,
 }) {
+  if (!finitePositive(sizeMm2)) throw new Error('Conductor cross-section must be a finite positive number.');
+  if (!finitePositive(insulThickMm)) throw new Error('Insulation thickness must be a finite positive number.');
+  if (!finiteNumber(outerSheathMm) || outerSheathMm < 0) throw new Error('Outer sheath thickness must be finite and non-negative.');
+  if (!finitePositive(burialDepthMm)) throw new Error('Burial depth must be a finite positive number.');
+  if (!finitePositive(soilResistivity)) throw new Error('Soil thermal resistivity must be a finite positive number.');
+  if (!finiteNumber(conduitOD_mm) || conduitOD_mm < 0) throw new Error('Conduit outer diameter must be finite and non-negative.');
+  if (typeof nCores !== 'number' || !Number.isInteger(nCores) || nCores < 1 || nCores > 3) {
+    throw new Error('Number of current-carrying cores must be an integer from 1 to 3.');
+  }
+  if (!Object.prototype.hasOwnProperty.call(INSULATION_RESISTIVITY, insulation)) {
+    throw new Error(`Unknown insulation type: ${insulation}. Use: ${Object.keys(INSULATION_RESISTIVITY).join(', ')}`);
+  }
+  const supportedMethods = ['direct-burial', 'conduit', 'tray', 'air'];
+  if (!supportedMethods.includes(installMethod)) throw new Error(`Unsupported installation method: ${installMethod}.`);
   const rho_i = INSULATION_RESISTIVITY[insulation] ?? 3.5; // K·m/W
 
   // Conductor outer diameter (mm) — circle of equivalent cross-section
@@ -253,6 +282,7 @@ export function thermalResistances({
   // Overall cable outer diameter
   const D_e_mm = D_cable_mm + 2 * outerSheathMm + (armoured ? 6 : 0);
   const D_e = D_e_mm / 1000; // convert to m for T4 formulae
+  if (!finitePositive(D_e_mm) || !finitePositive(D_cable_mm)) throw new Error('Cable geometry is not finite and positive; check conductor and insulation dimensions.');
 
   // T4 — External thermal resistance
   let T4;
@@ -262,13 +292,16 @@ export function thermalResistances({
     // where L = burial depth to cable centre-line (m)
     const L = burialDepthMm / 1000;
     const ratio = 2 * L / D_e;
+    if (!Number.isFinite(ratio) || ratio <= 1) throw new Error('Burial depth is too small for the calculated cable diameter; check cable geometry.');
     T4 = (soilResistivity / (2 * Math.PI)) * Math.log(ratio + Math.sqrt(ratio ** 2 - 1));
   } else if (installMethod === 'conduit') {
     // Two-part resistance: soil external + conduit air gap
     // Soil part: same Kennelly formula using conduit OD
     const D_cond = conduitOD_mm > 0 ? conduitOD_mm / 1000 : Math.max(D_e * 2, 0.05);
+    if (conduitOD_mm > 0 && conduitOD_mm <= D_e_mm) throw new Error('Conduit outer diameter must exceed the cable outer diameter.');
     const L = burialDepthMm / 1000;
     const ratio = 2 * L / D_cond;
+    if (!Number.isFinite(ratio) || ratio <= 1) throw new Error('Conduit burial depth is too small for the conduit geometry; check inputs.');
     const T4_soil = (soilResistivity / (2 * Math.PI)) * Math.log(ratio + Math.sqrt(ratio ** 2 - 1));
     // Air gap in conduit: simplified (IEC 60287-2-1 §2.2.3)
     // T4_air ≈ 0.1 K·m/W for typical conduit-to-cable clearance (conservative)
@@ -290,6 +323,10 @@ export function thermalResistances({
   // Conservative value for cross-bonded HV cables: λ1 ≈ 0.05
   // We return λ1 = 0 for distribution cables (≤ 33 kV); user can scale externally.
   const lambdaSheath = 0.0;
+
+  if (![T1, T2, T3, T4, D_e_mm, d_c].every(Number.isFinite)) {
+    throw new Error('Thermal geometry produced a non-finite result; check installation and cable dimensions.');
+  }
 
   return {
     T1: round4(T1),
@@ -356,10 +393,13 @@ export function groupDerating(n, arrangement = 'flat') {
  */
 export function ambientTempCorrection(insulation, thetaAmbient, thetaRef = 20) {
   const thetaMax = MAX_TEMP_C[insulation] ?? 90;
+  if (!finiteNumber(thetaAmbient) || !finiteNumber(thetaRef)) throw new Error('Ambient and reference temperatures must be finite.');
+  if (thetaRef >= thetaMax) throw new Error(`Reference ambient temperature ${thetaRef} °C must be below maximum conductor temperature ${thetaMax} °C.`);
   if (thetaAmbient >= thetaMax) throw new Error(
     `Ambient temperature ${thetaAmbient} °C exceeds maximum conductor temperature ${thetaMax} °C for ${insulation}`
   );
   const cTheta = Math.sqrt((thetaMax - thetaAmbient) / (thetaMax - thetaRef));
+  if (!Number.isFinite(cTheta)) throw new Error('Ambient temperature correction produced a non-finite result.');
   return Math.round(cTheta * 10000) / 10000;
 }
 
@@ -420,8 +460,19 @@ export function calcAmpacity({
   groupArrangement = 'flat',
 }) {
   // --- Validate ---
-  if (!sizeMm2 || sizeMm2 <= 0) throw new Error('sizeMm2 must be a positive number');
-  if (!insulThickMm || insulThickMm <= 0) throw new Error('insulThickMm must be a positive number');
+  if (!finitePositive(sizeMm2)) throw new Error('sizeMm2 must be a finite positive number.');
+  if (!finitePositive(insulThickMm)) throw new Error('insulThickMm must be a finite positive number.');
+  if (!finiteNumber(outerSheathMm) || outerSheathMm < 0) throw new Error('outerSheathMm must be finite and non-negative.');
+  if (!finiteNumber(ambientTempC)) throw new Error('ambientTempC must be finite.');
+  if (!finitePositive(frequencyHz)) throw new Error('frequencyHz must be a finite positive number.');
+  if (!finiteNumber(U0_kV) || U0_kV < 0) throw new Error('U0_kV must be finite and non-negative.');
+  if (!finitePositive(burialDepthMm)) throw new Error('burialDepthMm must be a finite positive number.');
+  if (!finitePositive(soilResistivity)) throw new Error('soilResistivity must be a finite positive number.');
+  if (!finiteNumber(conduitOD_mm) || conduitOD_mm < 0) throw new Error('conduitOD_mm must be finite and non-negative.');
+  if (typeof nCores !== 'number' || !Number.isInteger(nCores) || nCores < 1 || nCores > 3) throw new Error('nCores must be an integer from 1 to 3.');
+  if (typeof nCables !== 'number' || !Number.isInteger(nCables) || nCables < 1) throw new Error('nCables must be a positive integer.');
+  if (!['flat', 'trefoil', 'flat-touching'].includes(groupArrangement)) throw new Error(`Unsupported group arrangement: ${groupArrangement}.`);
+  if (!['Cu', 'Al'].includes(String(material))) throw new Error(`Unsupported conductor material: ${material}. Use Cu or Al.`);
 
   const thetaMax = MAX_TEMP_C[insulation];
   if (!thetaMax) throw new Error(`Unknown insulation type: ${insulation}. Use: ${Object.keys(MAX_TEMP_C).join(', ')}`);
@@ -469,12 +520,17 @@ export function calcAmpacity({
     + (I_rated ** 2) * R_ac * (T1 + n * (1 + lambda1) * T2 + n * (1 + lambda1 + lambda2) * (T3 + T4))
     + W_d * (0.5 * T1 + n * (T2 + T3 + T4));
 
+  const computedValues = [I_base, I_rated, thetaConductor, numerator, denominator, W_d, f_group];
+  if (!computedValues.every(Number.isFinite)) {
+    throw new Error('IEC 60287 produced a non-finite result; check cable geometry, thermal inputs, and frequency.');
+  }
+
   return {
     // Primary result
     I_rated: Math.round(I_rated * 10) / 10,    // A
     I_base: Math.round(I_base * 10) / 10,      // A (ungrouped)
     // Inputs echoed
-    sizeMm2, material, insulation, installMethod,
+    sizeMm2, material, insulation, nCores, installMethod,
     ambientTempC, frequencyHz,
     thetaMax, deltaTheta,
     // Thermal circuit
@@ -503,6 +559,8 @@ export function calcAmpacity({
 
 function round4(v) { return Math.round(v * 10000) / 10000; }
 function round6(v) { return Math.round(v * 1e6) / 1e6; }
+function finiteNumber(v) { return typeof v === 'number' && Number.isFinite(v); }
+function finitePositive(v) { return finiteNumber(v) && v > 0; }
 
 function buildWarnings({ sizeMm2, ambientTempC, thetaMax, f_group, I_rated, installMethod, soilResistivity }) {
   const warnings = [];

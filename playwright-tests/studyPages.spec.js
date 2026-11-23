@@ -103,6 +103,20 @@ test.describe('Harmonic Analysis', () => {
     await expect(page.locator('#save-project-btn')).toBeAttached();
   });
 
+  test('project actions lazy-load the manager from the navigation bridge', async ({ page }) => {
+    const projectActions = page.locator('.project-actions-trigger');
+    await expect(projectActions).toBeVisible();
+    await projectActions.click();
+    const newButton = page.getByRole('menuitem', { name: 'New Project' });
+    await expect(newButton).toBeVisible();
+    await newButton.click();
+    await expect(page.locator('.component-modal[role="dialog"]')).toBeVisible();
+    await expect.poll(() => page.evaluate(() => Boolean(
+      window.projectManager && window.projectManager.__ctrLazyProjectManager !== true
+    ))).toBe(true);
+    await page.locator('.component-modal[role="dialog"] .secondary-btn').click();
+  });
+
   test('page does not crash with no harmonic-source data', async ({ page }) => {
     // Chart renders a "no data" message when no harmonic sources exist
     const chart = page.locator('#harmonics-chart');
@@ -118,7 +132,124 @@ test.describe('Harmonic Analysis', () => {
     await expect(page.locator('#settings-btn')).toBeVisible();
   });
 
+  test('frequency scan rejects blank required inputs without retaining output', async ({ page }) => {
+    await page.locator('#fs-bus-kv').fill('');
+    await page.getByRole('button', { name: 'Run Frequency Scan' }).click();
+    await expect(page.locator('#fs-input-error')).toContainText('Bus voltage');
+    await expect(page.locator('#fs-results')).toBeHidden();
+  });
+
+  test('frequency scan rejects blank bank values without applying defaults', async ({ page }) => {
+    const fields = [
+      ['.fs-mvar', 'MVAR', '5'],
+      ['.fs-kv', 'kV', '13.8'],
+      ['.fs-tune', 'tune order', '0'],
+      ['.fs-q', 'Q factor', '30'],
+    ];
+    for (const [selector, label, replacement] of fields) {
+      await page.locator(selector).fill('');
+      await page.getByRole('button', { name: 'Run Frequency Scan' }).click();
+      await expect(page.locator('#fs-input-error')).toContainText(`Capacitor bank 1 ${label}`);
+      await expect(page.locator('#fs-results')).toBeHidden();
+      await page.locator(selector).fill(replacement);
+    }
+    const saved = await page.evaluate(async () => (await import('./dist/harmonics.js')).getStudies());
+    expect(saved.frequencyScan).toBeUndefined();
+  });
+
+  test('frequency scan marks a saved result stale when banks are added or removed', async ({ page }) => {
+    await page.evaluate(async () => {
+      const harmonics = await import('./dist/harmonics.js');
+      const current = harmonics.getProjectMeta?.() || {};
+      harmonics.setProjectMeta?.({ ...current, name: 'Harmonics Frequency Scan Lifecycle E2E' });
+      harmonics.setStudies?.({});
+    });
+    const frequencyAssessment = () => page.evaluate(() => {
+      const assessment = window.dataStore.getStudyAssessment('frequencyScan');
+      return { present: assessment?.present, freshness: assessment?.freshness, eligible: assessment?.eligible };
+    });
+    await page.getByRole('button', { name: 'Run Frequency Scan' }).click();
+    await expect.poll(async () => (await frequencyAssessment()).freshness).toBe('current');
+    expect(await frequencyAssessment()).toMatchObject({ present: true, eligible: true });
+
+    await page.getByRole('button', { name: '+ Add Bank' }).click();
+    await expect(page.locator('.study-global-freshness')).toHaveAttribute('data-study-lifecycle-state', 'stale');
+    await page.getByRole('button', { name: 'Run Frequency Scan' }).click();
+    await expect(page.locator('#fs-banks-tbody tr')).toHaveCount(2);
+    await expect.poll(async () => (await frequencyAssessment()).freshness).toBe('current');
+    await page.locator('.fs-remove-btn').last().click();
+    await expect(page.locator('.study-global-freshness')).toHaveAttribute('data-study-lifecycle-state', 'stale');
+  });
+
+  test('frequency scan restores saved parameters and bank fields exactly', async ({ page }) => {
+    await page.evaluate(async () => {
+      const harmonics = await import('./dist/harmonics.js');
+      const current = harmonics.getProjectMeta?.() || {};
+      harmonics.setProjectMeta?.({ ...current, name: 'Harmonics Frequency Scan Restore E2E' });
+    });
+    await page.fill('#fs-bus-kv', '12.47');
+    await page.fill('#fs-sc-mva', '250');
+    await page.selectOption('#fs-fbase', '50');
+    await page.fill('#fs-hmax', '31');
+    await page.locator('.fs-mvar').fill('8.5');
+    await page.locator('.fs-kv').fill('12.47');
+    await page.locator('.fs-tune').fill('4.7');
+    await page.locator('.fs-q').fill('42');
+    await page.getByRole('button', { name: '+ Add Bank' }).click();
+    const second = page.locator('#fs-banks-tbody tr').last();
+    await second.locator('.fs-mvar').fill('3.25');
+    await second.locator('.fs-kv').fill('6.6');
+    await second.locator('.fs-tune').fill('0');
+    await second.locator('.fs-q').fill('15');
+    await page.getByRole('button', { name: 'Run Frequency Scan' }).click();
+
+    await page.goto(staticSite.url('harmonics.html?e2e=1'));
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('#fs-banks-tbody tr')).toHaveCount(2);
+    await expect(page.locator('#fs-bus-kv')).toHaveValue('12.47');
+    await expect(page.locator('#fs-sc-mva')).toHaveValue('250');
+    await expect(page.locator('#fs-fbase')).toHaveValue('50');
+    await expect(page.locator('#fs-hmax')).toHaveValue('31');
+    await expect(page.locator('#fs-banks-tbody tr').nth(0).locator('.fs-mvar')).toHaveValue('8.5');
+    await expect(page.locator('#fs-banks-tbody tr').nth(0).locator('.fs-kv')).toHaveValue('12.47');
+    await expect(page.locator('#fs-banks-tbody tr').nth(0).locator('.fs-tune')).toHaveValue('4.7');
+    await expect(page.locator('#fs-banks-tbody tr').nth(0).locator('.fs-q')).toHaveValue('42');
+    await expect(page.locator('#fs-banks-tbody tr').nth(1).locator('.fs-mvar')).toHaveValue('3.25');
+    await expect(page.locator('#fs-banks-tbody tr').nth(1).locator('.fs-kv')).toHaveValue('6.6');
+    await expect(page.locator('#fs-banks-tbody tr').nth(1).locator('.fs-tune')).toHaveValue('0');
+    await expect(page.locator('#fs-banks-tbody tr').nth(1).locator('.fs-q')).toHaveValue('15');
+  });
+
+  test('legacy frequency scan bank fields remain blank until supplied', async ({ page }) => {
+    await page.evaluate(async () => {
+      const harmonics = await import('./dist/harmonics.js');
+      const current = harmonics.getProjectMeta?.() || {};
+      harmonics.setProjectMeta?.({ ...current, name: 'Harmonics Frequency Scan Legacy E2E' });
+      harmonics.setStudies?.({ frequencyScan: {
+        params: { busVoltageKv: 13.8, scMVA: 100, fBase: 60, hMax: 25 },
+        results: { sweep: [{ h: 1, zPu: 1 }], resonances: [] },
+      } });
+    });
+    await page.goto(staticSite.url('harmonics.html?e2e=1'));
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('#fs-banks-tbody tr')).toHaveCount(1);
+    await expect(page.locator('.fs-mvar')).toHaveValue('');
+    await expect(page.locator('.fs-kv')).toHaveValue('');
+    await expect(page.locator('.fs-tune')).toHaveValue('');
+    await expect(page.locator('.fs-q')).toHaveValue('');
+    await page.getByRole('button', { name: 'Run Frequency Scan' }).click();
+    await expect(page.locator('#fs-input-error')).toContainText('Capacitor bank 1 MVAR');
+  });
+
   test('frequency scan persists the canonical report handoff', async ({ page }) => {
+    // The lifecycle store deliberately refuses anonymous saves. Give this
+    // producer a real project identity so the test exercises the persisted
+    // canonical handoff rather than a local-only calculation.
+    await page.evaluate(async () => {
+      const harmonics = await import('./dist/harmonics.js');
+      const current = harmonics.getProjectMeta?.() || {};
+      harmonics.setProjectMeta?.({ ...current, name: 'Harmonics Frequency Scan E2E' });
+    });
     await page.getByRole('button', { name: 'Run Frequency Scan' }).click();
     await expect(page.getByRole('table', { name: 'Frequency scan resonance results' })).toBeVisible();
     const studies = await page.evaluate(async () => {

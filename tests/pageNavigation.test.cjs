@@ -66,7 +66,8 @@ describe('page navigation', () => {
     assert.ok(src.includes('New Project'), 'navigation.js missing New Project action');
     assert.ok(src.includes('Save Project'), 'navigation.js missing Save Project action');
     assert.ok(src.includes('Load Project'), 'navigation.js missing Load Project action');
-    assert.ok(src.includes("import('../projectManager.js')"), 'navigation.js should lazy-load project manager actions');
+    assert.ok(src.includes("new URL('dist/projectManager.js', document.baseURI)"), 'navigation.js should lazy-load the built project manager entry');
+    assert.ok(src.includes('__ctrLazyProjectManager'), 'navigation.js should expose the lazy project-manager bridge');
   });
 
   it('places the profile control immediately after Settings', () => {

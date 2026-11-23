@@ -33,8 +33,9 @@
     <p><strong>Page:</strong> <a href="../iec60909.html"><code>iec60909.html</code></a><br>
     <strong>Module:</strong> <code>analysis/iec60909.mjs</code><br>
     <strong>Standard:</strong> IEC 60909-0:2016 — Short-circuit currents in three-phase AC systems</p>
+    <aside class="callout warning"><strong>Review status — 2026-09-17 UTC:</strong> Screening only. The <a href="calculation-correction-verification-2026-09-17.md">correction verification</a> records numerical and output-contract repairs from the <a href="calculation-feature-review-2026-09-16.md">calculation review</a>. Model and standards-evidence limits still apply.</aside>
 
-    <aside class="callout warning"><strong>Edition boundary:</strong> This engine implements IEC 60909-0:2016. IEC published edition 3.0 in 2026; the application has not completed a licensed-text clause and formula delta review. Results therefore validate only the version-pinned 2016 calculation path and must not be represented as IEC 60909-0:2026 compliance.</aside>
+    <aside class="callout warning"><strong>Edition boundary:</strong> This engine targets IEC 60909-0:2016. IEC published edition 3.0 in 2026; the application has not completed a licensed-text clause and formula delta review. Results do not establish compliance with IEC 60909-0:2026.</aside>
 
     <h2>What IEC 60909 is and when to use it</h2>
     <p>IEC 60909-0:2016 defines the <em>equivalent voltage source method</em> for calculating short-circuit currents in three-phase AC power systems. Use this implementation only where the project basis explicitly adopts the 2016 edition and the responsible reviewer accepts the documented limitations.</p>
@@ -73,9 +74,9 @@
       <thead><tr><th>Fault type</th><th>Symbol</th><th>Formula</th></tr></thead>
       <tbody>
         <tr><td>Three-phase</td><td>I"k3</td><td>c × Un / (√3 × |Z1|)</td></tr>
-        <tr><td>Line-to-line</td><td>I"k2</td><td>(√3/2) × I"k3 ≈ 0.866 × I"k3</td></tr>
-        <tr><td>Line-to-earth</td><td>I"k1</td><td>√3 × c × Un / |2Z1 + Z0|</td></tr>
-        <tr><td>Two-phase-to-earth</td><td>I"k2E</td><td>3 × c × Un / (√3 × |Z1 + Z2||Z0|)</td></tr>
+        <tr><td>Line-to-line</td><td>I"k2</td><td>c × Un / |Z1 + Z2|, including unequal supplied sequence impedances.</td></tr>
+        <tr><td>Line-to-earth</td><td>I"k1</td><td>√3 × c × Un / |Z1 + Z2 + Z0|</td></tr>
+        <tr><td>Two-phase-to-earth</td><td>B/C phases and earth residual</td><td>Separate faulted-phase RMS magnitudes and |3I0|; the compatibility field is max(B,C).</td></tr>
       </tbody>
     </table>
     <p>where Z1, Z2, Z0 are the positive-, negative-, and zero-sequence impedances at the fault point.</p>
@@ -90,10 +91,10 @@
       <thead><tr><th>X/R ratio</th><th>κ</th><th>ip / (√2 × I"k3)</th></tr></thead>
       <tbody>
         <tr><td>1 (resistive)</td><td>1.07</td><td>1.07</td></tr>
-        <tr><td>5</td><td>1.37</td><td>1.37</td></tr>
+        <tr><td>5</td><td>1.56</td><td>1.56</td></tr>
         <tr><td>10</td><td>1.75</td><td>1.75</td></tr>
-        <tr><td>20</td><td>1.91</td><td>1.91</td></tr>
-        <tr><td>50</td><td>1.99</td><td>1.99</td></tr>
+        <tr><td>20</td><td>1.86</td><td>1.86</td></tr>
+        <tr><td>50</td><td>1.94</td><td>1.94</td></tr>
         <tr><td>∞ (inductive)</td><td>2.00</td><td>2.00</td></tr>
       </tbody>
     </table>
@@ -103,17 +104,17 @@
     <p>The RMS value of the symmetrical AC component at the time of contact separation in the circuit breaker. Used to verify the <strong>rated symmetrical short-circuit breaking current Ics</strong> of a circuit breaker.</p>
     <p>For <strong>far-from-generator</strong> short circuits (the most common case in distribution systems without local generators contributing to the fault):</p>
     <pre><code>Ib = I"k3     (μ = 1.0, no decay of AC component)</code></pre>
-    <p>For a direct synchronous-machine terminal infeed, the study applies μ to that machine's share of I"k3. In meshed systems where individual machine shares cannot be apportioned, it conservatively uses μ = 1.0 (see Limitations).</p>
+    <p>For a radial synchronous-machine terminal infeed, the study treats the initial current as that machine's contribution when applying μ. Multiple-infeed and meshed generator networks are not validated by this path (see Limitations).</p>
 
     <h3>Ith — Thermal equivalent short-circuit current</h3>
     <p>The RMS value of an equivalent constant current producing the same thermal effect (I²t) as the actual short-circuit current over the fault duration Tk. Used to check thermal withstand ratings of cables, busbars, and transformers.</p>
     <pre><code>Ith = I"k3 × √(m + n)</code></pre>
     <p>where:</p>
     <ul>
-      <li><strong>n = 1.0</strong> — AC component heating factor (= 1.0 for far-from-generator)</li>
-      <li><strong>m</strong> — DC component heating factor, from IEC 60909-0:2016 Fig. 22 (function of κ and Tk)</li>
+      <li><strong>n</strong> — the implementation uses (Ib/I&quot;k3)², with breaking-current decay evaluated at contact-separation delay rather than integrated over Tk. Agreement with the governing thermal method has not been independently established for near-generator faults.</li>
+      <li><strong>m</strong> — the implemented DC-heating approximation reconstructs a time constant from κ and uses -expm1(-2Tk/τ)/(2Tk/τ). Endpoint limits are 0 at κ = 1.02 and 1 at κ = 2.</li>
     </ul>
-    <p>The DC heating factor m decreases as fault duration Tk increases (DC component decays faster for short fault durations relative to the AC component). For long fault durations (Tk &gt; 3 s), m → 0 and Ith → I"k3.</p>
+    <p>The DC heating factor m decreases as fault duration Tk increases. Numerical overflow and endpoint defects have been corrected; invalid duration/frequency withholds the result. Confirm the approximation's applicability and standards basis before making thermal withstand conclusions.</p>
 
     <h2>Step-by-step workflow</h2>
 
@@ -151,23 +152,24 @@
 
     <h3>Step 4 — Run the study</h3>
     <p>Click <strong>Run IEC 60909 Study</strong>. Results appear in the table below. The study is also saved as <code>studies.iec60909</code> in the project.</p>
+    <p>Saved options restore on reopening. Results retain validity, required inputs, warnings, provenance, model limits, a timestamp, and an input fingerprint. Changes to project inputs or study options mark saved results stale; legacy results without fingerprints have unknown freshness. Incomplete rows show blank currents and the missing-input explanation.</p>
 
     <h3>Step 5 — Verify protective device ratings</h3>
     <p>For each bus, confirm:</p>
     <ul>
       <li><strong>ip ≤ equipment rated peak withstand current</strong> (Ipk or Icw peak on nameplate)</li>
       <li><strong>I"k3 ≤ circuit breaker rated symmetrical breaking current (Ics)</strong></li>
-      <li><strong>Ith ≤ cable / busbar thermal withstand</strong> (I²t rating ÷ Tk)</li>
+      <li>After confirming the thermal model applies to the installation, compare <strong>Ith² × Tk</strong> with the applicable cable/busbar <strong>I²t withstand</strong>, using consistent units and manufacturer conditions.</li>
     </ul>
 
     <h3>Step 6 — Export</h3>
-    <p>Use <strong>Download PDF</strong> for submittal packages or <strong>Download CSV</strong> for integration with spreadsheet calculations.</p>
+    <p><strong>Download PDF</strong> and <strong>Download CSV</strong> retain physical current quantities, status, provenance, options, timestamps, and saved/current fingerprints. PDF details wrap and paginate. Exporting does not refresh stale results or approve screening calculations. Project reports include both saved short-circuit namespaces when present.</p>
 
     <h2>Integration with other studies</h2>
     <table>
       <thead><tr><th>Study</th><th>Relationship</th></tr></thead>
       <tbody>
-        <tr><td><strong>Arc Flash</strong> (<a href="../arcFlash.html"><code>arcFlash.html</code></a>)</td><td>Uses I"k3 from IEC 60909 as the fault current. Run IEC 60909 first, then arc flash will pick up the saved results automatically.</td></tr>
+        <tr><td><strong>Arc Flash</strong> (<a href="../arcFlash.html"><code>arcFlash.html</code></a>)</td><td>The arc-flash engine runs the shared short-circuit calculation with its supplied options. Saving this dedicated IEC study alone does not select IEC options for a later arc-flash run; verify that study's actual fault-current basis.</td></tr>
         <tr><td><strong>TCC Coordination</strong> (<a href="../tcc.html"><code>tcc.html</code></a>)</td><td>Use Ib (breaking current) to verify the circuit breaker's Ics rating at the coordination point.</td></tr>
         <tr><td><strong>Short Circuit</strong> (<a href="../shortCircuit.html"><code>shortCircuit.html</code></a>)</td><td>The IEC method is also available in this page by selecting IEC in the method dropdown. The <code>iec60909.html</code> page provides the extended result columns (ip, Ib, Ith).</td></tr>
         <tr><td><strong>Load Flow</strong> (<a href="../loadFlow.html"><code>loadFlow.html</code></a>)</td><td>Load flow determines pre-fault operating voltages; the IEC method assumes c × Un regardless of actual operating voltage.</td></tr>
@@ -175,10 +177,12 @@
     </table>
 
     <h2>Limitations and assumptions</h2>
+    <p>The September 17 voltage-base correction refers cumulative upstream impedance through supported two-winding transformers using the squared winding-voltage ratio. This applies to ANSI and IEC runs, reversed edge orientation, and cascaded transformers. Generator rated current uses the nominal fault-side base, independent of a prefault operating-voltage override.</p>
+    <p>Missing winding voltages or unsupported three-winding referral produce an incomplete result with currents withheld. Impedance-path records retain winding voltages and the referral factor. Recalculate previously saved studies. The <a href="calculation-evidence-verification-2026-09-17.md">independent evidence verification</a> records the cases and limits; power-station-unit corrections and validated generator thermal decay remain outside the implemented scope.</p>
     <table>
       <thead><tr><th>Assumption</th><th>Detail</th></tr></thead>
       <tbody>
-        <tr><td>Generator contribution apportionment</td><td>For a direct synchronous-machine terminal infeed, K_G and μ are applied to the machine contribution. Meshed systems with multiple machine infeeds are not apportioned per source and conservatively use μ = 1.0.</td></tr>
+        <tr><td>Generator contribution apportionment</td><td>The cascade assumes a radial single infeed and treats the whole initial current as the terminal synchronous machine's contribution. Multiple-infeed and meshed generator networks are not validated; do not assume their machine shares or breaking duty are correctly apportioned.</td></tr>
         <tr><td>IEC impedance corrections</td><td>K_T is applied to qualifying transformer impedance and K_G to qualifying directly connected synchronous generators before the IEC impedance cascade. Power-station-unit K_S / K_SO corrections are not modeled.</td></tr>
         <tr><td>Balanced three-phase system</td><td>No provision for unbalanced pre-fault conditions.</td></tr>
         <tr><td>Frequency</td><td>m factor computation assumes constant AC frequency (50 or 60 Hz).</td></tr>
@@ -223,10 +227,12 @@
         <tr><td><code>threePhaseKA</code></td><td>kA</td><td>I"k3 — initial three-phase short-circuit current</td></tr>
         <tr><td><code>lineToGroundKA</code></td><td>kA</td><td>I"k1 — initial line-to-earth short-circuit current</td></tr>
         <tr><td><code>lineToLineKA</code></td><td>kA</td><td>I"k2 — initial line-to-line short-circuit current</td></tr>
-        <tr><td><code>doubleLineGroundKA</code></td><td>kA</td><td>I"k2E — initial two-phase-to-earth short-circuit current</td></tr>
+        <tr><td><code>doubleLineGroundKA</code></td><td>kA</td><td>Maximum RMS magnitude of the B/C faulted-phase currents</td></tr>
+        <tr><td><code>doubleLineGroundPhaseBKA</code> / <code>doubleLineGroundPhaseCKA</code></td><td>kA</td><td>Individual B/C faulted-phase RMS magnitudes</td></tr>
+        <tr><td><code>doubleLineGroundEarthKA</code></td><td>kA</td><td>Earth residual RMS magnitude |3I0|</td></tr>
         <tr><td><code>ip</code></td><td>kA</td><td>Peak short-circuit current (= κ × √2 × I"k3)</td></tr>
         <tr><td><code>Ib</code></td><td>kA</td><td>Symmetrical short-circuit breaking current (= I"k3 for far-from-generator)</td></tr>
-        <tr><td><code>Ith</code></td><td>kA</td><td>Thermal equivalent short-circuit current</td></tr>
+        <tr><td><code>Ith</code></td><td>kA</td><td>Screening thermal equivalent current; model limitations above still apply</td></tr>
         <tr><td><code>kappa</code></td><td>—</td><td>Peak factor κ</td></tr>
         <tr><td><code>cFactor</code></td><td>—</td><td>Voltage factor c applied</td></tr>
         <tr><td><code>asymKA</code></td><td>kA</td><td>Alias for ip (for compatibility with arc flash / TCC consumers)</td></tr>

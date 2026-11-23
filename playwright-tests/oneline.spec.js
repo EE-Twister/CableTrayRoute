@@ -210,6 +210,7 @@ test('transformer tap review shows expected voltage impact and requires approval
   });
   await page.goto(pageUrl('oneline.html?e2e=1'));
   await page.waitForSelector('[data-oneline-ready="1"]');
+  await page.evaluate(() => window.dataStore.setProjectMeta({ projectId: 'tap-review-fixture', projectName: 'Tap review fixture' }));
   await openToolbarMenu(page, 'Review');
   await page.locator('#studies-panel-btn').click();
   await page.locator('#run-tap-optimization-btn').click();
@@ -217,6 +218,32 @@ test('transformer tap review shows expected voltage impact and requires approval
   await expect(page.locator('#transformer-tap-review')).toContainText('What-if load-flow cases');
   await expect(page.locator('#transformer-tap-review')).toContainText('XFMR-REVIEW');
   await expect(page.locator('#transformer-tap-review')).toContainText('voltage limits 0.95 pu to 1.05 pu');
+
+  await page.evaluate(() => {
+    const provenance = window.dataStore.getStudyProvenance();
+    provenance.transformerTapOptimization.calculationRevision = 'calculation-v1';
+    window.dataStore.setItem('studyProvenance', provenance);
+  });
+  await page.locator('[data-tap-apply="1"]').click();
+  await expect(page.locator('.modal[role="dialog"]')).toContainText('previous solver version');
+  await page.locator('.modal[role="dialog"]').getByRole('button', { name: 'Close', exact: true }).click();
+  await page.locator('#run-tap-optimization-btn').click();
+  await expect.poll(() => page.evaluate(() => window.dataStore.getStudyAssessments().transformerTapOptimization?.eligible)).toBe(true);
+
+  await page.locator('[data-tap-apply="1"]').click();
+  const staleDuringApproval = page.locator('.modal[role="dialog"]');
+  await expect(staleDuringApproval).toBeVisible();
+  await page.evaluate(() => {
+    const provenance = window.dataStore.getStudyProvenance();
+    provenance.transformerTapOptimization.calculationRevision = 'calculation-v1';
+    window.dataStore.setItem('studyProvenance', provenance);
+  });
+  await staleDuringApproval.getByRole('button', { name: 'Approve & Apply', exact: true }).click();
+  await expect(page.locator('.modal[role="dialog"]')).toContainText('changed while approval was open');
+  await expect.poll(() => page.evaluate(() => window.dataStore.getOneLine().sheets[0].components.find(component => component.id === 'xfmr-review')?.tap_ratio)).toBe(1.025);
+  await page.locator('.modal[role="dialog"]').getByRole('button', { name: 'Close', exact: true }).click();
+  await page.locator('#run-tap-optimization-btn').click();
+  await expect.poll(() => page.evaluate(() => window.dataStore.getStudyAssessments().transformerTapOptimization?.eligible)).toBe(true);
 
   const before = await page.evaluate(() => ({
     oneLine: window.dataStore.getOneLine(),
@@ -258,9 +285,32 @@ test('palette retains recent symbols and supports favorites', async ({ page }) =
   await expect(pinnedAts).toBeVisible();
   await expect(pinnedAts).toHaveAttribute('data-palette-pinned-kind', 'recent');
 
-  await pinnedAts.dispatchEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 160, clientY: 160 });
-  await expect(page.locator('#palette-context-menu')).toBeVisible();
-  await page.getByRole('menuitem', { name: 'Add to Favorites' }).click();
+  await pinnedAts.scrollIntoViewIfNeeded();
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await pinnedAts.click({ button: 'right' });
+  const favoriteMenuItem = page.getByRole('menuitem', { name: 'Add to Favorites', exact: true });
+  expect(await favoriteMenuItem.count()).toBe(1);
+  const favoriteMenuGeometry = await page.evaluate(() => {
+    const menuItem = document.querySelector('#palette-context-menu [data-action="toggle-favorite"]');
+    const rect = menuItem?.getBoundingClientRect();
+    if (!menuItem || !rect) return null;
+    const target = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    return {
+      name: menuItem.textContent?.trim(),
+      role: menuItem.getAttribute('role'),
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
+      hit: target === menuItem || menuItem.contains(target)
+    };
+  });
+  expect(favoriteMenuGeometry).toMatchObject({ name: 'Add to Favorites', role: 'menuitem', hit: true });
+  const favoriteX = favoriteMenuGeometry.x + favoriteMenuGeometry.width / 2;
+  const favoriteY = favoriteMenuGeometry.y + favoriteMenuGeometry.height / 2;
+  await page.mouse.move(favoriteX, favoriteY);
+  await page.mouse.down();
+  await page.mouse.up();
   await expect(pinnedAts).toHaveAttribute('data-palette-pinned-kind', 'favorite');
 
   await page.locator('.palette-scroll [data-testid="palette-button"][data-subtype="switchboard"]').click();
@@ -748,7 +798,7 @@ test('study overlays separate result types and disclose stale provenance', async
       arcFlash: { scenario: 'default', runAt: '2026-07-16T12:02:00.000Z', oneLineRevision: 'stale-revision' }
     }
   };
-  await page.addInitScript(({ diagram, studies }) => {
+  await page.addInitScript(({ diagram, studies, studyProvenance }) => {
     localStorage.clear();
     sessionStorage.clear();
     localStorage.setItem('onelineTourDone', 'true');
@@ -757,6 +807,60 @@ test('study overlays separate result types and disclose stale provenance', async
   }, { diagram, studies });
   await page.goto(pageUrl('oneline.html?e2e=1'));
   await page.waitForSelector('[data-oneline-ready="1"]');
+
+  // Generate the current sidecars from the browser's actual source snapshot
+  // and solver payloads. The legacy _oneLineMeta above remains only as a
+  // migration fixture; it cannot establish lifecycle freshness.
+  const sidecars = await page.evaluate(async () => {
+    const { buildStudyProvenance, captureStudyRunContext, fingerprintStudyValue } = await import('./analysis/studyLifecycle.mjs');
+    const dataStore = window.dataStore;
+    const studies = dataStore.getStudies();
+    const projectIdentity = { projectId: window.currentProjectId || 'default', projectName: null };
+    const scenario = dataStore.getCurrentScenario();
+    const contextFor = studyKey => captureStudyRunContext(studyKey, {
+      projectSnapshot: dataStore.getStudySourceSnapshot(studyKey),
+      projectIdentity,
+      scenario,
+      dependencies: []
+    });
+    const shortCircuitContext = contextFor('shortCircuit');
+    const currentShortCircuit = buildStudyProvenance(
+      'shortCircuit', studies.shortCircuit, shortCircuitContext,
+    );
+    const arcFlashDependencies = [{
+      studyKey: 'shortCircuit',
+      resultHash: fingerprintStudyValue(studies.shortCircuit),
+      provenanceHash: fingerprintStudyValue(currentShortCircuit),
+      status: null
+    }];
+    const arcFlashContext = captureStudyRunContext('arcFlash', {
+      projectSnapshot: dataStore.getStudySourceSnapshot('arcFlash'),
+      projectIdentity,
+      scenario,
+      dependencies: arcFlashDependencies
+    });
+    const currentArcFlash = buildStudyProvenance(
+      'arcFlash', studies.arcFlash, arcFlashContext,
+    );
+    const loadFlowContext = contextFor('loadFlow');
+    const currentLoadFlow = buildStudyProvenance('loadFlow', studies.loadFlow, loadFlowContext);
+    const stale = value => ({ ...value, projectSnapshotHash: 'stale-project-snapshot' });
+    return {
+      current: {
+        loadFlow: currentLoadFlow,
+        shortCircuit: currentShortCircuit,
+        arcFlash: currentArcFlash
+      },
+      stale: {
+        loadFlow: stale(currentLoadFlow),
+        shortCircuit: stale(currentShortCircuit),
+        arcFlash: stale(currentArcFlash)
+      }
+    };
+  });
+  await page.evaluate(studyProvenance => {
+    window.dataStore.setItem('studyProvenance', studyProvenance);
+  }, sidecars.stale);
 
   const setOverlay = value => page.evaluate(nextValue => {
     const select = document.getElementById('data-state-overlay-select');
@@ -772,6 +876,23 @@ test('study overlays separate result types and disclose stale provenance', async
   await expect(page.locator('#voltage-legend')).toContainText('Fault Duty');
   await expect(page.locator('#voltage-legend')).toContainText('Available fault exceeds rating');
 
+  await setOverlay('arcFlash');
+  await page.evaluate(() => {
+    const toggle = document.getElementById('toggle-arcflash-label-mode');
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect(page.locator('.af-label-badge')).toHaveCount(0);
+
+  // A same-run dependency pair with current v2 provenance is eligible and
+  // may render its current Arc Flash labels after the stale phase is checked.
+  await page.evaluate(studyProvenance => {
+    window.dataStore.setItem('studyProvenance', studyProvenance);
+  }, {
+    ...sidecars.stale,
+    shortCircuit: sidecars.current.shortCircuit,
+    arcFlash: sidecars.current.arcFlash
+  });
   await setOverlay('arcFlash');
   await page.evaluate(() => {
     const toggle = document.getElementById('toggle-arcflash-label-mode');

@@ -55,6 +55,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",
+    "@noble/hashes": "^2.0.1",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "compression": "^1.8.1",
     "d3": "^7.9.0",

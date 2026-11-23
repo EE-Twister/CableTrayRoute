@@ -23,6 +23,29 @@ function formatPhases(phases) {
   return String(phases);
 }
 
+function isTransformerLine(line, transformerIds = new Set()) {
+  const type = `${line?.componentType || line?.type || ''}`.toLowerCase();
+  const subtype = `${line?.componentSubtype || ''}`.toLowerCase();
+  return type.includes('transformer') || subtype.includes('transformer') || transformerIds.has(String(line?.id || line?.componentId || ''));
+}
+
+function formatLineCurrent(line, transformerIds) {
+  if (isTransformerLine(line, transformerIds) && Number.isFinite(line?.fromCurrentA) && Number.isFinite(line?.toCurrentA)) {
+    return `From ${formatNumber(line.fromCurrentA, 1)} / To ${formatNumber(line.toCurrentA, 1)}`;
+  }
+  const amps = Number.isFinite(line?.amps) ? line.amps : Number.isFinite(line?.currentKA) ? line.currentKA * 1000 : null;
+  return amps === null ? '' : formatNumber(amps, 1, '0.0');
+}
+
+function formatLineDrop(line, transformerIds) {
+  if (!Number.isFinite(line?.dropPct)) return '';
+  const pct = `${formatNumber(line.dropPct, 2)}%`;
+  if (!isTransformerLine(line, transformerIds)) return pct;
+  const kv = Number.isFinite(line.dropKV) ? `; ${formatNumber(line.dropKV, 3)} kV` : '';
+  const basis = line.dropBasis?.type === 'per-unit-terminal' ? ' (rated-voltage terminal bases)' : '';
+  return `${pct}${kv}${basis}`;
+}
+
 function extractSummaryEntries(summary) {
   if (!summary || typeof summary !== 'object') return [];
   const hasSystemTotals = 'totalLoadKW' in summary
@@ -249,6 +272,7 @@ export function renderLoadFlowResultsHtml(res) {
   const lines = Array.isArray(res?.lines) ? res.lines : [];
   const sources = Array.isArray(res?.sources) ? res.sources : [];
   const warnings = Array.isArray(res?.warnings) ? res.warnings.filter(Boolean) : [];
+  const transformerIds = new Set((res?.summary?.branchConnections || []).filter(connection => `${connection?.componentType || ''}`.toLowerCase().includes('transformer') || `${connection?.componentSubtype || ''}`.toLowerCase().includes('transformer')).map(connection => String(connection.componentId || '')));
   const converged = res?.converged !== false;
   const busLabelMap = buildBusLabelMap(buses);
   let html = '';
@@ -304,11 +328,6 @@ export function renderLoadFlowResultsHtml(res) {
     html += '<h3>Line Flows</h3>';
     html += '<table><thead><tr><th>From</th><th>To</th><th>Phase</th><th>P (kW)</th><th>Q (kvar)</th><th>I (A)</th><th>From (kV)</th><th>To (kV)</th><th>ΔV (%)</th></tr></thead><tbody>';
     lines.forEach(line => {
-      const amps = Number.isFinite(line.amps)
-        ? line.amps
-        : Number.isFinite(line.currentKA)
-          ? line.currentKA * 1000
-          : null;
       const fromLabel = resolveBusLabel(line.from, line.fromLabel, busLabelMap);
       const toLabel = resolveBusLabel(line.to, line.toLabel, busLabelMap);
       html += '<tr>'
@@ -317,10 +336,10 @@ export function renderLoadFlowResultsHtml(res) {
         + `<td>${escapeHtml(line.phase || '')}</td>`
         + `<td>${formatNumber(line.P, 2, '0.00')}</td>`
         + `<td>${formatNumber(line.Q, 2, '0.00')}</td>`
-        + `<td>${amps !== null ? formatNumber(amps, 1, '0.0') : ''}</td>`
+        + `<td>${escapeHtml(formatLineCurrent(line, transformerIds))}</td>`
         + `<td>${formatNumber(line.fromKV, 3, '')}</td>`
         + `<td>${formatNumber(line.toKV, 3, '')}</td>`
-        + `<td>${formatNumber(line.dropPct, 2, '')}</td>`
+        + `<td>${escapeHtml(formatLineDrop(line, transformerIds))}</td>`
         + '</tr>';
     });
     html += '</tbody></table>';

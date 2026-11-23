@@ -1,5 +1,5 @@
 import { runCapacitorBankAnalysis } from './analysis/capacitorBank.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getStudies, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -27,7 +27,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!inputs) return;
 
     let result;
+    let runContext;
     try {
+      runContext = captureStudyRunContext('capacitorBank', { inputs, options: inputs });
       result = runCapacitorBankAnalysis(inputs);
     } catch (err) {
       showModal('Analysis Error', `<p>${err.message}</p>`, 'error');
@@ -35,9 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Persist
-    const studies = getStudies();
-    studies.capacitorBank = result;
-    setStudies(studies);
+    saveStudyResult('capacitorBank', result, runContext);
 
     renderResults(result);
   });
@@ -88,6 +88,24 @@ document.addEventListener('DOMContentLoaded', () => {
             ✓ Power factor is already at or above target — no capacitor bank required.
           </div>
           <p class="field-hint">Existing PF: ${safe.pfExisting} &nbsp;|&nbsp; Target PF: ${safe.pfTarget}</p>
+        </section>`;
+      return;
+    }
+
+    if (safe.bankSelection.status === 'unavailable') {
+      resultsDiv.innerHTML = `
+        <section class="results-panel" aria-labelledby="results-heading">
+          <h2 id="results-heading">Capacitor Bank Sizing Results</h2>
+          <div class="result-badge result-badge--fail" role="status">
+            <strong>No adequate standard bank available.</strong>
+            Required compensation is ${safe.kvarRequired} kVAR; the largest catalog size is ${safe.catalogMaximum} kVAR.
+          </div>
+          <div class="result-group">
+            <div class="result-row"><span class="result-label">Required reactive compensation</span><span class="result-value">${safe.kvarRequired} kVAR</span></div>
+            <div class="result-row"><span class="result-label">Standard bank selection</span><span class="result-value">Unavailable</span></div>
+            <p class="field-hint">Use engineered staging or a custom bank and rerun the resonance check with the actual selected capacity.</p>
+          </div>
+          ${safe.warnings.length ? `<ul class="drc-findings">${safe.warnings.map(w => `<li class="drc-finding drc-warn"><span class="drc-msg">${w}</span></li>`).join('')}</ul>` : ''}
         </section>`;
       return;
     }
@@ -146,6 +164,10 @@ document.addEventListener('DOMContentLoaded', () => {
             <span class="result-label">2-stage switched option</span>
             <span class="result-value">2 × ${safe.stageKvar} kVAR</span>
           </div>
+          <div class="result-row">
+            <span class="result-label">Achieved power factor (selected bank)</span>
+            <span class="result-value">${safe.achievedPf}</span>
+          </div>
           <p class="field-hint">Standard sizes near required: ${sizeOptionsHtml}</p>
         </div>
 
@@ -175,6 +197,21 @@ document.addEventListener('DOMContentLoaded', () => {
           nearestDominant: Number.isFinite(Number(result.resonance.nearestDominant)) ? Number(result.resonance.nearestDominant) : null
         }
       : null;
+    const catalogMaximum = Number(result.catalogMaximum || 2400);
+    const requiredKvar = Number(result.kvarRequired);
+    const savedBankSize = result.bankSize == null ? null : Number(result.bankSize);
+    const savedSelection = result.bankSelection || {};
+    // Older saved results capped an oversized requirement at the largest
+    // catalog bank. Reclassify that record on display so reload cannot present
+    // the capped value as an adequate recommendation.
+    const savedSelectionUnavailable = Number.isFinite(requiredKvar) && (
+      requiredKvar > catalogMaximum ||
+      savedSelection.status === 'unavailable' ||
+      savedSelection.exceedsCatalog === true
+    );
+    const safeBankSize = savedSelectionUnavailable ? null : savedBankSize;
+    const safeStageKvar = savedSelectionUnavailable ? null : (result.stageKvar == null ? null : Number(result.stageKvar));
+    const safeAchievedPf = savedSelectionUnavailable ? null : (result.achievedPf == null ? null : Number(result.achievedPf));
 
     return {
       busLabel: escHtml(String(result.busLabel || '')),
@@ -183,9 +220,16 @@ document.addEventListener('DOMContentLoaded', () => {
       pKw: Number(result.pKw),
       tanDeltaExisting: Number(result.tanDeltaExisting),
       tanDeltaTarget: Number(result.tanDeltaTarget),
-      kvarRequired: Number(result.kvarRequired),
-      bankSize: Number(result.bankSize),
-      stageKvar: Number(result.stageKvar),
+      kvarRequired: requiredKvar,
+      bankSize: safeBankSize,
+      stageKvar: safeStageKvar,
+      achievedPf: safeAchievedPf,
+      catalogMaximum,
+      bankSelection: {
+        adequate: savedSelectionUnavailable ? false : savedSelection.adequate !== false,
+        exceedsCatalog: savedSelectionUnavailable || Boolean(savedSelection.exceedsCatalog),
+        status: savedSelectionUnavailable ? 'unavailable' : (savedSelection.status || (safeBankSize == null ? 'unavailable' : 'selected')),
+      },
       timestamp: result.timestamp,
       detuning: {
         needed: Boolean(result.detuning?.needed),
@@ -195,7 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       warnings: safeWarnings,
       standardSizes: safeSizes,
-      resonance: safeResonance
+      resonance: savedSelectionUnavailable ? null : safeResonance
     };
   }
 

@@ -18,7 +18,10 @@ export function prepareProjectSnapshotForSave(snapshot, { transientSettingKeys =
   transientSettingKeys.forEach(key => {
     if (Object.prototype.hasOwnProperty.call(settings, key)) settings[key] = [];
   });
-  return { ...snapshot, settings };
+  const scenarioData = snapshot.scenarioData && typeof snapshot.scenarioData === 'object'
+    ? Object.fromEntries(Object.entries(snapshot.scenarioData).map(([name, value]) => [name, prepareProjectSnapshotForSave(value, { transientSettingKeys })]))
+    : snapshot.scenarioData;
+  return { ...snapshot, settings, ...(scenarioData ? { scenarioData } : {}) };
 }
 
 export function isVersionedProjectSnapshot(snapshot) {
@@ -37,6 +40,11 @@ export function createImportableProjectSnapshot(snapshot) {
   if (!isVersionedProjectSnapshot(snapshot)) return null;
   const importable = { ...snapshot };
   delete importable.__meta;
+  // Saved records may carry synchronization metadata that belongs to the
+  // storage envelope, never to the interchange document.
+  Object.keys(importable).forEach(key => {
+    if (key.startsWith('__')) delete importable[key];
+  });
   return importable;
 }
 

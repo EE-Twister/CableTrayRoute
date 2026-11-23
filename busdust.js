@@ -3,9 +3,10 @@ import {
   STANDARD_BUSWAY_RATINGS,
   BUSWAY_LIBRARY,
 } from './analysis/busDuctSizing.mjs';
-import { getStudies, setStudies, getLoads, getEquipment, getCables, getProjectMeta } from './dataStore.mjs';
+import { getStudies, getStudyAssessments, getLoads, getEquipment, getCables, getProjectMeta, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { studyLifecycleMetadataRows } from './analysis/studyExportMetadata.mjs';
 import {
   buildBusDuctProjectInputs,
   buildProjectScopeOptions,
@@ -33,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const exportBtn    = document.getElementById('export-btn');
   const projectOverrides = new Set();
   const projectData = () => ({
-    equipment: getEquipment(), loads: getLoads(), cables: getCables(), studies: getStudies(),
+    equipment: getEquipment(), loads: getLoads(), cables: getCables(), studies: getStudies(), studyAssessments: getStudyAssessments(),
   });
   const scopeOptions = buildProjectScopeOptions(projectData(), ['load', 'circuit']);
   let selectedScopeValue = getStudies().busDuctSizing?.projectLink?.scopeValue || scopeOptions[0]?.value || '';
@@ -73,9 +74,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const saved = getStudies().busDuctSizing;
   if (saved && saved._inputs) {
     (saved.projectLink?.overrides || []).forEach(field => projectOverrides.add(field));
-    restoreInputs(saved._inputs);
+    restoreInputs(saved._inputs, saved.projectLink);
     const restoredResult = runBusDuctStudy(saved._inputs);
     projectInputModel = buildBusDuctProjectInputs(resolveProjectScope(selectedScopeValue, projectData()), getProjectMeta());
+    applyProjectScope(selectedScopeValue);
     renderResults({ ...saved, ...restoredResult, _inputs: saved._inputs });
     exportBtn.disabled = !restoredResult.valid;
   } else if (selectedScopeValue) {
@@ -93,15 +95,22 @@ document.addEventListener('DOMContentLoaded', () => {
   // -------------------------------------------------------------------
 
   function calculate() {
+    if (selectedScopeValue) applyProjectScope(selectedScopeValue);
+    else if (!projectInputModel) projectInputModel = { bindings: {} };
     const inputs = readInputs();
+    const usesShortCircuit = !projectOverrides.has('faultCurrentKA')
+      && projectInputModel?.bindings?.faultCurrentKA?.sourcePath === 'studyResults.shortCircuit';
+    const runContext = captureStudyRunContext('busDuctSizing', {
+      inputs,
+      options: inputs,
+      ...(usesShortCircuit ? {} : { dependencies: [] }),
+    });
     const result = runBusDuctStudy(inputs);
 
     const snapshot = createStudyInputSnapshot('busDuctSizing', inputs, projectInputModel?.bindings || {}, projectOverrides);
     snapshot.scopeValue = selectedScopeValue;
     const toStore = withStudyProvenance({ ...result, _inputs: inputs }, snapshot);
-    const studies = getStudies();
-    studies.busDuctSizing = toStore;
-    setStudies(studies);
+    saveStudyResult('busDuctSizing', toStore, runContext);
 
     renderResults(toStore);
     exportBtn.disabled = !result.valid;
@@ -128,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  function restoreInputs(inputs) {
+  function restoreInputs(inputs, savedLink = null) {
     if (!inputs) return;
     const set = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
     set('run-label',     inputs.label);
@@ -143,6 +152,17 @@ document.addEventListener('DOMContentLoaded', () => {
     set('fault-ka',      inputs.faultCurrentKA);
     set('spacing-in',    inputs.conductorSpacingIn);
     set('span-ft',       inputs.supportSpanFt);
+    const fieldIds = {
+      label: 'run-label', phases: 'phases', systemVoltageV: 'system-voltage',
+      currentA: 'current-a', lengthFt: 'length-ft', ambientC: 'ambient-c', faultCurrentKA: 'fault-ka',
+    };
+    Object.entries(fieldIds).forEach(([fieldName, id]) => {
+      const sourcePath = savedLink?.bindings?.[fieldName]?.sourcePath;
+      if (sourcePath && !String(sourcePath).startsWith('manual.') && !projectOverrides.has(fieldName)) {
+        const element = document.getElementById(id);
+        if (element) element.dataset.projectLinkedValueAssigned = 'true';
+      }
+    });
   }
 
   // -------------------------------------------------------------------
@@ -150,6 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // -------------------------------------------------------------------
 
   function renderResults(result) {
+    result = normalizeBuswaySelection(result);
     renderWarnings(result);
 
     const el = document.getElementById('results');
@@ -169,6 +190,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const utilClass = a.utilizationPct > 100 ? 'fill-over' : a.utilizationPct > 80 ? 'fill-warn' : 'fill-ok';
     const vdClass   = vd.passNec ? 'fill-ok' : 'fill-over';
     const spanClass = fs.spanPass ? 'fill-ok' : 'fill-over';
+    const adequacyClass = sb.adequate ? 'fill-ok' : 'fill-over';
+    const adequacyLabel = sb.adequate
+      ? '✓ Adequate after derating'
+      : `✗ ${sb.adequacyStatus === 'catalog-exceeded' ? 'No adequate catalog rating' : 'Derated ampacity insufficient'}`;
 
     el.hidden = false;
     el.innerHTML = `
@@ -185,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <tr>
               <td>Selected busway</td>
               <td><strong>${sb.rating} A ${escapeHtml(sb.material)} busway</strong></td>
-              <td><span class="fill-badge ${utilClass}">Utilization ${a.utilizationPct}%</span></td>
+              <td><span class="fill-badge ${adequacyClass}">${adequacyLabel}</span><br><span class="fill-badge ${utilClass}">Utilization ${a.utilizationPct}%</span></td>
             </tr>
             <tr><td>Load current</td><td>${a.requestedCurrentA} A</td><td></td></tr>
             <tr><td>Base (rated) ampacity</td><td>${a.baseAmpacity} A</td><td></td></tr>
@@ -261,7 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // -------------------------------------------------------------------
 
   function exportCsv() {
-    const saved = getStudies().busDuctSizing;
+    const saved = normalizeBuswaySelection(getStudies().busDuctSizing);
     if (!saved || !saved.valid) return;
 
     const a  = saved.ampacity;
@@ -275,6 +300,9 @@ document.addEventListener('DOMContentLoaded', () => {
       ['Ampacity', 'Run label',             escapeHtml(saved.label),     '',      ''],
       ['Ampacity', 'Conductor material',    sb.material,                 '',      ''],
       ['Ampacity', 'Selected busway rating', sb.rating,                  'A',     ''],
+      ['Ampacity', 'Selection adequacy',     sb.adequacyStatus || (sb.adequate ? 'adequate' : 'inadequate'), '', sb.adequate ? 'Pass' : 'FAIL'],
+      ['Ampacity', 'Catalog adequacy',       sb.catalogAdequate == null ? '' : (sb.catalogAdequate ? 'Within catalog' : 'Catalog exceeded'), '', ''],
+      ['Ampacity', 'Derating adequacy',      sb.deratingAdequate == null ? '' : (sb.deratingAdequate ? 'Meets derated load' : 'Below derated load'), '', ''],
       ['Ampacity', 'Load current',          a.requestedCurrentA,         'A',     ''],
       ['Ampacity', 'Base ampacity',         a.baseAmpacity,              'A',     ''],
       ['Ampacity', 'Orientation factor',    a.orientationFactor,         '',      ''],
@@ -307,6 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
         rows.push(['Warnings', w, '', '', '']);
       }
     }
+    studyLifecycleMetadataRows(saved, { assessment: getStudyAssessments().busDuctSizing }).forEach(([key, value]) => rows.push(['Lifecycle', key, value, '', '']));
 
     const csv = rows.map(r =>
       r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')
@@ -319,5 +348,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     a_el.click();
     URL.revokeObjectURL(url);
+  }
+
+  function normalizeBuswaySelection(result) {
+    if (!result?.selectedBusway || !result?.ampacity) return result;
+    const selected = result.selectedBusway;
+    const ampacity = result.ampacity;
+    const requested = Number(ampacity.requestedCurrentA);
+    const derated = Number(ampacity.deratedAmpacity);
+    const maxRating = STANDARD_BUSWAY_RATINGS[STANDARD_BUSWAY_RATINGS.length - 1];
+    const catalogAdequate = Number(selected.rating) <= maxRating && requested <= maxRating;
+    const deratingAdequate = Number.isFinite(derated) && Number.isFinite(requested) && derated >= requested;
+    const adequate = catalogAdequate && deratingAdequate;
+    const adequacyStatus = adequate ? 'adequate' : !catalogAdequate ? 'catalog-exceeded' : 'derated-insufficient';
+    return {
+      ...result,
+      selectedBusway: { ...selected, adequate, catalogAdequate, deratingAdequate, adequacyStatus },
+    };
   }
 });

@@ -5,6 +5,7 @@ import {
   getGroundGridSafetyMetrics,
 } from './src/groundgridSafetyPresentation.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
+import { studyExportMetadata } from './analysis/studyExportMetadata.mjs';
 import {
   wennerApparentResistivity,
   fitTwoLayerSoil,
@@ -14,6 +15,15 @@ import {
   buildRectangularGeometry,
   evaluateRiskPoints,
 } from './analysis/groundSoilModel.mjs';
+import {
+  captureStudyRunContext,
+  on as onDataStoreChange,
+  STORAGE_KEYS,
+} from './dataStore.mjs';
+import {
+  assessStudyResult,
+  buildStudyProvenance,
+} from './analysis/studyLifecycle.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initStudyBasisPanel('groundGrid', {
@@ -101,6 +111,74 @@ document.addEventListener('DOMContentLoaded', () => {
   const svgWidth = 520;
   const svgHeight = 360;
   let latestAnalysisResult = null;
+  let latestRunContext = null;
+  let latestRunProvenance = null;
+  let runSequence = 0;
+
+  const rectangularRunInputIds = [
+    'unit-select', 'soil-rho', 'grid-lx', 'grid-ly', 'nx', 'ny',
+    'burial-depth', 'conductor-diameter', 'has-rods', 'rod-spacing-x',
+    'rod-spacing-y', 'grid-current', 'fault-duration', 'body-weight',
+    'surface-rho', 'surface-hs',
+  ];
+  const irregularRunInputIds = [
+    'irr-spacing-x', 'irr-spacing-y', 'irr-depth', 'irr-diameter',
+    'irr-rho', 'irr-current', 'irr-tf', 'irr-bw',
+  ];
+
+  function readRunInput(id) {
+    const control = document.getElementById(id);
+    if (!control) return null;
+    if (control.type === 'checkbox') return control.checked;
+    return control.value;
+  }
+
+  function getGroundRunInputs(mode) {
+    const ids = mode === 'irregular' ? irregularRunInputIds : rectangularRunInputIds;
+    return {
+      mode,
+      fields: Object.fromEntries(ids.map(id => [id, readRunInput(id)])),
+      polygonVertices: mode === 'irregular'
+        ? polygonVertices.map(vertex => ({ x: vertex.x, y: vertex.y }))
+        : null,
+      soilFit: mode === 'irregular' && soilFitResult
+        ? { rho1: soilFitResult.rho1, rho2: soilFitResult.rho2, h: soilFitResult.h }
+        : null,
+    };
+  }
+
+  function captureGroundRunContext(mode) {
+    return captureStudyRunContext('groundGrid', {
+      inputs: getGroundRunInputs(mode),
+      options: {
+        analysisMode: mode,
+        units: getUnits(),
+      },
+      inputSources: {
+        page: 'groundgrid.html',
+        governingStandard: 'IEEE 80-2013 / IEEE 81-2012',
+        geometry: mode === 'irregular' ? 'polygon vertices and mesh inputs' : 'rectangular grid inputs',
+      },
+      assumptions: [
+        'IEEE 80 rectangular screening applied to equivalent polygon area and perimeter for irregular grids',
+        'Hazard map uses simplified analytical superposition and is not a FEM/BEM solution',
+      ],
+      limitations: [
+        'Full numerical accuracy requires SES CDEGS, XGSLab, or equivalent FEM/BEM solver',
+        'Transferred voltage from LV neutrals and fences is not automated',
+      ],
+    });
+  }
+
+  function getGroundLifecycleAssessment() {
+    const resultAtExport = latestAnalysisResult;
+    const contextAtExport = latestRunContext;
+    const provenanceAtExport = latestRunProvenance;
+    if (!resultAtExport || !contextAtExport || !provenanceAtExport) return null;
+    const mode = contextAtExport.inputsSnapshot?.mode || 'rectangular';
+    const currentContext = captureGroundRunContext(mode);
+    return assessStudyResult('groundGrid', resultAtExport, provenanceAtExport, currentContext);
+  }
 
   function makeSvg(name, attrs = {}) {
     const node = document.createElementNS(SVG_NS, name);
@@ -734,6 +812,8 @@ document.addEventListener('DOMContentLoaded', () => {
       ? (imperial ? ftToM(previewParams.rodLength) : previewParams.rodLength)
       : 0;
     const bw = parseInt(document.getElementById('body-weight').value, 10);
+    const runContext = captureGroundRunContext('rectangular');
+    const runToken = ++runSequence;
 
     let r;
     try {
@@ -758,9 +838,17 @@ document.addEventListener('DOMContentLoaded', () => {
       resultsDiv.innerHTML = `<p class="alert-error" role="alert">Error: ${err.message}</p>`;
       return;
     }
+    if (runToken !== runSequence) return;
     latestAnalysisResult = r;
+    latestRunContext = runContext;
+    latestRunProvenance = buildStudyProvenance('groundGrid', r, runContext, {
+      validity: 'evaluated',
+    });
     renderSafetyDashboard(r);
     renderGridPreview();
+    document.dispatchEvent(new CustomEvent('ctr:study-ephemeral-complete', {
+      detail: { href: 'groundgrid.html' },
+    }));
 
     const section = document.createElement('section');
     section.className = 'results-panel groundgrid-results-detail';
@@ -872,10 +960,24 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function handleFormStateChange() {
+    runSequence += 1;
     latestAnalysisResult = null;
+    latestRunContext = null;
+    latestRunProvenance = null;
+    hazardMapData = null;
     if (resultsDiv) {
       resultsDiv.innerHTML = '';
     }
+    const riskBody = document.getElementById('risk-points-body');
+    if (riskBody) {
+      riskBody.innerHTML = '<tr><td colspan="9" class="table-empty-state">Run an analysis before reviewing risk points.</td></tr>';
+    }
+    const hazardExports = document.getElementById('hazard-export-btns');
+    if (hazardExports) hazardExports.hidden = true;
+    const hazardSvg = document.getElementById('hazard-map-svg');
+    if (hazardSvg) hazardSvg.innerHTML = '';
+    const hazardLegend = document.getElementById('hazard-legend');
+    if (hazardLegend) hazardLegend.hidden = true;
     renderSafetyDashboard(null);
     setRodSpacingVisibility();
     renderGridPreview();
@@ -904,7 +1006,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function onUnitChange() {
+    runSequence += 1;
     latestAnalysisResult = null;
+    latestRunContext = null;
+    latestRunProvenance = null;
     if (resultsDiv) {
       resultsDiv.innerHTML = '';
     }
@@ -929,6 +1034,21 @@ document.addEventListener('DOMContentLoaded', () => {
   if (unitSelect) {
     unitSelect.addEventListener('change', onUnitChange);
   }
+
+  const watchedProjectKeys = [
+    STORAGE_KEYS.equipment,
+    STORAGE_KEYS.loads,
+    STORAGE_KEYS.panels,
+    STORAGE_KEYS.cables,
+    STORAGE_KEYS.trays,
+    STORAGE_KEYS.conduits,
+    STORAGE_KEYS.ductbanks,
+    STORAGE_KEYS.oneLine,
+    STORAGE_KEYS.projectMeta,
+    STORAGE_KEYS.designBasis,
+  ];
+  watchedProjectKeys.forEach(key => onDataStoreChange(key, handleFormStateChange));
+  onDataStoreChange('scenario', handleFormStateChange);
 
   ['show-step-overlay', 'step-overlay-opacity'].forEach(id => {
     const input = document.getElementById(id);
@@ -987,24 +1107,31 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.addEventListener('click', () => {
         const row = parseInt(btn.closest('tr').dataset.row, 10);
         soilMeasurements.splice(row, 1);
+        handleFormStateChange();
         renderSoilTable();
       });
     });
-    tbody.querySelectorAll('.sm-a').forEach(input => {
-      input.addEventListener('change', () => syncSoilMeasurementsFromTable());
-    });
-    tbody.querySelectorAll('.sm-rho').forEach(input => {
-      input.addEventListener('change', () => syncSoilMeasurementsFromTable());
+    tbody.querySelectorAll('.sm-a, .sm-rho').forEach(input => {
+      ['input', 'change'].forEach(eventName => input.addEventListener(eventName, () => {
+        syncSoilMeasurementsFromTable();
+        handleFormStateChange();
+      }));
     });
   }
 
   function syncSoilMeasurementsFromTable() {
     const tbody = document.getElementById('soil-measurements-body');
-    if (!tbody) return;
-    soilMeasurements = Array.from(tbody.querySelectorAll('tr')).map(tr => ({
-      a: parseFloat(tr.querySelector('.sm-a').value) || 1,
-      rhoA: parseFloat(tr.querySelector('.sm-rho').value) || 100,
+    if (!tbody) return false;
+    const rows = Array.from(tbody.querySelectorAll('tr')).map(tr => ({
+      a: Number(String(tr.querySelector('.sm-a')?.value ?? '').trim()),
+      rhoA: Number(String(tr.querySelector('.sm-rho')?.value ?? '').trim()),
     }));
+    if (rows.some(row => !Number.isFinite(row.a) || row.a <= 0 || !Number.isFinite(row.rhoA) || row.rhoA <= 0)) {
+      soilMeasurements = rows;
+      return false;
+    }
+    soilMeasurements = rows;
+    return true;
   }
 
   function addDefaultSoilRows() {
@@ -1019,11 +1146,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('soil-add-row-btn')?.addEventListener('click', () => {
     soilMeasurements.push({ a: 2, rhoA: 100 });
+    handleFormStateChange();
     renderSoilTable();
   });
 
   document.getElementById('soil-fit-btn')?.addEventListener('click', () => {
-    syncSoilMeasurementsFromTable();
+    if (!syncSoilMeasurementsFromTable()) {
+      window.showAlertModal?.('Soil Fit', 'Every measurement needs positive finite electrode spacing and apparent resistivity.');
+      return;
+    }
     if (soilMeasurements.length < 3) {
       const { showAlertModal } = window;
       if (showAlertModal) showAlertModal('Soil Fit', 'At least 3 measurements are required.');
@@ -1031,6 +1162,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     try {
       soilFitResult = fitTwoLayerSoil(soilMeasurements);
+      handleFormStateChange();
       renderSoilFitResults(soilFitResult);
       renderSoilFitCurve(soilFitResult);
       document.getElementById('soil-fit-results').hidden = false;
@@ -1045,6 +1177,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const rhoInput = document.getElementById('soil-rho');
     if (rhoInput) {
       rhoInput.value = soilFitResult.rho1.toFixed(1);
+      handleFormStateChange();
       switchGGTab('ieee80');
     }
   });
@@ -1124,22 +1257,33 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.addEventListener('click', () => {
         const row = parseInt(btn.closest('tr').dataset.vrow, 10);
         polygonVertices.splice(row, 1);
+        handleFormStateChange();
         renderPolygonTable();
         updatePolygonPreview();
       });
     });
     tbody.querySelectorAll('.pv-x, .pv-y').forEach(input => {
-      input.addEventListener('change', () => { syncPolygonFromTable(); updatePolygonPreview(); });
+      ['input', 'change'].forEach(eventName => input.addEventListener(eventName, () => {
+        syncPolygonFromTable();
+        handleFormStateChange();
+        updatePolygonPreview();
+      }));
     });
   }
 
   function syncPolygonFromTable() {
     const tbody = document.getElementById('polygon-vertices-body');
-    if (!tbody) return;
-    polygonVertices = Array.from(tbody.querySelectorAll('tr')).map(tr => ({
-      x: parseFloat(tr.querySelector('.pv-x').value) || 0,
-      y: parseFloat(tr.querySelector('.pv-y').value) || 0,
+    if (!tbody) return false;
+    const readCoordinate = element => {
+      const raw = String(element?.value ?? '').trim();
+      return raw === '' ? NaN : Number(raw);
+    };
+    const rows = Array.from(tbody.querySelectorAll('tr')).map(tr => ({
+      x: readCoordinate(tr.querySelector('.pv-x')),
+      y: readCoordinate(tr.querySelector('.pv-y')),
     }));
+    polygonVertices = rows;
+    return rows.every(vertex => Number.isFinite(vertex.x) && Number.isFinite(vertex.y));
   }
 
   function addDefaultPolygon() {
@@ -1199,36 +1343,67 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('polygon-add-vertex-btn')?.addEventListener('click', () => {
     const last = polygonVertices[polygonVertices.length - 1] || { x: 0, y: 0 };
     polygonVertices.push({ x: last.x + 5, y: last.y });
+    handleFormStateChange();
     renderPolygonTable();
     updatePolygonPreview();
   });
 
   ['irr-spacing-x', 'irr-spacing-y', 'irr-depth'].forEach(id => {
-    document.getElementById(id)?.addEventListener('change', updatePolygonPreview);
+    ['input', 'change'].forEach(eventName => document.getElementById(id)?.addEventListener(eventName, () => {
+      handleFormStateChange();
+      updatePolygonPreview();
+    }));
   });
 
+  irregularRunInputIds.filter(id => !['irr-spacing-x', 'irr-spacing-y', 'irr-depth'].includes(id))
+    .forEach(id => ['input', 'change'].forEach(eventName => document.getElementById(id)
+      ?.addEventListener(eventName, handleFormStateChange)));
+
   document.getElementById('irregular-analyze-btn')?.addEventListener('click', async () => {
-    syncPolygonFromTable();
+    if (!syncPolygonFromTable()) {
+      window.showAlertModal?.('Irregular Grid', 'Every polygon vertex needs finite X and Y coordinates.');
+      return;
+    }
     if (polygonVertices.length < 3) {
       const { showAlertModal } = window;
       if (showAlertModal) showAlertModal('Irregular Grid', 'At least 3 polygon vertices required.');
       return;
     }
     try {
+      const requiredNumber = (id, label, minimum = 0) => {
+        const raw = String(document.getElementById(id)?.value ?? '').trim();
+        const value = Number(raw);
+        if (!raw || !Number.isFinite(value) || value <= minimum) throw new Error(`${label} is required and must be greater than ${minimum}.`);
+        return value;
+      };
+      if (polygonVertices.some(vertex => !Number.isFinite(vertex.x) || !Number.isFinite(vertex.y))) {
+        throw new Error('Every irregular-grid polygon vertex must have finite X and Y coordinates.');
+      }
       const params = {
         vertices: polygonVertices,
-        spacingX: parseFloat(document.getElementById('irr-spacing-x')?.value) || 3,
-        spacingY: parseFloat(document.getElementById('irr-spacing-y')?.value) || 3,
-        h: parseFloat(document.getElementById('irr-depth')?.value) || 0.5,
-        d: parseFloat(document.getElementById('irr-diameter')?.value) || 0.013,
-        rho: parseFloat(document.getElementById('irr-rho')?.value) || 100,
-        Ig: parseFloat(document.getElementById('irr-current')?.value) || 5000,
-        tf: parseFloat(document.getElementById('irr-tf')?.value) || 0.5,
-        bw: parseInt(document.getElementById('irr-bw')?.value, 10) || 70,
+        spacingX: requiredNumber('irr-spacing-x', 'Mesh spacing X'),
+        spacingY: requiredNumber('irr-spacing-y', 'Mesh spacing Y'),
+        h: requiredNumber('irr-depth', 'Burial depth'),
+        d: requiredNumber('irr-diameter', 'Conductor diameter'),
+        rho: requiredNumber('irr-rho', 'Soil resistivity'),
+        Ig: requiredNumber('irr-current', 'Maximum grid current'),
+        tf: requiredNumber('irr-tf', 'Fault duration'),
+        bw: requiredNumber('irr-bw', 'Body weight'),
       };
+      handleFormStateChange();
+      const runContext = captureGroundRunContext('irregular');
+      const runToken = ++runSequence;
       irregularGridResult = await analyzeIrregularGrid(params, soilFitResult);
+      if (runToken !== runSequence) return;
       latestAnalysisResult = irregularGridResult;
+      latestRunContext = runContext;
+      latestRunProvenance = buildStudyProvenance('groundGrid', irregularGridResult, runContext, {
+        validity: 'evaluated',
+      });
       renderIrrResults(irregularGridResult);
+      document.dispatchEvent(new CustomEvent('ctr:study-ephemeral-complete', {
+        detail: { href: 'groundgrid.html' },
+      }));
     } catch (err) {
       const { showAlertModal } = window;
       if (showAlertModal) showAlertModal('Irregular Grid Error', err.message);
@@ -1484,6 +1659,22 @@ document.addEventListener('DOMContentLoaded', () => {
         lines.push(cells.slice(0, 8).map(td => `"${td.textContent.trim().replace(/"/g, '""')}"`).join(','));
       }
     });
+    lines.push('# Lifecycle,Value');
+    const assessedRun = getGroundLifecycleAssessment();
+    const assessment = assessedRun ? {
+      ...assessedRun,
+      label: assessedRun.eligible
+        ? 'Current in-memory run'
+        : `In-memory run withheld (${assessedRun.reasons.join(', ') || 'freshness not verified'})`,
+    } : {
+      validity: { state: 'unevaluated' },
+      freshness: 'unknown',
+      eligible: false,
+      label: 'In-memory run withheld (missing run context)',
+      reasons: ['missing_run_context'],
+    };
+    lines.push(...Object.entries(studyExportMetadata(latestAnalysisResult || {}, { assessment }))
+      .map(([key, value]) => `${key},"${String(value ?? '').replace(/"/g, '""')}"`));
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);

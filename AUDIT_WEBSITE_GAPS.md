@@ -1,5 +1,7 @@
 # Website Gaps & Missing Functionality Audit
 
+> **Historical snapshot:** This report records the 2026-05-26 audit result. It is not a current regression or accessibility status report; consult later reviews for present findings.
+
 **Date:** 2026-05-26 (refresh of 2026-03-16 audit)
 **Scope:** Full website audit covering navigation, forms, accessibility, SEO, error handling, component library, and code quality
 

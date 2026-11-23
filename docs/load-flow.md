@@ -2,11 +2,25 @@
 
 The Load Flow study uses the active one-line diagram to build buses, branches, loads, and generation.
 
+The standalone study page uses a default budget of 60 iterations and records
+the effective budget with the saved study options. Explicit positive iteration
+requests are normalized to whole iterations and remain caller-controlled.
+The convergence tolerance is unchanged; a result that fails to converge is
+not saved as a usable study or made exportable. The raw solver and One-Line
+study controls retain their separate explicit settings.
+
+Design Synthesis drawings retain electrical bus roles and one branch per cable,
+including route impedance and cable ampacity metadata through project save and
+reload. See [the handoff verification](design-synthesis-study-handoff.md) for
+the supported model, independent arithmetic, and remaining limitations.
+
 ## Solver selection for large systems
 
-The study automatically uses a backward/forward-sweep solver when a balanced network has at least 250 buses and is a supported radial tree: one slack bus, PQ buses, a common voltage base, non-zero series impedances, and no taps, shunts, PV buses, or active IBR Volt-VAR controls. This path scales linearly with the radial branches and is intended for large utility-fed distribution systems.
+Before solving, explicitly finite zero-ohm cable connections are contracted only when their buses form same-voltage-base forests. A tie group may contain one slack bus, but multiple slack buses or merged PV/IBR controls are unsupported. Original buses and cable identities remain in results; each ideal-cable current is recovered from KCL over its unique tree cut. Cyclic ties, conflicting bases, or unsupported merged controls are reported as non-converged. Tiny but finite cable impedances remain physical.
 
-Newton-Raphson remains the default for smaller cases and is always retained for meshed networks, PV buses, multiple voltage bases, transformer taps, shunts, ideal ties, and active IBR controls. Results expose the selected method as `solver`; reports and downstream consumers otherwise receive the same bus, branch-flow, loss, source, warning, and convergence fields.
+After supported cable-tie contraction, the study automatically uses a backward/forward-sweep solver when a balanced network has at least 250 buses and is a supported radial tree: one slack bus, PQ buses, a common voltage base, non-zero series impedances, and no taps, shunts, PV buses, or active IBR Volt-VAR controls. This path scales linearly with the radial branches and is intended for large utility-fed distribution systems.
+
+Newton-Raphson remains the default for smaller cases and is retained for meshed networks, PV buses, multiple voltage bases, transformer taps, shunts, and active IBR controls. Results expose the selected method as `solver`; reports and downstream consumers otherwise receive the same bus, branch-flow, loss, source, warning, and convergence fields.
 
 The enforced large-project contract converts and solves one common utility bus, 1,000 downstream buses, and 2,000 attached devices in less than 2 seconds. A numerical regression runs the same supported network through both solvers and compares every bus voltage magnitude and angle plus real and reactive losses.
 
@@ -27,9 +41,21 @@ This keeps a 90 kW / 30 kvar unassigned load at 30 kW / 10 kvar on each phase in
 
 ## Transformer tap review
 
+Transformer flow results now distinguish primary/from and secondary/to currents,
+and compare voltage drop on rated terminal bases. Explicit excitation losses and
+phase shifts are supported in component data. See the
+[transformer foundation review](design-synthesis-transformers.md) for equations,
+input conventions, verification status, and remaining design integration.
+
 The One-Line **Studies → Review Transformer Taps** action provides a constrained what-if review for transformers with LTC metadata. It reuses the Load Flow solver on cloned One-Line snapshots and evaluates only the configured permitted range and discrete step. The review reports the controlled secondary-bus voltage, voltage change from the current case, system voltage range, convergence, and voltage-limit violations.
 
 The current transformer setting is never changed by running the review. A reviewer must choose **Approve & Apply** for a feasible recommendation. Approval rechecks that the One-Line revision is unchanged, writes the selected ratio through the existing One-Line setter, and therefore creates the normal One-Line revision-history entry. The saved review remains in `studyResults.transformerTapOptimization` with its source and applied revisions.
+
+Apply also requires current calculation evidence matching the displayed review.
+Recommendations saved with an earlier solver revision or changed study inputs
+must be rerun. The check runs before the confirmation dialog and again before
+changing the setting, so a change made while the dialog is open cannot apply an
+obsolete recommendation.
 
 For the shipped two-winding transformer metadata, the relevant fields are `ltc.enabled`, `ltc.min_tap_volts`, `ltc.max_tap_volts`, `ltc.step_percent`, and `ltc.setpoint_pu`. Optional `ltc.min_voltage_pu` and `ltc.max_voltage_pu` values constrain that transformer's feasible cases; otherwise the workflow uses 0.95–1.05 pu. An explicit disabled state is always honored. A transformer without a complete enabled range and positive step, valid voltage limits, or a resolvable controlled bus is shown as review-ineligible; no tap range or controlled-bus voltage is inferred from unrelated system buses.
 

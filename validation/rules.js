@@ -65,8 +65,44 @@ function getConsumerLinkedPtVtId(component) {
     || ''}`.trim();
 }
 
-export function runValidation(components = [], studies = {}) {
+function hasCurrentEvaluatedStudy(assessments, studyKey) {
+  const assessment = assessments?.[studyKey];
+  return assessment?.freshness === 'current'
+    && assessment?.validity?.state === 'evaluated'
+    && assessment?.eligible === true;
+}
+
+function hasDutyEvidence(study) {
+  return study && typeof study === 'object'
+    && Object.keys(study).length > 0;
+}
+
+function hasReliabilityEvidence(study) {
+  return study && typeof study === 'object'
+    && Object.prototype.hasOwnProperty.call(study, 'n1Failures');
+}
+
+function addHistoricalStudyWarning(issues, studyKey, assessment) {
+  const state = assessment?.freshness === 'stale' ? 'stale' : 'historical or unevaluated';
+  const reason = Array.isArray(assessment?.reasons) && assessment.reasons.length
+    ? ` (${assessment.reasons[0]})`
+    : '';
+  issues.push({
+    component: null,
+    studyKey,
+    severity: 'warning',
+    status: 'historical',
+    message: `Stored ${studyKey} results are ${state}${reason}; rerun the study before using them in current validation.`
+  });
+}
+
+export function runValidation(components = [], studies = {}, lifecycle = {}) {
   const issues = [];
+  // Study caches are historical data unless the caller supplies the v2
+  // lifecycle assessment computed for the same active project and scenario.
+  // This keeps bulk-restored/legacy duty and reliability payloads from being
+  // presented as current validation evidence.
+  const assessments = lifecycle?.assessments || lifecycle?.studyAssessments || {};
   const componentLookup = new Map(components.map(c => [c.id, c]));
   const describe = id => {
     const comp = componentLookup.get(id);
@@ -663,27 +699,35 @@ export function runValidation(components = [], studies = {}) {
   });
 
   // TCC duty/coordination violations from studies
-  Object.entries(studies?.duty && typeof studies.duty === 'object' ? studies.duty : {}).forEach(([id, msgs]) => {
-    if (!Array.isArray(msgs)) return;
-    msgs.forEach(msg => issues.push({ component: id, message: msg }));
-  });
-
-  const reliabilityFailures = Array.isArray(studies?.reliability?.n1Failures)
-    ? studies.reliability.n1Failures
-    : [];
-  const reliabilityDetails = studies?.reliability?.n1FailureDetails || {};
-  reliabilityFailures.forEach(id => {
-    const isolatedLoads = Array.isArray(reliabilityDetails[id]?.isolatedLoads)
-      ? reliabilityDetails[id].isolatedLoads
-      : [];
-    const isolatedMsg = isolatedLoads.length
-      ? ` Isolates: ${isolatedLoads.map(loadId => describe(loadId)).join(', ')}.`
-      : '';
-    issues.push({
-      component: id,
-      message: `Single point of failure under N-1 reliability check.${isolatedMsg}`
+  if (hasCurrentEvaluatedStudy(assessments, 'duty')) {
+    Object.entries(studies?.duty && typeof studies.duty === 'object' ? studies.duty : {}).forEach(([id, msgs]) => {
+      if (!Array.isArray(msgs)) return;
+      msgs.forEach(msg => issues.push({ component: id, message: msg }));
     });
-  });
+  } else if (hasDutyEvidence(studies?.duty)) {
+    addHistoricalStudyWarning(issues, 'duty', assessments?.duty);
+  }
+
+  if (hasCurrentEvaluatedStudy(assessments, 'reliability')) {
+    const reliabilityFailures = Array.isArray(studies?.reliability?.n1Failures)
+      ? studies.reliability.n1Failures
+      : [];
+    const reliabilityDetails = studies?.reliability?.n1FailureDetails || {};
+    reliabilityFailures.forEach(id => {
+      const isolatedLoads = Array.isArray(reliabilityDetails[id]?.isolatedLoads)
+        ? reliabilityDetails[id].isolatedLoads
+        : [];
+      const isolatedMsg = isolatedLoads.length
+        ? ` Isolates: ${isolatedLoads.map(loadId => describe(loadId)).join(', ')}.`
+        : '';
+      issues.push({
+        component: id,
+        message: `Single point of failure under N-1 reliability check.${isolatedMsg}`
+      });
+    });
+  } else if (hasReliabilityEvidence(studies?.reliability)) {
+    addHistoricalStudyWarning(issues, 'reliability', assessments?.reliability);
+  }
 
   return issues;
 }

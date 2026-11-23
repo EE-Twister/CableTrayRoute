@@ -7,6 +7,7 @@ import { computeImpedanceFromPerKm } from '../utils/cableImpedance.js';
 import { table9Impedance } from '../src/necTable9.mjs';
 import {
   computeIEC60909Bus,
+  computeDoubleLineGroundCurrents,
   cFactor as iecCFactor,
   generatorCorrectionKG,
   transformerCorrectionKT
@@ -183,6 +184,28 @@ if (isNodeRuntime) {
   nodeProtectiveDeviceCatalog = Array.isArray(calculationCatalogModule.default)
     ? calculationCatalogModule.default
     : [];
+}
+
+function hasNonFiniteImpedance(value) {
+  if (!value || typeof value !== 'object') return false;
+  const hasCoordinate = Object.prototype.hasOwnProperty.call(value, 'r')
+    || Object.prototype.hasOwnProperty.call(value, 'x');
+  if (!hasCoordinate) return false;
+  const coordinateIsNumeric = coordinate => coordinate !== null
+    && coordinate !== undefined
+    && coordinate !== ''
+    && typeof coordinate !== 'boolean'
+    && Number.isFinite(Number(coordinate));
+  return !coordinateIsNumeric(value.r) || !coordinateIsNumeric(value.x);
+}
+
+function hasInvalidImpedanceField(record, key) {
+  if (!record || typeof record !== 'object' || !Object.prototype.hasOwnProperty.call(record, key)) return false;
+  const value = record[key];
+  return !value || typeof value !== 'object'
+    || !Object.prototype.hasOwnProperty.call(value, 'r')
+    || !Object.prototype.hasOwnProperty.call(value, 'x')
+    || hasNonFiniteImpedance(value);
 }
 
 export const defaultProtectiveDeviceCatalog = nodeProtectiveDeviceCatalog;
@@ -672,6 +695,26 @@ function scaleImpedance(z, k) {
   return { r: (z.r || 0) * k, x: (z.x || 0) * k };
 }
 
+/** Refer an impedance between transformer voltage sides in ohms. */
+function referImpedanceByVoltage(z, fromKV, toKV) {
+  const from = Number(fromKV);
+  const to = Number(toKV);
+  if (!Number.isFinite(from) || from <= 0 || !Number.isFinite(to) || to <= 0) return z;
+  return scaleImpedance(z, (to / from) ** 2);
+}
+
+function transformerConnectionPorts(xfmr, connection, reversed) {
+  const transformerPort = normalizePortIndex(reversed ? connection?.targetPort : connection?.sourcePort);
+  const subtype = `${xfmr?.subtype || ''}`.trim().toLowerCase();
+  const twoWinding = !subtype || ['two_winding', 'auto_transformer', 'grounding_transformer'].includes(subtype);
+  const oppositePort = twoWinding ? (transformerPort === 0 ? 1 : 0) : null;
+  return {
+    transformerPort,
+    upstreamVoltageKV: oppositePort === null ? null : toKV(getTransformerVoltageForPort(xfmr, oppositePort)),
+    currentVoltageKV: toKV(getTransformerVoltageForPort(xfmr, transformerPort))
+  };
+}
+
 function getTransformerImpedance(xfmr, portIndex, corrections = null) {
   if (!xfmr || xfmr.type !== 'transformer') return { r: 0, x: 0 };
   const percent = getTransformerPercentForPort(xfmr, portIndex);
@@ -769,7 +812,14 @@ function findParentInfo(comp, comps, compMap, visited) {
   return null;
 }
 
-function loadTccSettings() {
+function loadTccSettings(explicit = null) {
+  if (explicit && typeof explicit === 'object') {
+    return {
+      devices: Array.isArray(explicit.devices) ? explicit.devices : [],
+      settings: explicit.settings && typeof explicit.settings === 'object' ? explicit.settings : {},
+      componentOverrides: explicit.componentOverrides && typeof explicit.componentOverrides === 'object' ? explicit.componentOverrides : {}
+    };
+  }
   try {
     const stored = getItem('tccSettings', DEFAULT_TCC_SETTINGS);
     if (stored && typeof stored === 'object') {
@@ -940,8 +990,17 @@ function computeImpedance(comp, comps, compMap, cache, visited = new Set(), cabl
       const resolvedConnection = cableResolver?.resolve(connection, upstream, comp);
       total = add(total, resolvedConnection?.impedance || toImpedance(connection.impedance));
       if (upstream.type === 'transformer') {
-        const portIndex = normalizePortIndex(reversed ? connection?.targetPort : connection?.sourcePort);
-        total = add(total, getTransformerImpedance(upstream, portIndex, corrections));
+        const ports = transformerConnectionPorts(upstream, connection, reversed);
+        total = add(total, getTransformerImpedance(upstream, ports.transformerPort, corrections));
+        const upstreamTotal = computeImpedance(upstream, comps, compMap, cache, visited, cableResolver, corrections);
+        total = add(total, referImpedanceByVoltage(
+          upstreamTotal,
+          ports.upstreamVoltageKV,
+          ports.currentVoltageKV
+        ));
+        visited.delete(comp.id);
+        cache.set(comp.id, total);
+        return total;
       }
     }
     total = add(total, computeImpedance(upstream, comps, compMap, cache, visited, cableResolver, corrections));
@@ -975,24 +1034,28 @@ function findTerminalSource(comp, comps, compMap) {
 /**
  * Rated current I_rG of a synchronous generator in kA.
  *
- *   I_rG = S_rG / (√3 × U_rG)
+ *   I_rG = S_rG / (√3 × U_base)
+ *
+ * U_base is the fault-bus voltage when the machine is connected through a
+ * transformer, so the current and initial fault current remain on one base.
  *
  * Returns null for anything that is not a synchronous generator with usable
  * rating data, which makes the caller fall back to μ = 1.
  */
-function generatorRatedCurrentKA(comp) {
+function generatorRatedCurrentKA(comp, faultKV = null) {
   if (comp?.type !== 'generator' || comp?.subtype === 'asynchronous') return null;
   const mva = parseNumeric(pickValue(comp, 'rated_mva') ?? pickValue(comp, 'mva'));
   const kva = parseNumeric(pickValue(comp, 'rated_kva') ?? pickValue(comp, 'kva'));
   const mvaRating = mva || (kva ? kva / 1000 : null);
-  const kv = toKV(
+  const ratedKV = toKV(
     pickValue(comp, 'rated_kv')
     ?? pickValue(comp, 'volts')
     ?? pickValue(comp, 'voltage')
     ?? pickValue(comp, 'baseKV')
   );
-  if (!mvaRating || mvaRating <= 0 || !kv || kv <= 0) return null;
-  return mvaRating / (Math.sqrt(3) * kv);
+  const baseKV = Number(faultKV) > 0 ? Number(faultKV) : ratedKV;
+  if (!mvaRating || mvaRating <= 0 || !baseKV || baseKV <= 0) return null;
+  return mvaRating / (Math.sqrt(3) * baseKV);
 }
 
 function buildImpedancePath(comp, comps, compMap, cableResolver, corrections = null) {
@@ -1010,6 +1073,19 @@ function buildImpedancePath(comp, comps, compMap, cableResolver, corrections = n
     if (connection) {
       const resolved = cableResolver?.resolve(connection, upstream, current);
       if (resolved?.segment) segments.unshift(resolved.segment);
+      if (!resolved?.segment && upstream?.type === 'cable') {
+        const cableImpedance = extractComponentImpedance(upstream);
+        if (hasImpedance(cableImpedance)) {
+          segments.unshift({
+            type: 'cable',
+            tag: componentIdentity(upstream),
+            source: 'One-Line cable data',
+            method: 'component-impedance',
+            rOhm: cableImpedance.r,
+            xOhm: cableImpedance.x
+          });
+        }
+      }
       (resolved?.assumptions || []).forEach(message => {
         if (message && !assumptions.includes(message)) assumptions.push(message);
       });
@@ -1017,8 +1093,11 @@ function buildImpedancePath(comp, comps, compMap, cableResolver, corrections = n
         if (message && !requiredInputs.includes(message)) requiredInputs.push(message);
       });
       if (upstream.type === 'transformer') {
-        const portIndex = normalizePortIndex(reversed ? connection?.targetPort : connection?.sourcePort);
-        const impedance = getTransformerImpedance(upstream, portIndex, corrections);
+        const ports = transformerConnectionPorts(upstream, connection, reversed);
+        const impedance = getTransformerImpedance(upstream, ports.transformerPort, corrections);
+        if (!ports.upstreamVoltageKV || !ports.currentVoltageKV) {
+          requiredInputs.push('Transformer winding voltages are required to refer upstream impedance to the fault-bus base.');
+        }
         if (hasImpedance(impedance)) {
           segments.unshift({
             type: 'transformer',
@@ -1026,7 +1105,12 @@ function buildImpedancePath(comp, comps, compMap, cableResolver, corrections = n
             source: 'One-Line transformer data',
             method: 'percent-impedance',
             rOhm: impedance.r,
-            xOhm: impedance.x
+            xOhm: impedance.x,
+            upstreamVoltageKV: ports.upstreamVoltageKV,
+            downstreamVoltageKV: ports.currentVoltageKV,
+            referralRatioSquared: ports.upstreamVoltageKV && ports.currentVoltageKV
+              ? (ports.currentVoltageKV / ports.upstreamVoltageKV) ** 2
+              : null
           });
         }
       }
@@ -1043,12 +1127,42 @@ function buildImpedancePath(comp, comps, compMap, cableResolver, corrections = n
         source: 'One-Line source data',
         method: 'thevenin',
         rOhm: impedance.r,
-        xOhm: impedance.x
+        xOhm: impedance.x,
+        sourceVoltageKV: directNominalVoltageKV(current)
       });
     }
   }
 
   return { segments, assumptions, requiredInputs };
+}
+
+function directNominalVoltageKV(comp) {
+  return toKV(
+    pickValue(comp, 'kV')
+    ?? pickValue(comp, 'kv')
+    ?? pickValue(comp, 'baseKV')
+    ?? pickValue(comp, 'voltage')
+    ?? pickValue(comp, 'volts')
+    ?? pickValue(comp, 'rated_kv')
+  );
+}
+
+/** Resolve the nameplate voltage base at a fault node, excluding prefault overrides. */
+function computeNominalFaultKV(comp, comps, compMap, visited = new Set()) {
+  if (!comp?.id || visited.has(comp.id)) return null;
+  visited.add(comp.id);
+  const direct = directNominalVoltageKV(comp);
+  if (direct && direct > 0) return direct;
+  const parent = findParentInfo(comp, comps, compMap, visited);
+  if (parent?.component) {
+    const { component: upstream, connection, reversed } = parent;
+    if (upstream.type === 'transformer' && connection) {
+      const ports = transformerConnectionPorts(upstream, connection, reversed);
+      if (ports.currentVoltageKV && ports.currentVoltageKV > 0) return ports.currentVoltageKV;
+    }
+    return computeNominalFaultKV(upstream, comps, compMap, visited);
+  }
+  return null;
 }
 
 function computePrefaultKV(comp, comps, compMap, cache, visited = new Set()) {
@@ -1137,7 +1251,10 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       : (Array.isArray(opts.cables) ? opts.cables : []);
   } else {
     opts = modelOrOpts || {};
-    const { sheets } = getOneLine();
+    const oneLine = Array.isArray(opts.oneLine)
+      ? { activeSheet: 0, sheets: opts.oneLine }
+      : (opts.oneLine || getOneLine());
+    const { sheets = [] } = oneLine;
     comps = Array.isArray(sheets[0]?.components)
       ? sheets.flatMap(s => s.components)
       : sheets;
@@ -1161,7 +1278,7 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
   const voltageCache = new Map();
   const protectiveLookupCache = new Map();
   const scaledDeviceCache = new Map();
-  const tccSettings = loadTccSettings();
+  const tccSettings = loadTccSettings(opts.tccSettings);
   const protectiveDeviceLibrary = Array.isArray(opts.deviceCatalog)
     ? opts.deviceCatalog
     : defaultProtectiveDeviceCatalog;
@@ -1172,6 +1289,7 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
   const defaultedLowImpedanceComponents = new Map();
   const cablesMissingImpedance = new Set();
   const cableDefaultTargets = new Set();
+  const cableMissingTargets = new Set();
 
   const reverseConnectionMap = new Map();
   comps.forEach(component => {
@@ -1190,7 +1308,10 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
     if (Math.abs(base.r) >= 1e-9 || Math.abs(base.x) >= 1e-9) return;
     cablesMissingImpedance.add(component.id);
     (component.connections || []).forEach(conn => {
-      if (typeof conn?.target === 'string') cableDefaultTargets.add(conn.target);
+      if (typeof conn?.target === 'string') {
+        cableDefaultTargets.add(conn.target);
+        cableMissingTargets.add(conn.target);
+      }
     });
     const upstream = reverseConnectionMap.get(component.id);
     if (upstream) {
@@ -1201,36 +1322,37 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
   });
 
   const ensureNonZero = (z, comp, fallbackZ) => {
-    const r = Number(z?.r) || 0;
-    const x = Number(z?.x) || 0;
+    const r = Number(z?.r);
+    const x = Number(z?.x);
+    if (!Number.isFinite(r) || !Number.isFinite(x)) {
+      if (comp?.id) missingImpedanceComponents.add(comp.id);
+      return null;
+    }
     if (Math.abs(r) < 1e-9 && Math.abs(x) < 1e-9) {
-      if (fallbackZ && (Math.abs(fallbackZ.r) >= 1e-9 || Math.abs(fallbackZ.x) >= 1e-9)) {
+      const isMissingConductorData = comp?.id
+        && (cablesMissingImpedance.has(comp.id) || cableMissingTargets.has(comp.id));
+      if (fallbackZ && !isMissingConductorData
+        && (Math.abs(fallbackZ.r) >= 1e-9 || Math.abs(fallbackZ.x) >= 1e-9)) {
         return { r: fallbackZ.r, x: fallbackZ.x };
       }
       const isConductorMissing = (comp?.type === 'cable' || comp?.type === 'busway') && comp?.id && cablesMissingImpedance.has(comp.id);
       const isTargetOfMissingCable = comp?.id && cableDefaultTargets.has(comp.id);
-      if ((isConductorMissing || isTargetOfMissingCable) && comp?.id) {
-        defaultedLowImpedanceComponents.set(
-          comp.id,
-          `${comp?.type === 'busway' ? 'Busway' : 'Cable'} impedance incomplete; results defaulted to low impedance until impedance data is provided.`
-        );
-        return { r: 1e-6, x: 1e-6 };
+      if ((isConductorMissing || isTargetOfMissingCable || isProtectionComponent(comp)) && comp?.id) {
+        missingImpedanceComponents.add(comp.id);
+      } else if (comp?.id) {
+        missingImpedanceComponents.add(comp.id);
       }
-      if (isProtectionComponent(comp) && comp?.id) {
-        defaultedLowImpedanceComponents.set(
-          comp.id,
-          'Protective device properties incomplete; results defaulted to low impedance until data is provided.'
-        );
-        return { r: 1e-6, x: 1e-6 };
-      }
-      if (comp?.id) missingImpedanceComponents.add(comp.id);
-      return { r: 1e-6, x: 1e-6 };
+      return null;
     }
     return { r, x };
   };
 
   comps.forEach(comp => {
     if (comp?.id && compMap.get(comp.id) !== comp) return;
+    // Validate transformer winding bases before solving. A missing or
+    // unsupported ratio must withhold the result instead of preserving an
+    // upstream ohmic value as though it were already on the fault-bus base.
+    const preflightPath = buildImpedancePath(comp, comps, compMap, cableResolver, iecCorrections);
     const baseZ = computeImpedance(comp, comps, compMap, impedanceCache, new Set(), cableResolver, iecCorrections);
     const fallbackZ = (!hasBusNodes || isBusStudyNode(comp))
       ? resolveUpstreamImpedance(comp, comps, compMap, impedanceCache, cableResolver, iecCorrections)
@@ -1240,7 +1362,20 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
     let z0 = comp.z0 ? toImpedance(comp.z0) : z1;
 
     const sourceList = Array.isArray(comp.sources) ? comp.sources : [];
-    if (sourceList.length) {
+    const hasInvalidSequenceInput = ['z1', 'z2', 'z0'].some(key => hasInvalidImpedanceField(comp, key))
+      || sourceList.some(source => ['z1', 'z2', 'z0'].some(key => {
+        const value = source?.[key]
+          ?? source?.impedance
+          ?? (!source?.z1 && !source?.z2 && !source?.z0 ? source : undefined);
+        return hasInvalidImpedanceField(source, key) || hasNonFiniteImpedance(value);
+      }));
+    if (hasInvalidSequenceInput) {
+      missingImpedanceComponents.add(comp.id);
+      z1 = null;
+      z2 = null;
+      z0 = null;
+    }
+    if (!hasInvalidSequenceInput && sourceList.length) {
       z1 = ensureNonZero(sourceList.reduce((acc, src) => combineParallel(acc, toImpedance(src.z1 || src.impedance || src)), z1), comp, fallbackZ);
       z2 = ensureNonZero(sourceList.reduce((acc, src) => combineParallel(acc, toImpedance(src.z2 || src.impedance || src)), z2), comp, fallbackZ);
       z0 = ensureNonZero(sourceList.reduce((acc, src) => combineParallel(acc, toImpedance(src.z0 || src.impedance || src)), z0), comp, fallbackZ);
@@ -1250,25 +1385,59 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       z0 = ensureNonZero(z0, comp, fallbackZ);
     }
 
-    const prefaultKV = computePrefaultKV(comp, comps, compMap, voltageCache) || 1;
+    const prefaultKV = computePrefaultKV(comp, comps, compMap, voltageCache);
     const methodCandidate = comp.method ?? opts.method ?? (prefaultKV > 1 ? 'IEC' : 'ANSI');
     const method = typeof methodCandidate === 'string'
       ? methodCandidate.toUpperCase()
       : (prefaultKV > 1 ? 'IEC' : 'ANSI');
 
     let entry;
+    const missingInputs = [...preflightPath.requiredInputs];
+    if (!z1 || !z2 || !z0) missingInputs.push('Finite, non-zero positive/negative/zero-sequence impedance data is required.');
+    if (!Number.isFinite(prefaultKV) || prefaultKV <= 0) missingInputs.push('A finite, positive prefault line-to-line voltage is required.');
+    if (cableMissingTargets.has(comp.id) || cablesMissingImpedance.has(comp.id)) {
+      missingInputs.push('Connected cable or busway impedance data is incomplete.');
+    }
+    let incomplete = missingInputs.length > 0;
     if (method === 'IEC') {
       // Near-to-generator decay (IEC 60909-0 §8): when the terminal infeed is a
       // synchronous machine it supplies the whole initial current at this bus, so
       // I"kG = I"k3 and μ applies to all of it. Any other source type leaves
       // generatorRatedCurrentKA null, which yields μ = 1.
       const terminalSource = findTerminalSource(comp, comps, compMap);
-      const iRatedKA = generatorRatedCurrentKA(terminalSource);
+      const nominalFaultKV = computeNominalFaultKV(comp, comps, compMap) || prefaultKV;
+      const iRatedKA = generatorRatedCurrentKA(terminalSource, nominalFaultKV);
       const c = iecCFactor(prefaultKV, opts.cMode || 'max', opts.lvTolerancePct ?? 10);
-      const ikTotalKA = ((prefaultKV * c) / Math.sqrt(3)) / mag(z1);
+      const ikTotalKA = !incomplete && c ? ((prefaultKV * c) / Math.sqrt(3)) / mag(z1) : null;
 
       // Delegate to the full IEC 60909-0:2016 engine
-      const iecFields = computeIEC60909Bus({
+      const iecFields = incomplete ? {
+        validity: 'unevaluated',
+        calculationStatus: 'incomplete',
+        requiredInputs: missingInputs,
+        warnings: [],
+        provenance: { standard: 'IEC 60909-0:2016', method: 'equivalent-voltage-source' },
+        modelLimits: {
+          thermalEquivalent: 'Screening-only simplified m+n approximation; verify against the adopted study method before issue.',
+          nearGeneratorThermal: 'Near-generator thermal decay is not a validated time-domain integration.'
+        },
+        cFactor: null,
+        kappa: null,
+        mu: null,
+        nearToGenerator: false,
+        generatorRatioIkgIrg: null,
+        threePhaseKA: null,
+        lineToLineKA: null,
+        lineToGroundKA: null,
+        doubleLineGroundKA: null,
+        doubleLineGroundPhaseBKA: null,
+        doubleLineGroundPhaseCKA: null,
+        doubleLineGroundEarthKA: null,
+        ip: null,
+        Ib: null,
+        Ith: null,
+        asymKA: null
+      } : computeIEC60909Bus({
         z1,
         z2,
         z0,
@@ -1292,39 +1461,76 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       const vFactor = comp.v_factor || 1.05;
       const V = (prefaultKV * vFactor) / Math.sqrt(3); // phase voltage in kV
 
-      const I3 = V / mag(z1);
-      const ILG = (3 * V) / mag(add(add(z1, z2), z0));
-      const ILL = (Math.sqrt(3) * V) / mag(add(z1, z2));
-      const Z2Z0 = parallel(z2, z0);
-      const IDLG = (3 * V) / mag(add(z1, Z2Z0));
+      const I3 = incomplete ? null : V / mag(z1);
+      const lineGroundImpedance = incomplete ? null : add(add(z1, z2), z0);
+      const lineLineImpedance = incomplete ? null : add(z1, z2);
+      const ILG = incomplete ? null : (3 * V) / mag(lineGroundImpedance);
+      const ILL = incomplete ? null : (Math.sqrt(3) * V) / mag(lineLineImpedance);
+      const dlg = incomplete ? null : computeDoubleLineGroundCurrents({ phaseVoltage: V, z1, z2, z0 });
+      const IDLG = dlg?.compatibilityKA ?? null;
+      const singularLineGround = lineGroundImpedance
+        && Math.hypot(lineGroundImpedance.r, lineGroundImpedance.x) <= 1e-12;
+      const singularLineLine = lineLineImpedance
+        && Math.hypot(lineLineImpedance.r, lineLineImpedance.x) <= 1e-12;
+      if (!incomplete && (singularLineGround || singularLineLine)
+        || ![I3, ILG, ILL, IDLG].every(Number.isFinite)) {
+        incomplete = true;
+        missingInputs.push('Sequence impedance network is singular or produced a non-finite fault current.');
+      }
 
       const xr = Math.abs(comp.xr_ratio || 0);
-      const asym = I3 * Math.SQRT2 * (1 + Math.exp(-Math.PI / Math.max(xr, 0.01)));
+      const asym = Number.isFinite(I3)
+        ? I3 * Math.SQRT2 * (1 + Math.exp(-Math.PI / Math.max(xr, 0.01)))
+        : null;
 
       entry = {
         method: 'ANSI',
         prefaultKV: Number(prefaultKV.toFixed(3)),
-        threePhaseKA: Number(I3.toFixed(2)),
-        asymKA: Number(asym.toFixed(2)),
-        lineToGroundKA: Number(ILG.toFixed(2)),
-        lineToLineKA: Number(ILL.toFixed(2)),
-        doubleLineGroundKA: Number(IDLG.toFixed(2))
+        validity: incomplete ? 'unevaluated' : 'evaluated',
+        calculationStatus: incomplete ? 'incomplete' : 'screening-only',
+        requiredInputs: incomplete ? missingInputs : [],
+        warnings: [],
+        provenance: { standard: 'ANSI/IEEE C37', method: 'symmetrical-components' },
+        modelLimits: { doubleLineGround: 'B/C faulted-phase RMS currents and earth residual are computed from complex symmetrical components; compatibility current is max(B,C).' },
+        threePhaseKA: Number.isFinite(I3) ? Number(I3.toFixed(2)) : null,
+        asymKA: Number.isFinite(asym) ? Number(asym.toFixed(2)) : null,
+        lineToGroundKA: Number.isFinite(ILG) ? Number(ILG.toFixed(2)) : null,
+        lineToLineKA: Number.isFinite(ILL) ? Number(ILL.toFixed(2)) : null,
+        doubleLineGroundKA: !incomplete && Number.isFinite(IDLG) ? Number(IDLG.toFixed(2)) : null,
+        doubleLineGroundPhaseBKA: !incomplete && dlg ? Number(dlg.phaseBKA.toFixed(2)) : null,
+        doubleLineGroundPhaseCKA: !incomplete && dlg ? Number(dlg.phaseCKA.toFixed(2)) : null,
+        doubleLineGroundEarthKA: !incomplete && dlg ? Number(dlg.earthKA.toFixed(2)) : null
       };
+      if (incomplete) {
+        entry.validity = 'unevaluated';
+        entry.calculationStatus = 'incomplete';
+        entry.requiredInputs = [...new Set(missingInputs)];
+        entry.threePhaseKA = null;
+        entry.asymKA = null;
+        entry.lineToGroundKA = null;
+        entry.lineToLineKA = null;
+      }
     }
 
     const lowImpedanceWarning = defaultedLowImpedanceComponents.get(comp.id);
     if (lowImpedanceWarning) {
       entry.warnings = [lowImpedanceWarning];
     } else if (missingImpedanceComponents.has(comp.id)) {
-      entry.warnings = ['Impedance data missing; results defaulted to low impedance until data is provided.'];
+      entry.warnings = ['Impedance data missing; affected currents were withheld until finite source and sequence impedances are provided.'];
     }
 
     const path = buildImpedancePath(comp, comps, compMap, cableResolver, iecCorrections);
+    const nominalFaultKV = computeNominalFaultKV(comp, comps, compMap) || prefaultKV;
     entry.equipmentTag = componentIdentity(comp) || comp.id;
     entry.impedanceProvenance = {
-      totalR: Number(z1.r || 0),
-      totalX: Number(z1.x || 0),
+      totalR: z1 && Number.isFinite(Number(z1.r)) ? Number(z1.r) : null,
+      totalX: z1 && Number.isFinite(Number(z1.x)) ? Number(z1.x) : null,
+      faultBusVoltageKV: Number.isFinite(Number(nominalFaultKV)) ? Number(nominalFaultKV) : null,
       segments: path.segments
+    };
+    entry.provenance = {
+      ...(entry.provenance || {}),
+      impedance: entry.impedanceProvenance
     };
     if (path.assumptions.length) {
       entry.warnings = [...new Set([...(entry.warnings || []), ...path.assumptions])];
@@ -1332,6 +1538,11 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
     if (path.requiredInputs.length) {
       entry.requiredInputs = [...new Set([...(entry.requiredInputs || []), ...path.requiredInputs])];
     }
+    if (incomplete) {
+      entry.warnings = [...new Set([...(entry.warnings || []), 'Short-circuit currents were not evaluated because required network inputs are incomplete.'])];
+    }
+    if (!entry.warnings?.length) delete entry.warnings;
+    if (!entry.requiredInputs?.length) delete entry.requiredInputs;
 
     limitFaultByProtection(
       entry,

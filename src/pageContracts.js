@@ -29,10 +29,14 @@ function contract({
   downstream = [],
   notes = []
 }) {
+  const hasStudyData = [...projectInputs, ...outputs].some(item => item.key === 'studyResults' || item.key.startsWith('studyResults.'));
+  const lifecycleInputs = hasStudyData && !projectInputs.some(item => item.key === studyProvenance.key)
+    ? [...projectInputs, studyProvenance]
+    : projectInputs;
   return {
     workflowStep,
     standaloneInputs,
-    projectInputs,
+    projectInputs: lifecycleInputs,
     outputs,
     readiness,
     downstream,
@@ -60,6 +64,7 @@ const trays = projectInput('traySchedule', 'schedule', true, 'Tray IDs, dimensio
 const conduits = projectInput('conduitSchedule', 'schedule', true, 'Conduit IDs, trade sizes, fill limits, material, and route geometry.');
 const ductbanks = projectInput('ductbankSchedule', 'schedule', false, 'Ductbank segments, conduit groups, geometry, and underground routing metadata.');
 const studies = projectInput('studyResults', 'study-result', false, 'Saved study results available for reports, cross-checks, and downstream studies.');
+const studyProvenance = projectInput('settings.studyProvenance', 'setting', false, 'Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.');
 const projectMeta = projectInput('settings.projectMeta', 'setting', false, 'Canonical project identity, client, site, engineer, revision, and environmental context.');
 const designBasis = projectInput('settings.designBasis', 'setting', false, 'Project code basis, sizing defaults, routing defaults, and study prerequisites.', { audit: { expectRead: false, reason: 'Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.' } });
 const designGates = projectInput('settings.designGateApprovals', 'setting', false, 'Review gate status used before deliverable release.');
@@ -75,6 +80,7 @@ const costEstimateArtifact = projectInput('settings.costEstimateArtifact', 'sett
 const pullPlanArtifact = projectInput('settings.pullPlanArtifact', 'setting', false, 'Saved pull engineering assumptions, direction comparison, limits, jam screening, and input warnings.');
 const scenarios = projectInput('settings.scenarios', 'setting', false, 'Scenario registry and active scenario selection.');
 const oneLineReconcilePending = projectInput('settings.oneLineScheduleReconcilePending', 'setting', false, 'Legacy compatibility flag; automatic shared-data synchronization keeps this false.');
+const designSynthesisReviewDraft = projectInput('settings.designSynthesisReviewDraft', 'setting', false, 'Persistent preliminary review-project status and issue restriction.');
 const switchingProcedures = projectInput('settings.switchingProcedures', 'setting', false, 'Read-only proposed switching procedure records and planning hold points.');
 const equipmentFilterPresets = projectInput('settings.equipmentFilterPresets', 'setting', false, 'Saved equipment list filter presets.');
 const mccLineupActiveId = projectInput('settings.mccLineupActiveId', 'setting', false, 'Active MCC lineup selection.');
@@ -118,6 +124,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
       costEstimateArtifact,
       tccSettings,
       oneLineReconcilePending,
+      designSynthesisReviewDraft,
       projectInput('settings.activeSampleWorkflow', 'setting', false, 'Active sample context used to suppress redundant sample-loading guidance.'),
       projectInput('settings.workflowDashboardFocus', 'setting', false, 'Routing or full-engineering dashboard focus selected for this project.')
     ],
@@ -218,7 +225,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
     workflowStep: 'oneLineDiagram',
     standaloneInputs: ['Manual diagram drawing, palette components, and imported sample diagrams within the active project.'],
     projectInputs: [
-      equipment, loads, panels, cables, trays, conduits, studies, tccSettings,
+      equipment, loads, panels, cables, trays, conduits, studies, tccSettings, designSynthesisReviewDraft,
       projectInput('settings.manufacturerDefaults', 'setting', false, 'Manufacturer default selections for one-line component properties.'),
       projectInput('settings.diagramScale', 'setting', false, 'Diagram scale setting.'),
       projectInput('settings.studySettings', 'setting', false, 'One-line embedded study settings.'),
@@ -228,7 +235,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
       projectInput('settings.diagramDatablockConfig', 'setting', false, 'One-line datablock display configuration.'),
       projectInput('settings.studyProvenance', 'setting', false, 'Study scenario, revision, approval, and run metadata used to qualify one-line overlays.'),
       projectInput('settings.activeSampleWorkflow', 'setting', false, 'Active sample context used to fit and guide the sample diagram.'),
-      projectInput('settings.gistToken', 'setting', false, 'Gist import/export token setting.'),
+      projectInput('settings.designSynthesisDeviceEvidence', 'setting', false, 'Referenced design-synthesis protective-device evidence for the selected linked cable.'),
       liveTelemetryConfig
     ],
     outputs: [
@@ -248,6 +255,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
       output('studyResults.harmonicNetwork', 'study-result', 'Embedded per-bus, per-branch, and PCC harmonic network screen generated from one-line.', ['harmonics.html', 'projectreport.html']),
       output('studyResults.motorStart', 'study-result', 'Embedded motor-start result generated from one-line.', ['motorStart.html', 'projectreport.html']),
       output('studyResults.reliability', 'study-result', 'Embedded reliability result generated from one-line.', ['reliability.html', 'projectreport.html']),
+      output('settings.studyProvenance', 'setting', 'Lifecycle sidecar qualifying embedded study results by source snapshot, model revision, validity, and freshness.', ['oneline.html', 'projectreport.html']),
       output('studyResults.duty', 'study-result', 'Embedded equipment-duty result generated from one-line validation.', ['equipmentevaluation.html', 'projectreport.html']),
       output('settings.scenarios', 'setting', 'Active scenario selection restored during one-line project import.', ['scenarios.html']),
       output('settings.studySettings', 'setting', 'One-line embedded study settings.', ['oneline.html']),
@@ -257,7 +265,6 @@ export const PAGE_CONTRACTS_BY_HREF = {
       output('settings.diagramDatablockConfig', 'setting', 'One-line datablock display configuration.', ['oneline.html']),
       output('settings.diagramScale', 'setting', 'Diagram scale setting.', ['oneline.html']),
       output('settings.diagramTitleBlock', 'setting', 'One-line title block fields.', ['oneline.html']),
-      output('settings.gistToken', 'setting', 'Gist import/export token setting.', ['oneline.html']),
       output('settings.onelineTemplates', 'setting', 'Reusable one-line component templates saved with project settings.', ['oneline.html']),
       output('settings.activeSampleWorkflow', 'setting', 'Sample workflow layout version saved after the diagram is arranged and fit.', ['oneline.html']),
       output('settings.oneLineScheduleReconcilePending', 'setting', 'Legacy reconcile flag retained as false for compatibility.', ['workflowdashboard.html']),
@@ -293,7 +300,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'cableschedule.html': contract({
     workflowStep: 'cableSchedule',
     standaloneInputs: ['Manual cable rows, template selection, imports, inline edits, and report options.'],
-    projectInputs: [equipment, loads, panels, oneLine, trays, conduits, ductbanks, cableTagSettings, cableChangeLog, designBasis, projectInput('settings.trayHardwareCatalogCustomProducts', 'setting', false, 'Project-owned governed cable constructions imported from the shared manufacturer catalog.')],
+    projectInputs: [equipment, loads, panels, oneLine, trays, conduits, ductbanks, cableTagSettings, cableChangeLog, designBasis, designSynthesisReviewDraft, projectInput('settings.trayHardwareCatalogCustomProducts', 'setting', false, 'Project-owned governed cable constructions imported from the shared manufacturer catalog.')],
     outputs: [
       output('cableSchedule', 'schedule', 'Cable rows with tags, endpoints, conductor details, length, and raceway assignments.', ['racewayschedule.html', 'cabletrayfill.html', 'conduitfill.html', 'optimalRoute.html', 'voltagedropstudy.html']),
       output('settings.cableTemplates', 'setting', 'User-maintained cable templates.', ['cableschedule.html']),
@@ -306,7 +313,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'panelschedule.html': contract({
     workflowStep: 'cableSchedule',
     standaloneInputs: ['Panel definitions, circuit rows, breaker selections, connected loads, and cable tags.'],
-    projectInputs: [equipment, loads, cables, designBasis],
+    projectInputs: [equipment, loads, cables, projectInput('oneLineDiagram', 'model', false, 'One-line data is checked for unresolved generated motor protection when exporting.'), designBasis, designSynthesisReviewDraft],
     outputs: [
       output('panelSchedule', 'schedule', 'Panel metadata, circuit schedules, breaker assignments, and served load links.', ['loadlist.html', 'oneline.html', 'cableschedule.html']),
       output('loadList', 'schedule', 'Panel-driven load updates when circuit edits create or update served loads.', ['loadlist.html', 'demandschedule.html']),
@@ -581,7 +588,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'projectreport.html': contract({
     workflowStep: 'deliverables',
     standaloneInputs: ['Report package selections, cover sheet data, revision rows, and manual assumptions.'],
-    projectInputs: [...deliverableInputs, lifecyclePackages, tccSettings, projectMeta, oneLineReconcilePending],
+    projectInputs: [...deliverableInputs, lifecyclePackages, tccSettings, projectMeta, oneLineReconcilePending, designSynthesisReviewDraft],
     outputs: [
       output('settings.projectMeta', 'setting', 'Shared project and report metadata edited from the report builder.', ['battery.html', 'generatorsizing.html', 'projectreport.html']),
       output('settings.reportSnapshots', 'setting', 'Saved report package snapshots.', ['workflowdashboard.html', 'projectreport.html']),
@@ -605,7 +612,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'demandschedule.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['Manual demand rows, diversity factors, load classes, and imported load schedules.'],
-    projectInputs: [loads, equipment, panels, designBasis],
+    projectInputs: [loads, equipment, panels, studyProvenance, designBasis],
     outputs: [
       exportOnly('Demand schedule summaries and load aggregation exports.', ['loadFlow.html', 'generatorsizing.html', 'projectreport.html'])
     ],
@@ -631,6 +638,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
     ],
     outputs: [
       output('studyResults.iec60287', 'study-result', 'Saved IEC 60287 ampacity result and input snapshot.', ['projectreport.html']),
+      output('studyResults.cableThermalDetailed', 'study-result', 'Saved source-traceable detailed cable thermal screening result, normalized inputs, losses, phase temperatures, and limitations.', ['projectreport.html']),
       studyApprovalOutput,
       exportOnly('IEC 60287 calculation report exports.', ['projectreport.html'])
     ],
@@ -697,6 +705,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
       projectInput('studyResults.capacitorBank', 'study-result', false, 'Capacitor bank sizing used as scan context.'),
       projectInput('studyResults.shortCircuit', 'study-result', false, 'System fault strength used for impedance estimates.'),
       projectInput('studyResults.iec60909', 'study-result', false, 'IEC short-circuit result used as a source-strength fallback.'),
+      projectMeta,
       designBasis,
       approvals
     ],
@@ -1123,7 +1132,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'transientstability.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['Generator inertia, mechanical power, clearing time, transfer reactance, and fault profile inputs.'],
-    projectInputs: [oneLine, equipment, projectInput('studyResults.loadFlow', 'study-result', false, 'Prefault operating point context.'), projectInput('studyResults.shortCircuit', 'study-result', false, 'Fault context for clearing checks.'), designBasis],
+    projectInputs: [oneLine, equipment, projectInput('studyResults.loadFlow', 'study-result', false, 'Prefault operating point context.'), projectInput('studyResults.shortCircuit', 'study-result', false, 'Fault context for clearing checks.'), projectMeta, designBasis],
     outputs: [
       output('studyResults.transientStability', 'study-result', 'Saved OMIB simulation, equal-area screen, and numerical critical-clearing-time result.', ['projectreport.html']),
       exportOnly('Transient stability plots and reports.', ['projectreport.html'])
@@ -1146,7 +1155,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'voltagedropstudy.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['Manual cable length/load rows, circuit classification, voltage, and conductor settings.'],
-    projectInputs: [cables, loads, projectInput('studyResults.loadFlow', 'study-result', false, 'Operating current or voltage context when available.'), designBasis],
+    projectInputs: [cables, loads, projectInput('studyResults.loadFlow', 'study-result', false, 'Operating current or voltage context when available.'), projectInput('settings.studyProvenance', 'setting', false, 'Input hash and source provenance used to reject stale study context.'), designBasis],
     outputs: [
       output('cableSchedule', 'schedule', 'Selected conductor-size recommendations applied through the governed cable schedule.', ['cableschedule.html', 'scenarios.html', 'projectreport.html']),
       output('studyResults.voltageDropStudy', 'study-result', 'Saved individual and feeder-plus-branch voltage-drop result with source traceability and sizing recommendations.', ['scenarios.html', 'projectreport.html']),

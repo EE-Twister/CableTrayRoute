@@ -265,6 +265,8 @@ export function buildRevisionTable(rows = []) {
  *   coverSheet?: object,
  *   revisions?: any[],
  *   assumptions?: string,
+ *   studyContextIndex?: object,
+ *   currentInputFingerprint?: string,
  * }} config
  * @param {{ [sectionKey: string]: object }} sectionData - pre-built section objects keyed by section key
  * @returns {ReportPackage}
@@ -275,6 +277,8 @@ export function buildReportPackage(config = {}, sectionData = {}) {
     coverSheet = {},
     revisions = [],
     assumptions = '',
+    studyContextIndex = {},
+    currentInputFingerprint = null,
   } = config;
 
   const cover    = buildCoverSheet(coverSheet);
@@ -313,7 +317,14 @@ export function buildReportPackage(config = {}, sectionData = {}) {
   return {
     id: `pkg-${Date.now()}`,
     generatedAt: new Date().toISOString(),
-    config: { sections, coverSheet: cover, revisions: revTable, assumptions: String(assumptions) },
+    config: {
+      sections,
+      coverSheet: cover,
+      revisions: revTable,
+      assumptions: String(assumptions),
+      currentInputFingerprint: currentInputFingerprint || null,
+    },
+    studyContextIndex: JSON.parse(JSON.stringify(studyContextIndex || {})),
     sections: builtSections,
   };
 }

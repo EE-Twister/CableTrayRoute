@@ -1,12 +1,81 @@
 # Calculation Accuracy Review
 
+> **Current status — 2026-10-25 UTC:** This document records corrections and scoped checks, including the [cable thermal tranche](cable-thermal-verification-2026-09-18.md), [conditional cable fault thermal screen](design-synthesis-cable-fault-withstand.md), [explicit initial fault-network integration](design-synthesis-fault-network.md), and [bounded TCC equipment comparisons](tcc-equipment-protection.md). It is not a blanket validation of every calculation or input range. The [calculation and feature review](calculation-feature-review-2026-09-16.md) records the C1–C10 defects as originally reproduced; the [correction verification](calculation-correction-verification-2026-09-17.md) records subsequent repairs and acceptance results. Overall readiness remains **Screening only**.
+
 Review of the engineering calculation modules for formula/numerical errors and
 for clarity of the inputs and assumptions each calculation makes. Findings are
 grouped into **corrected errors** (output was wrong) and **clarified
 assumptions** (output unchanged, but a simplification/limitation is now
 documented so users are not misled).
 
+The subsequent [independent calculation evidence review](calculation-evidence-verification-2026-09-17.md)
+records transformer voltage-base referral and ground-grid effective-length
+defects exposed by the next benchmark tranche, together with the verification
+of their corrections and revised evidence classifications.
+
+The [Design Synthesis study handoff review](design-synthesis-study-handoff.md)
+records a separate integration correction: generated drawings previously lost
+cable impedance and produced spurious load-flow branches. Generated and saved
+graphs now retain the physical circuits, load power, impedance, and cable
+ampacity metadata. The standalone study budget and result-serialization fixes
+are part of that verification; they do not change the convergence tolerance
+or establish full industrial-design readiness.
+
 ## Corrected errors
+
+The [bounded TCC equipment-curve review](tcc-equipment-protection.md) records
+corrections to endpoint clamping, vertical-boundary selection and missed interior
+damage limits. Unknown coverage no longer produces an evaluated time or margin.
+This improves the protection checking path without establishing exact
+manufacturer clearing semantics or completing motor protection.
+
+The [explicit initial fault-network review](design-synthesis-fault-network.md)
+adds a separate Design Synthesis network model for remote motor infeed, complex
+voltage-base transfers and shared-path current division. Its independently
+derived fixtures include numerical cancellation and 25/50-load routed cases.
+Legacy local-equivalent calculations retain their existing scope, and complete
+motor fault duty and protection remain unresolved.
+
+The subsequent [proposed-device current screen](design-synthesis-device-fault-screen.md)
+records source-end placement assumptions and distinguishes line-terminal current
+from actual current through the proposed device. Its independent oracle inserts
+explicit ideal breaker branches, including a mixed-voltage aggregate secondary
+main and a complex transformer tap. Full protection adequacy remains unevaluated.
+
+The [transformer foundation review](design-synthesis-transformers.md) records
+corrections to tapped-transformer terminal currents, shunt accounting, and
+voltage-drop reporting across voltage levels, with independent power-balance
+checks and separate final-gate status.
+
+The [September 18 cable thermal verification](cable-thermal-verification-2026-09-18.md)
+adds a separate geometry-based direct-burial thermal screen and public source
+profiles. It also records corrections to the legacy load-profile screen's core
+count, heat-capacity units, and time-constant scaling. These changes retain the
+overall **Screening only** classification.
+
+The optional [cable fault thermal screen](design-synthesis-cable-fault-withstand.md)
+adds a separate conditional adiabatic comparison for final sourced copper MC
+cables using per-phase signed branch histories. Its source coefficient and
+nominal metal areas are independent of the direct-burial thermal model above.
+Its continuous fault-selection mode now checks endpoint limits and every
+interior position of every generated cable against every selected conductor;
+legacy bus-only requests retain their prior scope. Complete extrema describe
+the supplied rounded coefficient model, without network forward-error or
+physical-input uncertainty bounds. It does not calculate actual device
+clearing or establish cable qualification. The [acceptance contract](design-synthesis-acceptance.md)
+records implementation verification; complete protection remains unresolved.
+
+Automatic conductor trials now connect a failed conditional comparison back to
+the sizing/routing pipeline under the existing shared absolute revision budget.
+Independent cases cover current feedback after resizing, endpoint EMT and tray
+capacity changes, retained operating-current margins, source-stock exhaustion,
+and exact saved criteria/history. This closes the automatic resizing gap for
+the supported bus and continuous cable-span screens. Actual protective
+clearing and complete motor protection remain unresolved. Independent exact
+SymPy root isolation verifies the new degree-six polynomial model; a synthetic
+cross-cable interior fault fixture fails the thermal limit despite passing
+endpoint/midpoint samples. The shared legacy fault solver retains exact output
+parity across 711 differential cases.
 
 | Module | Issue | Fix |
 | --- | --- | --- |
@@ -29,7 +98,9 @@ documented so users are not misled).
 | `analysis/voltageStability.mjs` | Q injection was clamped at zero net reactive load, flattening the Q-V sweep once injection exceeded the original demand. Sequential Newton-Raphson nonconvergence was labeled as a physical collapse/nose and converted into unsupported MW/MVAR stability margins. | Q injection can now produce net capacitive bus demand. Solver nonconvergence is reported only as a numerical boundary; physical P-V nose and reactive margins are withheld pending continuation power flow. UI, chart accessibility labels, contracts, and documentation use the same semantics. |
 | `analysis/insulationCoordination.mjs` | Protective margin was calculated from derived required withstand (`Ucw`) divided by arrester residual voltage, so selecting a higher BIL/SIL did not change the reported coordination margin. | Protective margin now uses the selected equipment withstand: `(selected BIL or SIL / arrester residual − 1) × 100`. The deterministic calculation remains a preliminary screen and identifies IEC 60071-2:2023 review and manufacturer insulation/arrester data as required for final coordination. |
 
-## Major rework: full standard implementations
+## Major rework: implemented models and benchmark scope
+
+The following entries describe the earlier implementation work and its identified fixtures. Agreement with those fixtures does not establish full standards coverage or validate every supported configuration.
 
 | Module | What was done |
 | --- | --- |
@@ -56,7 +127,9 @@ incomplete and therefore ineligible for draft labels.
 | `analysis/seismicBracing.mjs` & `analysis/seismicWindCombined.mjs` | The component-force equation is the **ASCE 7-16 §13.3.1 form** (`Fp = 0.4·ap·SDS·Wp·(1+2z/h)/(Rp/Ip)`); the revised ASCE 7-22 §13.3.1 equation (Hf, Rμ, Car, Rpo) is **not** implemented. The 12 ft / 40 ft brace spacings are NEMA VE 2 guidance values, not literal ASCE 7 limits. SDC E/F are derived from conservative SD1 thresholds as a stand-in for the §11.6 `S1 ≥ 0.75` rule, because the tool collects SD1 but not S1. |
 | `src/voltageDrop.js` | Power factor defaults to 0.9 lagging when `cable.power_factor` is absent; conduit material defaults to non-magnetic (PVC/aluminum) for the Table 9 column selection. |
 
-## Verified correct (audited, no change needed)
+## Earlier scoped checks (not complete validation)
+
+The earlier review checked the aspects listed below. It did not establish correctness across all inputs, numerical boundaries, UI adapters, or report paths. In particular, the new review found an IEC 60909 thermal-factor overflow and documented IEC 60287 simplifications and an invalid-geometry result; see the current review and [IEC 60287 guide](iec60287.md) before relying on either module.
 
 `analysis/iec60909.mjs` (c-factors, κ, K_T, ip, Ik1/Ik2/Ik3),
 `analysis/dcShortCircuit.mjs` (Stokes-Oppenlander arc voltage and corrected Ammerman/Wilkins energy-density models),

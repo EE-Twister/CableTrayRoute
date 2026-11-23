@@ -1,4 +1,4 @@
-import { getAuthRole, getProjectState } from '../../projectStorage.js';
+import { getAuthRole, getProjectState, readSavedProject, getProjectSaveStatusPresentation } from '../../projectStorage.js';
 import { mountProfileControl } from '../authProfileControl.js';
 import { observeMojibake, repairMojibakeDocument } from '../textEncoding.js';
 
@@ -282,15 +282,81 @@ function buildBrand() {
   return brand;
 }
 
-async function runProjectAction(actionName) {
-  if (!globalThis.projectManager) {
-    await import('../projectManager.js');
+let projectManagerLoadPromise = null;
+
+async function ensureProjectManager() {
+  const existing = globalThis.projectManager;
+  if (existing && existing.__ctrLazyProjectManager !== true) return existing;
+  if (!projectManagerLoadPromise) {
+    // Keep the action-only project manager out of every page's initial
+    // bundle. The build emits this shared entry beside each page bundle.
+    projectManagerLoadPromise = import(new URL('dist/projectManager.js', document.baseURI).href)
+      .then(() => globalThis.projectManager)
+      .finally(() => { projectManagerLoadPromise = null; });
   }
-  const action = globalThis.projectManager?.[actionName];
+  return projectManagerLoadPromise;
+}
+
+async function runProjectAction(actionName, ...args) {
+  const manager = await ensureProjectManager();
+  const action = manager?.[actionName];
   if (typeof action !== 'function') {
     throw new Error('Project manager is not available.');
   }
-  return action();
+  return action(...args);
+}
+
+function wireProjectManagerButtons() {
+  const actions = [
+    ['new-project-btn', 'newProject'],
+    ['save-project-btn', 'saveProject'],
+    ['load-project-btn', 'loadProject']
+  ];
+  for (const [id, actionName] of actions) {
+    const button = document.getElementById(id);
+    if (!button || button.dataset.projectManagerWired === 'true') continue;
+    button.dataset.projectManagerWired = 'true';
+    button.addEventListener('click', () => {
+      runProjectAction(actionName).catch(console.error);
+    });
+  }
+}
+
+function installProjectManagerBridge() {
+  if (typeof window === 'undefined' || window.__ctrProjectManagerBridgeInstalled) return;
+  window.__ctrProjectManagerBridgeInstalled = true;
+  wireProjectManagerButtons();
+  const needsProjectRequiredBridge = !window.projectManager;
+  if (needsProjectRequiredBridge) {
+    window.projectManager = {
+      __ctrLazyProjectManager: true,
+      newProject: (...args) => runProjectAction('newProject', ...args),
+      saveProject: (...args) => runProjectAction('saveProject', ...args),
+      loadProject: (...args) => runProjectAction('loadProject', ...args),
+      openProjectByName: (...args) => runProjectAction('openProjectByName', ...args),
+      deleteProject: (...args) => runProjectAction('deleteProject', ...args),
+      renameProject: (...args) => runProjectAction('renameProject', ...args),
+    };
+  }
+  if (needsProjectRequiredBridge && !window.__projectRequiredListenerWired) {
+    window.__projectRequiredListenerWired = true;
+    let projectPromptOpen = false;
+    document.addEventListener('ctr:project-required', () => {
+      if (projectPromptOpen) return;
+      projectPromptOpen = true;
+      runProjectAction('newProject')
+        .catch(console.error)
+        .finally(() => { projectPromptOpen = false; });
+    });
+  }
+  document.addEventListener('keydown', event => {
+    if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 's') return;
+    const active = document.activeElement;
+    if (active?.isContentEditable || active?.tagName === 'TEXTAREA') return;
+    if (active?.matches?.('input,select')) return;
+    event.preventDefault();
+    runProjectAction('saveProject').catch(console.error);
+  });
 }
 
 function buildProjectActionsControl(existingProjectDisplay) {
@@ -330,7 +396,13 @@ function buildProjectActionsControl(existingProjectDisplay) {
   const syncStatus = document.createElement('span');
   syncStatus.id = 'project-sync-status';
   syncStatus.className = 'project-sync-status project-sync-status--local';
-  syncStatus.textContent = 'Local';
+  let updatedAt = '';
+  try {
+    const projectName = String(display.textContent || '').replace(/^Project:\s*/i, '').trim();
+    updatedAt = readSavedProject(projectName)?.__meta?.updatedAt || '';
+    syncStatus.textContent = getProjectSaveStatusPresentation(projectName, updatedAt).label;
+  } catch { /* status remains truthful when storage is unavailable */ }
+  if (!syncStatus.textContent) syncStatus.textContent = 'Not saved yet';
 
   trigger.append(icon, display, syncStatus);
 
@@ -685,7 +757,9 @@ function mountPersistentNavigation() {
 }
 
 if (typeof window !== 'undefined' && hasNavigationDomApi()) {
+  installProjectManagerBridge();
   window.addEventListener('DOMContentLoaded', () => {
+    wireProjectManagerButtons();
     mountPersistentNavigation();
     mountPageTransitions();
   });

@@ -76,7 +76,15 @@ Direction changes without modeled bend data use the configured default bend radi
 
 ## Data and persistence
 
+Imported cable labels and raceway metadata appear as plain text in viewer tooltips. Cached shared-field-route summaries are rebuilt from route records when reopened; legacy cached HTML is ignored. Route highlighting and conduit-fill actions remain available on cached summaries.
+
 Calculated route results store the enriched raceway utilization data alongside each batch. Reopening the project therefore preserves maximum-fill values in the inspector and utilization heatmap. Legacy saved route results without this enrichment still load; their capacity contribution is treated as unknown rather than zero.
+
+Voltage-drop metadata is optional for routing. If a cable has missing or unsupported voltage-drop inputs, the router still calculates and displays a valid route when its routing inputs are complete; the resulting voltage-drop field remains unevaluated (`null`) and does not block route generation. Cable records that provide phase labels through `phases` are accepted alongside the singular `phase` field.
+
+Routing merges calculated segments and voltage-drop metadata into the matching Cable Schedule records. Existing tags, terminations, coordinates, engineering inputs, and custom fields survive recalculation and reload. Explicit edits to project cables in the routing table update only the edited fields; built-in routing samples remain isolated from the project schedule. Locking a route returns to Routing Setup after rendering finishes so **Run Routing** remains available.
+
+Route CSV and workbook downloads include a row for each calculated segment, with its raceway identity, endpoint coordinates, length, and cumulative length. The workbook also contains cable summaries. Route JSON and DXF exports retain the calculated geometry. The BOM workbook includes cable and raceway quantities from fresh routing results as well as legacy saved breakdowns; field-routed gaps contribute to cable length rather than raceway materials.
 
 The GLB export includes named tray, conduit, and ductbank nodes plus every calculated route segment. Cable bends and field jumps are preserved instead of being collapsed into a straight start-to-end chord.
 

@@ -176,7 +176,7 @@ describe('runVoltageDropStudy', () => {
 
   it('summary total equals number of cables', () => {
     const cables = [
-      { cable_tag: 'A', est_load: '10', cable_rating: '480', length: '50', conductor_size: '12', conductor_material: 'CU' },
+      { cable_tag: 'A', est_load: '10', cable_rating: '480', length: '50', conductor_size: '12', conductor_material: 'CU', phases: 3 },
       { cable_tag: 'B', est_load: '10', cable_rating: '480', length: '0' },
       { cable_tag: 'C' },
     ];
@@ -188,8 +188,8 @@ describe('runVoltageDropStudy', () => {
 
   it('summary maxDropPct is >= avgDropPct', () => {
     const cables = [
-      { cable_tag: 'X', est_load: '20', cable_rating: '120', length: '100', conductor_size: '12', conductor_material: 'CU' },
-      { cable_tag: 'Y', est_load: '20', cable_rating: '120', length: '200', conductor_size: '12', conductor_material: 'CU' },
+      { cable_tag: 'X', est_load: '20', cable_rating: '120', length: '100', conductor_size: '12', conductor_material: 'CU', phases: 1 },
+      { cable_tag: 'Y', est_load: '20', cable_rating: '120', length: '200', conductor_size: '12', conductor_material: 'CU', phases: 1 },
     ];
     const { summary } = runVoltageDropStudy(cables);
     assert.ok(summary.maxDropPct >= summary.avgDropPct,

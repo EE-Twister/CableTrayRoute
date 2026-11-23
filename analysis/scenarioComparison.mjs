@@ -1,3 +1,5 @@
+import { assessStudyResult as assessReportStudyResult } from './studyResultContext.mjs';
+
 const VOLATILE_KEYS = new Set([
   'generatedAt',
   'runAt',
@@ -263,34 +265,79 @@ function collectMetrics(value, prefix = '', output = [], depth = 0) {
   return output;
 }
 
-export function summarizeStudyResult(studyKey, value, provenance = {}) {
+export function summarizeStudyResult(studyKey, value, provenance = {}, currentContext = null, dependencyAssessments = {}) {
   if (value == null || (Array.isArray(value) && value.length === 0)) {
     return {
       key: studyKey,
       label: STUDY_LABELS[studyKey] || studyKey,
       present: false,
       valid: false,
+      validity: 'unevaluated',
+      freshness: 'unknown',
+      eligibility: 'withheld',
+      resultStatus: 'No saved result',
       runAt: null,
       sourceFingerprint: null,
       metrics: [],
     };
   }
+  const assessment = assessReportStudyResult(
+    studyKey,
+    value,
+    provenance,
+    { currentStudyContext: currentContext, dependencyAssessments },
+  );
   return {
     key: studyKey,
     label: STUDY_LABELS[studyKey] || studyKey,
     present: true,
-    valid: value?.runMetadata ? value.runMetadata.valid === true : null,
-    runAt: value?.runMetadata?.runAt || value?.generatedAt || value?.updatedAt || provenance?.capturedAt || null,
-    sourceFingerprint: value?.runMetadata?.sourceFingerprint || provenance?.inputHash || null,
+    valid: assessment.eligible,
+    validity: assessment.validity,
+    freshness: assessment.freshness,
+    eligibility: assessment.eligible ? 'eligible' : 'withheld',
+    resultStatus: assessment.label,
+    reasons: assessment.reasons || [],
+    runAt: assessment.runAt || value?.runMetadata?.runAt || value?.generatedAt || value?.updatedAt || provenance?.capturedAt || null,
+    sourceFingerprint: assessment.sourceFingerprint || value?.runMetadata?.sourceFingerprint || provenance?.inputHash || null,
+    calculationVersion: provenance?.calculationRevision || provenance?.modelRevision || null,
+    assumptions: assessment.assumptions,
+    warnings: assessment.warnings,
+    modelLimits: assessment.modelLimits,
+    limitations: assessment.limitations,
+    units: assessment.units,
+    source: assessment.source,
+    inputSource: assessment.inputSource,
+    evidenceClass: assessment.evidenceClass,
+    independentDerivation: assessment.independentDerivation,
+    inputSources: assessment.inputSources,
+    studyOptions: assessment.studyOptions,
+    provenance: assessment.provenance,
     metrics: collectMetrics(value),
   };
 }
 
-export function compareStudyCollections(before = {}, after = {}, provenanceBefore = {}, provenanceAfter = {}) {
-  const keys = [...new Set([...Object.keys(before || {}), ...Object.keys(after || {})])].sort();
+export function compareStudyCollections(before = {}, after = {}, provenanceBefore = {}, provenanceAfter = {}, options = {}) {
+  const keys = [...new Set([
+    ...Object.keys(before || {}),
+    ...Object.keys(after || {}),
+    ...Object.keys(provenanceBefore || {}),
+    ...Object.keys(provenanceAfter || {}),
+  ])].filter(key => !key.startsWith('_')).sort();
   return keys.map(key => {
-    const first = summarizeStudyResult(key, before?.[key], provenanceBefore?.[key]);
-    const second = summarizeStudyResult(key, after?.[key], provenanceAfter?.[key]);
+    const first = summarizeStudyResult(
+      key,
+      before?.[key],
+      provenanceBefore?.[key],
+      options.beforeContexts?.[key] || options.beforeContext,
+      options.beforeDependencies || {},
+    );
+    const second = summarizeStudyResult(
+      key,
+      after?.[key],
+      provenanceAfter?.[key],
+      options.afterContexts?.[key] || options.afterContext,
+      options.afterDependencies || {},
+    );
     let status = 'unchanged';
     if (!first.present && second.present) status = 'added';
     else if (first.present && !second.present) status = 'removed';
@@ -394,6 +441,14 @@ export function compareProjectScenarios(before = {}, after = {}) {
     after?.studies,
     before?.studyProvenance,
     after?.studyProvenance,
+    {
+      beforeContext: before?.studyContext || before?.currentStudyContext || before?.currentContext || null,
+      afterContext: after?.studyContext || after?.currentStudyContext || after?.currentContext || null,
+      beforeContexts: before?.studyContext?.currentStudyContexts || before?.currentStudyContexts || {},
+      afterContexts: after?.studyContext?.currentStudyContexts || after?.currentStudyContexts || {},
+      beforeDependencies: before?.studyContext?.assessments || before?.dependencyAssessments || {},
+      afterDependencies: after?.studyContext?.assessments || after?.dependencyAssessments || {},
+    },
   ).map(study => {
     const beforeApproval = before?.studyApprovals?.[study.key] || null;
     const afterApproval = after?.studyApprovals?.[study.key] || null;

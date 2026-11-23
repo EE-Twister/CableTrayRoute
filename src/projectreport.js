@@ -11,7 +11,7 @@ import { READINESS_VOCABULARY } from './workflowStatus.js';
 import '../site.js';
 import {
   getCables, getTrays, getConduits, getDuctbanks,
-  getStudies, getStudyApprovals, getEquipment, getLoads, getOneLine,
+  getStudies, getStudyApprovals, getStudyProvenance, getStudyAssessments, getEquipment, getLoads, getOneLine,
   getReportSnapshots, setReportSnapshot, deleteReportSnapshot,
   getLifecyclePackages,
   getDeliverableArtifacts, getFieldExecutionRecords, getFieldObservationQueue, getFieldObservations, getProcurementRegister, upsertDeliverableArtifact,
@@ -52,6 +52,7 @@ import {
   sectionToAOA,
 } from '../analysis/reportPackage.mjs';
 import { buildFieldObservationReportRows, summarizeFieldObservations } from '../analysis/fieldObservations.mjs';
+import { buildStudyContextIndex, studyMetadataColumns } from '../analysis/studyResultContext.mjs';
 
 // ---------------------------------------------------------------------------
 // DOM references (resolved after DOMContentLoaded)
@@ -311,9 +312,12 @@ function loadProjectData() {
     loads: getLoads(),
     oneLine: getOneLine(),
     studies:   getStudies(),
+    studyProvenance: getStudyProvenance(),
+    studyAssessments: getStudyAssessments(),
     approvals: getStudyApprovals(),
     designBasis: getDesignBasis(),
     designGateApprovals: getDesignGateApprovals(),
+    designSynthesisReviewDraft: getItem('designSynthesisReviewDraft', null),
     tccSettings: getItem('tccSettings', null),
     routeResults: getItem('latestRouteResults', null),
     currentInputFingerprint: getProjectInputFingerprint(),
@@ -549,7 +553,9 @@ function constructionSectionData(projectData) {
     deliverables: {
       key: 'deliverables',
       title: 'Deliverable Register',
-      rows: buildArtifactRegisterRows(projectData.deliverables),
+      rows: buildArtifactRegisterRows(projectData.deliverables, {
+        currentInputFingerprint: projectData.currentInputFingerprint || '',
+      }),
       summary: { 'Tracked deliverables': projectData.deliverables.length },
     },
   };
@@ -558,6 +564,7 @@ function constructionSectionData(projectData) {
 function availableSectionInputs(projectData) {
   return {
     studies: projectData.studies,
+    studyProvenance: projectData.studyProvenance,
     cables: projectData.cables,
     trays: projectData.trays,
     conduits: projectData.conduits,
@@ -578,22 +585,34 @@ function availableSectionInputs(projectData) {
 
 function assemblePackage(config, projectData) {
   const { studies, approvals, trays, cables, drcResults } = projectData;
+  const studyOptions = {
+    currentInputFingerprint: projectData.currentInputFingerprint || null,
+    studyProvenance: projectData.studyProvenance || {},
+    precomputedAssessments: projectData.studyAssessments || {},
+    currentStudyContext: projectData.currentStudyContext || null,
+    calculationVersion: projectData.calculationVersion || null,
+    withholdIneligible: true,
+  };
 
   // Build per-section data for study and DRC sections
   const sectionData = {
-    arcFlash:     buildArcFlashSection(studies, approvals),
-    shortCircuit: buildShortCircuitSection(studies, approvals),
-    loadFlow:     buildLoadFlowSection(studies, approvals),
-    harmonics:    buildHarmonicsSection(studies, approvals),
-    motorStart:   buildMotorStartSection(studies, approvals),
-    voltageDrop:  buildVoltageDropSection(studies, approvals),
-    reliability:  buildReliabilitySection(studies, approvals),
+    arcFlash:     buildArcFlashSection(studies, approvals, studyOptions),
+    shortCircuit: buildShortCircuitSection(studies, approvals, studyOptions),
+    loadFlow:     buildLoadFlowSection(studies, approvals, studyOptions),
+    harmonics:    buildHarmonicsSection(studies, approvals, studyOptions),
+    motorStart:   buildMotorStartSection(studies, approvals, studyOptions),
+    voltageDrop:  buildVoltageDropSection(studies, approvals, studyOptions),
+    reliability:  buildReliabilitySection(studies, approvals, studyOptions),
     drc:          buildDRCSection(Array.isArray(drcResults) ? drcResults : []),
     ...constructionSectionData(projectData),
-    ...buildAdvancedStudySections(studies, approvals),
+    ...buildAdvancedStudySections(studies, approvals, studyOptions),
   };
 
-  return buildReportPackage(config, sectionData);
+  return buildReportPackage({
+    ...config,
+    studyContextIndex: buildStudyContextIndex(studies, projectData.studyProvenance, studyOptions),
+    currentInputFingerprint: projectData.currentInputFingerprint || null,
+  }, sectionData);
 }
 
 // ---------------------------------------------------------------------------
@@ -616,6 +635,16 @@ function buildBaseReport(projectData) {
 }
 
 // ---------------------------------------------------------------------------
+// SheetJS cells must be scalar values. Structured validity-contract fields
+// remain readable and round-trippable as JSON text in exported workbooks.
+function xlsxCell(value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'object') {
+    try { return JSON.stringify(value); } catch (_) { return String(value); }
+  }
+  return value;
+}
+
 // Export: XLSX
 // ---------------------------------------------------------------------------
 
@@ -631,20 +660,20 @@ function exportXLSX(pkg, baseReport) {
   // Cover sheet as a simple key-value sheet
   if (sections.cover) {
     const cover = sections.cover.data || {};
-    const aoa = [['Field', 'Value'], ...Object.entries(cover).map(([k, v]) => [k, v])];
+    const aoa = [['Field', 'Value'], ...Object.entries(cover).map(([k, v]) => [k, xlsxCell(v)])];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Cover');
   }
 
   // Revision history
   if (sections.revisions) {
     const rows = sections.revisions.rows || [];
-    const aoa = [['Rev', 'Date', 'Description', 'By'], ...rows.map(r => [r.rev, r.date, r.description, r.by])];
+    const aoa = [['Rev', 'Date', 'Description', 'By'], ...rows.map(r => [xlsxCell(r.rev), xlsxCell(r.date), xlsxCell(r.description), xlsxCell(r.by)])];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Revisions');
   }
 
   // Assumptions
   if (sections.assumptions) {
-    const aoa = [['Assumptions / Basis of Design'], [sections.assumptions.text || '']];
+    const aoa = [['Assumptions / Basis of Design'], [xlsxCell(sections.assumptions.text)]];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Assumptions');
   }
 
@@ -652,7 +681,7 @@ function exportXLSX(pkg, baseReport) {
   if (sections.cables && baseReport.cables) {
     const rows = baseReport.cables.rows || [];
     const headers = ['id', 'from', 'to', 'size', 'insulation', 'voltage', 'lengthFt', 'raceway'];
-    const aoa = [headers, ...rows.map(r => headers.map(h => r[h] ?? ''))];
+    const aoa = [headers, ...rows.map(r => headers.map(h => xlsxCell(r[h])))];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Cables');
   }
 
@@ -660,25 +689,40 @@ function exportXLSX(pkg, baseReport) {
   if (sections.fill && baseReport.fill) {
     const { trays, conduits } = baseReport.fill;
     const headers = ['id', 'type', 'areaIn2', 'fillIn2', 'usedPct', 'limitPct', 'status'];
-    const aoa = [headers, ...[...trays, ...conduits].map(r => headers.map(h => r[h] ?? ''))];
+    const aoa = [headers, ...[...trays, ...conduits].map(r => headers.map(h => xlsxCell(r[h])))];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Fill');
   }
 
   // DRC
   if (sections.drc && sections.drc.rows) {
     const headers = ['rule', 'severity', 'component', 'message', 'remediation', 'accepted'];
-    const aoa = [headers, ...(sections.drc.rows || []).map(r => headers.map(h => r[h] ?? ''))];
+    const aoa = [headers, ...(sections.drc.rows || []).map(r => headers.map(h => xlsxCell(r[h])))];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'DRC');
+  }
+
+  const studyIndex = Object.values(pkg.studyContextIndex || {});
+  if (studyIndex.length) {
+    const headers = [
+      'studyKey', 'present', 'validity', 'freshness', 'eligible', 'resultStatus',
+      'calculationVersion', 'calculationVersionStatus', 'sourceFingerprint',
+      'currentInputFingerprint', 'calculatedAt', 'inputSources', 'source', 'inputSource',
+      'assumptions', 'modelLimits', 'limitations', 'units', 'evidenceClass',
+      'independentDerivation', 'warnings', 'studyOptions', 'provenance',
+    ];
+    const aoa = [headers, ...studyIndex.map(row => headers.map(header => xlsxCell(
+      header === 'eligible' ? (row.eligible ? 'eligible' : 'withheld') : row[header],
+    )))];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'StudyIndex');
   }
 
   // Study sections
   const studySections = [
     { key: 'arcFlash',     headers: ['id', 'incidentEnergy', 'ppeCategory', 'boundary', 'clearingTime', 'voltage'],    sheetName: 'ArcFlash' },
-    { key: 'shortCircuit', headers: ['id', 'i3ph_kA', 'iSlg_kA', 'iLL_kA', 'iDLG_kA', 'voltage'],                    sheetName: 'ShortCircuit' },
+    { key: 'shortCircuit', headers: ['id', 'method', 'studySource', 'i3ph_kA', 'iSlg_kA', 'iLL_kA', 'iDLG_kA', 'iDLGPhaseB_kA', 'iDLGPhaseC_kA', 'iDLGEarth_kA', 'voltage', 'validity', 'calculationStatus', 'requiredInputs', 'warnings', 'provenance', 'modelLimits', 'studyOptions', 'inputFingerprint', 'currentInputFingerprint', 'freshness', 'calculatedAt'], sheetName: 'ShortCircuit' },
     { key: 'loadFlow',     headers: ['id', 'voltagePu', 'voltageKv', 'angleDeg', 'loadKW', 'loadKVAR'],               sheetName: 'LoadFlow-Buses', rowKey: 'busRows' },
     { key: 'harmonics',    headers: ['id', 'ithd', 'vthd', 'limit', 'warning', 'calculationStatus'],                   sheetName: 'Harmonics' },
     { key: 'motorStart',   headers: ['id', 'inrushKA', 'voltageSagPct', 'accelTime', 'method'],                        sheetName: 'MotorStart' },
-    { key: 'voltageDrop',  headers: ['id', 'from', 'to', 'inputSource', 'path', 'dropPct', 'limitPct', 'status', 'combinedDropPct', 'combinedLimitPct', 'combinedStatus', 'recommendation'], sheetName: 'VoltageDrop' },
+    { key: 'voltageDrop',  headers: ['id', 'from', 'to', 'inputSource', 'path', 'dropPct', 'limitPct', 'status', 'combinedDropPct', 'combinedLimitPct', 'combinedStatus', 'recommendation', 'resultValidity', 'resultUnits', 'resultInputSources', 'resultAssumptions', 'resultModelLimits', 'resultWarnings', 'inputFingerprint'], sheetName: 'VoltageDrop' },
     { key: 'reliability',  headers: ['id', 'kw', 'critical', 'availabilityPct', 'outageHours', 'interruptionsPerYear', 'eensKwh'], sheetName: 'Reliability' },
     { key: 'quasiDynamic', headers: ['bus', 'minVm', 'maxVm', 'risk'], sheetName: 'QuasiDynamic' },
     { key: 'probabilisticLoadFlow', headers: ['bus', 'mean', 'p05', 'min', 'pUnder', 'pOver'], sheetName: 'ProbLoadFlow' },
@@ -687,14 +731,17 @@ function exportXLSX(pkg, baseReport) {
     { key: 'frequencyScan', headers: ['order', 'frequencyHz', 'impedance', 'type', 'risk'], sheetName: 'FrequencyScan' },
     { key: 'transientStability', headers: ['status', 'clearingTime', 'maxAngle', 'cct', 'cctCycles'], sheetName: 'TransientStability' },
     { key: 'optimalPowerFlow', headers: ['unit', 'output', 'loading', 'incrementalCost', 'cost', 'limit'], sheetName: 'OptimalPowerFlow' },
-  ];
+  ].map(section => ({
+    ...section,
+    headers: [...new Set([...section.headers, ...studyMetadataColumns()])],
+  }));
 
   for (const { key, headers, sheetName, rowKey } of studySections) {
     const sec = sections[key];
     if (!sec || sec.empty) continue;
     const rows = sec[rowKey || 'rows'] || [];
     if (!rows.length) continue;
-    const aoa = [headers, ...rows.map(r => headers.map(h => r[h] ?? ''))];
+    const aoa = [headers, ...rows.map(r => headers.map(h => xlsxCell(r[h])))];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), sheetName);
   }
 
@@ -702,7 +749,7 @@ function exportXLSX(pkg, baseReport) {
     const headers = ['order', 'failed', 'impacted', 'impactedKw', 'criticalKw', 'probability'];
     const aoa = [
       headers,
-      ...sections.reliability.cutSets.map(row => headers.map(header => row[header] ?? '')),
+      ...sections.reliability.cutSets.map(row => headers.map(header => xlsxCell(row[header]))),
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Reliability-CutSets');
   }
@@ -711,7 +758,7 @@ function exportXLSX(pkg, baseReport) {
   if (sections.heatTrace && baseReport.heatTrace) {
     const branchRows = baseReport.heatTrace.branchSchedule?.rows || [];
     const headers = ['name', 'status', 'heatTraceCableTypeLabel', 'effectiveTraceLengthFt', 'maxCircuitLengthFt', 'selectedWPerFt', 'requiredWatts', 'voltageV', 'loadAmps'];
-    const aoa = [headers, ...branchRows.map(r => headers.map(h => r[h] ?? ''))];
+    const aoa = [headers, ...branchRows.map(r => headers.map(h => xlsxCell(r[h])))];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'HeatTrace');
   }
 
@@ -956,9 +1003,12 @@ function loadProjectDataWithPackage() {
     loads: Array.isArray(snap.loads) ? snap.loads : getLoads(),
     oneLine: snap.oneLine || getOneLine(),
     studies:   snap.studies   || {},
+    studyProvenance: snap.studyProvenance || {},
+    studyAssessments: snap.studyAssessments || {},
     approvals: snap.approvals || {},
     designBasis: snap.designBasis || getDesignBasis(),
     designGateApprovals: snap.designGateApprovals || getDesignGateApprovals(),
+    designSynthesisReviewDraft: snap.designSynthesisReviewDraft ?? getItem('designSynthesisReviewDraft', null),
     tccSettings: snap.tccSettings || getItem('tccSettings', null),
     routeResults: snap.latestRouteResults || snap.routeResults || null,
     currentInputFingerprint: snap.currentInputFingerprint || '',
@@ -978,6 +1028,7 @@ function currentReportReadinessDiagnostics() {
   const snap = activeLifecyclePkg?.projectSnapshot || {};
   return buildDeliverableReadinessDiagnostics({
     equipment: projectData.equipment,
+    loads: projectData.loads,
     oneLine: projectData.oneLine,
     cables: projectData.cables,
     trays: projectData.trays,
@@ -993,6 +1044,7 @@ function currentReportReadinessDiagnostics() {
     lifecyclePackages: getLifecyclePackages(),
     designBasis: projectData.designBasis,
     designGateApprovals: projectData.designGateApprovals,
+    designSynthesisReviewDraft: projectData.designSynthesisReviewDraft,
     tccSettings: projectData.tccSettings,
     enforceDesignBasis: true,
     currentInputFingerprint: activeLifecyclePkg ? '' : getProjectInputFingerprint(),
@@ -1006,7 +1058,9 @@ function currentDesignBasisReview() {
   return buildDesignBasisReview({
     designBasis: projectData.designBasis,
     designGateApprovals: projectData.designGateApprovals,
+    designSynthesisReviewDraft: projectData.designSynthesisReviewDraft,
     equipment: projectData.equipment,
+    loads: projectData.loads,
     oneLine: projectData.oneLine,
     cables: projectData.cables,
     trays: projectData.trays,

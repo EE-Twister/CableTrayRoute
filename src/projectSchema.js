@@ -28,6 +28,7 @@ const STORAGE_FIELDS = new Set(STORAGE_REQUIRED_FIELDS);
 const INTERCHANGE_FIELDS = new Set([
   ...INTERCHANGE_REQUIRED_FIELDS,
   'meta',
+  'scenarioData',
   'oneLine',
   'mccLineups'
 ]);
@@ -221,6 +222,9 @@ export function validateProjectImport(value) {
         addError(errors, '/oneLine/activeSheet', 'must be a non-negative integer');
       }
     }
+  }
+  if (value.scenarioData !== undefined && !isPlainObject(value.scenarioData)) {
+    addError(errors, '/scenarioData', 'must be an object keyed by scenario name');
   }
   return validationResult(errors);
 }

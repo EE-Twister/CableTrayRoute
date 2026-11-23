@@ -30,7 +30,7 @@ export function renderConnections({
   routeConnection,
   isHiddenByLayer,
   includePoint,
-  getCableForConnection,
+  getCableForConnection, getProtectionLabel,
   getVoltageRange,
   usedVoltageRanges,
   parseCablePhases,
@@ -177,7 +177,7 @@ export function renderConnections({
       }
       label.setAttribute('dominant-baseline', 'middle');
       label.setAttribute('fill', stroke);
-      let labelText = cable?.tag || cable?.cable_type || '';
+      let labelText = [cable?.tag || cable?.cable_type || '', getProtectionLabel?.(source, target, connection)].filter(Boolean).join(' ');
       if (!engineeringPrint && showOverlays) {
         const overlays = [];
         if (dataStateOverlayMode === 'faultDuty' && connection.faultKA != null) {

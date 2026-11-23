@@ -1,0 +1,125 @@
+import { test, expect } from '@playwright/test';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { startStaticServer } from './staticServer.helper.js';
+
+const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+let server;
+test.beforeAll(async () => { server = await startStaticServer(root); });
+test.afterAll(async () => { await server?.close(); });
+
+test('curve-source research stays visible in reports and saved selected-device evidence', async ({ page }, testInfo) => {
+  test.setTimeout(120000);
+  await page.goto(server.url('designsynthesis.html'));
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.locator('#synthesis-load-sample').click();
+  await expect(page.locator('#synthesis-status')).toContainText('sample loaded');
+  await page.locator('#synthesis-generate').click();
+  await expect(page.locator('#synthesis-status')).toContainText('Proposal generated');
+  const review = page.locator('#synthesis-curve-source-review');
+  await expect(review).toContainText('clearing and coordination remain unevaluated', { ignoreCase: true });
+  await expect(review).toContainText('TC01200002E');
+  await expect(review).toContainText('FD3020');
+  await expect(review).toContainText('480 V');
+  await review.screenshot({ path: testInfo.outputPath('curve-source-review.png') });
+  const jsonDownload = page.waitForEvent('download');
+  await page.locator('#synthesis-download-json').click();
+  const proposal = JSON.parse(await fs.readFile(await (await jsonDownload).path(), 'utf8'));
+  const selected = proposal.cables.find(cable => cable.protectiveDevice?.catalogNumber === 'FD3020').protectiveDevice;
+  expect(selected.curveSourceResearch).toMatchObject({ curveId: 'TC012037EN', pageOneBased: 32, clearingEvaluation: 'unevaluated' });
+  const txtDownload = page.waitForEvent('download');
+  await page.locator('#synthesis-download-report').click();
+  const report = await fs.readFile(await (await txtDownload).path(), 'utf8');
+  expect(report).toContain('Selected breaker curve-source review:');
+  expect(report).toContain('TC012037EN');
+  expect(report).toContain('clearing and coordination unevaluated');
+
+  await page.locator('#synthesis-apply').click();
+  await expect(page.getByRole('heading', { name: 'Create New Project' })).toBeVisible();
+  await page.locator('input[id^="project-name-"]').fill('Curve Source Evidence Journey');
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Choose a Project Template' })).toBeVisible();
+  await page.locator('[data-template-id="blank"]').click();
+  await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Use Template', exact: true }).click()]);
+  await expect(page.locator('#synthesis-status')).toContainText('Proposal generated', { timeout: 90000 });
+  await page.locator('#synthesis-apply').click();
+  await page.waitForURL(/cableschedule\.html/);
+  await page.reload();
+  await page.waitForFunction(() => window.__ctrProjectReady === true);
+  const evidence = await page.evaluate(() => {
+    const cable = window.dataStore.getCables().find(item => item.protectiveDevice?.catalogNumber === 'FD3020');
+    const records = window.dataStore.getItem('designSynthesisDeviceEvidence', {});
+    return records[cable.protectiveDeviceEvidenceRef];
+  });
+  expect(evidence.curveSourceResearch).toEqual(selected.curveSourceResearch);
+  await page.goto(server.url('designsynthesis.html'));
+  const savedReview = page.locator('#synthesis-saved-curve-source-container');
+  await expect(savedReview).toContainText('Saved selected breaker curve-source review');
+  await expect(savedReview).toContainText('FD3020');
+  await expect(savedReview).toContainText('480 V');
+  await savedReview.screenshot({ path: testInfo.outputPath('saved-curve-source-review.png') });
+  const scenario = await page.evaluate(() => {
+    const original = window.dataStore.getCurrentScenario();
+    window.dataStore.switchScenario('curve-evidence-empty-scenario');
+    return original;
+  });
+  await expect(savedReview).toBeEmpty();
+  await page.evaluate(name => window.dataStore.switchScenario(name), scenario);
+  await expect(savedReview).toContainText('Saved selected breaker curve-source review');
+  await page.evaluate(() => {
+    const cables = structuredClone(window.dataStore.getCables());
+    const cable = cables.find(item => item.protectiveDevice?.catalogNumber === 'FD3020');
+    cable.operating_voltage = 208;
+    window.dataStore.setCables(cables);
+  });
+  await expect(savedReview).toContainText('Saved device evidence is missing or changed');
+  await page.evaluate(() => {
+    const cables = structuredClone(window.dataStore.getCables());
+    const cable = cables.find(item => item.protectiveDevice?.catalogNumber === 'FD3020');
+    cable.operating_voltage = 480;
+    window.dataStore.setCables(cables);
+  });
+  await expect(savedReview).toContainText('Saved selected breaker curve-source review');
+  await expect(savedReview).not.toContainText('Saved device evidence is missing or changed');
+  await page.evaluate(() => {
+    const cable = window.dataStore.getCables().find(item => item.protectiveDevice?.catalogNumber === 'FD3020');
+    const records = structuredClone(window.dataStore.getItem('designSynthesisDeviceEvidence', {}));
+    records[cable.protectiveDeviceEvidenceRef].catalogNumber = 'ALTERED';
+    window.dataStore.setItem('designSynthesisDeviceEvidence', records);
+  });
+  await expect(savedReview).toContainText('Saved device evidence is missing or changed');
+});
+
+test('saved mixed-voltage review binds both transformer sides to their operating voltages', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.goto(server.url('designsynthesis.html'));
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.locator('#synthesis-load-mixed-sample').click();
+  await expect(page.locator('#synthesis-status')).toContainText('sample loaded');
+  await page.locator('#synthesis-generate').click();
+  await expect(page.locator('#synthesis-status')).toContainText('Proposal generated');
+  await page.locator('#synthesis-apply').click();
+  await expect(page.getByRole('heading', { name: 'Create New Project' })).toBeVisible();
+  await page.locator('input[id^="project-name-"]').fill('Mixed Voltage Curve Evidence');
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Choose a Project Template' })).toBeVisible();
+  await page.locator('[data-template-id="blank"]').click();
+  await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Use Template', exact: true }).click()]);
+  await expect(page.locator('#synthesis-status')).toContainText('Proposal generated', { timeout: 90000 });
+  await page.locator('#synthesis-apply').click();
+  await page.waitForURL(/cableschedule\.html/);
+  await page.waitForFunction(() => window.__ctrProjectReady === true);
+  const transformer = await page.evaluate(() => window.dataStore.getEquipment().find(item => item.type === 'transformer'));
+  expect(transformer.primaryProtectiveDeviceEvidenceRef).toBeTruthy();
+  expect(transformer.secondaryMainDeviceEvidenceRef).toBeTruthy();
+  await page.goto(server.url('designsynthesis.html'));
+  const saved = page.locator('#synthesis-saved-curve-source-container');
+  await expect(saved).toContainText(`${transformer.id} primary (480 V)`);
+  await expect(saved).toContainText(`${transformer.id} secondary (208 V)`);
+  await expect(saved).not.toContainText('Saved device evidence is missing or changed');
+  await saved.locator('summary').click();
+  await expect(saved).toContainText('other voltages unqualified');
+});

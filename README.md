@@ -5,6 +5,34 @@ Designed to find the optimal cable route for your cable.
 
 For a step-by-step overview of the workflow, see the [Project Workflow](docs/project-workflow.md) guide. Each tool can run on its own, but following the eight-step project path provides a smoother integrated experience.
 
+The [Design Synthesis workspace](docs/design-synthesis.md) starts from equipment ratings and locations, a known supply, permitted corridors, and design criteria. It generates a preliminary radial distribution proposal with panels, cables, manufacturer protective-device candidates, routes, tray capacity checks, and reports. The included industrial case has 30 loads. Its current scope and verification requirements are recorded in the [equipment-to-design acceptance contract](docs/design-synthesis-acceptance.md); it does not perform final protection coordination or approve a construction design.
+
+The [shared tray routing example](docs/design-synthesis-capacity-routing.md) shows 25 loads using a permitted bypass when the short tray fills, while retaining electrical sizing and voltage-drop limits.
+
+The optional [explicit fault-network screen](docs/design-synthesis-fault-network.md) models initial three-phase RMS current from referenced utility and motor equivalents on the final generated routes. Its synthetic sample, separate source contributions, reports and saved summaries retain the limits of the model; complete motor protection remains blocked.
+
+The [proposed-device current screen](docs/design-synthesis-device-fault-screen.md) places source-end device assumptions on that network and distinguishes line-terminal available current from current through each device, including faults on either side. Standalone ratings and conditional assembly ratings remain separate; complete protection adequacy remains unevaluated.
+
+The [contract audit](docs/design-synthesis-contract-audit.md) maps that workflow to its acceptance evidence and remaining gaps, including stricter input checks, panel identity history during regeneration, and readable design criteria in reports.
+
+[Automatic operating-study revision](docs/design-synthesis-study-revision.md) connects generation to balanced load-flow checks and bounded conductor/protection revisions. It records independent numerical checks, failure handling, and the current verification status; broader industrial design remains incomplete.
+
+[Mixed-voltage synthesis](docs/design-synthesis-mixed-voltage-review.md) now extends the verified workflow to 25–50 direct 480 V and balanced 208 V loads, with sourced 30/75/150 kVA transformer profiles, separate primary/secondary protection checks, operating-study revisions, and durable project regeneration. The [transformer foundation](docs/design-synthesis-transformers.md) records its shared-model prerequisites. This remains preliminary screening; arbitrary voltage arrangements, complete motor protection and acceleration, and construction-ready design are not established.
+
+For the calculation and feature review, see [Calculation Feature Review (2026-09-16)](docs/calculation-feature-review-2026-09-16.md), with subsequent fixes and verification in [Calculation Correction Verification (2026-09-17)](docs/calculation-correction-verification-2026-09-17.md).
+
+[Motor integration](docs/design-synthesis-motors.md) adds explicit motor current bases, conductor requirements, and initial DOL starting-voltage screening with bounded design revisions. Motor proposals retain unresolved protection requirements and remain blocked from Apply; this is progress toward complete industrial design, not completed motor engineering.
+
+[Motor branch-breaker research](docs/design-synthesis-motor-branch-breakers.md) connects an explicit inverse-time method to exact Siemens breaker/contactor/overload candidates and conservative branch conductor sizing. It retains separate motor and feeder current bases; complete fault duty, coordination, installation and motor protection remain unresolved.
+
+[Motor starter research candidates](docs/design-synthesis-motor-starters.md) add one sourced Siemens contactor/overload/controller combination with explicit horsepower, frequency, grounding, control-power and enclosure checks. The workspace includes a synthetic sample and retains failed conditions, source evidence and rejected candidates in its review and reports. This does not complete motor protection or enable motor Apply.
+
+The routing integration follow-up is recorded in [Routing and Core Workflow Verification (2026-09-17)](docs/routing-workflow-verification-2026-09-17.md), including cable-data preservation and downloaded route-data checks.
+
+Browser acceptance, accessibility, export-content checks, and visual-baseline verification are recorded in [Browser Acceptance Verification (2026-09-17)](docs/browser-acceptance-verification-2026-09-17.md).
+
+The next calculation-evidence tranche and its transformer/grounding corrections are recorded in [Independent Calculation Evidence (2026-09-17)](docs/calculation-evidence-verification-2026-09-17.md).
+
 The Sample Gallery includes workflow and specialist projects with populated equipment, loads, one-lines, raceways, routed cable results, and study seeds. Opening a guided checklist first activates its sample project, and specialist pages such as Ductbank Route initialize directly from the shared schedules instead of requiring duplicate page-specific entry. The Underground Ductbank sample uses the same equipment tags, feeder terminations, demand currents, and parent ductbank records across Equipment List, Load List, One-Line, Cable List, Raceway Schedule, and thermal analysis. Automated adequacy checks tie every sample to the pages in its guided checklist so a listed demonstration cannot ship with an empty supporting view.
 
 The Project Workflow Core sample also drives a reproducible 20-sheet engineering demonstration package with expanded equipment and load lists, cable and raceway schedules, multiple ductbank and tray cross-sections, a multi-branch one-line, short-circuit and arc-flash results, arc-flash labels, and a TCC chart. Run `npm run sample:engineering-report` to create the single PDF described in [Engineering Sample Report Package](docs/engineering-sample-report.md).
@@ -55,7 +83,7 @@ The deployment server applies cache and compression defaults optimized for finge
 - Other static files use `Cache-Control: public, max-age=600, must-revalidate`.
 - Text-like responses larger than 1 KB (HTML/CSS/JS/JSON/XML/SVG) are gzip-compressed by default.
 
-The build copy pipeline (`scripts/copyAssets.js`) now emits fingerprinted copies and an `asset-manifest.json` map in both `dist/` and `docs/` so deployments can adopt immutable URLs while keeping HTML short-lived.
+The build copy pipeline (`scripts/copyAssets.cjs`) now emits fingerprinted copies and an `asset-manifest.json` map in both `dist/` and `docs/` so deployments can adopt immutable URLs while keeping HTML short-lived.
 
 For rollout safety, keep older fingerprinted files available until all clients have refreshed to the new HTML references.
 
@@ -77,7 +105,7 @@ the recommended end-to-end workflow:
 
 Each tool can be used independently. Following the shared workflow lets project
 data move between modules through explicit reconcile actions instead of hidden
-cross-module overwrites. See [`docs/project-workflow.md`](docs/project-workflow.md).
+cross-module overwrites. See [`docs/project-workflow.md`](docs/project-workflow.md). For persistence and reload behavior, see [`docs/project-recovery.md`](docs/project-recovery.md); for structured calculation outputs and screening limits, see [`docs/calculation-result-contract.md`](docs/calculation-result-contract.md).
 
 ## New Feature: Cross-Sheet Off-Page Connectors
 
@@ -129,7 +157,7 @@ The Equipment List now lets you define extra columns. Click **Add Column** to sp
 
 ## Manual Raceway vs Automatic Routing
 
-Supplying specific **Raceway IDs** on a cable forces the router to follow those tray segments in order. Any IDs that do not match trays in the schedule are ignored. If none of the provided IDs exist, the router automatically reverts to its standard pathfinding. Leaving the field empty always triggers automatic routing.
+Supplying specific **Raceway IDs** on a cable requests those tray segments in order. IDs that do not match the loaded raceway schedule are ignored; when no usable requested segment remains, the router falls back to standard pathfinding. Leaving the field empty always triggers automatic routing. This is a routing-selection rule, not a guarantee that the resulting path satisfies every project design constraint.
 
 ## New Feature: Conduit Exclusion Diagnostics
 
@@ -153,7 +181,7 @@ coordinates for that cable.
 Click **Site Help** in the settings menu to open a help dialog without leaving
 the page. The modal highlights key functions like cable tagging and allowed
 cable groups, explains how to import or export CSV files, and references the
-NEC 40% fill guideline used for tray capacity calculations.
+commonly used 40% tray-fill screening guideline; the percentage is a configurable screening limit and is not universal NEC compliance for every installation.
 
 ## Updates
 
@@ -221,6 +249,10 @@ Use **Batch Edit** from each schedule table's **More** menu to apply a shared fi
 ## Ductbank Analysis
 
 `ductbankroute.html` analyzes underground ductbanks. You can add conduits and cables through guided entry dialogs, import them from CSV files, download CSV templates, or load a complete example from the compact action toolbar. The page applies practical default thermal assumptions, summarizes conduit count, cable count, assignments, warnings, and thermal alerts, and provides quick filters for assigned, unassigned, missing-data, fill-warning, and thermal-alert rows. Actionable warnings jump to the field that needs correction, filtered tables show row counts and empty states, and the **Auto Assign** helper can distribute unassigned cables across available conduits. The workflow strip keeps users moving from **Validate** to **Calculate Fill**, **Thermal**, and **Export**. Example formats are available at `examples/ductbank_template.csv` and `examples/cables_ductbank.csv`. The **Thermal** tool overlays a heat map showing estimated earth temperatures, and selecting an individual cable in the drawing opens quick properties with a table-row shortcut. Use the **Export** menu for the XLSX workbook, conduit and cable CSVs, image export, thermal data, canvas data, and the calculation report. Ductbank data is saved between sessions; select **Delete Saved Data** from the settings menu to clear it.
+
+## Detailed Cable Thermal Screen
+
+`iec60287.html` includes a separate direct-burial thermal screen with explicit cable layers, supplied electrical losses, and isolated, flat-spaced, trefoil-spaced, or touching-trefoil geometry. Two public Cableizer reference profiles can be run without private cable data; incomplete Eland manufacturer records are retained as source-only references. Saved studies and CSV exports preserve inputs, source provenance, temperatures, losses, model revision, and freshness. This remains **Screening only**, with fixed electrical-loss inputs and bounded installation scope. See the [thermal model guide](docs/cable-thermal-model.md) and [verification record](docs/cable-thermal-verification-2026-09-18.md).
 
 ## Ductbank Geometry Integration
 

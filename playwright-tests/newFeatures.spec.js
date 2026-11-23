@@ -211,6 +211,56 @@ test.describe('Ground Grid Analysis', () => {
     await expect(table).toBeVisible();
   });
 
+  test('rebuilds hazard and risk exports after a source input changes', async ({ page }) => {
+    await page.click('#ground-grid-form button[type="submit"]');
+    await expect(page.locator('#results table')).toBeVisible();
+
+    await page.click('#gg-tab-hazard');
+    await page.click('#hazard-generate-btn');
+    expect(await page.locator('#hazard-map-svg rect').count()).toBeGreaterThan(1);
+    await page.click('#gg-tab-risks');
+    await expect(page.locator('#risk-points-body tr:not(:has(td.table-empty-state))')).toHaveCount(2);
+
+    await page.click('#gg-tab-ieee80');
+    await page.fill('#grid-current', '6000');
+    await expect(page.locator('#results')).toBeEmpty();
+    await expect(page.locator('#risk-points-body')).toContainText('Run an analysis before reviewing risk points.');
+    await expect(page.locator('#hazard-map-svg')).toBeEmpty();
+
+    await page.click('#gg-tab-ieee80');
+    await page.click('#ground-grid-form button[type="submit"]');
+    await expect(page.locator('#results table')).toBeVisible();
+    await page.click('#gg-tab-hazard');
+    await page.click('#hazard-generate-btn');
+    expect(await page.locator('#hazard-map-svg rect').count()).toBeGreaterThan(1);
+    await page.click('#gg-tab-risks');
+    await expect(page.locator('#risk-points-body tr:not(:has(td.table-empty-state))')).toHaveCount(2);
+  });
+
+  test('uses IEEE rod-aware step length for a no-rod 40 by 30 m grid', async ({ page }) => {
+    await page.locator('.cp-mode-switch__button[data-unit="metric"]').click();
+    await page.fill('#soil-rho', '100');
+    await page.fill('#grid-lx', '40');
+    await page.fill('#grid-ly', '30');
+    await page.fill('#nx', '5');
+    await page.fill('#ny', '4');
+    await page.fill('#burial-depth', '0.5');
+    await page.fill('#conductor-diameter', '10');
+    await page.fill('#grid-current', '2000');
+    await page.fill('#fault-duration', '0.5');
+    await page.selectOption('#body-weight', '50');
+    await page.fill('#surface-rho', '300');
+    await page.fill('#surface-hs', '0.1');
+
+    await page.click('button[type="submit"]');
+
+    const results = page.locator('#results');
+    await expect(results).toContainText('Step Voltage');
+    await expect(results).toContainText('414.0');
+    await expect(results).toContainText('398.2');
+    await expect(results).toContainText('FAIL');
+  });
+
   test('shows error for invalid inputs', async ({ page }) => {
     // Clear required field
     await page.fill('#soil-rho', '-10');

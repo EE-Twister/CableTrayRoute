@@ -1,0 +1,61 @@
+import { test, expect } from '@playwright/test';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { startStaticServer } from './staticServer.helper.js';
+
+const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+let server;
+test.beforeAll(async () => { server = await startStaticServer(root); });
+test.afterAll(async () => { await server?.close(); });
+
+test('constant-current source research is visible, exported and retained with saved-study caveats', async ({ page }) => {
+  test.setTimeout(180000);
+  const input = JSON.parse(await fs.readFile(path.join(root, 'samples/design-synthesis-tray-congestion.json'), 'utf8'));
+  input.equipment = Array.from({ length: 25 }, (_, index) => ({ ...input.equipment[0], id: `CURVE-LOAD-${index}`, tag: `CURVE-LOAD-${index}` }));
+  input.faultStudy = { networkBaseMVA: 1, sourceInventory: { status: 'complete', reference: 'Synthetic UI research fixture' },
+    sources: [{ equipmentId: 'S', emfPhaseV: { re: 480 / Math.sqrt(3), im: 0 }, impedance: { rOhm: 2.75, xOhm: 0.015 }, inService: true, reference: 'Synthetic source, not field evidence' }] };
+  await page.goto(server.url('designsynthesis.html'));
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await expect(page.locator('#synthesis-generate')).toBeEnabled();
+  await page.locator('#synthesis-import').setInputFiles({ name: 'curve-research.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(input)) });
+  await expect(page.locator('#synthesis-status')).toContainText('Imported curve-research.json');
+  await page.locator('#synthesis-generate').click();
+  await expect(page.locator('#synthesis-status')).toContainText('Proposal generated', { timeout: 90000 });
+  const review = page.locator('#synthesis-device-fault-review');
+  await expect(review).toContainText('Constant-current chart research');
+  await expect(review).toContainText('not actual clearing');
+  await expect(review).toContainText('evaluated-graphical-conservative-envelope');
+  const jsonDownload = page.waitForEvent('download');
+  await page.locator('#synthesis-download-json').click();
+  const proposal = JSON.parse(await fs.readFile(await (await jsonDownload).path(), 'utf8'));
+  const item = proposal.deviceFaultValidation.placements.find(row => row.device?.id === 'eaton_series_c_fd3020');
+  expect(item.comparisons.constantCurrentCurveResearch.plotUpperTimeSeconds).toBeGreaterThan(8);
+  expect(item.comparisons.constantCurrentCurveResearch.plotUpperTimeSeconds).toBeLessThan(12);
+  expect(item.comparisons.protectionAdequacy).toBe('unevaluated');
+  const reportDownload = page.waitForEvent('download');
+  await page.locator('#synthesis-download-report').click();
+  const report = await fs.readFile(await (await reportDownload).path(), 'utf8');
+  expect(report).toContain('hypothetical constant current, not actual clearing or protection approval');
+  expect(report).toContain('TC01200002E');
+
+  await page.locator('#synthesis-apply').click();
+  await expect(page.getByRole('heading', { name: 'Create New Project' })).toBeVisible();
+  await page.locator('input[id^="project-name-"]').fill('Constant Current Research');
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Choose a Project Template' })).toBeVisible();
+  await page.locator('[data-template-id="blank"]').click();
+  await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Use Template', exact: true }).click()]);
+  await expect(page.locator('#synthesis-status')).toContainText('Proposal generated', { timeout: 90000 });
+  await page.locator('#synthesis-apply').click();
+  await page.waitForURL(/cableschedule\.html/);
+  await page.reload();
+  await page.waitForFunction(() => window.__ctrProjectReady === true);
+  await page.goto(server.url('designsynthesis.html'));
+  const saved = page.locator('#synthesis-saved-constant-current-research');
+  await expect(saved).toContainText('not been revalidated against the current project');
+  await expect(saved).toContainText('FD3020');
+  await expect(saved).toContainText('evaluated-graphical-conservative-envelope');
+  await expect(saved).toContainText('9.84');
+});

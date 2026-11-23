@@ -6,7 +6,9 @@ import {
   getOneLine,
   setOneLine,
   getStudies,
-  setStudies,
+  captureStudyRunContext,
+  assertStudyRunContextCurrent,
+  saveStudyResult,
   on,
   STORAGE_KEYS,
   getTrayHardwareCatalogCustomProducts
@@ -84,6 +86,10 @@ import {
   PROTECTIVE_DEVICE_TYPES,
   isProtectiveDeviceType as isProtectiveType
 } from './tcc/equipmentConstraintModel.mjs';
+import {
+  EQUIPMENT_SCREENING_CAVEAT,
+  formatEquipmentConstraintCheck
+} from './tcc/equipmentConstraintPresentationModel.mjs';
 import {
   buildTypeGroups,
   describeEntryAttributes,
@@ -1430,7 +1436,7 @@ function removeDeviceFromSelection(uid) {
   const updated = current.filter(id => id !== uid);
   applySelectionSet(updated, { persist: true });
   if (updated.length) {
-    plot();
+    safePlot();
   } else {
     chart.selectAll('*').remove();
     violationDiv.textContent = '';
@@ -2089,19 +2095,28 @@ function setActiveComponent(componentId, { preserveSelection = false } = {}) {
   });
   renderSettings();
   if (deviceSelect && deviceSelect.selectedOptions.length && selection.length) {
-    plot();
+    safePlot();
   }
   return selection;
 }
 async function updateShortCircuitStudy() {
   const oneLine = getOneLine();
   const projectDevices = libraryDevices.filter(device => !device.catalogShard);
+  const runContext = captureStudyRunContext('shortCircuit', {
+    inputs: { method: 'ANSI', deviceCatalog: projectDevices },
+    options: { method: 'ANSI' },
+    assumptions: ['Short-circuit source values are refreshed for the active TCC equipment context.'],
+  });
   const deviceCatalog = await loadReferencedProtectiveDevices(oneLine, { catalog: protectiveDeviceCatalog, additionalDevices: projectDevices }).catch(() => projectDevices);
+  assertStudyRunContextCurrent(runContext);
   const sc = runShortCircuit({ deviceCatalog });
-  const studies = getStudies();
-  studies.shortCircuit = sc;
-  setStudies(studies);
+  saveStudyResult('shortCircuit', sc, runContext);
   return sc;
+}
+function refreshShortCircuitStudy() {
+  updateShortCircuitStudy().catch(error => {
+    console.warn('[tcc] short-circuit refresh skipped:', error?.message || error);
+  });
 }
 function refreshProjectCatalogDevices() {
   const projectDevices = (getTrayHardwareCatalogCustomProducts() || [])
@@ -2132,34 +2147,31 @@ async function init() {
     baseLibraryDevices = [];
   }
   refreshProjectCatalogDevices();
-
   const initialSelection = refreshCatalog({
     includeComponentContext: true,
     includeDeviceParam: true,
     resetSelection: resetToAdjacentContext
   });
-
   renderOneLinePreview(getActiveComponentId());
-
-  updateShortCircuitStudy();
+  refreshShortCircuitStudy();
 
   if (getActiveComponentId() && deviceSelect && deviceSelect.selectedOptions.length && initialSelection.length) {
-    plot();
+    safePlot();
   }
 
   on(STORAGE_KEYS.oneLine, () => {
     const selection = refreshCatalog({ preserveSelection: true });
-    updateShortCircuitStudy();
+    refreshShortCircuitStudy();
     renderOneLinePreview(getActiveComponentId());
     if (getActiveComponentId() && deviceSelect && deviceSelect.selectedOptions.length && selection.length) {
-      plot();
+      safePlot();
     }
   });
 
   on(STORAGE_KEYS.cables, () => {
     const selection = refreshCatalog({ preserveSelection: true, includeComponentContext: true });
     if (getActiveComponentId() && deviceSelect && deviceSelect.selectedOptions.length && selection.length) {
-      plot();
+      safePlot();
     }
   });
 
@@ -2180,10 +2192,10 @@ async function init() {
     updateCalloutScopeControl();
     refreshProjectCatalogDevices();
     const selection = refreshCatalog({ includeComponentContext: true, includeDeviceParam: true });
-    updateShortCircuitStudy();
+    refreshShortCircuitStudy();
     renderOneLinePreview(getActiveComponentId());
     if (getActiveComponentId() && deviceSelect && deviceSelect.selectedOptions.length && selection.length) {
-      plot();
+      safePlot();
     }
   });
 }
@@ -3317,7 +3329,7 @@ if (afThresholdSelect) {
     const val = Number(afThresholdSelect.value);
     if (val > 0) {
       arcFlashOverlayThreshold = val;
-      plot();
+      safePlot();
     }
   });
 }
@@ -3376,10 +3388,9 @@ if (contextBackBtn) {
     );
   });
 }
-
 async function applyPlotAndPersistence() {
-  await plot();
   persistSettings();
+  await safePlot();
 }
 
 function requestPlotRefresh(message = 'Inputs changed. Updating plot...') {
@@ -3512,7 +3523,7 @@ function syncComponentOverrides(componentSettings) {
     .forEach(entry => defaults.add(entry.uid));
   selectDefaults(defaults);
   renderSettings();
-  plot();
+  safePlot();
 }
 
 function updateComponentAssignment(componentId, deviceId, overrides = {}, { autoSelect = false, replaceSelection = false } = {}) {
@@ -3567,7 +3578,7 @@ function updateComponentAssignment(componentId, deviceId, overrides = {}, { auto
   }
   applySelectionSet(filteredSelection, { persist: true });
   renderSettings();
-  plot();
+  safePlot();
   renderOneLinePreview(componentId);
   return {
     updatedEntry: deviceMap.get(`component:${componentId}`) || null,
@@ -3811,7 +3822,7 @@ function renderEquipmentMetrics(overlays = [], checks = []) {
     `;
   }).join('');
   const checkItems = checks.map(check => `
-    <li class="tcc-equipment-check" data-status="${escapeHtml(check.status)}">
+    <li class="tcc-equipment-check" data-status="${escapeHtml(check.status)}" data-screening-status="${escapeHtml(check.screeningStatus || 'evaluated')}" data-kind="${escapeHtml(check.kind || '')}"${check.reason ? ` data-reason="${escapeHtml(check.reason)}"` : ''}>
       <strong>${escapeHtml(check.label)}</strong>
       <span>${escapeHtml(check.detail)}</span>
     </li>
@@ -3824,86 +3835,22 @@ function renderEquipmentMetrics(overlays = [], checks = []) {
       <h2>Equipment Reference Metrics</h2>
       <span>${entries.length} ${entries.length === 1 ? 'reference' : 'references'}</span>
     </div>
+    <p class="tcc-equipment-screening-note">${escapeHtml(EQUIPMENT_SCREENING_CAVEAT)}</p>
     <div class="tcc-equipment-grid">${cards}</div>
     ${checkBlock}
   `;
   equipmentMetricsPanel.classList.remove('hidden');
 }
-function protectiveCheckName(entry) {
-  return entry?.selection?.name || entry?.selection?.baseDevice?.name || entry?.selection?.uid || 'Protective device';
-}
-
-function equipmentAssociationReviewDetail(evaluation) {
-  const reason = evaluation.associationReason;
-  if (reason === 'ambiguous_nearest_upstream_devices' || reason === 'ambiguous_plotted_device') {
-    return 'Protection association is unknown because more than one nearest-upstream device is possible. Review the one-line topology and device assignments.';
-  }
-  if (reason === 'associated_device_not_plotted') {
-    return 'Protection association is unknown because the uniquely assigned nearest-upstream device is not plotted. Plot that component-bound device and review the screening check.';
-  }
-  if (reason === 'constraint_data_incomplete') {
-    return 'Protection screening is unknown because the equipment reference does not contain complete current/time data.';
-  }
-  return 'Protection association is unknown because no uniquely assigned nearest-upstream device was found. Review the one-line topology and device assignments.';
-}
-
-function formatRideThroughCheck(evaluation) {
-  const { current, margin, overlay, status } = evaluation;
-  if (status === 'review') {
-    return {
-      status: 'warning',
-      screeningStatus: 'unknown',
-      label: overlay.sourceLabel || overlay.name || 'Equipment',
-      detail: equipmentAssociationReviewDetail(evaluation)
-    };
-  }
-  const eventName = overlay.kind === 'inrush'
-    ? 'inrush'
-    : `${overlay.startProfile || 'motor start'}${overlay.estimated ? ' estimate' : ''}`.toLowerCase();
-  return {
-    status,
-    label: overlay.sourceLabel || overlay.name || 'Equipment',
-    detail: status === 'ok'
-      ? `${protectiveCheckName(evaluation.entry)} rides through ${eventName} by ${formatCoordinationSeconds(margin)} s.`
-      : `${protectiveCheckName(evaluation.entry)} may trip during ${eventName}; margin ${formatCoordinationSeconds(margin)} s at ${formatCoordinationCurrent(current)} A.`
-  };
-}
-
-function formatDamageLimitCheck(evaluation) {
-  const { margin, overlay, point, status } = evaluation;
-  if (status === 'review') {
-    return {
-      status: 'warning',
-      screeningStatus: 'unknown',
-      label: overlay.sourceLabel || overlay.name || 'Equipment',
-      detail: equipmentAssociationReviewDetail(evaluation)
-    };
-  }
-  const noun = overlay.kind === 'cable'
-    ? 'cable damage'
-    : overlay.kind === 'motorThermal'
-      ? 'motor thermal limit'
-      : 'transformer damage';
-  return {
-    status,
-    label: overlay.sourceLabel || overlay.name || 'Equipment',
-    detail: status === 'ok'
-      ? `${protectiveCheckName(evaluation.entry)} clears before ${noun} with ${formatCoordinationSeconds(margin)} s margin.`
-      : `No plotted device clears before ${noun}; worst margin ${formatCoordinationSeconds(margin)} s at ${formatCoordinationCurrent(point.current)} A.`
-  };
-}
-
 function computeEquipmentConstraintChecks(plotted = [], overlays = []) {
   return evaluateEquipmentConstraints(plotted, overlays, {
     componentFlowMap,
     componentDeviceUidMap: getComponentDeviceUidMap(),
     depthLimit: MAX_NEIGHBOR_DEPTH
   })
-    .map(evaluation => (
-      evaluation.kind === 'rideThrough'
-        ? formatRideThroughCheck(evaluation)
-        : formatDamageLimitCheck(evaluation)
-    ));
+    .map(evaluation => formatEquipmentConstraintCheck(evaluation, {
+      formatSeconds: formatCoordinationSeconds,
+      formatCurrent: formatCoordinationCurrent
+    }));
 }
 function resolvePlotDomains(devicePlots, overlays, faultCurrentA, allCurrents, allTimes) {
   const preset = normalizeRangePreset(activeRangePreset);
@@ -3917,7 +3864,6 @@ function resolvePlotDomains(devicePlots, overlays, faultCurrentA, allCurrents, a
     defaultInrushDuration: DEFAULT_INRUSH_DURATION,
   });
 }
-
 async function plot() {
   const state = {
     activeCoordMarkerDrawer,
@@ -3929,6 +3875,17 @@ async function plot() {
     annotationContext,
     lastCoordState
   };
+  const dutyContextId = getActiveComponentId();
+  const dutyRunContext = captureStudyRunContext('duty', {
+    inputs: {
+      componentId: dutyContextId,
+      selectedDeviceIds: selectedDeviceIds()
+    },
+    options: {
+      rangePreset: activeRangePreset,
+      viewOptions: activeViewOptions
+    }
+  });
   try {
     return await renderTccChart({
       state,
@@ -3994,7 +3951,11 @@ async function plot() {
       selectedDeviceIds,
       setItem,
       setPlotAvailability,
-      setStudies,
+      saveStudyResult,
+      assertStudyRunContextCurrent,
+      dutyRunContext,
+      dutyContextId,
+      getDutyOptions: () => ({ rangePreset: activeRangePreset, viewOptions: activeViewOptions }),
       settingsDiv,
       shouldRenderCalloutForEntry,
       showCurveContextMenu,
@@ -4024,7 +3985,11 @@ async function plot() {
     } = state);
   }
 }
-
+function safePlot() {
+  return plot().catch(error => {
+    console.warn('[tcc] plot refresh skipped:', error?.message || error);
+  });
+}
 function autoCoordinate() {
   if (!activePlotted || !activePlotted.length) {
     showCoordResults(null, false, 'Plot devices first before running Auto-Coordinate.');

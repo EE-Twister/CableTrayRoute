@@ -12,6 +12,7 @@ import {
   getCables,
   getTrays,
   getStudies,
+  getStudyAssessments,
   getCoachAuditTrail,
   setCoachAuditTrail,
 } from '../dataStore.mjs';
@@ -158,8 +159,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const cables  = getCables()  || [];
     const trays   = getTrays()   || [];
     const studies = getStudies() || {};
+    const studyAssessments = getStudyAssessments() || {};
 
-    lastResult = runDesignCoach({ cables, trays, studies });
+    lastResult = runDesignCoach({ cables, trays, studies, studyAssessments });
     renderKpi(lastResult.summary);
     renderResults(lastResult);
   }

@@ -1,19 +1,25 @@
 function finiteNumber(value) {
-  return Number.isFinite(Number(value));
+  return typeof value === 'number' && Number.isFinite(value);
 }
 
 export function arcFlashResultEntries(results = {}, scope = 'project') {
   return Object.entries(results || {}).filter(([id, result]) => {
     if (id.startsWith('_') || !result || typeof result !== 'object') return false;
-    if (!finiteNumber(result.incidentEnergy)) return false;
+    if (!Object.prototype.hasOwnProperty.call(result, 'incidentEnergy')
+        && !Object.prototype.hasOwnProperty.call(result, 'calculationStatus')
+        && !Object.prototype.hasOwnProperty.call(result, 'requiredInputs')) return false;
     return scope === 'project' || id === scope;
   });
 }
 
 export function isArcFlashLabelEligible(info = {}) {
   const requiredInputs = Array.isArray(info.requiredInputs) ? info.requiredInputs : [];
-  return info.calculationStatus !== 'incomplete'
+  const validity = typeof info.validity === 'string' ? info.validity.toLowerCase() : '';
+  const calculationStatus = String(info.calculationStatus || '').toLowerCase();
+  return !['incomplete', 'unevaluated', 'unsupported', 'invalid', 'missing-inputs'].includes(calculationStatus)
+    && !['incomplete', 'unevaluated', 'invalid'].includes(validity)
     && requiredInputs.length === 0
+    && info.calculationInputs?.withinModelRange !== false
     && finiteNumber(info.incidentEnergy)
     && Number(info.incidentEnergy) >= 0
     && finiteNumber(info.nominalVoltage)
@@ -34,7 +40,9 @@ export function summarizeArcFlashResults(results = {}, scope = 'project') {
   const total = entries.length;
   const labelEligible = entries.filter(([, result]) => isArcFlashLabelEligible(result)).length;
   const incomplete = entries.filter(([, result]) => {
-    return result.calculationStatus === 'incomplete'
+    return !finiteNumber(result.incidentEnergy)
+      || ['incomplete', 'unevaluated', 'unsupported', 'invalid', 'missing-inputs'].includes(String(result.calculationStatus || '').toLowerCase())
+      || ['incomplete', 'unevaluated', 'invalid'].includes(String(result.validity || '').toLowerCase())
       || (Array.isArray(result.requiredInputs) && result.requiredInputs.length > 0);
   }).length;
   const outsideModelRange = entries.filter(([, result]) => result.calculationInputs?.withinModelRange === false).length;
@@ -69,7 +77,10 @@ export function summarizeArcFlashResults(results = {}, scope = 'project') {
 export function arcFlashReadinessLabel(result = {}) {
   if (isArcFlashLabelEligible(result)) return 'Label eligible';
   if (result.calculationInputs?.withinModelRange === false) return 'Outside model range';
-  if (result.calculationStatus === 'incomplete' || result.requiredInputs?.length) return 'Inputs required';
+  if (!finiteNumber(result.incidentEnergy)
+      || ['incomplete', 'unevaluated', 'unsupported', 'invalid', 'missing-inputs'].includes(String(result.calculationStatus || '').toLowerCase())
+      || ['incomplete', 'unevaluated', 'invalid'].includes(String(result.validity || '').toLowerCase())
+      || result.requiredInputs?.length) return 'Inputs required';
   return 'Review required';
 }
 

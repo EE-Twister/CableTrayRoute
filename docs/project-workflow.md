@@ -11,6 +11,8 @@ The workflow uses four separate readiness signals:
 
 A complete data workflow is not automatically issue-ready. The Dashboard and Report Package Builder both expose blocking DRC errors and missing cable insulation or voltage-rating fields.
 
+Workflow and issue-readiness indicators do not establish engineering accuracy or standards compliance. The [2026-09-16 calculation and feature review](calculation-feature-review-2026-09-16.md) preserves the original findings; subsequent outcomes are recorded in [calculation correction verification](calculation-correction-verification-2026-09-17.md) and [routing workflow verification](routing-workflow-verification-2026-09-17.md). Review each study's model/evidence limits before relying on saved studies or exported deliverables.
+
 Home, the Workflow Dashboard, guided workflow strips, DRC, and the Report Package Builder derive their completion and next-action state from the same core workflow diagnostics. A saved route therefore advances routing consistently on each surface, and active DRC counts remain consistent when moving between them.
 
 CableTrayRoute supports two project-scoped working modes:
@@ -21,6 +23,18 @@ CableTrayRoute supports two project-scoped working modes:
 `Equipment List -> Load List -> One-Line -> Cable Schedule -> Raceway Schedule -> Fill / Routing -> Studies -> Deliverables`
 
 ## Integrated Path
+
+For an equipment-first starting point, the [Design Synthesis workspace](design-synthesis.md)
+accepts equipment ratings and locations, a known supply, permitted corridors,
+and design criteria. It proposes panel assignments, feeder sizes, manufacturer
+protective-device candidates, routes, tray dimensions, and a connected one-line.
+The reviewed proposal can populate the shared schedules in one undoable action.
+This differs from One-Line Auto-Build, which uses relationships already supplied
+in the project records. Synthesis currently supports a bounded radial design;
+transformers, motor starting and overload design, protection coordination,
+assembly SCCR, and construction approval remain outside that generated scope.
+See the [acceptance contract](design-synthesis-acceptance.md) for verification
+status and the remaining requirements.
 
 1. **Equipment List:** Create the major equipment inventory with tags, descriptions, ratings, and locations.
 2. **Load List:** Define loads and their source relationships. Source / Panel fields can reference Equipment List tags.
@@ -71,9 +85,13 @@ Deleting a referenced canonical record does not silently cascade-delete dependen
 - When a named project page is opened without its project hash, the shared shell recovers the active name from canonical project storage before initializing schedule or One-Line autosave. One-Line layout changes therefore remain attached to the current project instead of reopening the Create New Project dialog. A genuinely unnamed workspace still requires a project name before core engineering records are written.
 - **Fill / Routing** now shows routing diagnostics for schedule-ready cables, routing-ready cables, coordinate-ready cables, invalid raceway references, geometry blockers, and handoff context on tray/conduit fill pages. Tray Fill includes a project-tray selector that loads the selected tray dimensions, compartments, and assigned cable rows; a selected Optimal Route result hands its tray directly into the same loader. The selected Article 392 evaluation is separate from the geometric packing-density display and withholds a pass when required evidence is missing or the arrangement is outside its stated scope.
 - **Deliverables** use saved route results from Optimal Route to expose pull-card groups, spool-sheet readiness, report-section readiness, design-basis review gate status, saved snapshots, and release-package status on the downstream pages. Route geometry, endpoint/length reconciliation, raceway references and cable-group compatibility, input freshness, and selected tray/conduit capacity evidence must pass the raceway-assurance gate before route-dependent outputs are issue-ready. When pull planning is enabled, cable/equipment sources, bend-radius evidence, minimum bend radius, selected equipment checks, and pull-point access must also pass Pull Constructability Assurance.
+- Generated motor records or one-line projections from Design Synthesis keep a non-reviewable protection gate open in the workflow dashboard and Project Report. A saved review decision cannot clear this gate, or any other gate that requires missing inputs to be resolved. Removing a cable row does not clear the motor gate while generated motor equipment, loads, or diagram projections remain. The application cannot yet verify and clear this motor gate. This protects issue readiness; it does not authorize applying blocked motor proposals or qualify the design. Individual schedule and diagram exports have their own workflows and are not represented as covered by the Project Report gate.
+- When generated motor records are present, the Cable Schedule workbook adds a `Review status` column to every row and its print view shows a preliminary notice. Panel Schedule workbooks include the same notice, and One-Line PDF, DXF, DWG and diagram JSON exports carry it. The One-Line combined report export is blocked in this state; the separately labeled Design Synthesis preliminary exports remain available for review. These notices do not cover every standalone export in the application and do not establish motor protection, assembly ratings, or readiness to issue.
+- A separately created Design Synthesis motor review project carries a persistent project-level preliminary gate and banner, even if generated motor rows are later removed. The copy contains the proposed schedules, routes and drawing, but not full study histories; keep the original proposal JSON and report for those details. Some standalone exports do not carry the banner. Existing-tray reuse is not supported by this review-project handoff.
 - **Route quantity and cost assurance** converts successful routes into cable-run and conductor footage plus uniquely counted installed raceways. Cost Estimate retains governed-price coverage, labor/productivity coverage, extension checks, input freshness, and deterministic quantity/cost signatures. A saved legacy, stale, allowance-only, or otherwise blocked estimate prevents Project Report issue readiness until regenerated; no estimate remains non-applicable when the project has not created one.
-- **Study results** label saved Short Circuit output as current, stale, or unknown against the active project-input fingerprint. Each rerun retains a compact per-bus snapshot so the next run can show previous/current three-phase fault current and deltas.
+- **Study results** distinguish numerical validity, freshness, and engineering pass/fail outcomes. Saved calculations record the project/scenario inputs, manual inputs, options, settings, model version, and upstream results they used. Relevant edits mark results stale; imported results without complete run provenance remain unknown until rerun. Save, reopen, and scenario switching preserve this distinction. Reports retain assumptions, warnings, and provenance, and dependent calculations withhold stale or unknown sources. Short Circuit reruns also retain a compact per-bus snapshot for previous/current three-phase fault current and deltas. See [the calculation result contract](calculation-result-contract.md).
 - **Ductbank Route** includes a project-ductbank selector plus a next-action strip for conduit setup, cable assignment, fill calculation, thermal review, and calculation-report export.
+- **Detailed cable thermal screen**, on the IEC 60287 page, supports explicit radial cable construction and directly buried isolated, spaced-flat, spaced-trefoil, and touching-trefoil formations. Public reference profiles allow an initial run without private cable data; manufacturer records with missing inputs remain source-only. Its saved result, freshness, and CSV export are separate from the simplified ampacity study. See [cable thermal modeling](cable-thermal-model.md) for supported scope and evidence.
 - **Sample Gallery** includes visual thumbnail cards for the Project Workflow Core sample plus realistic commercial office, water treatment pump station, and EV charging depot samples. These projects exercise equipment, loads, one-line links, cable schedule rows, raceway geometry, route results, study data, report snapshots, and release packages. Sample copies report whether they were written to persistent browser storage; if storage is full or unavailable, the sample remains usable in the current tab and the user is told to export it before closing or reloading.
 - **TCC** can open directly from a one-line protective device, plot the selected device with its nearest upstream and downstream protective devices beside a matching one-line preview, keep additional selected references collapsed into a compact count above the graph, prioritize the graph before controls on narrow screens, show transformer inrush/damage, motor cold/hot starting, motor thermal, and cable damage reference metrics where project data is available below the graph, expose those equipment references on hover/focus/tap in a pinned side-panel detail, confirm estimated equipment assumptions from metric cards or pinned detail, toggle draggable chart callouts for device tags and selected settings with context/selected/all scope options, choose chart range presets for coordination, motor starting, transformer inrush, and fault-current review, export a full review package with the graph, one-line preview, metrics, and coordination results, and show a source-to-load one-line preview with label leaders for dense layouts.
 
@@ -92,3 +110,12 @@ The handoff stays explicit:
 - Project Report shows route results, pull groups, spool counts, design-basis review gate status, report snapshots, and release packages before preview generation.
 - Report exports, print/PDF output, snapshots, and dashboard release packages are visibly disabled while required workflow, raceway-assurance, pull-constructability, or design-basis deliverable gates remain open; the readiness panel links to the first blocker.
 - No deliverable page deletes or silently overwrites schedule records.
+
+## Project-state handoff between design pages
+
+The Equipment List, Load List, and One-Line page use the same page-local project
+store for their editing and project-manager actions. Save the named project
+before moving between pages; a saved equipment import or load list is then
+available to the subsequent design workflow. This handoff does not replace the
+explicit engineering review and acceptance steps in Design Synthesis.
+

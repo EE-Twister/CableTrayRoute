@@ -1,4 +1,6 @@
 import { repairMojibakeDeep } from './src/textEncoding.js';
+import { COMPACT_SYNTHESIS_KEYS, isCompactSynthesisKey, isDeviceEvidenceEnvelope, packProjectDeviceEvidence, unpackDeviceEvidence, unpackProjectDeviceEvidence } from './utils/designSynthesisDeviceEvidenceCodec.mjs';
+import { isProjectSettingKey, isProjectStorageKey, sanitizeProjectSettings } from './src/projectSettingKeys.js';
 import {
   PROJECT_SCHEMA_VERSION,
   assertValidStoredProject,
@@ -242,7 +244,7 @@ function migrateOneLineDiagram(data) {
 
 function migrateSettingsPayload(settings = {}) {
   if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return settings;
-  const next = { ...settings };
+  const next = sanitizeProjectSettings(settings);
   const oneLine = next.oneLineDiagram;
   if (oneLine && typeof oneLine === 'object') {
     next.oneLineDiagram = migrateOneLineDiagram(oneLine);
@@ -298,6 +300,13 @@ const PROJECT_MIGRATIONS = new Map([
 
 function migrateProject(old = {}) {
   let projectDocument = repairMojibakeDeep(old);
+  // Manufacturer evidence and encoded/future payloads are source data, not
+  // display text to repair. Preserve them through unrelated migrations.
+  if (old?.settings && projectDocument?.settings && typeof projectDocument.settings === 'object') {
+    for (const key of COMPACT_SYNTHESIS_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(old.settings, key)) projectDocument.settings[key] = cloneSavedProjectValue(old.settings[key]);
+    }
+  }
   let version = readProjectSchemaVersion(projectDocument);
   while (version < PROJECT_SCHEMA_VERSION) {
     const migrate = PROJECT_MIGRATIONS.get(version);
@@ -578,12 +587,13 @@ function writeRawStorage(key, value, options = {}) {
   const storage = getStorage();
   if (!storage || storageWriteBlocked) {
     updateStorageScanLengths();
-    return;
+    return false;
   }
   if (skipLocalStorage && value !== null && value !== undefined) {
     updateStorageScanLengths();
-    return;
+    return true;
   }
+  let written = true;
   try {
     if (value === null || value === undefined) {
       storage.removeItem(key);
@@ -592,8 +602,10 @@ function writeRawStorage(key, value, options = {}) {
     }
   } catch (e) {
     handleStorageWriteError('project storage write failed', key, e);
+    written = false;
   }
   updateStorageScanLengths();
+  return written;
 }
 
 function listPrefixedKeys(prefix) {
@@ -673,12 +685,58 @@ function scenarioStorageKey(scenario, key) {
   return `${scenario}:${key}`;
 }
 
+// Undo/redo operates on the authoritative project object. Study readers also
+// use the scenario-prefixed cache, so keep the two study entries synchronized
+// after a history operation. This makes the result and its provenance sidecar
+// one atomic history unit without changing any established result shape.
+function syncCurrentScenarioStudyStorage() {
+  const settings = project.settings && typeof project.settings === 'object' ? project.settings : {};
+  for (const key of ['studyResults', 'studyProvenance']) {
+    const value = settings[key];
+    writeScenarioRaw(currentScenarioName, key, value === undefined ? null : JSON.stringify(value));
+  }
+}
+
+// History operations update the authoritative project object directly. Keep
+// the active scenario-prefixed mirrors aligned so dataStore readers observe
+// the same state after undo/redo as they did before it.
+function syncCurrentScenarioStorage(previousProject = null) {
+  const values = {
+    equipment: project.settings?.equipment,
+    panelSchedule: project.settings?.panelSchedule,
+    loadList: project.settings?.loadList,
+    cableSchedule: project.cables,
+    traySchedule: project.trays,
+    conduitSchedule: project.conduits,
+    ductbankSchedule: project.ductbanks,
+    cableTypicals: project.cableTypicals,
+    oneLineDiagram: project.settings?.oneLineDiagram,
+  };
+  for (const [key, value] of Object.entries(values)) {
+    writeScenarioRaw(currentScenarioName, key, value === undefined ? null : JSON.stringify(value));
+  }
+  const previousSettings = previousProject?.settings || {};
+  const settingKeys = new Set([...Object.keys(previousSettings), ...Object.keys(project.settings || {})]);
+  for (const key of settingKeys) {
+    if (!isProjectSettingKey(key)) continue;
+    const value = project.settings?.[key];
+    if (key === 'session' || key === 'collapsedGroups' || key === 'units' || key === 'theme' || key in values) continue;
+    writeScenarioRaw(currentScenarioName, key, value === undefined ? null : JSON.stringify(value));
+  }
+  // Design-synthesis apply stores these settings in the active scenario. If
+  // history restores a project predating synthesis, remove the introduced
+  // mirrors rather than leaving stale proposal output visible to readers.
+  for (const key of ['designSynthesisLastApplied', 'designSynthesisInputSignature', 'latestRouteResults']) {
+    if (!Object.prototype.hasOwnProperty.call(project.settings || {}, key)) writeScenarioRaw(currentScenarioName, key, null);
+  }
+}
+
 function readScenarioRaw(scenario, key) {
   return readRawStorage(scenarioStorageKey(scenario, key));
 }
 
 function writeScenarioRaw(scenario, key, value, options) {
-  writeRawStorage(scenarioStorageKey(scenario, key), value, options);
+  return writeRawStorage(scenarioStorageKey(scenario, key), value, options);
 }
 
 function getAllStorageKeys() {
@@ -729,22 +787,50 @@ export function setCurrentScenarioNameState(name) {
 }
 
 export function readScenarioValue(key, fallback, scenario = currentScenarioName) {
+  if (!isProjectStorageKey(key)) return fallback;
   const target = sanitizeScenarioName(scenario) || currentScenarioName;
   const raw = readScenarioRaw(target, key);
   if (raw === null || raw === undefined) return fallback;
   return safeParse(raw, fallback);
 }
 
+// Apply a scoped browser storage event to this module instance before its
+// consumers are notified. Separate page bundles can initialize their own
+// storage listeners in a different order.
+export function refreshScenarioCacheFromStorageEvent(key, raw, scenario = currentScenarioName) {
+  if (!isProjectStorageKey(key)) return;
+  const target = sanitizeScenarioName(scenario) || currentScenarioName;
+  const storageKey = scenarioStorageKey(target, key);
+  if (raw === null || raw === undefined) {
+    memoryStorage.delete(storageKey);
+    missingStorageKeys.add(storageKey);
+  } else {
+    memoryStorage.set(storageKey, raw);
+    missingStorageKeys.delete(storageKey);
+  }
+}
+
+function canReplaceUnsupportedDeviceEvidence(current, next, options = {}) {
+  if (options.allowUnsupportedDeviceEvidenceReplacement === true || !isDeviceEvidenceEnvelope(unpackDeviceEvidence(current))) return true;
+  return JSON.stringify(current) === JSON.stringify(next);
+}
+
 export function writeScenarioValue(key, value, scenario = currentScenarioName, options = {}) {
+  if (!isProjectStorageKey(key)) return false;
   const target = sanitizeScenarioName(scenario) || currentScenarioName;
   try {
     const serialized = JSON.stringify(value);
     const storageKey = scenarioStorageKey(target, key);
     if (readScenarioRaw(target, key) === serialized) return false;
+    if (isCompactSynthesisKey(key)
+        && (!canReplaceUnsupportedDeviceEvidence(readScenarioValue(key, null, target), value, options)
+            || (target === currentScenarioName && !canReplaceUnsupportedDeviceEvidence(project.settings?.[key], value, options)))) {
+      throw new Error('Unsupported or damaged device evidence cannot be replaced automatically.');
+    }
     if (serialized.length > MAX_SCENARIO_ENTRY_SIZE) {
       writeScenarioRaw(target, key, serialized, { skipLocalStorage: true });
       if (target === currentScenarioName) {
-        setProjectKey(key, serialized, { skipLocalStorage: true, captureUndo: options.captureUndo });
+        setProjectKey(key, serialized, { skipLocalStorage: true, captureUndo: options.captureUndo, allowUnsupportedDeviceEvidenceReplacement: options.allowUnsupportedDeviceEvidenceReplacement });
       }
       if (!scenarioSizeWarnings.has(storageKey)) {
         scenarioSizeWarnings.add(storageKey);
@@ -755,7 +841,7 @@ export function writeScenarioValue(key, value, scenario = currentScenarioName, o
     }
     writeScenarioRaw(target, key, serialized);
     if (target === currentScenarioName) {
-      setProjectKey(key, serialized, { captureUndo: options.captureUndo });
+      setProjectKey(key, serialized, { captureUndo: options.captureUndo, allowUnsupportedDeviceEvidenceReplacement: options.allowUnsupportedDeviceEvidenceReplacement });
     }
     return true;
   } catch (e) {
@@ -764,45 +850,105 @@ export function writeScenarioValue(key, value, scenario = currentScenarioName, o
   }
 }
 
-export function writeScenarioSessionValue(key, value, scenario = currentScenarioName) {
+export function writeScenarioSessionValue(key, value, scenario = currentScenarioName, options = {}) {
+  if (!isProjectStorageKey(key)) return false;
   const target = sanitizeScenarioName(scenario) || currentScenarioName;
   try {
     const serialized = JSON.stringify(value);
+    if (isCompactSynthesisKey(key)
+        && (!canReplaceUnsupportedDeviceEvidence(readScenarioValue(key, null, target), value, options)
+            || (target === currentScenarioName && !canReplaceUnsupportedDeviceEvidence(project.settings?.[key], value, options)))) {
+      throw new Error('Unsupported or damaged device evidence cannot be replaced automatically.');
+    }
     writeSessionStorage(scenarioStorageKey(target, key), serialized);
     if (target === currentScenarioName) {
       writeSessionStorage(key, serialized);
-      setProjectKey(key, serialized, { skipLocalStorage: true, sessionOnly: true });
+      setProjectKey(key, serialized, { skipLocalStorage: true, sessionOnly: true, allowUnsupportedDeviceEvidenceReplacement: options.allowUnsupportedDeviceEvidenceReplacement });
     }
+    return true;
   } catch (error) {
     console.error('scenario session write failed', key, error);
+    return false;
   }
 }
 
-export function removeScenarioValue(key, scenario = currentScenarioName) {
+export function removeScenarioValue(key, scenario = currentScenarioName, options = {}) {
+  if (!isProjectStorageKey(key)) return;
   const target = sanitizeScenarioName(scenario) || currentScenarioName;
+  if (isCompactSynthesisKey(key) && options.allowUnsupportedDeviceEvidenceDeletion !== true
+      && (isDeviceEvidenceEnvelope(unpackDeviceEvidence(readScenarioValue(key, null, target)))
+          || (target === currentScenarioName && isDeviceEvidenceEnvelope(unpackDeviceEvidence(project.settings?.[key]))))) {
+    throw new Error('Unsupported or damaged device evidence cannot be removed automatically.');
+  }
   writeScenarioRaw(target, key, null);
   if (target === currentScenarioName) {
-    removeProjectKey(key);
+    removeProjectKey(key, options);
   }
 }
 
 export function listScenarioKeysState(scenario = currentScenarioName) {
   const target = sanitizeScenarioName(scenario) || currentScenarioName;
-  return listPrefixedKeys(`${target}:`);
+  return listPrefixedKeys(`${target}:`).filter(isProjectStorageKey);
 }
 
-export function cloneScenarioStorage(from, to) {
+export function cloneScenarioStorage(from, to, options = {}) {
   const source = sanitizeScenarioName(from) || currentScenarioName;
   const target = sanitizeScenarioName(to);
   if (!target) return;
   const keys = listScenarioKeysState(source);
-  for (const key of keys) {
-    const raw = readScenarioRaw(source, key);
-    if (raw === null || raw === undefined) continue;
-    writeScenarioRaw(target, key, raw);
-    if (target === currentScenarioName) {
-      setProjectKey(key, raw);
+  const entries = keys.map(key => [key, readScenarioRaw(source, key)])
+    .filter(([, raw]) => raw !== null && raw !== undefined);
+  for (const evidence of entries.filter(([key]) => isCompactSynthesisKey(key))) {
+    if (options.allowUnsupportedDeviceEvidenceReplacement === true) continue;
+    const key = evidence[0];
+    const targetRaw = readScenarioRaw(target, key);
+    let sourceValue;
+    let targetValue;
+    try {
+      sourceValue = JSON.parse(evidence[1]);
+      targetValue = targetRaw === null || targetRaw === undefined ? null : JSON.parse(targetRaw);
+    } catch {
+      throw new Error('Unreadable device evidence cannot be cloned automatically.');
     }
+    if (isDeviceEvidenceEnvelope(unpackDeviceEvidence(sourceValue))
+        || !canReplaceUnsupportedDeviceEvidence(targetValue, sourceValue)
+        || (target === currentScenarioName && !canReplaceUnsupportedDeviceEvidence(project.settings?.[key], sourceValue))) {
+      throw new Error('Unsupported or damaged device evidence cannot be cloned automatically.');
+    }
+  }
+  const snapshot = captureProjectTransactionSnapshot();
+  // A new target is not yet in the scenario list, so the general transaction
+  // snapshot may not recognize its keys. Include them explicitly for rollback.
+  for (const [key] of entries) {
+    const storageKey = scenarioStorageKey(target, key);
+    if (Object.prototype.hasOwnProperty.call(snapshot.raw, storageKey)) continue;
+    const localValue = safeGet(getStorage(), storageKey);
+    const sessionValue = safeGet(getSessionStorage(), storageKey);
+    snapshot.raw[storageKey] = {
+      value: localValue ?? sessionValue ?? memoryStorage.get(storageKey) ?? null,
+      localValue,
+      sessionValue,
+      memoryValue: memoryStorage.get(storageKey) ?? null,
+      memory: memoryStorage.has(storageKey),
+      local: localValue !== null,
+      session: sessionValue !== null,
+    };
+  }
+  const hadPersistentStorage = Boolean(getStorage()) && !storageWriteBlocked;
+  try {
+    for (const [key, raw] of entries) {
+      const written = writeScenarioRaw(target, key, raw);
+      if (hadPersistentStorage && !written) throw new Error('Scenario clone could not be written to storage.');
+      if (target === currentScenarioName) {
+        setProjectKey(key, raw, options);
+        if (hadPersistentStorage && storageWriteBlocked) throw new Error('Scenario clone could not be written to storage.');
+      }
+    }
+  } catch (error) {
+    if (!restoreProjectTransactionSnapshot(snapshot)) {
+      throw new Error('Scenario clone failed and its storage snapshot could not be fully restored.', { cause: error });
+    }
+    throw error;
   }
 }
 
@@ -895,17 +1041,20 @@ function persistSavedProjects() {
   if (savedProjectsError) throw savedProjectsError;
   const names = Object.keys(savedProjectsCache);
   if (!names.length) {
-    writeRawStorage(SAVED_PROJECTS_KEY, null);
+    if (!writeRawStorage(SAVED_PROJECTS_KEY, null)) {
+      throw new SavedProjectMigrationError('Saved projects could not be written to storage.');
+    }
     return;
   }
   try {
-    writeRawStorage(SAVED_PROJECTS_KEY, JSON.stringify(savedProjectsCache));
+    if (!writeRawStorage(SAVED_PROJECTS_KEY, JSON.stringify(savedProjectsCache))) {
+      throw new Error('Persistent storage rejected the saved project write.');
+    }
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));
     const wrapped = error instanceof SavedProjectMigrationError
       ? error
       : new SavedProjectMigrationError('Saved projects could not be written to storage.', error);
-    savedProjectsError = wrapped;
     throw wrapped;
   }
 }
@@ -977,6 +1126,8 @@ export function writeSavedProject(projectId, sections = {}, options = {}) {
   const entries = sections && typeof sections === 'object' ? Object.entries(sections) : [];
   if (!entries.length) return;
   const previous = isPlainObject(savedProjectsCache[name]) ? savedProjectsCache[name] : {};
+  const cacheBefore = cloneSavedProjectValue(savedProjectsCache);
+  const rawBefore = readRawStorage(SAVED_PROJECTS_KEY);
   const current = options.replace === true ? {} : { ...previous };
   const previousMeta = isPlainObject(previous.__meta) ? previous.__meta : {};
   for (const [key, value] of entries) {
@@ -1000,7 +1151,42 @@ export function writeSavedProject(projectId, sections = {}, options = {}) {
     savedProjectsCache[name] = current;
   }
   migratedSavedProjects.delete(name);
-  persistSavedProjects();
+  try {
+    persistSavedProjects();
+  } catch (error) {
+    savedProjectsCache = cacheBefore;
+    if (rawBefore === null || rawBefore === undefined) {
+      memoryStorage.delete(SAVED_PROJECTS_KEY);
+      missingStorageKeys.add(SAVED_PROJECTS_KEY);
+    } else {
+      memoryStorage.set(SAVED_PROJECTS_KEY, rawBefore);
+      missingStorageKeys.delete(SAVED_PROJECTS_KEY);
+    }
+    throw error;
+  }
+}
+
+/** Rename a saved project with one durable cache write. */
+export function renameSavedProject(oldProjectId, newProjectId, sections = null) {
+  const oldName = typeof oldProjectId === 'string' ? oldProjectId.trim() : '';
+  const newName = typeof newProjectId === 'string' ? newProjectId.trim() : '';
+  if (!oldName || !newName || oldName === newName) return false;
+  ensureSavedProjectsCache();
+  const original = cloneSavedProjectValue(savedProjectsCache);
+  const rawBefore = readRawStorage(SAVED_PROJECTS_KEY);
+  const record = sections && typeof sections === 'object' ? sections : savedProjectsCache[oldName];
+  if (!record || typeof record !== 'object') return false;
+  savedProjectsCache[newName] = cloneSavedProjectValue(record);
+  delete savedProjectsCache[oldName];
+  try {
+    persistSavedProjects();
+    return true;
+  } catch (error) {
+    savedProjectsCache = original;
+    if (rawBefore === null || rawBefore === undefined) memoryStorage.delete(SAVED_PROJECTS_KEY);
+    else memoryStorage.set(SAVED_PROJECTS_KEY, rawBefore);
+    throw error;
+  }
 }
 
 export function readSavedProject(projectId) {
@@ -1298,6 +1484,61 @@ export function writeAppSetting(key, value) {
   writeRawStorage(key, value);
 }
 
+const PROJECT_SAVE_STATUS_PREFIX = 'ctrProjectSaveStatus:';
+
+export function readProjectSaveStatus(projectId) {
+  const name = typeof projectId === 'string' ? projectId.trim() : '';
+  if (!name) return {};
+  const value = readAppSetting(`${PROJECT_SAVE_STATUS_PREFIX}${encodeURIComponent(name)}`);
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+export function writeProjectSaveStatus(projectId, status = {}) {
+  const name = typeof projectId === 'string' ? projectId.trim() : '';
+  if (!name) return;
+  const previous = readProjectSaveStatus(name);
+  writeAppSetting(`${PROJECT_SAVE_STATUS_PREFIX}${encodeURIComponent(name)}`, {
+    ...previous,
+    ...status,
+    localSavedAt: status.localSavedAt ?? previous.localSavedAt ?? null,
+    cloudSavedAt: status.cloudSavedAt ?? previous.cloudSavedAt ?? null,
+  });
+}
+
+export function getProjectSaveStatusPresentation(projectId, fallbackLocalAt = '') {
+  const status = readProjectSaveStatus(projectId);
+  let recordLocalAt = '';
+  if (!fallbackLocalAt && typeof projectId === 'string' && projectId.trim()) {
+    try {
+      const record = readSavedProject(projectId);
+      recordLocalAt = record?.__meta?.updatedAt || '';
+    } catch { /* saved-project diagnostics are reported by their own callers */ }
+  }
+  const localAt = status.localSavedAt || fallbackLocalAt || recordLocalAt || '';
+  const cloudAt = status.cloudSavedAt || '';
+  const localTime = Date.parse(localAt);
+  const cloudTime = Date.parse(cloudAt);
+  const hasNewerLocal = Boolean(status.localSavedAt) && Boolean(localAt) && (!cloudAt || !Number.isFinite(cloudTime)
+    || (Number.isFinite(localTime) && localTime > cloudTime));
+  const format = value => {
+    if (!value) return '';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '' : date.toLocaleString();
+  };
+  const localLabel = format(localAt);
+  const cloudLabel = format(cloudAt);
+  return {
+    label: hasNewerLocal
+      ? `Local changes · ${localLabel}`
+      : cloudLabel ? `Cloud synced · ${cloudLabel}` : localLabel ? `Saved locally · ${localLabel}` : 'Not saved yet',
+    state: hasNewerLocal ? 'local' : cloudLabel ? 'saved' : localLabel ? 'local' : 'dirty',
+    detail: `Last local save: ${localLabel || 'not recorded'}; last cloud save: ${cloudLabel || 'not recorded'}.`,
+    localSavedAt: localAt || null,
+    cloudSavedAt: cloudAt || null,
+    hasNewerLocal,
+  };
+}
+
 // Enumerate the full keys (optionally limited to those starting with `prefix`)
 // that are visible to readAppSetting — across session, local, and in-memory
 // storage. Session keys are listed first so callers that prefer the live tab's
@@ -1431,13 +1672,29 @@ function safeParse(value, fallback) {
 }
 
 function setTrackedSettings(keys) {
-  trackedSettingsKeys = new Set(keys);
+  trackedSettingsKeys = new Set(keys.filter(isProjectSettingKey));
   trackedSettingsKeys.delete('session');
   trackedSettingsKeys.delete('collapsedGroups');
 }
 
+function isProjectTransactionStorageKey(key) {
+  return key === PROJECT_KEY
+    || key === SCENARIOS_KEY
+    || key === CURRENT_SCENARIO_KEY
+    || key === SAVED_PROJECTS_KEY
+    || key === CONDUIT_CACHE_KEY
+    || key === 'activeSampleWorkflow'
+    || new Set([
+      'cableSchedule', 'traySchedule', 'conduitSchedule', 'ductbankSchedule',
+      'cableTypicals', 'panelSchedule', 'equipment', 'loadList', 'mccLineups',
+      'oneLineDiagram', 'studyResults', 'units', 'theme'
+    ]).has(key)
+    || trackedSettingsKeys.has(key)
+    || scenarioListCache.some(scenario => key.startsWith(`${scenario}:`));
+}
+
 function notifyChange() {
-  const snapshot = cloneProject();
+  const snapshot = unpackProjectDeviceEvidence(cloneProject());
   listeners.forEach(fn => {
     try {
       fn(snapshot);
@@ -1512,13 +1769,14 @@ function syncDerivedStorage(storage, changeSet = null) {
   if (hasChange(changeSet, 'settings:other')) {
     const settings = project.settings && typeof project.settings === 'object' ? project.settings : {};
     const filteredKeys = Object.keys(settings).filter(k => (
-      k !== 'session'
+      isProjectSettingKey(k)
+      && k !== 'session'
       && k !== 'collapsedGroups'
       && !sessionOnlyProjectKeys.has(k)
     ));
 
     for (const key of trackedSettingsKeys) {
-      if (!filteredKeys.includes(key)) {
+      if (isProjectSettingKey(key) && !filteredKeys.includes(key)) {
         removeDerived(key);
       }
     }
@@ -1537,16 +1795,26 @@ function persistProject({ notify = true, changeSet = null, mutationType = 'persi
   const storage = getStorage();
   let syncStats = { writes: 0, skips: 0 };
   if (storage && !storageWriteBlocked) {
-    syncStats = syncDerivedStorage(storage, changeSet) || syncStats;
-    if (!storageWriteBlocked && !projectSchemaLoadError) {
+    // Commit the authoritative project record first. If that write is
+    // rejected (for example by quota), derived legacy keys must remain
+    // untouched so the transaction can still preserve the previous copy.
+    if (!projectSchemaLoadError) {
       try {
         const persistedProject = sessionOnlyProjectKeys.size ? cloneProject() : project;
         sessionOnlyProjectKeys.forEach(key => {
           if (persistedProject.settings) delete persistedProject.settings[key];
         });
-        storage.setItem(PROJECT_KEY, JSON.stringify(persistedProject));
-      }
-      catch (e) { handleStorageWriteError('project save failed', e); }
+        const serializedProject = JSON.stringify(persistedProject);
+        storage.setItem(PROJECT_KEY, serializedProject);
+        // Keep the shared raw cache coherent with the authoritative write.
+        // Other bundles/pages may read through readRawStorage(), which prefers
+        // this cache over the backend.
+        memoryStorage.set(PROJECT_KEY, serializedProject);
+        missingStorageKeys.delete(PROJECT_KEY);
+      } catch (e) { handleStorageWriteError('project save failed', e); }
+    }
+    if (!storageWriteBlocked) {
+      syncStats = syncDerivedStorage(storage, changeSet) || syncStats;
     }
   }
   if (notify) notifyChange();
@@ -1738,16 +2006,20 @@ export async function initializeProjectStorage() {
 }
 
 export function getProjectState() {
-  return cloneProject();
+  return unpackProjectDeviceEvidence(cloneProject());
 }
 
 export function getProjectSchemaLoadError() {
   return projectSchemaLoadError;
 }
 
-export function setProjectState(next) {
+export function setProjectState(next, options = {}) {
+  if (COMPACT_SYNTHESIS_KEYS.some(key => !canReplaceUnsupportedDeviceEvidence(project.settings?.[key], next?.settings?.[key], options)
+      || !canReplaceUnsupportedDeviceEvidence(readScenarioValue(key, null), next?.settings?.[key], options))) {
+    throw new Error('Unsupported or damaged device evidence cannot be replaced automatically.');
+  }
   const oldProject = cloneProject();
-  project = migrateProject(next || {});
+  project = packProjectDeviceEvidence(migrateProject(next || {}));
   const changeSet = createChangeSet([
     'cables',
     'trays',
@@ -1758,7 +2030,10 @@ export function setProjectState(next) {
     'settings:collapsedGroups',
     'settings:other'
   ]);
-  pushUndo(oldProject, { coalesceKey: 'setProjectState', allowCoalesce: false });
+  if (captureBatchedChanges(changeSet)) return;
+  if (options.captureUndo !== false) {
+    pushUndo(oldProject, { coalesceKey: 'setProjectState', allowCoalesce: false });
+  }
   persistProject({ changeSet, mutationType: 'setProjectState' });
 }
 
@@ -1797,8 +2072,15 @@ export function setProjectKey(key, value, options = {}) {
     if (!options.skipLocalStorage) {
       const storage = getStorage();
       if (storage && !storageWriteBlocked) {
+        let validated;
         try {
-          const validated = migrateProject(JSON.parse(value));
+          validated = packProjectDeviceEvidence(migrateProject(JSON.parse(value)));
+        } catch (e) { handleStorageWriteError('project save failed', e); return; }
+        if (COMPACT_SYNTHESIS_KEYS.some(setting => !canReplaceUnsupportedDeviceEvidence(project.settings?.[setting], validated.settings?.[setting], options)
+            || !canReplaceUnsupportedDeviceEvidence(readScenarioValue(setting, null), validated.settings?.[setting], options))) {
+          throw new Error('Unsupported or damaged device evidence cannot be replaced automatically.');
+        }
+        try {
           storage.setItem(key, JSON.stringify(validated));
           projectSchemaLoadError = null;
         }
@@ -1819,6 +2101,11 @@ export function setProjectKey(key, value, options = {}) {
       persistProject({ changeSet: createChangeSet(['settings:other']), mutationType: `setProjectKey:${key}:redact` });
     }
     return;
+  }
+  if (!isProjectStorageKey(key)) return;
+  if (isCompactSynthesisKey(key) && (!canReplaceUnsupportedDeviceEvidence(project.settings?.[key], safeParse(value, null), options)
+      || !canReplaceUnsupportedDeviceEvidence(readScenarioValue(key, null), safeParse(value, null), options))) {
+    throw new Error('Unsupported or damaged device evidence cannot be replaced automatically.');
   }
   const shouldCaptureUndo = !projectMutationBatch
     && !options.sessionOnly
@@ -1888,6 +2175,12 @@ export function setProjectKey(key, value, options = {}) {
 
 export function removeProjectKey(key, options = {}) {
   if (!key) return;
+  if (key !== PROJECT_KEY && !NON_EXPORTABLE_SETTING_KEYS.has(key) && !isProjectStorageKey(key)) return;
+  if (isCompactSynthesisKey(key) && options.allowUnsupportedDeviceEvidenceDeletion !== true
+      && (isDeviceEvidenceEnvelope(unpackDeviceEvidence(project.settings?.[key]))
+          || isDeviceEvidenceEnvelope(unpackDeviceEvidence(readScenarioValue(key, null))))) {
+    throw new Error('Unsupported or damaged device evidence cannot be removed automatically.');
+  }
   sessionOnlyProjectKeys.delete(key);
   const session = getSessionStorage();
   if (session) {
@@ -1949,9 +2242,15 @@ export function removeProjectKey(key, options = {}) {
 
 export function undoProjectChange() {
   if (!undoStack.length || !applyPatch) return;
+  if (COMPACT_SYNTHESIS_KEYS.some(key => isDeviceEvidenceEnvelope(unpackDeviceEvidence(readScenarioValue(key, null)))
+      || isDeviceEvidenceEnvelope(unpackDeviceEvidence(project.settings?.[key])))) {
+    console.warn('Undo is unavailable while a compact design record uses an unsupported or damaged encoding.');
+    return;
+  }
   undoCoalesceState = null;
   const patch = popUndoPatch();
   const current = cloneProject();
+  const previousProject = cloneProject();
   try {
     const result = applyPatch(current, patch, true).newDocument;
     if (compare) {
@@ -1961,6 +2260,8 @@ export function undoProjectChange() {
       pushRedoPatch([]);
     }
     project = migrateProject(result);
+    syncCurrentScenarioStorage(previousProject);
+    syncCurrentScenarioStudyStorage();
     persistProject({ mutationType: 'undoProjectChange' });
   } catch (e) {
     console.warn('undo failed', e);
@@ -1969,9 +2270,15 @@ export function undoProjectChange() {
 
 export function redoProjectChange() {
   if (!redoStack.length || !applyPatch) return;
+  if (COMPACT_SYNTHESIS_KEYS.some(key => isDeviceEvidenceEnvelope(unpackDeviceEvidence(readScenarioValue(key, null)))
+      || isDeviceEvidenceEnvelope(unpackDeviceEvidence(project.settings?.[key])))) {
+    console.warn('Redo is unavailable while a compact design record uses an unsupported or damaged encoding.');
+    return;
+  }
   undoCoalesceState = null;
   const patch = popRedoPatch();
   const current = cloneProject();
+  const previousProject = cloneProject();
   try {
     const result = applyPatch(current, patch, true).newDocument;
     if (compare) {
@@ -1981,6 +2288,8 @@ export function redoProjectChange() {
       pushUndoPatch([]);
     }
     project = migrateProject(result);
+    syncCurrentScenarioStorage(previousProject);
+    syncCurrentScenarioStudyStorage();
     persistProject({ mutationType: 'redoProjectChange' });
   } catch (e) {
     console.warn('redo failed', e);
@@ -2016,14 +2325,7 @@ export function getProjectStorageDiagnostics() {
 /** Capture all local/session project state for an atomic multi-key workflow. */
 export function captureProjectTransactionSnapshot() {
   primeRawStorageCache(true);
-  const isWorkflowKey = key => key === PROJECT_KEY
-    || key === SCENARIOS_KEY
-    || key === CURRENT_SCENARIO_KEY
-    || key === SAVED_PROJECTS_KEY
-    || key === CONDUIT_CACHE_KEY
-    || key === 'activeSampleWorkflow'
-    || scenarioListCache.some(scenario => key.startsWith(`${scenario}:`));
-  const keys = new Set([...memoryStorage.keys()].filter(isWorkflowKey));
+  const keys = new Set([...memoryStorage.keys()].filter(isProjectTransactionStorageKey));
   const sources = { local: new Set(), session: new Set() };
   for (const [kind, storage] of Object.entries({ local: getStorage(), session: getSessionStorage() })) {
     if (!storage) continue;
@@ -2031,7 +2333,7 @@ export function captureProjectTransactionSnapshot() {
       for (let index = 0; index < storage.length; index += 1) {
         const key = storage.key(index);
         if (key) {
-          if (isWorkflowKey(key)) {
+          if (isProjectTransactionStorageKey(key)) {
             keys.add(key);
             sources[kind].add(key);
           }
@@ -2041,8 +2343,20 @@ export function captureProjectTransactionSnapshot() {
   }
   const raw = {};
   keys.forEach(key => {
+    let localValue = null;
+    let sessionValue = null;
+    try { if (sources.local.has(key)) localValue = getStorage()?.getItem(key) ?? null; } catch {}
+    try { if (sources.session.has(key)) sessionValue = getSessionStorage()?.getItem(key) ?? null; } catch {}
+    const memoryPresent = memoryStorage.has(key);
     raw[key] = {
-      value: memoryStorage.has(key) ? memoryStorage.get(key) : readRawStorage(key),
+      // Keep each backend's value separately. A key can legitimately have
+      // different local/session values (for example, display units), and a
+      // rollback must not overwrite one backend with the other.
+      value: sources.local.has(key) ? localValue : sources.session.has(key) ? sessionValue : memoryStorage.get(key),
+      localValue,
+      sessionValue,
+      memoryValue: memoryPresent ? memoryStorage.get(key) : null,
+      memory: memoryPresent,
       local: sources.local.has(key),
       session: sources.session.has(key),
     };
@@ -2056,55 +2370,89 @@ export function captureProjectTransactionSnapshot() {
     savedProjectsCache: cloneSavedProjectValue(savedProjectsCache),
     savedProjectsLoaded,
     savedProjectsError,
+    storageWriteBlocked,
+    quotaWarningShown,
     migratedSavedProjects: [...migratedSavedProjects],
     undoStack: cloneSavedProjectValue(undoStack),
     redoStack: cloneSavedProjectValue(redoStack),
     undoHistoryBytes,
     redoHistoryBytes,
     undoCoalesceState: undoCoalesceState ? cloneSavedProjectValue(undoCoalesceState) : null,
+    trackedSettingsKeys: [...trackedSettingsKeys],
   };
 }
 
 /** Restore a snapshot captured by captureProjectTransactionSnapshot(). */
 export function restoreProjectTransactionSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== 'object') return false;
-  const isWorkflowKey = key => key === PROJECT_KEY
-    || key === SCENARIOS_KEY
-    || key === CURRENT_SCENARIO_KEY
-    || key === SAVED_PROJECTS_KEY
-    || key === CONDUIT_CACHE_KEY
-    || key === 'activeSampleWorkflow'
-    || scenarioListCache.some(scenario => key.startsWith(`${scenario}:`));
-  const currentKeys = new Set([...memoryStorage.keys()].filter(isWorkflowKey));
+  const currentKeys = new Set([...memoryStorage.keys()].filter(isProjectTransactionStorageKey));
   for (const storage of [getStorage(), getSessionStorage()]) {
     if (!storage) continue;
     try {
       for (let index = storage.length - 1; index >= 0; index -= 1) {
         const key = storage.key(index);
-        if (key && isWorkflowKey(key)) currentKeys.add(key);
+        if (key && isProjectTransactionStorageKey(key)) currentKeys.add(key);
       }
     } catch {}
   }
   const raw = snapshot.raw && typeof snapshot.raw === 'object' ? snapshot.raw : {};
+  let rawRestoreSucceeded = true;
+  const restoreBackendValue = (storage, key, shouldExist, value) => {
+    if (!storage) return !shouldExist;
+    try {
+      if (shouldExist && value !== null && value !== undefined) {
+        if (storage.getItem(key) !== value) storage.setItem(key, value);
+        return storage.getItem(key) === value;
+      }
+      if (storage.getItem(key) !== null) storage.removeItem(key);
+      return storage.getItem(key) === null;
+    } catch {
+      return false;
+    }
+  };
   currentKeys.forEach(key => {
-    try { getStorage()?.removeItem(key); } catch {}
-    try { getSessionStorage()?.removeItem(key); } catch {}
-  });
-  currentKeys.forEach(key => {
+    if (Object.prototype.hasOwnProperty.call(raw, key)) return;
+    rawRestoreSucceeded = restoreBackendValue(getStorage(), key, false, null) && rawRestoreSucceeded;
+    rawRestoreSucceeded = restoreBackendValue(getSessionStorage(), key, false, null) && rawRestoreSucceeded;
     memoryStorage.delete(key);
     missingStorageKeys.delete(key);
   });
   Object.entries(raw).forEach(([key, entry]) => {
-    if (!entry || entry.value === null || entry.value === undefined) return;
-    memoryStorage.set(key, entry.value);
+    if (!entry || typeof entry !== 'object') return;
     try {
-      if (entry.local) getStorage()?.setItem(key, entry.value);
-      if (entry.session) getSessionStorage()?.setItem(key, entry.value);
+      const local = getStorage();
+      const session = getSessionStorage();
+      const localValue = Object.prototype.hasOwnProperty.call(entry, 'localValue')
+        ? entry.localValue
+        : (entry.local ? entry.value : null);
+      const sessionValue = Object.prototype.hasOwnProperty.call(entry, 'sessionValue')
+        ? entry.sessionValue
+        : (entry.session ? entry.value : null);
+      const localRestored = restoreBackendValue(local, key, Boolean(entry.local), localValue);
+      const sessionRestored = restoreBackendValue(session, key, Boolean(entry.session), sessionValue);
+      rawRestoreSucceeded = localRestored && sessionRestored && rawRestoreSucceeded;
+      if (!localRestored) console.warn('project transaction local restore failed', key);
+      if (!sessionRestored) console.warn('project transaction session restore failed', key);
     } catch (error) {
       console.warn('project transaction restore failed', key, error);
     }
+    const memoryValue = entry.memory
+      ? entry.memoryValue
+      : (entry.local ? entry.localValue ?? entry.value : entry.session ? entry.sessionValue ?? entry.value : entry.value);
+    if (entry.memory || (!entry.local && !entry.session && entry.value !== null && entry.value !== undefined)) {
+      if (memoryValue === null || memoryValue === undefined) memoryStorage.delete(key);
+      else memoryStorage.set(key, memoryValue);
+    } else {
+      memoryStorage.delete(key);
+    }
+    if (entry.local || entry.session || (entry.value !== null && entry.value !== undefined)) missingStorageKeys.delete(key);
   });
   project = migrateProject(snapshot.project || {});
+  trackedSettingsKeys = new Set(Array.isArray(snapshot.trackedSettingsKeys)
+    ? snapshot.trackedSettingsKeys.filter(isProjectSettingKey)
+    : Object.keys(project.settings || {}).filter(isProjectSettingKey));
+  trackedSettingsKeys.delete('session');
+  trackedSettingsKeys.delete('collapsedGroups');
   scenarioListCache = ensureScenarioList(snapshot.scenarioList);
   currentScenarioName = sanitizeScenarioName(snapshot.currentScenarioName) || scenarioListCache[0] || 'base';
   conduitCacheState = snapshot.conduitCacheState ? cloneSavedProjectValue(snapshot.conduitCacheState) : null;
@@ -2123,9 +2471,16 @@ export function restoreProjectTransactionSnapshot(snapshot) {
   projectMutationBatch = null;
   derivedStorageCache.clear();
   mutationCounters.clear();
+  if (rawRestoreSucceeded) {
+    if (typeof snapshot.storageWriteBlocked === 'boolean') storageWriteBlocked = snapshot.storageWriteBlocked;
+    if (typeof snapshot.quotaWarningShown === 'boolean') quotaWarningShown = snapshot.quotaWarningShown;
+  } else {
+    storageWriteBlocked = true;
+    quotaWarningShown = true;
+  }
   updateStorageScanLengths();
   notifyChange();
-  return true;
+  return rawRestoreSucceeded;
 }
 
 export function onProjectChange(handler) {

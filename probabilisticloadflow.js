@@ -15,10 +15,11 @@ import {
   isStudyResultStale,
   validatePowerFlowStudyModel
 } from './analysis/studyResultReadiness.mjs';
-import { getOneLine, getStudies, setStudies } from './dataStore.mjs';
+import { getOneLine, getStudies, getStudyAssessments, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { studyLifecycleMetadataLines } from './analysis/studyExportMetadata.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -177,10 +178,8 @@ document.addEventListener('DOMContentLoaded', () => {
     errorsDiv.hidden = true;
     errorsDiv.textContent = '';
 
-    const studies = getStudies();
     result.persisted = true;
-    studies.probabilisticLoadFlow = result;
-    setStudies(studies);
+    saveStudyResult('probabilisticLoadFlow', result, captureStudyRunContext('probabilisticLoadFlow', { inputs: result.inputs || {}, options: {} }));
 
     renderResults(result);
     exportBtn.hidden = false;
@@ -334,6 +333,7 @@ document.addEventListener('DOMContentLoaded', () => {
     lines.push(`# Scenarios,${r.sampleCount},Converged,${r.convergedCount},Seed,${r.inputs.seed}`);
     lines.push(`# P(violation),${(r.probabilityOfViolation * 100).toFixed(2)}%`);
     lines.push(`# Loss kW (mean/p05/p50/p95),${r.lossStats.mean.toFixed(2)},${r.lossStats.p05.toFixed(2)},${r.lossStats.p50.toFixed(2)},${r.lossStats.p95.toFixed(2)}`);
+    lines.push(...studyLifecycleMetadataLines(r, { assessment: getStudyAssessments().probabilisticLoadFlow }));
     lines.push('Bus,MeanVm,StdVm,MinVm,P5Vm,MaxVm,P_under_0.95,P_over_1.05');
     r.busStats.forEach(b => {
       lines.push([

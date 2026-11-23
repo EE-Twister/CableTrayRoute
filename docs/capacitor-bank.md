@@ -1,5 +1,7 @@
 # Capacitor Bank Sizing & Power Factor Correction
 
+> **Catalog boundary:** Required compensation above the built-in 2,400 kVAR catalog limit is reported as unavailable. The result keeps the required compensation, returns a null standard-bank recommendation and achieved PF, and asks for engineered staging or a custom bank before resonance analysis.
+
 **Page:** `capacitorbank.html`  
 **Module:** `analysis/capacitorBank.mjs`  
 **Standards:** IEEE 18-2012, IEEE 519-2022, NEMA CP 1-2000
@@ -49,7 +51,7 @@ Q_cap = 1000 × (tan(cos⁻¹(0.80)) − tan(cos⁻¹(0.95)))
       = 421 kVAR
 ```
 
-The tool then selects the nearest standard NEMA bank size ≥ the required kVAR. Standard sizes (kVAR): 25, 50, 100, 150, 200, 300, 400, 600, 900, 1200, 1800, 2400.
+The tool then selects the nearest standard NEMA bank size ≥ the required kVAR. Standard sizes (kVAR): 25, 50, 100, 150, 200, 300, 400, 600, 900, 1200, 1800, 2400. If the requirement exceeds 2,400 kVAR, no standard size is claimed; the UI marks the selection unavailable and reports the required compensation for follow-up engineering.
 
 **2-stage option:** For facilities with a variable load profile, a 2-stage switched bank (two equal halves) avoids leading PF at light load. Each stage is switched in and out by a power factor controller relay.
 
@@ -62,6 +64,8 @@ h_r = √(kVA_sc / kVAR_cap)
 ```
 
 where `kVA_sc` is the short-circuit kVA at the bus (from the Short Circuit study) and `kVAR_cap` is the installed capacitor bank rating.
+
+Resonance and achieved PF are calculated only after an actual standard bank is selected. They remain unavailable while the catalog requirement is exceeded.
 
 At parallel resonance, the system presents a high impedance at harmonic frequency `h_r`. If a harmonic source injects current at that frequency, the resulting harmonic voltage amplification can:
 - Damage capacitors (IEEE 18-2012 §5.4 limits voltage THD to 120% of rated)

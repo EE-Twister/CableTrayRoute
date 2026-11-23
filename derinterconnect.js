@@ -2,8 +2,9 @@ import {
   runDERInterconnectStudy,
   HARMONIC_CURRENT_LIMITS_PCT,
 } from './analysis/derInterconnect.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getStudies, getStudyAssessments, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
+import { studyLifecycleMetadataLines } from './analysis/studyExportMetadata.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -44,6 +45,7 @@ function handleStudySubmit(e) {
   if (!inputs) return;
 
   let result;
+  const runContext = captureStudyRunContext('derInterconnect', { inputs, options: inputs });
   try {
     result = runDERInterconnectStudy({
       pcc_voltage: {
@@ -86,9 +88,7 @@ function handleStudySubmit(e) {
 
   renderResults(result);
 
-  const studies = getStudies();
-  studies.derInterconnect = { inputs, result };
-  setStudies(studies);
+  saveStudyResult('derInterconnect', { inputs, result }, runContext);
 }
 
 // ---------------------------------------------------------------------------
@@ -328,6 +328,7 @@ function exportCSV() {
     `Frequency Ride-Through,IEEE 1547-2018 Table 5,"${r.ride_through.f_requirement.lo}-${r.ride_through.f_requirement.hi} Hz",${r.ride_through.freq_rt_pass ? 'Compliant' : 'Non-compliant'},${r.ride_through.freq_rt_pass ? 'PASS' : 'FAIL'}`,
     `Harmonic THD,IEEE 1547-2018 Table 2,<= 5.0%,"${r.harmonics.thd_pct}%",${r.harmonics.thd_pass ? 'PASS' : 'FAIL'}`,
     `Overall,,,,${r.overall_pass ? 'PASS' : 'FAIL'}`,
+    ...studyLifecycleMetadataLines(r, { assessment: getStudyAssessments().derInterconnect }),
   ];
 
   downloadText(lines.join('\n'), 'der-interconnect-study.csv', 'text/csv');

@@ -95,6 +95,7 @@ describe('extractVoltageDropRecs()', () => {
       conductor_material: opts.conductor_material ?? 'CU',
       est_load: opts.est_load ?? 100,
       operating_voltage: opts.operating_voltage ?? 480,
+      phases: opts.phases ?? 3,
       circuit_type: opts.circuit_type ?? 'feeder',
       ...opts,
     };

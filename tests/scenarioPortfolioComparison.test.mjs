@@ -5,6 +5,7 @@ import {
   compareStudyCollections,
   buildScenarioStudyImpact,
 } from '../analysis/scenarioComparison.mjs';
+import { buildStudyProvenance, captureStudyRunContext } from '../analysis/studyLifecycle.mjs';
 
 const base = {
   scenario: 'base',
@@ -133,6 +134,37 @@ const future = {
   );
   assert.strictEqual(result.studies[0].status, 'changed');
   assert.strictEqual(result.studies[0].approvalChanged, true);
+}
+
+{
+  const loadFlow = { converged: true, summary: { totalLoadKW: 100 } };
+  const makeContext = (scenario, loadKw) => captureStudyRunContext('loadFlow', {
+    projectSnapshot: { loads: [{ id: 'L-1', kw: loadKw }] },
+    inputs: { loadKw },
+    options: { mode: 'test' },
+    scenario,
+    projectIdentity: { projectId: 'scenario-lifecycle-test', projectName: 'Scenario Lifecycle Test' },
+  });
+  const baseContext = makeContext('Base', 100);
+  const futureContext = makeContext('Future', 125);
+  const baseProvenance = buildStudyProvenance('loadFlow', loadFlow, baseContext, { validity: 'evaluated' });
+  const futureProvenance = buildStudyProvenance('loadFlow', loadFlow, futureContext, { validity: 'evaluated' });
+  const currentComparison = compareProjectScenarios(
+    { scenario: 'Base', studies: { loadFlow }, studyProvenance: { loadFlow: baseProvenance }, studyContext: baseContext },
+    { scenario: 'Future', studies: { loadFlow }, studyProvenance: { loadFlow: futureProvenance }, studyContext: futureContext },
+  );
+  assert.equal(currentComparison.studies.find(study => study.key === 'loadFlow').before.freshness, 'current');
+  assert.equal(currentComparison.studies.find(study => study.key === 'loadFlow').after.freshness, 'current');
+
+  const changedFutureContext = makeContext('Future', 150);
+  const staleComparison = compareProjectScenarios(
+    { scenario: 'Base', studies: { loadFlow }, studyProvenance: { loadFlow: baseProvenance }, studyContext: baseContext },
+    { scenario: 'Future', studies: { loadFlow }, studyProvenance: { loadFlow: futureProvenance }, studyContext: changedFutureContext },
+  );
+  const staleStudy = staleComparison.studies.find(study => study.key === 'loadFlow');
+  assert.equal(staleStudy.before.freshness, 'current');
+  assert.equal(staleStudy.after.freshness, 'stale');
+  assert.equal(staleStudy.after.eligibility, 'withheld');
 }
 
 {

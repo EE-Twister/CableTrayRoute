@@ -1,8 +1,9 @@
 import { runShortCircuit } from '../analysis/shortCircuit.mjs';
-import { getOneLine, getCables, getStudies, setStudies, getProjectInputFingerprint } from '../dataStore.mjs';
+import { getOneLine, getCables, getStudies, getStudyAssessments, captureStudyRunContext, assertStudyRunContextCurrent, saveStudyResult, getProjectInputFingerprint } from '../dataStore.mjs';
 import { getProjectState } from '../projectStorage.js';
 import { downloadPDF } from '../reports/reporting.mjs';
 import { loadReferencedProtectiveDevices } from '../src/protectiveDevices/calculationCatalog.mjs';
+import { studyExportMetadata } from '../analysis/studyExportMetadata.mjs';
 
 function projectComponents() {
   const sheets = getOneLine()?.sheets;
@@ -16,14 +17,15 @@ function buildModel() {
 function resultEntries(results = {}, scope = 'project') {
   if (!results || typeof results !== 'object' || Array.isArray(results)) return [];
   return Object.entries(results).filter(([id, result]) => {
-    if (!result || typeof result !== 'object' || !Number.isFinite(Number(result.threePhaseKA))) return false;
+    if (!result || typeof result !== 'object' || !Object.prototype.hasOwnProperty.call(result, 'threePhaseKA')) return false;
     return scope === 'project' || id === scope;
   });
 }
 
 function summaryResult(results = {}) {
   if (!results || typeof results !== 'object' || Array.isArray(results)) return null;
-  const availableFaultKa = Number(results.availableFaultKa ?? results.availableFaultKA ?? results.faultCurrentKA ?? results.faultKa);
+  const availableRaw = results.availableFaultKa ?? results.availableFaultKA ?? results.faultCurrentKA ?? results.faultKa;
+  const availableFaultKa = availableRaw === null || availableRaw === undefined || availableRaw === '' ? NaN : Number(availableRaw);
   const status = String(results.status || '').trim();
   const updatedAt = results.updatedAt || results.generatedAt || results._meta?.updatedAt || null;
   if (!Number.isFinite(availableFaultKa) && !status && !updatedAt) return null;
@@ -50,18 +52,23 @@ function summarizeForHistory(results = {}) {
   const entries = resultEntries(results);
   const summary = summaryResult(results);
   if (!entries.length && !summary) return null;
+  const evaluatedThreePhase = entries
+    .map(([, result]) => result.threePhaseKA === null || result.threePhaseKA === undefined || result.threePhaseKA === ''
+      ? NaN
+      : Number(result.threePhaseKA))
+    .filter(value => Number.isFinite(value));
   return {
     updatedAt: resultTimestamp(results),
     method: entries[0]?.[1]?.method || results?._meta?.method || null,
     locations: entries.length,
-    availableFaultKa: summary?.availableFaultKa ?? (entries.length ? Math.max(...entries.map(([, result]) => Number(result.threePhaseKA) || 0)) : null),
+    availableFaultKa: summary?.availableFaultKa ?? (evaluatedThreePhase.length ? Math.max(...evaluatedThreePhase) : null),
     inputFingerprint: results?._meta?.inputFingerprint || null,
     buses: entries.map(([id, result]) => ({
       id,
       equipmentTag: result.equipmentTag || id,
-      threePhaseKA: Number(result.threePhaseKA) || 0,
-      lineToGroundKA: Number(result.lineToGroundKA) || 0,
-      lineToLineKA: Number(result.lineToLineKA) || 0
+      threePhaseKA: finiteNullableNumber(result.threePhaseKA),
+      lineToGroundKA: finiteNullableNumber(result.lineToGroundKA),
+      lineToLineKA: finiteNullableNumber(result.lineToLineKA)
     }))
   };
 }
@@ -100,8 +107,8 @@ export function buildShortCircuitComparison(results = {}) {
     rows: tags.map(tag => {
       const current = currentByTag.get(tag);
       const prior = previousByTag.get(tag);
-      const currentKa = current ? Number(current.threePhaseKA) : null;
-      const previousKa = prior ? Number(prior.threePhaseKA) : null;
+      const currentKa = current ? finiteNullableNumber(current.threePhaseKA) : null;
+      const previousKa = prior ? finiteNullableNumber(prior.threePhaseKA) : null;
       return {
         tag,
         currentKa: Number.isFinite(currentKa) ? currentKa : null,
@@ -118,6 +125,17 @@ function inputQuality(result = {}) {
   return required.length ? `${required.length} required input(s)` : warnings.length ? `${warnings.length} assumption(s)` : 'Complete';
 }
 
+export function formatKA(value) {
+  const number = finiteNullableNumber(value);
+  return Number.isFinite(number) ? number.toFixed(2) : 'Unevaluated';
+}
+
+function finiteNullableNumber(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -130,7 +148,13 @@ function escapeHtml(value) {
 export async function runShortCircuitStudy(opts = {}) {
   const model = buildModel();
   if (!model.buses.length) throw new Error('The active project One-Line has no components to analyze.');
+  const runContext = captureStudyRunContext('shortCircuit', {
+    inputs: opts,
+    options: opts,
+    assumptions: ['The selected short-circuit method and protective-device catalog are evaluated against the active One-Line model.'],
+  });
   const deviceCatalog = await loadReferencedProtectiveDevices(model);
+  assertStudyRunContextCurrent(runContext);
   const results = runShortCircuit(model, { ...opts, deviceCatalog });
   const studies = getStudies();
   const previous = summarizeForHistory(studies.shortCircuit);
@@ -143,20 +167,25 @@ export async function runShortCircuitStudy(opts = {}) {
     modelCounts: { components: model.buses.length, cables: model.cables.length },
     history: [previous, ...existingHistory].filter(Boolean).slice(0, 5)
   };
-  studies.shortCircuit = results;
-  setStudies(studies);
+  saveStudyResult('shortCircuit', results, runContext);
   return results;
 }
 
 export function exportShortCircuitReport(results = {}) {
+  const lifecycle = studyExportMetadata(results, { assessment: getStudyAssessments().shortCircuit });
   const entries = resultEntries(results);
   const summary = summaryResult(results);
   if (!entries.length && !summary) return false;
   if (!entries.length) {
-    downloadPDF('Short Circuit Saved Result', ['status', 'availableFaultKa', 'updatedAt'], [{
+    downloadPDF('Short Circuit Saved Result', ['status', 'availableFaultKa', 'updatedAt', 'freshness', 'eligibility', 'calculationVersion', 'calculatedAt', 'provenance'], [{
       status: summary.status,
       availableFaultKa: summary.availableFaultKa,
-      updatedAt: summary.updatedAt || ''
+      updatedAt: summary.updatedAt || '',
+      freshness: lifecycle.freshness,
+      eligibility: lifecycle.resultEligibility,
+      calculationVersion: lifecycle.calculationVersion,
+      calculatedAt: lifecycle.calculatedAt,
+      provenance: lifecycle.provenance,
     }], 'shortcircuit.pdf');
     return true;
   }
@@ -164,10 +193,19 @@ export function exportShortCircuitReport(results = {}) {
   const headers = isIEC
     ? ['bus', 'prefaultKV', 'threePhaseKA', 'lineToGroundKA', 'lineToLineKA', 'ip', 'Ib', 'Ith', 'kappa', 'inputQuality']
     : ['bus', 'threePhaseKA', 'lineToGroundKA', 'lineToLineKA', 'doubleLineGroundKA', 'inputQuality'];
+  headers.push('validity', 'freshness', 'eligibility', 'calculationVersion', 'calculatedAt', 'assumptions', 'warnings', 'provenance');
   const rows = entries.map(([bus, result]) => ({
     bus: result.equipmentTag || bus,
     ...result,
-    inputQuality: inputQuality(result)
+    inputQuality: inputQuality(result),
+    validity: lifecycle.resultValidity,
+    freshness: lifecycle.freshness,
+    eligibility: lifecycle.resultEligibility,
+    calculationVersion: lifecycle.calculationVersion,
+    calculatedAt: lifecycle.calculatedAt,
+    assumptions: lifecycle.assumptions,
+    warnings: lifecycle.warnings,
+    provenance: lifecycle.provenance,
   }));
   downloadPDF(isIEC ? 'IEC 60909 Short-Circuit Report' : 'Short Circuit Report', headers, rows, 'shortcircuit.pdf');
   return true;
@@ -193,9 +231,9 @@ function renderResults(results, scope = 'project') {
     [
       result.equipmentTag || id,
       result.method || 'ANSI',
-      Number(result.threePhaseKA).toFixed(2),
-      Number(result.lineToGroundKA || 0).toFixed(2),
-      Number(result.lineToLineKA || 0).toFixed(2),
+      formatKA(result.threePhaseKA),
+      formatKA(result.lineToGroundKA),
+      formatKA(result.lineToLineKA),
       inputQuality(result)
     ].forEach(value => {
       const cell = document.createElement('td');
@@ -246,7 +284,7 @@ function renderResults(results, scope = 'project') {
     const segments = Array.isArray(provenance.segments) ? provenance.segments : [];
     const lines = [
       `${result.equipmentTag || id}`,
-      `  Method: ${result.method || 'ANSI'} · 3-phase=${Number(result.threePhaseKA || 0).toFixed(2)} kA · line-ground=${Number(result.lineToGroundKA || 0).toFixed(2)} kA · line-line=${Number(result.lineToLineKA || 0).toFixed(2)} kA`,
+      `  Method: ${result.method || 'ANSI'} · Status=${result.calculationStatus || 'unknown'} · 3-phase=${formatKA(result.threePhaseKA)} kA · line-ground=${formatKA(result.lineToGroundKA)} kA · line-line=${formatKA(result.lineToLineKA)} kA`,
       `  Total positive-sequence impedance: R=${Number(provenance.totalR || 0).toFixed(6)} Ω, X=${Number(provenance.totalX || 0).toFixed(6)} Ω`
     ];
     segments.forEach((segment, index) => {

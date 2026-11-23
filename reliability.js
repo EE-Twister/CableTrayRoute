@@ -4,8 +4,10 @@ import {
   getLoads,
   getOneLine,
   getStudies,
+  getStudyAssessments,
   setItem,
-  setStudies,
+  captureStudyRunContext,
+  saveStudyResult,
 } from './dataStore.mjs';
 import {
   createStudyRunMetadata,
@@ -13,6 +15,7 @@ import {
   isStudyResultStale,
 } from './analysis/studyResultReadiness.mjs';
 import { downloadCSV } from './reports/reporting.mjs';
+import { studyLifecycleMetadataRows } from './analysis/studyExportMetadata.mjs';
 import { showAlertModal } from './src/components/modal.js';
 
 const INPUT_KEY = 'reliabilityInputs';
@@ -403,7 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ),
     };
     if (governed) {
-      setStudies({ ...getStudies(), reliability: completedResult });
+      saveStudyResult('reliability', completedResult, captureStudyRunContext('reliability', { inputs: completedResult.inputs || {}, options: {} }));
     }
     renderSavedOrRunResult(completedResult);
     runBtn.textContent = 'Recheck & Analyse';
@@ -435,6 +438,8 @@ document.addEventListener('DOMContentLoaded', () => {
       ...[...lastResult.n1Impacts, ...lastResult.n2Impacts].map(impact => [
         `N-${impact.failed.length}`, impact.failed.join(' + '), impact.impactedKw, impact.probability, impact.impacted.join('; '), '',
       ]),
+      ...studyLifecycleMetadataRows(lastResult, { assessment: getStudyAssessments().reliability })
+        .map(([key, value]) => ['Lifecycle', key, value, '', '', '']),
     ];
     downloadCSV(
       ['Record Type', 'Name / Failed Components', 'Value / Interrupted kW', 'Availability / Probability', 'Outage / Affected Loads', 'EENS'],

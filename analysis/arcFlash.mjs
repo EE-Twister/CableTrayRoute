@@ -561,7 +561,12 @@ export async function runArcFlash(options = {}) {
       addNote('Bolted fault current resolved to 0 kA; check connectivity and source definitions.');
       addRequired('Confirm the upstream source and conductors provide a non-zero fault current.');
     }
-    if (!protectiveComp || (!protectiveComp.tccId && compClearing === null && upstreamClearing === null)) {
+    // An explicit equipment or upstream clearing time is a complete source
+    // even when no library protective-device component is linked. Only ask
+    // for a device association when the calculation had to fall back to the
+    // screening default.
+    if ((!protectiveComp && compClearing === null && upstreamClearing === null)
+      || (protectiveComp && !protectiveComp.tccId && compClearing === null && upstreamClearing === null)) {
       addNote('Clearing time defaulted to 0.2 s because no protective device data was linked.');
       addRequired('Associate a protective device time-current curve or specify a clearing time.');
     } else if (protectiveComp?.tccId && !protectiveDevice && compClearing === null && upstreamClearing === null) {

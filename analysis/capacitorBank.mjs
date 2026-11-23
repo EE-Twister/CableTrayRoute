@@ -185,14 +185,27 @@ export function detuningRecommendation(harmonicOrder, riskLevel) {
  *             options: number[] }}
  */
 export function standardBankSizes(kvarRequired) {
-  if (kvarRequired < 0) throw new Error('kvarRequired must be ≥ 0');
+  if (!Number.isFinite(kvarRequired) || kvarRequired < 0) throw new Error('kvarRequired must be a finite number ≥ 0');
   if (kvarRequired === 0) {
-    return { recommended: 0, twoStage: 0, stageKvar: 0, options: [] };
+    return { recommended: 0, twoStage: 0, stageKvar: 0, options: [], exceedsCatalog: false, adequate: true };
   }
 
   // Smallest standard size that meets or exceeds requirement
-  const recommended = STANDARD_KVAR_SIZES.find(s => s >= kvarRequired)
-    ?? STANDARD_KVAR_SIZES[STANDARD_KVAR_SIZES.length - 1];
+  const recommended = STANDARD_KVAR_SIZES.find(s => s >= kvarRequired);
+
+  // Do not substitute the largest catalog item when the requested bank is
+  // beyond the catalog.  A capped value looks like an adequate selection and
+  // can incorrectly feed the resonance calculation as if it were installed.
+  if (recommended === undefined) {
+    return {
+      recommended: null,
+      twoStage: null,
+      stageKvar: null,
+      options: [],
+      exceedsCatalog: true,
+      adequate: false,
+    };
+  }
 
   // 2-stage option: two equal stages totalling the recommended size
   const stageKvar = recommended / 2;
@@ -202,7 +215,14 @@ export function standardBankSizes(kvarRequired) {
   const idx = STANDARD_KVAR_SIZES.indexOf(recommended);
   const options = STANDARD_KVAR_SIZES.slice(Math.max(0, idx - 1), idx + 3);
 
-  return { recommended, twoStage, stageKvar, options };
+  return { recommended, twoStage, stageKvar, options, exceedsCatalog: false, adequate: true };
+}
+
+function achievedPowerFactor(pKw, tanDeltaExisting, selectedKvar) {
+  if (!(Number.isFinite(pKw) && pKw > 0) || !Number.isFinite(tanDeltaExisting)
+    || !Number.isFinite(selectedKvar) || selectedKvar < 0) return null;
+  const qNet = pKw * tanDeltaExisting - selectedKvar;
+  return Math.round((pKw / Math.sqrt((pKw * pKw) + (qNet * qNet))) * 10000) / 10000;
 }
 
 /**
@@ -235,6 +255,11 @@ export function runCapacitorBankAnalysis(inputs) {
 
   const warnings = [];
 
+  if (![pKw, pfExisting, pfTarget].every(Number.isFinite) || !(pKw > 0)
+    || !(pfExisting > 0 && pfExisting <= 1) || !(pfTarget > 0 && pfTarget <= 1)) {
+    throw new Error('pKw must be finite and greater than zero; power factors must be finite values in (0, 1].');
+  }
+
   // Step 1 — Required kVAR
   const kvarResult = requiredKvar({ pKw, pfExisting, pfTarget });
 
@@ -248,11 +273,14 @@ export function runCapacitorBankAnalysis(inputs) {
       kvaScMva,
       kvarRequired: 0,
       bankSize: 0,
+      catalogMaximum: STANDARD_KVAR_SIZES[STANDARD_KVAR_SIZES.length - 1],
       twoStage: 0,
       stageKvar: 0,
       standardSizes: [],
       tanDeltaExisting: kvarResult.tanDeltaExisting,
       tanDeltaTarget: kvarResult.tanDeltaTarget,
+      achievedPf: pfExisting,
+      bankSelection: { adequate: true, exceedsCatalog: false, status: 'not-required' },
       resonance: null,
       detuning: { needed: false, detuningPct: null, tunedToOrder: null,
         rationale: 'Power factor is already at or above target — no capacitor bank required.' },
@@ -263,6 +291,37 @@ export function runCapacitorBankAnalysis(inputs) {
 
   // Step 2 — Standard bank size selection
   const bankResult = standardBankSizes(kvarResult.kvarRequired);
+
+  if (!bankResult.adequate) {
+    warnings.push(
+      `Required compensation (${kvarResult.kvarRequired} kVAR) exceeds the largest standard capacitor bank ` +
+      `size (${STANDARD_KVAR_SIZES[STANDARD_KVAR_SIZES.length - 1]} kVAR). No adequate catalog selection is available; ` +
+      'engineered staging or a custom bank is required.'
+    );
+    return {
+      busLabel,
+      pKw,
+      pfExisting,
+      pfTarget,
+      voltageKv,
+      kvaScMva,
+      kvarRequired: kvarResult.kvarRequired,
+      bankSize: null,
+      catalogMaximum: STANDARD_KVAR_SIZES[STANDARD_KVAR_SIZES.length - 1],
+      twoStage: null,
+      stageKvar: null,
+      standardSizes: [],
+      tanDeltaExisting: kvarResult.tanDeltaExisting,
+      tanDeltaTarget: kvarResult.tanDeltaTarget,
+      achievedPf: null,
+      bankSelection: { adequate: false, exceedsCatalog: true, status: 'unavailable' },
+      resonance: null,
+      detuning: { needed: false, detuningPct: null, tunedToOrder: null,
+        rationale: 'Resonance check unavailable until an actual capacitor-bank size is selected.' },
+      warnings,
+      timestamp: new Date().toISOString(),
+    };
+  }
 
   if (bankResult.recommended > kvarResult.kvarRequired * 1.5) {
     warnings.push(
@@ -319,9 +378,12 @@ export function runCapacitorBankAnalysis(inputs) {
     tanDeltaExisting: kvarResult.tanDeltaExisting,
     tanDeltaTarget: kvarResult.tanDeltaTarget,
     bankSize: bankResult.recommended,
+    catalogMaximum: STANDARD_KVAR_SIZES[STANDARD_KVAR_SIZES.length - 1],
     twoStage: bankResult.twoStage,
     stageKvar: bankResult.stageKvar,
     standardSizes: bankResult.options,
+    achievedPf: achievedPowerFactor(pKw, kvarResult.tanDeltaExisting, bankResult.recommended),
+    bankSelection: { adequate: true, exceedsCatalog: false, status: 'selected' },
     resonance,
     detuning,
     warnings,

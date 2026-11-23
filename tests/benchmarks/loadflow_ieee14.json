@@ -19,7 +19,7 @@
       "Pg": 40,
       "Qg": 42.4,
       "Vm": 1.045,
-      "Va": -4.98
+      "Va": 0
     },
     {
       "id": "3",
@@ -28,9 +28,9 @@
       "Pd": 94.2,
       "Qd": 19,
       "Pg": 0,
-      "Qg": 25,
+      "Qg": 23.4,
       "Vm": 1.01,
-      "Va": -12.72
+      "Va": 0
     },
     {
       "id": "4",
@@ -38,8 +38,8 @@
       "baseKV": 69,
       "Pd": 47.8,
       "Qd": -3.9,
-      "Vm": 1.019,
-      "Va": -10.33
+      "Vm": 1,
+      "Va": 0
     },
     {
       "id": "5",
@@ -47,8 +47,8 @@
       "baseKV": 69,
       "Pd": 7.6,
       "Qd": 1.6,
-      "Vm": 1.02,
-      "Va": -8.78
+      "Vm": 1,
+      "Va": 0
     },
     {
       "id": "6",
@@ -59,7 +59,7 @@
       "Pg": 0,
       "Qg": 12.2,
       "Vm": 1.07,
-      "Va": -14.22
+      "Va": 0
     },
     {
       "id": "7",
@@ -67,8 +67,8 @@
       "baseKV": 13.8,
       "Pd": 0,
       "Qd": 0,
-      "Vm": 1.061,
-      "Va": -13.37
+      "Vm": 1,
+      "Va": 0
     },
     {
       "id": "8",
@@ -79,7 +79,7 @@
       "Pg": 0,
       "Qg": 17.4,
       "Vm": 1.09,
-      "Va": -13.36
+      "Va": 0
     },
     {
       "id": "9",
@@ -87,8 +87,9 @@
       "baseKV": 13.8,
       "Pd": 29.5,
       "Qd": 16.6,
-      "Vm": 1.056,
-      "Va": -14.94
+      "Vm": 1,
+      "Va": 0,
+      "Bs": 19
     },
     {
       "id": "10",
@@ -96,8 +97,8 @@
       "baseKV": 13.8,
       "Pd": 9,
       "Qd": 5.8,
-      "Vm": 1.051,
-      "Va": -15.1
+      "Vm": 1,
+      "Va": 0
     },
     {
       "id": "11",
@@ -105,8 +106,8 @@
       "baseKV": 13.8,
       "Pd": 3.5,
       "Qd": 1.8,
-      "Vm": 1.057,
-      "Va": -14.79
+      "Vm": 1,
+      "Va": 0
     },
     {
       "id": "12",
@@ -114,8 +115,8 @@
       "baseKV": 13.8,
       "Pd": 6.1,
       "Qd": 1.6,
-      "Vm": 1.055,
-      "Va": -15.07
+      "Vm": 1,
+      "Va": 0
     },
     {
       "id": "13",
@@ -123,8 +124,8 @@
       "baseKV": 13.8,
       "Pd": 13.5,
       "Qd": 5.8,
-      "Vm": 1.05,
-      "Va": -15.16
+      "Vm": 1,
+      "Va": 0
     },
     {
       "id": "14",
@@ -132,8 +133,8 @@
       "baseKV": 13.8,
       "Pd": 14.9,
       "Qd": 5,
-      "Vm": 1.036,
-      "Va": -16.04
+      "Vm": 1,
+      "Va": 0
     }
   ],
   "branches": [
@@ -191,28 +192,27 @@
       "to": "7",
       "r": 0,
       "x": 0.20912,
-      "b": 0
+      "b": 0,
+      "ratio": 0.978,
+      "angle": 0
     },
     {
       "from": "4",
       "to": "9",
       "r": 0,
       "x": 0.55618,
-      "b": 0
+      "b": 0,
+      "ratio": 0.969,
+      "angle": 0
     },
     {
       "from": "5",
       "to": "6",
       "r": 0,
       "x": 0.25202,
-      "b": 0
-    },
-    {
-      "from": "5",
-      "to": "7",
-      "r": 0,
-      "x": 0.17615,
-      "b": 0
+      "b": 0,
+      "ratio": 0.932,
+      "angle": 0
     },
     {
       "from": "6",
@@ -286,11 +286,85 @@
     }
   ],
   "expected": {
+    "1": {
+      "Vm": 1.06,
+      "Va": 0
+    },
     "2": {
-      "Vm": 1.045
+      "Vm": 1.045,
+      "Va": -4.9826
+    },
+    "3": {
+      "Vm": 1.01,
+      "Va": -12.725
+    },
+    "4": {
+      "Vm": 1.01767,
+      "Va": -10.3128
+    },
+    "5": {
+      "Vm": 1.01951,
+      "Va": -8.7738
+    },
+    "6": {
+      "Vm": 1.07,
+      "Va": -14.2209
+    },
+    "7": {
+      "Vm": 1.06152,
+      "Va": -13.3596
+    },
+    "8": {
+      "Vm": 1.09,
+      "Va": -13.3596
+    },
+    "9": {
+      "Vm": 1.05593,
+      "Va": -14.9385
+    },
+    "10": {
+      "Vm": 1.05099,
+      "Va": -15.0972
+    },
+    "11": {
+      "Vm": 1.05691,
+      "Va": -14.7906
+    },
+    "12": {
+      "Vm": 1.05519,
+      "Va": -15.0755
+    },
+    "13": {
+      "Vm": 1.05038,
+      "Va": -15.1562
     },
     "14": {
-      "Vm": 6.9093
+      "Vm": 1.03553,
+      "Va": -16.0336
+    }
+  },
+  "_benchmarkMetadata": {
+    "caseSource": {
+      "name": "MATPOWER case14.m",
+      "url": "https://github.com/MATPOWER/matpower/blob/master/data/case14.m",
+      "version": "master retrieved 2026-09-18",
+      "description": "IEEE 14-bus input converted from the UW PSTCA IEEE CDF archive."
+    },
+    "solutionReference": {
+      "name": "ITI IEEE 14-bus PSS/E reference model solved bus voltages",
+      "url": "https://raw.githubusercontent.com/ITI/models/master/electric-grid/physical/reference/ieee-14bus/models/ieee-14-bus.raw",
+      "version": "retrieved 2026-09-18",
+      "precision": "voltage magnitude five decimal places; angle four decimal places in the RAW bus records",
+      "note": "The reference uses the same UW IEEE 14-bus case, 100 MVA base, 20 branches including three transformer records, and the same solved bus voltage targets."
+    },
+    "mapping": {
+      "busType": "MATPOWER type 3 -> slack, 2 -> PV, 1 -> PQ",
+      "load": "Pd/Qd MW/MVAr -> load kw/kvar by multiplying by 1000",
+      "generation": "Pg/Qg MW/MVAr -> generation kw/kvar by multiplying by 1000",
+      "branchImpedance": "r/x per-unit -> ohms using baseZ = baseKV^2/baseMVA",
+      "branchCharging": "b per-unit -> siemens using baseY = baseMVA/baseKV^2, split equally",
+      "transformer": "non-unit ratio fields become branch tap ratios",
+      "busShunt": "Bs MVAr at 1 pu -> siemens using Bs/baseKV^2"
     }
   }
 }

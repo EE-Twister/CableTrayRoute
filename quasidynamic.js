@@ -13,10 +13,11 @@ import {
   isStudyResultStale,
   validatePowerFlowStudyModel
 } from './analysis/studyResultReadiness.mjs';
-import { getOneLine, getStudies, setStudies } from './dataStore.mjs';
+import { getOneLine, getStudies, getStudyAssessments, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { studyLifecycleMetadataRows } from './analysis/studyExportMetadata.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -165,10 +166,8 @@ document.addEventListener('DOMContentLoaded', () => {
     errorsDiv.hidden = true;
     errorsDiv.textContent = '';
 
-    const studies = getStudies();
     result.persisted = true;
-    studies.quasiDynamic = result;
-    setStudies(studies);
+    saveStudyResult('quasiDynamic', result, captureStudyRunContext('quasiDynamic', { inputs: result.inputs || {}, options: {} }));
 
     renderResults(result);
     exportBtn.hidden = false;
@@ -492,6 +491,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function exportCsv(result) {
     const rows = ['hour,loadScale,genScale,converged,totalLoadKw,totalLossKw'];
+    studyLifecycleMetadataRows(result, { assessment: getStudyAssessments().quasiDynamic }).forEach(([key, value]) => rows.push(`${encodeCsvCell(key)},${encodeCsvCell(value)}`));
     for (const t of result.timeSeries) {
       rows.push(`${t.hour},${t.loadScale},${t.genScale},${t.converged},${(t.totalLoadKw ?? 0).toFixed(3)},${(t.totalLossKw ?? 0).toFixed(4)}`);
     }

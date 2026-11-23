@@ -283,6 +283,19 @@ describe('evaluateEquipment() — protective device', () => {
     const evals = evaluateEquipment([comp], [], {}, catalog);
     assert.strictEqual(evals[0].checks.aic.status, EVAL_STATUS.INCOMPLETE);
   });
+
+  it('withholds stale short-circuit values from equipment checks', () => {
+    const comp = { id: 'B1', type: 'breaker', props: { device: 'breaker_65ka', name: 'Main Breaker' } };
+    const evals = evaluateEquipment(
+      [comp],
+      [],
+      { shortCircuit: scResults, arcFlash: afResults },
+      catalog,
+      { studyAssessments: { shortCircuit: { validity: { state: 'evaluated' }, eligible: false, freshness: 'stale' } } },
+    );
+    assert.equal(evals[0].faultKA, null);
+    assert.equal(evals[0].checks.aic.status, EVAL_STATUS.INCOMPLETE);
+  });
 });
 
 describe('evaluateEquipment() — switchboard', () => {

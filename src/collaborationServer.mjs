@@ -27,36 +27,58 @@ export function attachCollaborationServer(httpServer, wss, options = {}) {
   // Cap incoming frame size so an authenticated client cannot exhaust memory
   // (or amplify a broadcast) with an oversized patch payload.
   const maxMessageBytes = Number(options.maxMessageBytes) > 0 ? Number(options.maxMessageBytes) : 64 * 1024;
-  // projectId → Set of { ws, username }
+  // Authenticated rooms are scoped to the storage owner's account namespace.
+  // The public protocol continues to use the unqualified projectId.
   const rooms = new Map();
   // projectId → monotonically increasing sequence counter
   const seqCounters = new Map();
 
-  function broadcastPresence(projectId) {
-    const room = rooms.get(projectId);
+  function closeClient(ws, code = 1011, reason = 'Message handling failed') {
+    try { ws.close(code, reason); }
+    catch { try { ws.terminate(); } catch { /* Transport is already unavailable. */ } }
+  }
+
+  function sendToClient(client, message) {
+    if (!client.identity) {
+      if (client.ws.readyState === 1) client.ws.send(message);
+      return;
+    }
+    client.delivery = client.delivery.then(async () => {
+      if (client.ws.readyState !== 1) return;
+      if (!await client.identity.authorize()) {
+        closeClient(client.ws, 1008, 'Session expired');
+        return;
+      }
+      if (client.ws.readyState === 1) client.ws.send(message);
+    }).catch(() => { closeClient(client.ws); });
+  }
+
+  function broadcastPresence(roomKey) {
+    const room = rooms.get(roomKey);
     if (!room) return;
     const users = [...room].map(c => c.username).filter(Boolean);
+    const projectId = room.values().next().value.projectId;
     const msg = JSON.stringify({ type: 'presence', projectId, users });
     for (const client of room) {
-      if (client.ws.readyState === 1 /* OPEN */) {
-        client.ws.send(msg);
-      }
+      sendToClient(client, msg);
     }
   }
 
-  function broadcast(projectId, senderWs, message) {
-    const room = rooms.get(projectId);
+  function broadcast(roomKey, senderWs, message) {
+    const room = rooms.get(roomKey);
     if (!room) return;
     const msg = JSON.stringify(message);
     for (const client of room) {
       if (client.ws !== senderWs && client.ws.readyState === 1 /* OPEN */) {
-        client.ws.send(msg);
+        sendToClient(client, msg);
       }
     }
   }
 
   httpServer.on('upgrade', async (request, socket, head) => {
-    const { pathname } = new URL(request.url, 'http://localhost');
+    let pathname;
+    try { ({ pathname } = new URL(request.url, 'http://localhost')); }
+    catch { socket.destroy(); return; }
     if (pathname !== '/ws/collab') {
       socket.destroy();
       return;
@@ -68,7 +90,9 @@ export function attachCollaborationServer(httpServer, wss, options = {}) {
       } catch {
         valid = false;
       }
-      if (!valid) {
+      if (!valid || typeof request.collaborationIdentity?.username !== 'string'
+        || !request.collaborationIdentity.username
+        || typeof request.collaborationIdentity.authorize !== 'function') {
         socket.destroy();
         return;
       }
@@ -78,58 +102,81 @@ export function attachCollaborationServer(httpServer, wss, options = {}) {
     });
   });
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, request) => {
+    const identity = validateUpgrade ? request?.collaborationIdentity : null;
+    if (validateUpgrade && !identity) {
+      closeClient(ws, 1008, 'Authentication required');
+      return;
+    }
     let currentProjectId = null;
     let currentUsername = null;
+    let currentRoomKey = null;
+    let authorization = null;
+    let incoming = Promise.resolve();
+    let pendingMessages = 0;
+    let closed = false;
+    const client = { ws, identity, delivery: Promise.resolve(), username: null, projectId: null };
+    const sendMessage = message => sendToClient(client, JSON.stringify(message));
 
     function removeFromRoom() {
-      if (!currentProjectId) return;
-      const room = rooms.get(currentProjectId);
+      if (!currentRoomKey) return;
+      const room = rooms.get(currentRoomKey);
       if (room) {
         room.forEach(c => { if (c.ws === ws) room.delete(c); });
         if (room.size === 0) {
-          rooms.delete(currentProjectId);
-          seqCounters.delete(currentProjectId);
-        } else broadcastPresence(currentProjectId);
+          rooms.delete(currentRoomKey);
+          seqCounters.delete(currentRoomKey);
+        } else broadcastPresence(currentRoomKey);
       }
     }
 
-    ws.on('message', (data) => {
+    function handleMessage(data) {
       const size = typeof data === 'string' ? Buffer.byteLength(data) : (data?.length ?? 0);
       if (size > maxMessageBytes) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Message too large' }));
+        sendMessage({ type: 'error', message: 'Message too large' });
         return;
       }
       let msg;
       try {
         msg = JSON.parse(data.toString());
       } catch {
-        ws.send(JSON.stringify({ type: 'error', message: 'Invalid JSON' }));
+        sendMessage({ type: 'error', message: 'Invalid JSON' });
+        return;
+      }
+
+      if (!msg || typeof msg !== 'object' || Array.isArray(msg) || typeof msg.type !== 'string') {
+        sendMessage({ type: 'error', message: 'Invalid message' });
         return;
       }
 
       if (msg.type === 'ping') {
-        ws.send(JSON.stringify({ type: 'pong' }));
+        sendMessage({ type: 'pong' });
         return;
       }
 
       if (msg.type === 'join') {
-        removeFromRoom();
-        const requestedProjectId = String(msg.projectId || '');
-        if (requestedProjectId.length > 200) {
-          currentProjectId = null;
-          currentUsername = null;
-          ws.send(JSON.stringify({ type: 'error', message: 'Project ID too long' }));
+        if (typeof msg.projectId !== 'string' || (msg.username !== undefined && typeof msg.username !== 'string')) {
+          sendMessage({ type: 'error', message: 'Invalid join fields' });
           return;
         }
+        const requestedProjectId = msg.projectId;
+        if (requestedProjectId.length > 200) {
+          sendMessage({ type: 'error', message: 'Project ID too long' });
+          return;
+        }
+        const requestedUsername = identity ? identity.username : (msg.username || 'Anonymous').slice(0, 100);
+        removeFromRoom();
         currentProjectId = requestedProjectId;
-        currentUsername = String(msg.username || 'Anonymous').slice(0, 100);
-        if (!rooms.has(currentProjectId)) rooms.set(currentProjectId, new Set());
-        if (!seqCounters.has(currentProjectId)) seqCounters.set(currentProjectId, 0);
-        rooms.get(currentProjectId).add({ ws, username: currentUsername });
+        currentUsername = requestedUsername;
+        currentRoomKey = JSON.stringify([identity?.username || null, currentProjectId]);
+        if (!rooms.has(currentRoomKey)) rooms.set(currentRoomKey, new Set());
+        if (!seqCounters.has(currentRoomKey)) seqCounters.set(currentRoomKey, 0);
+        client.username = currentUsername;
+        client.projectId = currentProjectId;
+        rooms.get(currentRoomKey).add(client);
         // Send the current sequence to the joining client so it starts in sync
-        ws.send(JSON.stringify({ type: 'sync', seq: seqCounters.get(currentProjectId) }));
-        broadcastPresence(currentProjectId);
+        sendMessage({ type: 'sync', seq: seqCounters.get(currentRoomKey) });
+        broadcastPresence(currentRoomKey);
         return;
       }
 
@@ -137,19 +184,24 @@ export function attachCollaborationServer(httpServer, wss, options = {}) {
         removeFromRoom();
         currentProjectId = null;
         currentUsername = null;
+        currentRoomKey = null;
         return;
       }
 
       if (msg.type === 'patch') {
+        if (identity && !authorization?.canWrite) {
+          sendMessage({ type: 'error', message: 'Insufficient permissions' });
+          return;
+        }
         if (!currentProjectId) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Join a project first' }));
+          sendMessage({ type: 'error', message: 'Join a project first' });
           return;
         }
         // Assign the next sequence number to this patch
-        const seq = (seqCounters.get(currentProjectId) || 0) + 1;
-        seqCounters.set(currentProjectId, seq);
+        const seq = (seqCounters.get(currentRoomKey) || 0) + 1;
+        seqCounters.set(currentRoomKey, seq);
         // Relay the patch with its sequence number to all other clients in the room
-        broadcast(currentProjectId, ws, {
+        broadcast(currentRoomKey, ws, {
           type: 'patch',
           projectId: currentProjectId,
           username: currentUsername,
@@ -157,12 +209,41 @@ export function attachCollaborationServer(httpServer, wss, options = {}) {
           seq,
         });
         // Acknowledge the sequence back to the sender
-        ws.send(JSON.stringify({ type: 'ack', seq }));
+        sendMessage({ type: 'ack', seq });
         return;
       }
+    }
+
+    function failConnection() {
+      // EventEmitter does not contain listener exceptions. Fail only this
+      // connection if a protocol or transport operation unexpectedly throws.
+      closeClient(ws);
+    }
+
+    ws.on('message', (data) => {
+      if (!identity) {
+        try { handleMessage(data); } catch { failConnection(); }
+        return;
+      }
+      const size = typeof data === 'string' ? Buffer.byteLength(data) : (data?.length ?? 0);
+      if (closed || size > maxMessageBytes || pendingMessages >= 32) {
+        closeClient(ws, 1008, 'Message limit exceeded');
+        return;
+      }
+      pendingMessages += 1;
+      incoming = incoming.then(async () => {
+        if (closed) return;
+        authorization = await identity.authorize();
+        if (closed) return;
+        if (!authorization) {
+          closeClient(ws, 1008, 'Session expired');
+          return;
+        }
+        handleMessage(data);
+      }).catch(failConnection).finally(() => { pendingMessages -= 1; });
     });
 
-    ws.on('close', removeFromRoom);
-    ws.on('error', removeFromRoom);
+    ws.on('close', () => { closed = true; removeFromRoom(); });
+    ws.on('error', () => { closed = true; removeFromRoom(); });
   });
 }

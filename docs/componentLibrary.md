@@ -68,7 +68,7 @@ Add new objects to the JSON array and provide matching icons to extend the palet
 
 ## Palette Favorites and Recent Symbols
 
-The One-Line palette opens with the full component library available. Placing a symbol by click or drag/drop records it in **Favorites & Recent** (up to eight recent symbols), so commonly used equipment stays at the top of the palette. Right-click a palette item and choose **Add to Favorites** to keep it there permanently (up to twelve favorites); choose **Remove from Favorites** to unpin it. **Clear Recent** removes only recent history, never explicit favorites. These preferences are stored with the user's application settings, not in the shared project diagram.
+The One-Line palette opens with the full component library available. Placing a symbol by click or drag/drop records it in **Favorites & Recent** (up to eight recent symbols), so commonly used equipment stays at the top of the palette. Right-click a palette item and choose **Add to Favorites** to keep it there permanently (up to twelve favorites); choose **Remove from Favorites** to unpin it. The palette context menu follows viewport coordinates while the page is scrolled, so its actions remain reachable beside the item that opened it. **Clear Recent** removes only recent history, never explicit favorites. These preferences are stored with the user's application settings, not in the shared project diagram.
 
 For quick drafting, right-click a blank canvas area to add a Utility Source, Bus, Breaker, Transformer, or Panel at the snapped pointer location. **Repeat Last** in the Edit toolbar, **Repeat Last Symbol** in that canvas menu, or `Alt+R` places the most recently used palette symbol at the guided viewport location. These actions use the same library, grid snapping, undo, and recent-symbol tracking as ordinary palette placement.
 
@@ -193,6 +193,8 @@ Team releases are deployment-scoped. Configure an initial administrator as descr
 If you are not logged in, or the server is unreachable, the Library Manager falls back to browser `localStorage` and the static `componentLibrary.json` file — no data is lost.
 
 ## Acceptance Criteria Mapping
+
+Workbook schema fields and component subtype names are treated as data, including names such as `__proto__` and `constructor`. Importing these names cannot change browser object prototypes before validation runs.
 
 - Non-technical users can add/edit/delete library entries using structured tables only.
 - Workbook import validates payloads and blocks save until issues are fixed.

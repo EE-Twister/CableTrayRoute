@@ -97,6 +97,9 @@ function collectAnalysisModules() {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const filePath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
+        // Benchmark fixture helpers are evidence inputs, not production
+        // calculation modules and must not inflate the analysis inventory.
+        if (path.relative(ANALYSIS_DIR, filePath).replace(/\\/g, '/') === 'benchmarks') continue;
         walk(filePath);
       } else if (ANALYSIS_MODULE_RE.test(entry.name) && !TEST_FILE_RE.test(entry.name)) {
         const relativePath = path.relative(ROOT, filePath).replace(/\\/g, '/');

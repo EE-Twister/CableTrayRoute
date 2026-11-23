@@ -658,12 +658,12 @@ export function initCpLayoutCanvas({
           <label>Y1 <input type="number" step="1" data-cp-prop-key="y1" value="${roundTo(selectedItem.y1, 2)}"></label>
           <label>X2 <input type="number" step="1" data-cp-prop-key="x2" value="${roundTo(selectedItem.x2, 2)}"></label>
           <label>Y2 <input type="number" step="1" data-cp-prop-key="y2" value="${roundTo(selectedItem.y2, 2)}"></label>
-          <label>Label <input type="text" data-cp-prop-key="label" value="${selectedItem.label || ''}"></label>
+          <label>Label <input type="text" data-cp-prop-key="label" value="${escapeHtml(selectedItem.label || '')}"></label>
         `
       : `
           <label>X <input type="number" step="1" data-cp-prop-key="x" value="${roundTo(selectedItem.x, 2)}"></label>
           <label>Y <input type="number" step="1" data-cp-prop-key="y" value="${roundTo(selectedItem.y, 2)}"></label>
-          <label>Label <input type="text" data-cp-prop-key="label" value="${selectedItem.label || ''}" ${selected.kind === 'reference' ? 'disabled' : ''}></label>
+          <label>Label <input type="text" data-cp-prop-key="label" value="${escapeHtml(selectedItem.label || '')}" ${selected.kind === 'reference' ? 'disabled' : ''}></label>
         `;
     propertiesPanelContent.innerHTML = `
       <h4>${title}${indexLabel}</h4>

@@ -1,0 +1,41 @@
+{
+  "provenance": { "kind": "synthetic", "note": "Co-located packaged loads and an explicit panel-location override isolate shared tray capacity. This is not a surveyed plant or a manufacturer motor qualification." },
+  "supply": { "id": "S", "tag": "S", "voltage": 480, "phases": 3, "capacityKva": 500, "availableFaultCurrentKA": 20, "x": 0, "y": 0, "z": 0 },
+  "equipment": [
+    { "id": "L-01", "tag": "L-01", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-02", "tag": "L-02", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-03", "tag": "L-03", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-04", "tag": "L-04", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-05", "tag": "L-05", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-06", "tag": "L-06", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-07", "tag": "L-07", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-08", "tag": "L-08", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-09", "tag": "L-09", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-10", "tag": "L-10", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-11", "tag": "L-11", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-12", "tag": "L-12", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-13", "tag": "L-13", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-14", "tag": "L-14", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-15", "tag": "L-15", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-16", "tag": "L-16", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-17", "tag": "L-17", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-18", "tag": "L-18", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-19", "tag": "L-19", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-20", "tag": "L-20", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-21", "tag": "L-21", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-22", "tag": "L-22", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-23", "tag": "L-23", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-24", "tag": "L-24", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 },
+    { "id": "L-25", "tag": "L-25", "kw": 2, "powerFactor": 1, "voltage": 480, "phases": 3, "x": 20, "y": 0, "z": 0 }
+  ],
+  "criteria": { "code": "NEC", "maxPanelLoadKva": 500, "maxLoadsPerPanel": 50, "maxEndpointAttachmentFt": 1, "voltageDropLimitPct": 3, "conductorMaterial": "copper", "temperatureRatingC": 75, "ambientTempC": 30, "bundledConductors": 3 },
+  "overrides": { "panelLocations": { "DP-01": { "x": 0, "y": 0, "z": 0, "note": "Synthetic tray congestion acceptance: panel at source, packaged loads at remote node." } } },
+  "corridors": {
+    "nodes": [{ "id": "N0", "x": 0, "y": 0, "z": 0 }, { "id": "N1", "x": 20, "y": 0, "z": 0 }, { "id": "N9", "x": 0, "y": 50, "z": 0 }],
+    "edges": [
+      { "id": "SHORT", "from": "N0", "to": "N1", "widthIn": 6, "depthIn": 6, "permitted": true },
+      { "id": "BYPASS-A", "from": "N0", "to": "N9", "widthIn": 24, "depthIn": 6, "permitted": true },
+      { "id": "BYPASS-B", "from": "N9", "to": "N1", "widthIn": 24, "depthIn": 6, "permitted": true }
+    ]
+  }
+}

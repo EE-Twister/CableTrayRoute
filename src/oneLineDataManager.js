@@ -171,9 +171,13 @@ function spreadsheetValues(row) {
 
 function exportVisibleCsvRows() {
   const rows = visibleRows();
+  const csvRows = rows.map(row => {
+    const values = spreadsheetValues(row);
+    return Object.fromEntries(ONE_LINE_DATA_HEADERS.map((header, index) => [header, values[index]]));
+  });
   downloadCSV(
     ONE_LINE_DATA_HEADERS,
-    rows.map(spreadsheetValues),
+    csvRows,
     'one-line-data-manager.csv',
   );
   setStatus(`Exported ${rows.length} displayed component${rows.length === 1 ? '' : 's'} to CSV.`, 'success');

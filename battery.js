@@ -1,6 +1,6 @@
 import { runBatterySizingAnalysis } from './analysis/batterySizing.mjs';
 import { buildBatteryRackLayoutModel } from './analysis/batteryRackLayout.mjs';
-import { getStudies, setStudies, getLoads, getDesignBasis, getProjectMeta } from './dataStore.mjs';
+import { getStudies, getStudyAssessments, getLoads, getDesignBasis, getProjectMeta, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import {
   buildBatteryProjectInputs,
@@ -78,6 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return buildBatteryProjectInputs({
       loads: getLoads(),
       studies: getStudies(),
+      studyAssessments: getStudyAssessments(),
       designBasis: getDesignBasis(),
       projectMeta: getProjectMeta(),
     });
@@ -129,7 +130,14 @@ document.addEventListener('DOMContentLoaded', () => {
       element.value = saved[fieldName];
       bindProjectField(element, projectInputModel.bindings[fieldName], projectOverrides, fieldName);
     });
+    Object.entries(savedFieldIds).forEach(([fieldName, id]) => {
+      const sourcePath = saved.projectLink?.bindings?.[fieldName]?.sourcePath;
+      if (!sourcePath || String(sourcePath).startsWith('manual.') || projectOverrides.has(fieldName)) return;
+      const element = document.getElementById(id);
+      if (element) element.dataset.projectLinkedValueAssigned = 'true';
+    });
     applyProjectInputs(false);
+    restoreManualBatteryInputs(saved);
     renderResults(saved);
     const currentInputs = readFormInputs();
     if (currentInputs) {
@@ -143,13 +151,23 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Form submission ---
   form.addEventListener('submit', e => {
     e.preventDefault();
+    applyProjectInputs(false);
     const inputs = readFormInputs();
     if (!inputs) return;
 
     let result;
+    let runContext;
     try {
+      const usesMotorStart = !projectOverrides.has('peakLoadKw')
+        && projectInputModel?.bindings?.peakLoadKw?.sourcePath === 'studyResults.motorStart';
+      runContext = captureStudyRunContext('batterySizing', {
+        inputs,
+        options: inputs,
+        ...(usesMotorStart ? {} : { dependencies: [] }),
+      });
       result = runBatterySizingAnalysis(inputs);
       const rackLayout = buildBatteryRackLayoutModel(result, inputs.rackLayoutInputs);
+      result.sizingMethod = inputs.sizingMethod;
       result.rackLayoutInputs = rackLayout.inputs;
       result.rackLayoutSummary = rackLayout.summary;
       const snapshot = createStudyInputSnapshot('batterySizing', inputs, projectInputModel.bindings, projectOverrides);
@@ -160,9 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Persist
-    const studies = getStudies();
-    studies.batterySizing = result;
-    setStudies(studies);
+    saveStudyResult('batterySizing', result, runContext);
 
     renderResults(result);
   });
@@ -184,23 +200,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const rackLayoutInputs = readRackLayoutInputs(get, getFloat);
     const sizingMethod = sizingMethodSelect?.value || 'energy-screen';
 
-    if (!averageLoadKw || averageLoadKw <= 0) {
+    if (!Number.isFinite(averageLoadKw) || averageLoadKw <= 0) {
       showModal('Input Error', '<p>Average load P<sub>avg</sub> (kW) must be greater than zero.</p>', 'error');
       return null;
     }
-    if (!peakLoadKw || peakLoadKw <= 0) {
+    if (!Number.isFinite(peakLoadKw) || peakLoadKw <= 0) {
       showModal('Input Error', '<p>Peak load P<sub>peak</sub> (kW) must be greater than zero.</p>', 'error');
       return null;
     }
-    if (!runtimeHours || runtimeHours <= 0) {
+    if (!Number.isFinite(runtimeHours) || runtimeHours <= 0) {
       showModal('Input Error', '<p>Required runtime must be greater than zero.</p>', 'error');
       return null;
     }
-    if (isNaN(designMarginPct) || designMarginPct < 0) {
+    if (!Number.isFinite(designMarginPct) || designMarginPct < 0) {
       showModal('Input Error', '<p>Design margin must be ≥ 0%.</p>', 'error');
       return null;
     }
-    if (!upsPowerFactor || upsPowerFactor <= 0 || upsPowerFactor > 1) {
+    if (!Number.isFinite(upsPowerFactor) || upsPowerFactor <= 0 || upsPowerFactor > 1) {
       showModal('Input Error', '<p>UPS power factor must be between 0 (exclusive) and 1.0.</p>', 'error');
       return null;
     }
@@ -280,6 +296,42 @@ document.addEventListener('DOMContentLoaded', () => {
     setValue('end-of-life-capacity-pct', duty.endOfLifeCapacityPct);
   }
 
+  function restoreManualBatteryInputs(savedResult) {
+    const setValue = (id, value) => {
+      const element = document.getElementById(id);
+      if (element && value != null) element.value = value;
+    };
+    const savedWasManual = fieldName => {
+      if (projectOverrides.has(fieldName)) return true;
+      const sourcePath = savedResult?.projectLink?.bindings?.[fieldName]?.sourcePath;
+      return !sourcePath || String(sourcePath).startsWith('manual.');
+    };
+    setValue('chemistry', savedResult.chemistry);
+    if (savedWasManual('ambientTempC')) setValue('ambient-temp-c', savedResult.ambientTempC);
+    if (savedWasManual('designMarginPct')) setValue('design-margin-pct', savedResult.designMarginPct);
+    if (savedWasManual('runtimeHours')) setValue('runtime-hours', savedResult.runtimeHours);
+    const rack = savedResult.rackLayoutInputs || {};
+    Object.entries({
+      nominalCellVoltageV: 'rack-cell-voltage-v',
+      dcBusVoltageV: 'rack-dc-bus-voltage-v',
+      cellCapacityAh: 'rack-cell-capacity-ah',
+      cellsPerModule: 'rack-cells-per-module',
+      modulesPerRack: 'rack-modules-per-rack',
+      rackWidthFt: 'rack-width-ft',
+      rackDepthFt: 'rack-depth-ft',
+      rackHeightFt: 'rack-height-ft',
+      racksPerRow: 'rack-racks-per-row',
+      frontAisleFt: 'rack-front-aisle-ft',
+      rearClearanceFt: 'rack-rear-clearance-ft',
+      sideClearanceFt: 'rack-side-clearance-ft',
+      rowSpacingFt: 'rack-row-spacing-ft',
+    }).forEach(([field, id]) => setValue(id, rack[field]));
+    setValue('rack-terminal-side', rack.terminalSide);
+    const stringProtection = document.getElementById('rack-string-protection');
+    if (stringProtection && rack.includeStringProtection != null) stringProtection.checked = rack.includeStringProtection;
+    cellVoltageEdited = rack.nominalCellVoltageV != null;
+  }
+
   function readRackLayoutInputs(get, getFloat) {
     return {
       dcBusVoltageV: getFloat('rack-dc-bus-voltage-v'),
@@ -301,6 +353,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderResults(r) {
+    r = normalizeUpsResult(r);
     resultsDiv.innerHTML = '';
 
     let rackLayoutModel = null;
@@ -464,7 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </p>
           <div class="result-row">
             <span class="result-label">Screening standard UPS size</span>
-            <span class="result-value"><strong>${r.standardKva} kVA</strong></span>
+            <span class="result-value"><strong>${formatUpsSelection(r)}</strong></span>
           </div>
         </div>
 
@@ -585,7 +638,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
           <div class="result-row">
             <span class="result-label">Screening standard UPS size</span>
-            <span class="result-value"><strong>${r.standardKva} kVA</strong></span>
+            <span class="result-value"><strong>${formatUpsSelection(r)}</strong></span>
           </div>
         </div>
 
@@ -596,6 +649,33 @@ document.addEventListener('DOMContentLoaded', () => {
         ${warningsHtml}
         <p class="field-hint result-timestamp">Analysis run: ${new Date(r.timestamp).toLocaleString()}</p>
       </section>`;
+  }
+
+  function formatUpsSelection(result) {
+    if (result.standardKva == null || result.upsAdequate === false) {
+      const maximum = result.upsCatalogMaximum || 1000;
+      return `Unavailable (catalog max ${maximum} kVA)`;
+    }
+    return `${result.standardKva} kVA`;
+  }
+
+  function normalizeUpsResult(result) {
+    const maximum = Number(result.upsCatalogMaximum || 1000);
+    const required = Number(result.kvaRequired);
+    const legacyCappedSelection = Number.isFinite(required) && required > maximum;
+    if (!legacyCappedSelection) return result;
+    const warnings = Array.isArray(result.warnings) ? [...result.warnings] : [];
+    if (!warnings.some(w => /no adequate catalog selection/i.test(String(w)))) {
+      warnings.push(`Required UPS capacity (${required} kVA) exceeds the largest standard UPS size (${maximum} kVA). No adequate catalog selection is available; obtain an engineered or manufacturer-specific selection.`);
+    }
+    return {
+      ...result,
+      standardKva: null,
+      upsAdequate: false,
+      upsExceedsCatalog: true,
+      upsCatalogMaximum: maximum,
+      warnings,
+    };
   }
 
   function renderRackLayoutSection(model) {

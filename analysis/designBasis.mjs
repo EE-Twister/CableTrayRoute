@@ -1,3 +1,5 @@
+import { countGeneratedMotorProjections } from './designSynthesisMotorReadiness.mjs';
+
 export const DESIGN_BASIS_STORAGE_KEY = 'designBasis';
 
 export const DEFAULT_DESIGN_BASIS = {
@@ -156,7 +158,7 @@ function hasProtectiveDeviceSettings(project = {}) {
 
 function reviewedGateState(gate, approvals = {}) {
   const approval = approvals && typeof approvals === 'object' ? approvals[gate.id] : null;
-  if (!approvalIsReviewed(approval)) {
+  if (gate.reviewable === false || !approvalIsReviewed(approval)) {
     return { ...gate, status: 'open', approval: null };
   }
   return { ...gate, status: 'reviewed', approval };
@@ -308,6 +310,8 @@ export function buildDesignBasisReview(project = {}) {
   const routeResults = routeResultRows(project.routeResults || project.latestRouteResults || project.settings?.latestRouteResults || []);
   const keysWithStudyResults = studyKeys(project.studies || project.settings?.studies || {});
   const generatedRecordCount = countGeneratedRecords(project);
+  const generatedMotorProjections = countGeneratedMotorProjections(project);
+  const preliminaryDraft = project.designSynthesisReviewDraft ?? project.settings?.designSynthesisReviewDraft;
 
   const addAssumption = (id, label, detail, source = 'design-basis') => {
     assumptions.push({ id, label, detail, source });
@@ -343,6 +347,28 @@ export function buildDesignBasisReview(project = {}) {
       'Save Design Basis Wizard',
       'Project defaults, study prerequisites, and release approval rules have not been saved.',
       'workflowdashboard.html',
+      { blocking: true, enforceOnDeliverables: true, reviewable: false }
+    );
+  }
+
+  if (generatedMotorProjections > 0) {
+    addGate(
+      'design-synthesis-motor-protection-unresolved',
+      'critical',
+      'Resolve generated motor protection',
+      `${generatedMotorProjections} generated motor record(s) or diagram projection(s) contain preliminary motor protection. Starting withstand, fault duty, coordination, installation and assembly ratings must be established before issue. The application cannot yet verify and clear this gate.`,
+      'designsynthesis.html',
+      { blocking: true, enforceOnDeliverables: true, reviewable: false }
+    );
+  }
+
+  if (preliminaryDraft !== undefined && preliminaryDraft !== null) {
+    addGate(
+      'design-synthesis-preliminary-review-project',
+      'critical',
+      'Preliminary review project',
+      'This project is a screening copy of a generated design. Its protection, fault duty and installation have not been established; the application cannot clear this review-project gate.',
+      'designsynthesis.html',
       { blocking: true, enforceOnDeliverables: true, reviewable: false }
     );
   }

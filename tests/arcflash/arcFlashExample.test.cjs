@@ -71,6 +71,18 @@ global.localStorage = {
       const hardened = await runArcFlash();
       assert(hardened.BUS2, 'arc flash result should be produced for non-string electrode config');
       assert(Number.isFinite(hardened.BUS2.incidentEnergy), 'incident energy should be numeric');
+      setOneLine({ activeSheet: 0, sheets: [{ name: 'Explicit Clearing', components: [
+        { id: 'BUS-EXPLICIT', type: 'breaker', kV: 0.48, clearing_time: 0.1,
+          z1: { r: 0, x: 0.05 }, z2: { r: 0, x: 0.05 }, z0: { r: 0, x: 0.05 },
+          sources: [{ z1: { r: 0, x: 0.02 }, z2: { r: 0, x: 0.02 }, z0: { r: 0, x: 0.02 } }],
+          enclosure: 'Box', gap: 32, working_distance: 455, electrode_config: 'VCB',
+          enclosure_height: 508, enclosure_width: 508, enclosure_depth: 508 }
+      ] }] });
+      const explicitResults = await runArcFlash();
+      const explicit = explicitResults['BUS-EXPLICIT'];
+      assert.strictEqual(explicit.calculationStatus, 'calculated');
+      assert.deepStrictEqual(explicit.requiredInputs, undefined);
+      assert.strictEqual(explicit.calculationInputs.clearingTimeSource, 'equipment-explicit');
     });
 
   });

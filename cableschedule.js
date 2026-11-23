@@ -1,6 +1,7 @@
 import { bootstrapPage } from './src/lifecycle/pageBootstrap.js';
 import './site.js';
 import * as dataStore from './dataStore.mjs';
+import { preliminaryMotorNotice, withCableReviewNotice } from './src/design-synthesis/preliminaryProjectNotice.mjs';
 import { createTable, STORAGE_KEYS } from './tableUtils.mjs';
 import { openModal, showAlertModal } from './src/components/modal.js';
 import { confirmProjectEntityDeletion } from './src/components/projectDeletionReview.js';
@@ -28,6 +29,7 @@ import {
 import { renderCablePrintReport as renderCablePrintReportTo } from './src/cable-schedule/printReport.js';
 import { applyCableSizingHighlight } from './src/cable-schedule/sizingHighlight.js';
 import { collectPanelOptions, collectRacewayOptions } from './src/cable-schedule/optionModel.js';
+import { ensureImportedOption } from './src/components/importedOption.js';
 import {
   MAX_TEMPLATE_IMPORT_COUNT,
   MAX_TEMPLATE_IMPORT_FILE_BYTES,
@@ -77,11 +79,6 @@ const CABLE_TOUR_STEPS = [
   { selector: '#export-xlsx-btn',        message: 'Export to Excel at any time to share your cable schedule or back it up offline.' }
 ];
 
-// Initialize Cable Schedule page logic
-// This file mirrors the inline script previously embedded in
-// cableschedule.html.  It now lives in its own module so that the Rollup
-// build (src/cableschedule.js -> dist/cableschedule.js) actually includes the
-// behaviour needed to populate the schedule table.
 
 async function initCableSchedule() {
   const projectId = window.currentProjectId;
@@ -730,6 +727,7 @@ async function initCableSchedule() {
         opts.forEach(option => { option.selected = values.includes(option.value); });
       }
     } else if (val !== undefined && val !== null) {
+      if (field.tagName === 'SELECT' && !col.multiple) ensureImportedOption(field, val);
       field.value = val;
     }
     if (field.tagName === 'SELECT' && !col.multiple && field.options.length && (val === undefined || val === null)) {
@@ -949,7 +947,8 @@ async function initCableSchedule() {
     activeTable = tableInstance;
     const renderedRow = rowData || {};
     const rowIndex = tr?.parentElement ? Array.from(tr.parentElement.rows).indexOf(tr) : -1;
-    const storedRow = tableData?.find(entry => entry?.tag && entry.tag === renderedRow.tag)
+    const storedRow = tableData?.find(entry => entry?.id && renderedRow?.id && entry.id === renderedRow.id)
+      || tableData?.find(entry => entry?.tag && entry.tag === renderedRow.tag)
       || (rowIndex >= 0 ? tableData?.[rowIndex] : null)
       || {};
     activeRowData = { ...storedRow, ...renderedRow };
@@ -1055,6 +1054,7 @@ async function initCableSchedule() {
         closeEditor();
         return;
       }
+      activeTable.updateRowRecord?.(activeRow, updatedValues);
       const offset = activeTable.colOffset || 0;
       activeTable.columns.forEach((col, idx) => {
         const value = updatedValues[col.key];
@@ -2190,9 +2190,7 @@ async function initCableSchedule() {
 
       const visibleData = table.getData();
       const data = visibleData.map((row, index) => {
-        const storedRow = tableData?.find(entry => entry?.tag && entry.tag === row.tag)
-          || tableData?.[index]
-          || {};
+        const storedRow = tableData?.find(entry => entry?.id && row.id && entry.id === row.id) || tableData?.find(entry => entry?.tag && entry.tag === row.tag) || tableData?.[index] || {};
         const next = { ...storedRow, ...row };
         if (row.impedance !== undefined) {
           if (row.impedance === '' || row.impedance == null) delete next.impedance_per_1000ft;
@@ -2413,7 +2411,9 @@ async function initCableSchedule() {
 
       const typeSelect = makeCell(createQuickAddSelect(cableTypes, { blankLabel: 'Type' }));
       typeSelect.name = 'cable_type';
-      typeSelect.value = values.cable_type || '';
+      const importedCableType = values.cable_type || '';
+      if (importedCableType && !cableTypes.includes(importedCableType)) typeSelect.appendChild(Object.assign(document.createElement('option'), { value: importedCableType, textContent: `${importedCableType} (imported)` }));
+      typeSelect.value = importedCableType;
 
       const sizeSelect = makeCell(createQuickAddSelect(conductorSizes, { blankLabel: 'Size' }));
       sizeSelect.name = 'conductor_size';
@@ -2830,11 +2830,9 @@ async function initCableSchedule() {
   }
 
   // Provide a setData method similar to Tabulator for convenience.
+  const setCableTableData = table.setData.bind(table);
   table.setData = function(rows){
-    this.tbody.innerHTML='';
-    (rows||[]).forEach(r=>this.addRow(r));
-    this.updateRowCount?.();
-    this.applyFilters?.();
+    setCableTableData(rows);
     updateBatchTypicalControls();
   };
 
@@ -3120,7 +3118,7 @@ async function initCableSchedule() {
       ...reportRows.map(row => reportColumns.map(col => formatReportValue(row[col.key])))
     ];
     const suffix = reportMode.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
-    const result = writeAoaWorkbook(sheetData, {
+    const result = writeAoaWorkbook(withCableReviewNotice(sheetData, preliminaryMotorNotice()), {
       sheetName: REPORT_MODE_LABELS[reportMode],
       filename: `cable-schedule-${suffix}-${todayStamp()}.xlsx`
     });
@@ -3136,6 +3134,7 @@ async function initCableSchedule() {
       columns: getReportColumns(reportMode),
       rows: getReportRows(reportMode),
       modeLabel: REPORT_MODE_LABELS[reportMode],
+      reviewNotice: preliminaryMotorNotice(),
       formatValue: formatReportValue,
       formatDateTime
     });

@@ -4,7 +4,8 @@ import {
   MAX_TEMP_C,
 } from './analysis/iec60287.mjs';
 import {
-  getStudies, setStudies, getCables, getEquipment, getLoads, getTrays, getConduits, getDuctbanks, getItem,
+  captureStudyRunContext, getStudies, getStudyAssessments, getCables, getEquipment, getLoads, getTrays, getConduits, getDuctbanks, getItem,
+  saveStudyResult,
   getDesignBasis, getProjectMeta,
 } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
@@ -24,6 +25,7 @@ import {
   renderProjectScopeSelector,
 } from './src/components/projectInputBinding.js';
 import { escapeHtml as escHtml } from './src/htmlUtils.mjs';
+import { showAlertModal } from './src/components/modal.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -44,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const projectOverrides = new Set();
   const projectData = () => ({
     cables: getCables(), equipment: getEquipment(), loads: getLoads(), trays: getTrays(), conduits: getConduits(), ductbanks: getDuctbanks(),
-    designBasis: getDesignBasis(), projectMeta: getProjectMeta(), studies: getStudies(), sampleStudyInputs: getItem('sampleStudyInputs', {}),
+    designBasis: getDesignBasis(), projectMeta: getProjectMeta(), studies: getStudies(), studyAssessments: getStudyAssessments(), sampleStudyInputs: getItem('sampleStudyInputs', {}),
   });
   const scopeOptions = buildProjectScopeOptions(projectData(), ['circuit']);
   const saved = getStudies().iec60287;
@@ -54,6 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ? requestedScope
     : (savedIsResult ? saved?.projectLink?.scopeValue : '') || scopeOptions[0]?.value || '';
   let projectInputModel = null;
+  const showModal = (title, message) => showAlertModal(title, message, { variant: 'error' });
 
   initStudyBasisPanel('iec60287', {
     standard: 'IEC 60287-1-1:2023',
@@ -140,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const t = defaultInsulThickMm(size, vc);
       insulThickInput.value = t;
     } catch (err) {
-      showModal('Lookup Error', `<p>${escHtml(err.message)}</p>`, 'error');
+      showModal('Lookup Error', err.message || 'Unable to determine a standard insulation thickness.');
     }
   });
 
@@ -160,6 +163,10 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     const inputs = readFormInputs();
     if (!inputs) return;
+    const runContext = captureStudyRunContext('iec60287', {
+      inputs,
+      options: { scopeValue: selectedScopeValue },
+    });
 
     let result;
     try {
@@ -168,14 +175,12 @@ document.addEventListener('DOMContentLoaded', () => {
       snapshot.scopeValue = selectedScopeValue;
       result = withStudyProvenance(result, snapshot);
     } catch (err) {
-      showModal('Calculation Error', `<p>${escHtml(err.message)}</p>`, 'error');
+      showModal('Calculation Error', err.message || 'The cable ampacity calculation could not be completed.');
       return;
     }
 
     // Persist result
-    const studies = getStudies();
-    studies.iec60287 = result;
-    setStudies(studies);
+    saveStudyResult('iec60287', result, runContext);
 
     renderResults(result);
   });
@@ -184,36 +189,81 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function readFormInputs() {
     const get = id => document.getElementById(id);
-    const getFloat = id => parseFloat(get(id).value);
+    const getFloat = id => {
+      const value = get(id).value.trim();
+      return value === '' ? NaN : Number(value);
+    };
+    const getOptionalFloat = (id, fallback) => {
+      const value = get(id).value.trim();
+      return value === '' ? fallback : Number(value);
+    };
 
-    const sizeMm2 = parseFloat(get('size-mm2').value);
+    const sizeMm2 = Number(get('size-mm2').value);
     const material = get('material').value;
     const insulation = get('insulation').value;
     const insulThickMm = getFloat('insul-thick-mm');
     const outerSheathMm = getFloat('outer-sheath-mm');
-    const nCores = parseInt(get('n-cores').value, 10);
+    const nCores = Number(get('n-cores').value);
     const armoured = get('armoured').checked;
     const installMethod = get('install-method').value;
-    const burialDepthMm = getFloat('burial-depth-mm') || 800;
-    const soilResistivity = getFloat('soil-resistivity') || 1.0;
-    const conduitOD_mm = getFloat('conduit-od-mm') || 0;
+    const burialDepthMm = installMethod === 'tray' || installMethod === 'air'
+      ? getOptionalFloat('burial-depth-mm', 800)
+      : getFloat('burial-depth-mm');
+    const soilResistivity = installMethod === 'tray' || installMethod === 'air'
+      ? getOptionalFloat('soil-resistivity', 1.0)
+      : getFloat('soil-resistivity');
+    const conduitOD_mm = installMethod === 'conduit'
+      ? getFloat('conduit-od-mm')
+      : getOptionalFloat('conduit-od-mm', 0);
     const ambientTempC = getFloat('ambient-temp-c');
-    const frequencyHz = parseInt(get('frequency-hz').value, 10);
-    const U0_kV = getFloat('u0-kv') || 0;
-    const nCables = parseInt(get('n-cables').value, 10) || 1;
+    const frequencyHz = Number(get('frequency-hz').value);
+    const U0_kV = getOptionalFloat('u0-kv', 0);
+    const nCables = getFloat('n-cables');
     const groupArrangement = get('group-arrangement').value;
 
     if (!Number.isFinite(insulThickMm) || insulThickMm <= 0) {
-      showModal('Input Error', '<p>Insulation wall thickness must be greater than 0 mm. Use the <strong>Use Default Thickness</strong> button to populate a standard value.</p>', 'error');
+      showModal('Input Error', 'Insulation wall thickness must be greater than 0 mm. Use the Use Default Thickness button to populate a standard value.');
+      return null;
+    }
+    if (!Number.isFinite(sizeMm2) || sizeMm2 <= 0) {
+      showModal('Input Error', 'Conductor cross-section must be a finite positive value.');
+      return null;
+    }
+    if (!Number.isFinite(outerSheathMm) || outerSheathMm < 0) {
+      showModal('Input Error', 'Outer sheath thickness must be finite and non-negative.');
+      return null;
+    }
+    if (!Number.isInteger(nCores) || nCores < 1 || nCores > 3) {
+      showModal('Input Error', 'Current-carrying cores must be an integer from 1 to 3.');
+      return null;
+    }
+    if (!Number.isFinite(frequencyHz) || frequencyHz <= 0) {
+      showModal('Input Error', 'System frequency must be a finite positive value.');
+      return null;
+    }
+    if (!Number.isFinite(U0_kV) || U0_kV < 0) {
+      showModal('Input Error', 'Phase-to-earth voltage U₀ must be finite and non-negative.');
+      return null;
+    }
+    if (!Number.isFinite(nCables) || !Number.isInteger(nCables) || nCables < 1) {
+      showModal('Input Error', 'Number of grouped cables must be a positive integer.');
+      return null;
+    }
+    if (!Number.isFinite(burialDepthMm) || burialDepthMm <= 0 || !Number.isFinite(soilResistivity) || soilResistivity <= 0) {
+      showModal('Input Error', 'Burial depth and soil thermal resistivity must be finite positive values.');
+      return null;
+    }
+    if (!Number.isFinite(conduitOD_mm) || conduitOD_mm < 0) {
+      showModal('Input Error', 'Conduit outer diameter must be finite and non-negative.');
       return null;
     }
     if (!Number.isFinite(ambientTempC)) {
-      showModal('Input Error', '<p>Ambient temperature (°C) is required.</p>', 'error');
+      showModal('Input Error', 'Ambient temperature (°C) is required.');
       return null;
     }
     const thetaMax = MAX_TEMP_C[insulation] ?? 90;
     if (ambientTempC >= thetaMax) {
-      showModal('Input Error', `<p>Ambient temperature (${ambientTempC} °C) must be less than the maximum conductor temperature (${thetaMax} °C for ${insulation}).</p>`, 'error');
+      showModal('Input Error', `Ambient temperature (${ambientTempC} °C) must be less than the maximum conductor temperature (${thetaMax} °C for ${insulation}).`);
       return null;
     }
 

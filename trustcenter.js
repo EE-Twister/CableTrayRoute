@@ -143,10 +143,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const expectedStr = formatVal(c.expectedVal, c.type);
       const actualStr   = c.actualVal !== undefined ? formatVal(c.actualVal, c.type) : '—';
       const deviStr     = (c.deviation !== null && c.deviation !== undefined)
-        ? (c.type === 'boolean' ? '—' : c.deviation.toFixed(4))
+        ? (c.type === 'boolean' ? '—' : formatVal(c.deviation, c.type))
         : '—';
       const tolStr = c.tolerance != null
-        ? (c.type === 'boolean' ? '—' : `±${c.tolerance}`)
+        ? (c.type === 'boolean' ? '—' : `±${formatVal(c.tolerance, c.type)}`)
         : '—';
 
       return `
@@ -154,11 +154,35 @@ document.addEventListener('DOMContentLoaded', () => {
           <td>${escapeHtml(c.description)}</td>
           <td>${escapeHtml(expectedStr)}</td>
           <td>${escapeHtml(actualStr)}</td>
+          <td>${escapeHtml(c.unit || '—')}</td>
           <td>${escapeHtml(deviStr)}</td>
           <td>${escapeHtml(tolStr)}</td>
+          <td>${escapeHtml(c.toleranceBasis || '—')}</td>
           <td><span class="fill-badge ${passCls}" aria-label="${c.pass ? 'Pass' : 'Fail'}">${passLabel}</span></td>
         </tr>`;
     }).join('');
+
+    const inputRows = r.inputs
+      ? flattenEvidenceInputs(r.inputs, '', r.inputUnits || {}).map(({ key, value, unit }) => `<tr><td><code>${escapeHtml(key)}</code></td><td>${escapeHtml(formatEvidenceValue(value))}</td><td>${escapeHtml(unit || '—')}</td></tr>`).join('')
+      : '';
+    const inputsHtml = r.inputs ? `
+      <p><strong>Executable inputs</strong></p>
+      <table class="results-table" aria-label="Executable inputs"><thead><tr><th>Input</th><th>Value</th><th>Unit</th></tr></thead><tbody>${inputRows}</tbody></table>` : '';
+    const sourceHtml = r.source
+      ? `<p><strong>Evidence source:</strong> ${escapeHtml(r.source.title)} (${escapeHtml(r.source.kind)})<br><a href="${escapeHtml(r.source.url)}" target="_blank" rel="noopener noreferrer">Open source</a> · ${escapeHtml(r.source.locator)} · accessed ${escapeHtml(r.source.accessedOn)}</p>`
+      : (r.sourceUrl ? `<p><a href="${escapeHtml(r.sourceUrl)}" target="_blank" rel="noopener noreferrer">Official source</a></p>` : '');
+    const inputSourceHtml = r.inputSource
+      ? `<p><strong>Input source:</strong> ${escapeHtml(r.inputSource.title)} (${escapeHtml(r.inputSource.kind)})<br><a href="${escapeHtml(r.inputSource.url)}" target="_blank" rel="noopener noreferrer">Open input source</a> · ${escapeHtml(r.inputSource.locator)} · accessed ${escapeHtml(r.inputSource.accessedOn)}</p>`
+      : '';
+    const additionalSourcesHtml = r.additionalSources?.length
+      ? `<p><strong>Additional sources:</strong></p>${r.additionalSources.map(source => `<p>${escapeHtml(source.title)} (${escapeHtml(source.kind)}) · ${escapeHtml(source.locator)} · accessed ${escapeHtml(source.accessedOn)}</p>`).join('')}`
+      : '';
+    const assumptionsHtml = r.assumptions?.length
+      ? `<p><strong>Assumptions</strong></p><ul>${r.assumptions.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+      : '';
+    const limitationsHtml = Array.isArray(r.limitations) && r.limitations.length
+      ? `<p><strong>Known limitations</strong></p><ul>${r.limitations.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+      : '';
 
     const errorHtml = r.error
       ? `<div class="error-msg" role="alert" style="margin-bottom:1rem"><strong>Runtime error:</strong> ${escapeHtml(r.error)}</div>`
@@ -169,10 +193,17 @@ document.addEventListener('DOMContentLoaded', () => {
         <h2>${escapeHtml(r.id)}: ${escapeHtml(r.label)}</h2>
         <p style="font-size:.85rem; color:var(--color-text-muted,#666)">
           <strong>Standard:</strong> ${escapeHtml(r.standardRef)}
-          ${r.sourceUrl ? ` &nbsp;Â·&nbsp; <a href="${escapeHtml(r.sourceUrl)}" target="_blank" rel="noopener noreferrer">Official source</a>` : ''}
+          ${r.evidenceClass ? ` &nbsp;Â·&nbsp; Evidence: ${escapeHtml(r.evidenceClass.replaceAll('_', ' '))}` : ''}
           ${r.fixtureId ? ` &nbsp;Â·&nbsp; Fixture: <code>${escapeHtml(r.fixtureId)}</code>` : ''}
         </p>
         <p>${escapeHtml(r.description)}</p>
+        ${r.independentDerivation ? `<p><strong>Independent derivation:</strong> ${escapeHtml(r.independentDerivation)}</p>` : ''}
+        ${assumptionsHtml}
+        ${sourceHtml}
+        ${inputSourceHtml}
+        ${additionalSourcesHtml}
+        ${inputsHtml}
+        ${limitationsHtml}
 
         ${errorHtml}
 
@@ -182,8 +213,10 @@ document.addEventListener('DOMContentLoaded', () => {
               <th scope="col">Check</th>
               <th scope="col">Expected</th>
               <th scope="col">Actual</th>
+              <th scope="col">Unit</th>
               <th scope="col">Deviation</th>
               <th scope="col">Tolerance</th>
+              <th scope="col">Tolerance basis</th>
               <th scope="col">Result</th>
             </tr>
           </thead>
@@ -197,7 +230,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function formatVal(val, type) {
     if (type === 'boolean') return val ? 'true' : 'false';
-    if (typeof val === 'number') return Number.isInteger(val) ? String(val) : val.toFixed(4);
+    if (typeof val === 'number') {
+      if (!Number.isFinite(val)) return String(val);
+      if (Number.isInteger(val)) return String(val);
+      const abs = Math.abs(val);
+      if (abs > 0 && abs < 0.001) return val.toPrecision(8);
+      return String(Number(val.toPrecision(8)));
+    }
     return String(val ?? '');
+  }
+
+  function flattenEvidenceInputs(value, prefix, inputUnits) {
+    const unit = inputUnits?.[prefix];
+    if (value === null || typeof value !== 'object' || unit) {
+      return [{ key: prefix || 'value', value, unit }];
+    }
+    if (Array.isArray(value)) {
+      return value.flatMap((item, index) => flattenEvidenceInputs(item, `${prefix}[${index}]`, inputUnits));
+    }
+    return Object.entries(value).flatMap(([key, child]) =>
+      flattenEvidenceInputs(child, prefix ? `${prefix}.${key}` : key, inputUnits));
+  }
+
+  function formatEvidenceValue(val) {
+    if (val === null || val === undefined) return '';
+    if (typeof val === 'object') return JSON.stringify(val);
+    return String(val);
   }
 });

@@ -11,10 +11,12 @@ export const BUNDLE_BUDGETS = Object.freeze({
   'arcFlash.js': 650_000,
   'tcc.js': 1_000_000,
   'library.js': 200_000,
-  'harmonics.js': 200_000,
-  'loadFlow.js': 325_000,
+  // Lossless storage and its preservation guards add roughly 10 kB to these
+  // entries; keeping the codec inline preserves their single startup request.
+  'harmonics.js': 205_000,
+  'loadFlow.js': 335_000,
   'motorStart.js': 225_000,
-  'contingency.js': 325_000,
+  'contingency.js': 330_000,
   'transientstability.js': 650_000,
   'equipmentevaluation.js': 1_000_000,
 });

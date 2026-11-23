@@ -6,7 +6,8 @@ import {
   isStudyResultStale,
   validatePowerFlowStudyModel
 } from '../analysis/studyResultReadiness.mjs';
-import { getOneLine, getStudies, setStudies } from '../dataStore.mjs';
+import { getOneLine, getStudies, getStudyProvenance, getStudyAssessments, captureStudyRunContext, saveStudyResult, getStudyAssessment } from '../dataStore.mjs';
+import { studyLifecycleMetadataLines } from '../analysis/studyExportMetadata.mjs';
 
 /**
  * Run N-1 contingency analysis and store results.
@@ -36,6 +37,12 @@ export function runContingencyStudy(opts = {}, inputModel = null, inputReadiness
     };
   }
 
+  const runContext = captureStudyRunContext('contingency', {
+    inputs: opts,
+    options: opts,
+    assumptions: ['N-1 branch outage screening uses the validated base-case load-flow model.'],
+    warnings: readiness.warnings,
+  });
   const results = runContingency(model, opts);
   const baseCoverage = evaluateConvergenceCoverage(results.baseCase?.converged ? 1 : 0, 1, { minimumRatio: 1 });
   const valid = baseCoverage.valid && results.contingencies.length > 0;
@@ -46,9 +53,7 @@ export function runContingencyStudy(opts = {}, inputModel = null, inputReadiness
   });
   results.persisted = valid;
   if (!valid) return results;
-  const studies = getStudies();
-  studies.contingency = results;
-  setStudies(studies);
+  saveStudyResult('contingency', results, runContext);
   return results;
 }
 
@@ -84,7 +89,25 @@ if (typeof document !== 'undefined') {
   const initialModel = buildLoadFlowModel(getOneLine());
   const initialReadiness = validatePowerFlowStudyModel(initialModel);
   const saved = getStudies().contingency;
-  const stale = isStudyResultStale(saved, initialReadiness.sourceFingerprint);
+  const savedOptions = getStudyProvenance()?.contingency?.optionsSnapshot;
+  if (savedOptions && typeof savedOptions === 'object') {
+    const fields = {
+      baseMVA: savedOptions.baseMVA,
+      voltageMin: savedOptions.voltageMinPu,
+      voltageMax: savedOptions.voltageMaxPu,
+      overloadPct: savedOptions.overloadThresholdPct,
+      generatorInertiaH: savedOptions.generatorInertiaH,
+      faultClearingTime_s: savedOptions.faultClearingTime_s,
+    };
+    Object.entries(fields).forEach(([name, value]) => {
+      const control = form?.elements?.namedItem(name);
+      if (control && value != null) control.value = value;
+    });
+    const transientControl = form?.elements?.namedItem('checkTransientStability');
+    if (transientControl && savedOptions.checkTransientStability != null) transientControl.checked = savedOptions.checkTransientStability === true;
+  }
+  const stale = isStudyResultStale(saved, initialReadiness.sourceFingerprint)
+    || (saved?.persisted && !getStudyAssessment('contingency').eligible);
   lastValidResult = saved?.persisted && !stale ? saved : null;
   exportBtn.disabled = !lastValidResult;
   renderReadiness(initialReadiness, { stale });
@@ -92,13 +115,37 @@ if (typeof document !== 'undefined') {
   if (form) {
     form.addEventListener('submit', ev => {
       ev.preventDefault();
-      const baseMVA = Number(form.baseMVA?.value) || 100;
-      const voltageMin = Number(form.voltageMin?.value) || 0.95;
-      const voltageMax = Number(form.voltageMax?.value) || 1.05;
-      const overloadPct = Number(form.overloadPct?.value) || 100;
+      const readRequiredNumber = (name, label, limits = {}) => {
+        const raw = String(form[name]?.value ?? '').trim();
+        const value = Number(raw);
+        if (!raw || !Number.isFinite(value)
+            || (limits.min !== undefined && value < limits.min)
+            || (limits.max !== undefined && value > limits.max)) {
+          throw new Error(`${label} is required and must be a valid number${limits.min !== undefined ? ` ≥ ${limits.min}` : ''}${limits.max !== undefined ? ` ≤ ${limits.max}` : ''}.`);
+        }
+        return value;
+      };
+      let baseMVA;
+      let voltageMin;
+      let voltageMax;
+      let overloadPct;
+      let generatorInertiaH;
+      let faultClearingTime_s;
+      try {
+        baseMVA = readRequiredNumber('baseMVA', 'Base MVA', { min: 0.1 });
+        voltageMin = readRequiredNumber('voltageMin', 'Minimum voltage', { min: 0.5, max: 1.0 });
+        voltageMax = readRequiredNumber('voltageMax', 'Maximum voltage', { min: 1.0, max: 1.5 });
+        overloadPct = readRequiredNumber('overloadPct', 'Overload threshold', { min: 0 });
+        generatorInertiaH = readRequiredNumber('generatorInertiaH', 'Generator inertia', { min: 1, max: 20 });
+        faultClearingTime_s = readRequiredNumber('faultClearingTime_s', 'Fault clearing time', { min: 0.02, max: 1.0 });
+      } catch (error) {
+        if (statusEl) statusEl.textContent = `${error.message} No result was saved or enabled for export.`;
+        if (summaryEl) summaryEl.innerHTML = '<div class="result-card result-warn"><strong>Input review required.</strong></div>';
+        exportBtn.disabled = true;
+        lastValidResult = null;
+        return;
+      }
       const checkTransientStability = !!form.checkTransientStability?.checked;
-      const generatorInertiaH = Number(form.generatorInertiaH?.value) || 5.0;
-      const faultClearingTime_s = Number(form.faultClearingTime_s?.value) || 0.1;
 
       if (statusEl) statusEl.textContent = 'Running…';
       if (summaryEl) summaryEl.textContent = '';
@@ -221,6 +268,7 @@ if (typeof document !== 'undefined') {
           .map(value => `"${String(value ?? '').replace(/"/g, '""')}"`);
         rows.push(values.join(','));
       });
+      rows.push(...studyLifecycleMetadataLines(lastValidResult, { assessment: getStudyAssessments().contingency }));
       const anchor = document.createElement('a');
       anchor.href = URL.createObjectURL(new Blob([rows.join('\n')], { type: 'text/csv' }));
       anchor.download = 'contingency-results.csv';

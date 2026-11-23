@@ -18,22 +18,40 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('profile-btn').addEventListener('click', runProfile);
 
   function getInputs() {
-    return {
-      frequency: parseInt(document.getElementById('frequency').value, 10),
-      currentA: parseFloat(document.getElementById('load-current').value) || 0,
-      nCables: Math.max(1, parseInt(document.getElementById('n-cables').value, 10) || 1),
-      trayWidthIn: parseFloat(document.getElementById('tray-width').value) || 12,
-      cableOdIn: parseFloat(document.getElementById('cable-od').value) || 1.0,
-      measDistanceIn: parseFloat(document.getElementById('meas-distance').value) || 36,
+    const read = id => {
+      const raw = String(document.getElementById(id)?.value ?? '').trim();
+      if (!raw) return null;
+      const value = Number(raw);
+      return Number.isFinite(value) ? value : null;
     };
+    return {
+      frequency: read('frequency'),
+      currentA: read('load-current'),
+      nCables: read('n-cables'),
+      trayWidthIn: read('tray-width'),
+      cableOdIn: read('cable-od'),
+      measDistanceIn: read('meas-distance'),
+    };
+  }
+
+  function validateInputs(inp) {
+    const errors = [];
+    if (![50, 60].includes(inp.frequency)) errors.push('Power frequency must be 50 or 60 Hz.');
+    if (!(inp.currentA > 0)) errors.push('Load current must be greater than zero.');
+    if (!Number.isInteger(inp.nCables) || inp.nCables < 1) errors.push('Number of cable sets must be a positive integer.');
+    if (!(inp.trayWidthIn > 0)) errors.push('Tray inside width is required and must be greater than zero.');
+    if (!(inp.cableOdIn > 0)) errors.push('Cable outer diameter is required and must be greater than zero.');
+    if (!(inp.measDistanceIn >= 0)) errors.push('Measurement distance is required and cannot be negative.');
+    return errors;
   }
 
   function inToM(v) { return v * 0.0254; }
 
   function calculate() {
     const inp = getInputs();
-    if (inp.currentA <= 0) {
-      showAlertModal('Input Error', 'Load current must be greater than zero.');
+    const errors = validateInputs(inp);
+    if (errors.length) {
+      showAlertModal('Input Error', errors.join(' '));
       return;
     }
 
@@ -136,8 +154,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function runProfile() {
     const inp = getInputs();
-    if (inp.currentA <= 0) {
-      showAlertModal('Input Error', 'Load current must be greater than zero.');
+    const errors = validateInputs(inp);
+    if (errors.length) {
+      showAlertModal('Input Error', errors.join(' '));
       return;
     }
 

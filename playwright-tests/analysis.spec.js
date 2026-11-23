@@ -7,6 +7,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { startStaticServer } from './staticServer.helper.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
 const pageUrl = file => 'file://' + path.join(root, file);
@@ -16,13 +17,23 @@ const startupScriptsByPage = new WeakMap();
 // Load Flow
 // ---------------------------------------------------------------------------
 test.describe('Load Flow', () => {
+  let staticSite;
+
+  test.beforeAll(async () => {
+    staticSite = await startStaticServer(root);
+  });
+
+  test.afterAll(async () => {
+    await staticSite?.close();
+  });
+
   test.beforeEach(async ({ page }) => {
     const startupScripts = [];
     startupScriptsByPage.set(page, startupScripts);
     page.on('request', request => {
       if (request.resourceType() === 'script') startupScripts.push(new URL(request.url()).pathname);
     });
-    await page.goto(pageUrl('loadFlow.html?e2e=1&e2e_reset=1'));
+    await page.goto(staticSite.url('loadFlow.html?e2e=1&e2e_reset=1'));
     await page.waitForLoadState('networkidle');
   });
 
@@ -67,6 +78,9 @@ test.describe('Load Flow', () => {
 test.describe('Arc Flash', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
+      // Seed only the first page load. Subsequent reloads must read the
+      // canonical project written through window.dataStore.setOneLine().
+      if (localStorage.getItem('CTR_PROJECT_V1')) return;
       const oneLine = {
         activeSheet: 0,
         sheets: [{
@@ -118,6 +132,30 @@ test.describe('Arc Flash', () => {
     await expect(page.locator('#arcflash-results-table')).toBeVisible();
     await expect(page.locator('#arcflash-results-table')).toContainText('Clearing time basis');
     await expect(page.locator('#arcflash-export-btn')).toBeEnabled();
+  });
+
+  test('capture guard blocks a stale export after the controller re-enables its button', async ({ page }) => {
+    await page.locator('#arcflash-form button[type="submit"]').click();
+    await expect(page.locator('#arcflash-export-btn')).toBeEnabled();
+
+    await page.evaluate(() => {
+      const oneLine = window.dataStore.getOneLine();
+      oneLine.sheets[0].components[0].clearing_time = 0.2;
+      window.dataStore.setOneLine(oneLine);
+    });
+    await page.reload();
+    await expect(page.locator('#arcflash-status')).toContainText('One-Line has changed');
+
+    await page.evaluate(() => {
+      const exportButton = document.getElementById('arcflash-export-btn');
+      window.__arcFlashExportGuardClicks = 0;
+      exportButton.addEventListener('click', () => { window.__arcFlashExportGuardClicks += 1; });
+      // Simulate a controller render pass that accidentally enables the stale control.
+      exportButton.disabled = false;
+      exportButton.click();
+    });
+    expect(await page.evaluate(() => window.__arcFlashExportGuardClicks)).toBe(0);
+    await expect(page.locator('#arcflash-export-btn')).toBeDisabled();
   });
 });
 

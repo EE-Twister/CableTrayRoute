@@ -8,7 +8,7 @@ import {
   SAFETY_FACTOR_DETERMINISTIC,
   SAFETY_FACTOR_STATISTICAL,
 } from './analysis/insulationCoordination.mjs';
-import { getStudies, setStudies, getEquipment, getLoads, getCables, getProjectMeta } from './dataStore.mjs';
+import { getStudies, getStudyAssessments, getEquipment, getLoads, getCables, getProjectMeta, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsDiv = document.getElementById('results');
   const errorsDiv = document.getElementById('calc-errors');
   const projectOverrides = new Set();
-  const projectData = () => ({ equipment: getEquipment(), loads: getLoads(), cables: getCables(), studies: getStudies() });
+  const projectData = () => ({ equipment: getEquipment(), loads: getLoads(), cables: getCables(), studies: getStudies(), studyAssessments: getStudyAssessments() });
   const scopeOptions = buildProjectScopeOptions(projectData(), ['equipment', 'circuit']);
   let selectedScopeValue = getStudies().insulationCoordination?.projectLink?.scopeValue || scopeOptions[0]?.value || '';
   let projectInputModel = null;
@@ -141,9 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
     errorsDiv.hidden = true;
     errorsDiv.textContent = '';
 
-    const studies = getStudies();
-    studies.insulationCoordination = result;
-    setStudies(studies);
+    saveStudyResult('insulationCoordination', result, captureStudyRunContext('insulationCoordination', { inputs, options: inputs }));
 
     renderResults(result);
   });

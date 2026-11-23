@@ -19,6 +19,58 @@ function parseNum(val) {
   return m ? Number(m[1]) : 0;
 }
 
+export const MOTOR_START_LIMITS = Object.freeze({ motors: 128, curvePoints: 256, totalCurvePoints: 4096, curveCharacters: 16384, totalCurveCharacters: 65536 });
+
+function motorStartError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
+// Check every supported representation before starting any synchronous study.
+// Unused aliases are checked too, so switching precedence cannot evade a budget.
+export function validateMotorStartWorkload(components) {
+  let motors = 0;
+  let totalPoints = 0;
+  let totalCharacters = 0;
+  for (const component of components) {
+    if (!isMotorComponent(component)) continue;
+    motors += 1;
+    if (motors > MOTOR_START_LIMITS.motors) {
+      throw motorStartError('MOTOR_START_WORK_LIMIT', `Motor starting supports at most ${MOTOR_START_LIMITS.motors} motors per study.`);
+    }
+    for (const container of [component, component.props]) {
+      for (const key of ['load_torque_curve', 'load_torque']) {
+        const spec = container?.[key];
+        if (spec === undefined || spec === null || spec === '') continue;
+        if (typeof spec !== 'string' && !Array.isArray(spec)) {
+          throw motorStartError('MOTOR_START_CURVE_INVALID', 'Torque curves must be strings or arrays of speed:torque strings.');
+        }
+        if (Array.isArray(spec) && spec.length > MOTOR_START_LIMITS.curvePoints) {
+          throw motorStartError('MOTOR_START_WORK_LIMIT', 'Torque curve workload exceeds the supported study limits.');
+        }
+        const characters = typeof spec === 'string' ? spec.length : spec.reduce((sum, point) => sum + (typeof point === 'string' ? point.length : MOTOR_START_LIMITS.curveCharacters + 1), 0);
+        totalCharacters += characters;
+        if (characters > MOTOR_START_LIMITS.curveCharacters || totalCharacters > MOTOR_START_LIMITS.totalCurveCharacters
+          || (Array.isArray(spec) && spec.length > MOTOR_START_LIMITS.curvePoints)) {
+          throw motorStartError('MOTOR_START_WORK_LIMIT', 'Torque curve workload exceeds the supported study limits.');
+        }
+        const points = typeof spec === 'string' ? spec.split(/[,\s]+/).filter(Boolean) : spec;
+        totalPoints += points.length;
+        if (points.length > MOTOR_START_LIMITS.curvePoints || totalPoints > MOTOR_START_LIMITS.totalCurvePoints) {
+          throw motorStartError('MOTOR_START_WORK_LIMIT', 'Torque curve workload exceeds the supported study limits.');
+        }
+        for (const point of points) {
+          const values = point.split(':');
+          if (values.length !== 2 || values.some(value => !value.trim() || !Number.isFinite(Number(value)))) {
+            throw motorStartError('MOTOR_START_CURVE_INVALID', 'Torque curve points must contain finite speed:torque values.');
+          }
+        }
+      }
+    }
+  }
+}
+
 function parseTorqueCurve(spec) {
   if (!spec) return () => 0;
   const pts = [];
@@ -39,12 +91,19 @@ function parseTorqueCurve(spec) {
     const sp = speedFrac * 100;
     let p1 = pts[0] || { s: 0, t: 0 };
     let p2 = pts[pts.length - 1] || { s: 100, t: 100 };
-    for (let i = 0; i < pts.length - 1; i++) {
-      if (sp >= pts[i].s && sp <= pts[i + 1].s) {
-        p1 = pts[i];
-        p2 = pts[i + 1];
-        break;
+    if (pts.length > 1 && sp >= pts[0].s && sp <= pts[pts.length - 1].s) {
+      // First upper endpoint at/above speed preserves the original first
+      // matching interval, including repeated speed points.
+      let low = 0;
+      let high = pts.length - 1;
+      while (low < high) {
+        const middle = Math.floor((low + high) / 2);
+        if (pts[middle].s < sp) low = middle + 1;
+        else high = middle;
       }
+      const upper = Math.max(1, low);
+      p1 = pts[upper - 1];
+      p2 = pts[upper];
     }
     const ratio = (sp - p1.s) / ((p2.s - p1.s) || 1);
     const torquePct = p1.t + (p2.t - p1.t) * ratio;
@@ -186,11 +245,15 @@ export function calculateMotorStartCase(input = {}, criteria = {}) {
  * Estimate voltage sag during motor starting using a simple Thevenin model.
  * @returns {Object<string,{inrushKA:number,voltageSagPct:number,accelTime:number,starterType:string}>}
  */
-export function runMotorStart() {
-  const { sheets } = getOneLine();
+export function runMotorStart(options = {}) {
+  const oneLine = Array.isArray(options.oneLine)
+    ? { activeSheet: 0, sheets: options.oneLine }
+    : (options.oneLine || getOneLine());
+  const { sheets = [] } = oneLine;
   const comps = (Array.isArray(sheets[0]?.components)
     ? sheets.flatMap(s => s.components)
     : sheets).filter(c => c && c.type !== 'annotation' && c.type !== 'dimension');
+  validateMotorStartWorkload(comps);
   const results = {};
   comps.forEach(c => {
     const subtype = typeof c.subtype === 'string' ? c.subtype.toLowerCase() : '';
@@ -258,8 +321,10 @@ export function runMotorStart() {
     const dt   = 0.01;
     let time   = 0;
     let maxDrop = 0;
+    let steps = 0;
 
-    while (w < wSync && time < 60) {
+    while (w < wSync && time < 60 && steps < 6001) {
+      steps += 1;
       const slip = Math.max(1 - w / wSync, 0.001);
       let effectiveIlr;
       if (profile.type === 'soft_starter') {

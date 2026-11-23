@@ -1,6 +1,7 @@
 import ampacity from "../ampacity.mjs";
 import { isMetricConductorSize, normalizeSizeToken, table9Impedance } from "./necTable9.mjs";
 import { normalizeCablePhases } from "../utils/cablePhases.js";
+import { createCalculationResult } from "../analysis/resultContract.mjs";
 
 /**
  * Conductor voltage drop (percent of supply voltage), including conductor
@@ -34,15 +35,16 @@ import { normalizeCablePhases } from "../utils/cablePhases.js";
  */
 export function calculateVoltageDrop(cable = {}, length = 0, phase = 3) {
   const { dcResistance } = ampacity;
-  const current = parseFloat(cable.est_load) || 0;
-  const voltage =
-    parseFloat(cable.operating_voltage) || parseFloat(cable.cable_rating) || 0;
+  const currentRaw = cable.est_load;
+  const voltageRaw = cable.operating_voltage ?? cable.cable_rating;
+  const current = currentRaw === '' || currentRaw == null ? 0 : Number(currentRaw);
+  const voltage = voltageRaw === '' || voltageRaw == null ? 0 : Number(voltageRaw);
   const parallelRaw = cable.parallel_count ?? cable.parallel_runs ?? cable.parallel;
   const parallelCount = parallelRaw == null || parallelRaw === '' ? 1 : Number(parallelRaw);
   if (!Number.isInteger(parallelCount) || parallelCount < 1) return null;
-  if (!(current > 0 && voltage > 0)) return null;
+  if (!(Number.isFinite(current) && current > 0 && Number.isFinite(voltage) && voltage > 0)) return null;
   const phaseCount = normalizeCablePhases(phase).length ||
-    (Number.isFinite(Number(phase)) ? Number(phase) : normalizeCablePhases(cable).length) || 3;
+    (Number.isFinite(Number(phase)) ? Number(phase) : normalizeCablePhases(cable).length);
   if (![1, 2, 3].includes(phaseCount)) return null;
   const material = cable.conductor_material;
   const conduit = cable.conduit_material || cable.raceway_material || cable.conduit_type;
@@ -74,7 +76,9 @@ export function calculateVoltageDrop(cable = {}, length = 0, phase = 3) {
   const pf = Number.isFinite(pfRaw) && pfRaw > 0 && pfRaw <= 1 ? pfRaw : 0.9;
   const sinTheta = Math.sqrt(Math.max(0, 1 - pf * pf));
 
-  const lengthMeters = (parseFloat(length) || 0) * 0.3048;
+  const lengthFt = Number(length);
+  if (!(Number.isFinite(lengthFt) && lengthFt > 0)) return null;
+  const lengthMeters = lengthFt * 0.3048;
   const factor = phaseCount === 3 ? Math.sqrt(3) : 2;
   // Parallel conductors share the circuit current and therefore reduce the
   // equivalent per-phase impedance by the same factor under the equal-length,
@@ -83,6 +87,35 @@ export function calculateVoltageDrop(cable = {}, length = 0, phase = 3) {
     * ((RperMeter * pf + XperMeter * sinTheta) / parallelCount);
   const percent = voltage ? (dropVolts / voltage) * 100 : 0;
   return percent;
+}
+
+export function calculateVoltageDropResult(cable = {}, length = 0, phase = 3) {
+  const value = calculateVoltageDrop(cable, length, phase);
+  const phaseCount = normalizeCablePhases(phase).length || (Number.isFinite(Number(phase)) ? Number(phase) : 0);
+  const warnings = [];
+  if (!(Number(length) > 0)) warnings.push('A positive cable length is required.');
+  const currentValue = Number(cable?.est_load);
+  const voltageValue = Number(cable?.operating_voltage ?? cable?.cable_rating);
+  if (!(Number.isFinite(currentValue) && currentValue > 0)) warnings.push('A positive operating current is required.');
+  if (!(Number.isFinite(voltageValue) && voltageValue > 0)) warnings.push('A positive operating voltage is required.');
+  if (![1, 2, 3].includes(phaseCount)) warnings.push('Phase count must be 1, 2, or 3.');
+  if (!cable?.conductor_size) warnings.push('A conductor size is required.');
+  if (!Number.isFinite(value)) warnings.push('Voltage drop was not evaluated because required inputs or conductor impedance are unsupported.');
+  const parallelCount = cable.parallel_count ?? cable.parallel_runs ?? cable.parallel ?? 1;
+  return {
+    value: Number.isFinite(value) ? value : null,
+    units: '%',
+    resultContract: createCalculationResult({
+      value,
+      units: '%',
+      validity: Number.isFinite(value) ? 'evaluated' : 'unevaluated',
+      inputSources: { cable: 'Cable Schedule', impedance: describeVoltageDropBasis(cable) },
+      assumptions: { phaseCount, parallelCount, powerFactor: cable.power_factor ?? 0.9, conduitMaterial: cable.conduit_material ?? cable.raceway_material ?? cable.conduit_type ?? null, impedanceOverride: cable.impedance_per_1000ft ?? cable.impedance ?? null, temperatureRating: cable.insulation_rating ?? 75 },
+      modelLimits: { model: 'screening voltage drop' },
+      warnings,
+      inputs: { cable: { ...cable, power_factor: cable.power_factor ?? 0.9, parallel_count: parallelCount, conduit_material: cable.conduit_material ?? cable.raceway_material ?? cable.conduit_type ?? null, impedance_per_1000ft: cable.impedance_per_1000ft ?? cable.impedance ?? null }, length, phase: phaseCount },
+    }),
+  };
 }
 
 /**

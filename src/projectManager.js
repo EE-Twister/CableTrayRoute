@@ -9,15 +9,18 @@ import {
   clearAuthContextState,
   getSavedProjectsError,
   writeSavedProject,
+  renameSavedProject,
   readSavedProject,
   removeSavedProject,
   readProjectSessionValue,
   writeProjectSessionValue,
-  removeProjectSessionValue
+  removeProjectSessionValue,
+  writeProjectSaveStatus,
+  getProjectSaveStatusPresentation
 } from '../projectStorage.js';
 import { openModal, showAlertModal, ensureFieldAssistiveText } from './components/modal.js';
 import { resolveActiveProjectName } from './projectContext.js';
-import { summarizeSavedProjectRecord } from './projectSnapshot.js';
+import { createImportableProjectSnapshot, isVersionedProjectSnapshot, summarizeSavedProjectRecord } from './projectSnapshot.js';
 import { mountProfileControl, signOutCurrentUser, updateAuthSessionControls } from './authProfileControl.js';
 import {
   createAuthContextFromSupabaseSession,
@@ -181,6 +184,19 @@ function currentProjectName() {
     typeof window !== 'undefined' ? window.currentProjectId : '',
     storedProjectName
   );
+}
+
+function loadLocalProjectWithoutEnvelopeMetadata(name) {
+  const record = readSavedProject(name);
+  if (!record || !isVersionedProjectSnapshot(record)) return false;
+  const snapshot = createImportableProjectSnapshot(record);
+  if (!snapshot) return false;
+  const imported = importProject(snapshot);
+  if (imported) {
+    applyProjectStateName(name);
+    if (typeof window !== 'undefined') window.currentProjectId = name;
+  }
+  return imported;
 }
 
 
@@ -398,14 +414,17 @@ async function promptLoadProject(projects) {
 }
 
 async function selectProjectTemplate() {
+  let chosen = null;
   return openModal({
     title: 'Choose a Project Template',
     primaryText: 'Use Template',
     secondaryText: 'Skip',
     defaultWidth: 'wide',
+    onSubmit() {
+      return chosen;
+    },
     render(body, controller) {
       controller.setPrimaryDisabled(true);
-      let chosen = null;
 
       const grid = document.createElement('div');
       grid.className = 'template-grid';
@@ -439,7 +458,6 @@ async function selectProjectTemplate() {
 
       body.appendChild(grid);
 
-      controller.onSubmit = () => controller.close(chosen);
     }
   });
 }
@@ -452,7 +470,7 @@ async function newProject() {
     message: 'Choose a unique name for the new project.'
   });
   const trimmed = normalizeProjectName(name);
-  if (!trimmed) return;
+  if (!trimmed) return false;
 
   const template = await selectProjectTemplate();
 
@@ -470,9 +488,10 @@ async function newProject() {
   } catch (e) {
     console.error('Failed to initialize new project storage', e);
     await showAlertModal('Project Error', 'Failed to create new project storage. Please try again or reload the page.');
-    return;
+    return false;
   }
   location.reload();
+  return true;
 }
 
 function renameProject(name) {
@@ -484,21 +503,14 @@ function renameProject(name) {
   if (validation) throw new Error(validation);
   if (current && trimmed !== current) {
     try {
-      const record = readSavedProject(current);
-      if (record) {
-        writeSavedProject(trimmed, record);
-        removeSavedProject(current);
-      }
-      const auth = getAuthContext();
-      if (isSupabaseAuthContext(auth)) {
-        supabaseDeleteProject(auth, current).catch(err => {
-          console.warn('[projectManager] Supabase old project removal failed:', err?.message || err);
-        });
-      }
+      const record = exportProject();
+      renameSavedProject(current, trimmed, record);
+      // Keep the old cloud name until the renamed snapshot has been uploaded
+      // successfully by the normal save flow. Deleting first would make a
+      // reconnect or failed upload lose the only recoverable cloud copy.
     } catch (e) {
       console.error('Project rename persistence failed', e);
-      // Fire-and-forget: renameProject is synchronous so we don't await the modal
-      showAlertModal('Rename Warning', 'The project was renamed but could not be saved to storage. Your changes may be lost on reload.');
+      throw e;
     }
   }
   setProjectHash(trimmed);
@@ -577,7 +589,13 @@ async function serverLoadProject(name) {
   if (!imported) return false;
   // The local snapshot and its revision are committed together so a reload
   // or navigation retains the optimistic-concurrency base.
-  dsSaveProject(name);
+  const localSaved = dsSaveProject(name);
+  if (!localSaved) {
+    const message = `Project "${name}" could not be saved locally. Your previous saved copy was preserved.`;
+    dispatchProjectSyncStatus({ label: 'Save failed', state: 'error', detail: message });
+    await showAlertModal('Save Failed', message);
+    return;
+  }
   if (version) {
     persistServerRevision(name, auth, version);
   }
@@ -619,7 +637,13 @@ async function saveProject(options = {}) {
   // Save locally and attempt server sync if logged in
   const auth = getAuthContext();
   const baseVersion = readServerRevision(name, auth);
-  dsSaveProject(name);
+  const localSaved = dsSaveProject(name);
+  if (!localSaved) {
+    const message = `Project "${name}" could not be saved locally. Your previous saved copy was preserved.`;
+    dispatchProjectSyncStatus({ label: 'Save failed', state: 'error', detail: message });
+    await showAlertModal('Save Failed', message);
+    return;
+  }
   const storageError = getSavedProjectsError();
   let serverResult = { attempted: false, ok: false };
   let serverError = null;
@@ -645,20 +669,41 @@ async function saveProject(options = {}) {
   }
   let message;
   if (conflict) {
+    writeProjectSaveStatus(name, { localSavedAt: new Date().toISOString() });
     message = `Project "${name}" was saved locally, but the server has newer changes. Reload the server copy before trying to sync this local version.`;
-    dispatchProjectSyncStatus({ label: 'Conflict', state: 'error', detail: message });
+    dispatchProjectSyncStatus({
+      ...getProjectSaveStatusPresentation(name),
+      state: 'error',
+      detail: `${message} ${getProjectSaveStatusPresentation(name).detail}`
+    });
     await showAlertModal('Server Save Conflict', message);
     return;
   }
   if (serverError || (attempted && !ok)) {
     message = `Project "${name}" saved locally. Server sync failed.`;
-    dispatchProjectSyncStatus({ label: 'Sync failed', state: 'error', detail: message });
+    const savedAt = new Date().toISOString();
+    writeProjectSaveStatus(name, { localSavedAt: savedAt });
+    dispatchProjectSyncStatus({
+      ...getProjectSaveStatusPresentation(name),
+      state: 'error',
+      detail: `${message} ${getProjectSaveStatusPresentation(name).detail}`
+    });
   } else if (!attempted) {
     message = `Project "${name}" saved locally.`;
-    dispatchProjectSyncStatus({ label: 'Local', state: 'local', detail: message });
+    const savedAt = new Date().toISOString();
+    writeProjectSaveStatus(name, { localSavedAt: savedAt });
+    dispatchProjectSyncStatus({
+      ...getProjectSaveStatusPresentation(name),
+      detail: `${message} ${getProjectSaveStatusPresentation(name).detail}`
+    });
   } else {
     message = `Project "${name}" successfully saved.`;
-    dispatchProjectSyncStatus({ label: 'Saved', state: 'saved', detail: message });
+    const savedAt = new Date().toISOString();
+    writeProjectSaveStatus(name, { localSavedAt: savedAt, cloudSavedAt: savedAt });
+    dispatchProjectSyncStatus({
+      ...getProjectSaveStatusPresentation(name),
+      detail: `${message} ${getProjectSaveStatusPresentation(name).detail}`
+    });
   }
   await showAlertModal('Project Saved', message);
 }
@@ -678,7 +723,11 @@ async function loadProject() {
   try { loaded = await serverLoadProject(name); } catch (e) { console.error(e); }
   if (!loaded) {
     persistServerRevision(name, getAuthContext(), '');
-    const stored = dsLoadProject(name);
+    let stored = dsLoadProject(name);
+    // A synced local snapshot is a storage envelope. If an older loader sees
+    // its __serverSync metadata as project data, retry with the interchange
+    // payload after stripping envelope keys so offline recovery still works.
+    if (!stored) stored = loadLocalProjectWithoutEnvelopeMetadata(name);
     const postLoadError = getSavedProjectsError();
     if (postLoadError) {
       const message = postLoadError.message || 'Saved projects could not be read. Clear saved data in Settings and try again.';
@@ -704,6 +753,7 @@ async function openProjectByName(name) {
   if (!loaded) {
     persistServerRevision(trimmed, getAuthContext(), '');
     loaded = dsLoadProject(trimmed);
+    if (!loaded) loaded = loadLocalProjectWithoutEnvelopeMetadata(trimmed);
   }
   if (!loaded) {
     await showAlertModal('Project Not Found', `Project "${trimmed}" could not be loaded from your saved projects.`);
@@ -1154,13 +1204,8 @@ function initProjectManagerControls() {
   mountShareControls();
   mountProfileControl();
   mountProjectWorkspace();
-  dispatchProjectSyncStatus({
-    label: isSupabaseAuthContext(getAuthContext()) ? 'Cloud ready' : 'Local',
-    state: isSupabaseAuthContext(getAuthContext()) ? 'ready' : 'local',
-    detail: isSupabaseAuthContext(getAuthContext())
-      ? 'Project saves can sync to your account.'
-      : 'Project saves are local until you log in.'
-  });
+  const activeName = currentProjectName();
+  dispatchProjectSyncStatus(getProjectSaveStatusPresentation(activeName));
 
   // Add login/logout button
   const menu = document.getElementById('settings-menu');

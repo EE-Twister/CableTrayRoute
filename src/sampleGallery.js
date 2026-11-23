@@ -39,7 +39,8 @@ import {
   getSamplesByTag,
   validateSampleProject,
   migrateSampleProject,
-  sampleProjectToImportPayload
+  sampleProjectToImportPayload,
+  getSamplePageLabel
 } from '../analysis/sampleGallery.mjs';
 
 const PROGRESS_KEY_PREFIX = 'ctr_sample_progress_';
@@ -479,8 +480,7 @@ function showChecklist(sample) {
     const link = document.createElement('a');
     link.className = 'checklist-step__link';
     link.href = globalThis.projectScopedHref?.(step.page) || step.page;
-    const pageLabel = step.page.split(/[?#]/)[0].replace('.html', '');
-    link.textContent = `Go to ${pageLabel} →`;
+    link.textContent = `Open ${getSamplePageLabel(step.page)} →`;
     link.textContent = repairMojibake(link.textContent);
     link.addEventListener('click', () => {
       markStepDone(sample.id, idx);

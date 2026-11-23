@@ -158,6 +158,7 @@ export function buildLifecyclePackage(config = {}, projectData = {}) {
   const approvals = deepClone(projectData.approvals || {});
   const designBasis = deepClone(projectData.designBasis || null);
   const designGateApprovals = deepClone(projectData.designGateApprovals || {});
+  const designSynthesisReviewDraft = deepClone(projectData.designSynthesisReviewDraft ?? null);
   const tccSettings = deepClone(projectData.tccSettings || null);
   const fieldObservations = deepClone(Array.isArray(projectData.fieldObservations) ? projectData.fieldObservations : []);
   const fieldObservationQueue = deepClone(Array.isArray(projectData.fieldObservationQueue) ? projectData.fieldObservationQueue : []);
@@ -192,6 +193,7 @@ export function buildLifecyclePackage(config = {}, projectData = {}) {
       approvals,
       designBasis,
       designGateApprovals,
+      designSynthesisReviewDraft,
       tccSettings,
       fieldObservations,
       fieldObservationQueue,

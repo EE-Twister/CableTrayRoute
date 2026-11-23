@@ -89,7 +89,11 @@ export function normalizeHeatTraceBranchCase(caseItem = {}, index = 0) {
   const effectiveTraceLengthFt = asNumber(result?.effectiveTraceLengthFt, lineLengthFt + componentAllowanceLengthFt);
   const maxCircuitLengthFt = getMaxCircuitLengthFt(result, inputs);
   const warnings = normalizeWarnings(result?.warnings);
-  const status = getBranchStatus({ result, warnings, lineLengthFt: effectiveTraceLengthFt, maxCircuitLengthFt });
+  const lifecycleAssessment = caseItem._lifecycleAssessment || null;
+  const lifecycleBlocked = lifecycleAssessment && lifecycleAssessment.eligible !== true;
+  const status = lifecycleBlocked
+    ? 'invalid'
+    : getBranchStatus({ result, warnings, lineLengthFt: effectiveTraceLengthFt, maxCircuitLengthFt });
 
   return {
     id: String(caseItem.id || `heat-trace-branch-${index + 1}`),
@@ -126,6 +130,11 @@ export function normalizeHeatTraceBranchCase(caseItem = {}, index = 0) {
     coverageRatio: round(result?.coverageRatio ?? 0, 4),
     circuitUtilizationPct: maxCircuitLengthFt > 0 ? round((effectiveTraceLengthFt / maxCircuitLengthFt) * 100, 1) : 0,
     status,
+    lifecycleStatus: lifecycleAssessment?.freshness || 'unknown',
+    lifecycleValidity: lifecycleAssessment?.validity?.state || 'unknown',
+    lifecycleReasons: lifecycleAssessment?.reasons || [],
+    lifecycleEligible: lifecycleAssessment?.eligible === true,
+    provenance: caseItem._provenance || null,
     warnings,
     createdAt: caseItem.createdAt || null,
     updatedAt: caseItem.updatedAt || caseItem.createdAt || null,
@@ -135,8 +144,9 @@ export function normalizeHeatTraceBranchCase(caseItem = {}, index = 0) {
 export function buildHeatTraceBranchSchedule(cases = []) {
   const rows = (Array.isArray(cases) ? cases : [])
     .map((caseItem, index) => normalizeHeatTraceBranchCase(caseItem, index));
+  const issuedRows = rows.filter(row => row.status !== 'invalid');
   const voltageGroups = new Map();
-  rows.forEach(row => {
+  issuedRows.forEach(row => {
     const key = String(row.voltageV || 'unknown');
     const existing = voltageGroups.get(key) || { voltageV: row.voltageV, count: 0, totalWatts: 0, totalAmps: 0 };
     existing.count += 1;
@@ -149,11 +159,12 @@ export function buildHeatTraceBranchSchedule(cases = []) {
     rows,
     summary: {
       branchCount: rows.length,
-      totalConnectedWatts: round(rows.reduce((sum, row) => sum + row.totalWatts, 0), 1),
-      totalConnectedKw: round(rows.reduce((sum, row) => sum + row.totalWatts, 0) / 1000, 3),
-      totalRequiredWatts: round(rows.reduce((sum, row) => sum + row.requiredWatts, 0), 1),
-      totalRequiredKw: round(rows.reduce((sum, row) => sum + row.requiredWatts, 0) / 1000, 3),
-      totalLoadAmps: round(rows.reduce((sum, row) => sum + row.loadAmps, 0), 2),
+      eligibleBranchCount: issuedRows.length,
+      totalConnectedWatts: round(issuedRows.reduce((sum, row) => sum + row.totalWatts, 0), 1),
+      totalConnectedKw: round(issuedRows.reduce((sum, row) => sum + row.totalWatts, 0) / 1000, 3),
+      totalRequiredWatts: round(issuedRows.reduce((sum, row) => sum + row.requiredWatts, 0), 1),
+      totalRequiredKw: round(issuedRows.reduce((sum, row) => sum + row.requiredWatts, 0) / 1000, 3),
+      totalLoadAmps: round(issuedRows.reduce((sum, row) => sum + row.loadAmps, 0), 2),
       overLimitCount: rows.filter(row => row.status === 'overLimit').length,
       warningCount: rows.filter(row => row.status === 'warning' || row.warnings.length).length,
       invalidCount: rows.filter(row => row.status === 'invalid').length,

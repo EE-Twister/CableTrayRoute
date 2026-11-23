@@ -340,3 +340,79 @@ describe('attachCollaborationServer — invalid JSON', () => {
     assert.ok(errors.length >= 1, 'should return error for invalid JSON');
   });
 });
+
+describe('attachCollaborationServer — untrusted message shapes', () => {
+  it('rejects non-message JSON values and remains usable', () => {
+    const { httpServer, wss } = setupServer();
+    const ws = connectClient(httpServer, wss);
+    const invalid = [null, [], ['ping'], 'ping', 42, true, {}, { type: null }, { type: {} }];
+    for (const value of invalid) {
+      assert.doesNotThrow(() => ws._receive(value));
+      assert.deepStrictEqual(ws.lastSent(), { type: 'error', message: 'Invalid message' });
+      ws._receive({ type: 'ping' });
+      assert.deepStrictEqual(ws.lastSent(), { type: 'pong' });
+    }
+  });
+
+  it('rejects unsafe join fields before changing room membership or sequence', () => {
+    const { httpServer, wss } = setupServer();
+    const alice = joinClient(httpServer, wss, 'proj1', 'alice');
+    const bob = joinClient(httpServer, wss, 'proj1', 'bob');
+    const invalid = [null, 7, false, [], {}, { toString: null }, [{ toString: {} }]];
+    for (const field of ['projectId', 'username']) {
+      for (const value of invalid) {
+        const previousPresence = bob.sentOfType('presence').length;
+        assert.doesNotThrow(() => alice._receive({
+          type: 'join', projectId: 'other-project', username: 'other-user', [field]: value
+        }));
+        assert.strictEqual(alice.lastSent().message, 'Invalid join fields');
+        assert.strictEqual(bob.sentOfType('presence').length, previousPresence);
+      }
+    }
+    alice._receive({ type: 'join', projectId: 'p'.repeat(201), username: 'alice' });
+    assert.strictEqual(alice.lastSent().message, 'Project ID too long');
+    alice._receive({ type: 'patch', patch: { stillJoined: true } });
+    assert.deepStrictEqual(bob.lastSent(), {
+      type: 'patch', projectId: 'proj1', username: 'alice', patch: { stillJoined: true }, seq: 1
+    });
+    assert.deepStrictEqual(alice.lastSent(), { type: 'ack', seq: 1 });
+  });
+
+  it('validates parsed escaped and duplicate fields before and after leaving', () => {
+    const { httpServer, wss } = setupServer();
+    const ws = connectClient(httpServer, wss);
+    const frames = [
+      '{"type":"join","projectId":{"toString":null},"username":"alice"}',
+      '{"type":"join","projectId":"proj1","username":{"toString":null}}',
+      '{"type":"join","projectId":"proj1","user\\u006eame":{"toString":null}}',
+      '{"type":"join","projectId":"proj1","username":"alice","username":{"toString":null}}'
+    ];
+    for (const frame of frames) {
+      assert.doesNotThrow(() => ws._emit('message', Buffer.from(frame)));
+      assert.strictEqual(ws.lastSent().message, 'Invalid join fields');
+    }
+    ws._receive({ type: 'join', projectId: 'proj1' });
+    assert.ok(ws.lastSent().users.includes('Anonymous'));
+    ws._receive({ type: 'leave' });
+    for (const frame of frames) {
+      assert.doesNotThrow(() => ws._emit('message', Buffer.from(frame)));
+      assert.strictEqual(ws.lastSent().message, 'Invalid join fields');
+    }
+    ws._receive({ type: 'patch', patch: {} });
+    assert.strictEqual(ws.lastSent().message, 'Join a project first');
+    ws._receive({ type: 'join', projectId: 'proj1', username: 'a'.repeat(110) });
+    assert.deepStrictEqual(ws.lastSent().users, ['a'.repeat(100)]);
+  });
+
+  it('contains unexpected handler failures to the affected connection', () => {
+    const { httpServer, wss } = setupServer();
+    const alice = joinClient(httpServer, wss, 'proj1', 'alice');
+    const bob = joinClient(httpServer, wss, 'proj1', 'bob');
+    alice.send = () => { throw new Error('Transport unavailable'); };
+    assert.doesNotThrow(() => alice._receive({ type: 'ping' }));
+    assert.strictEqual(alice.readyState, WS_CLOSED);
+    assert.deepStrictEqual(bob.lastSent().users, ['bob']);
+    bob._receive({ type: 'ping' });
+    assert.deepStrictEqual(bob.lastSent(), { type: 'pong' });
+  });
+});

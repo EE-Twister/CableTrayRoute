@@ -1,7 +1,12 @@
 const { defineConfig } = require('@playwright/test');
 const path = require('path');
 
-const visualBrowserChannel = process.platform === 'win32' ? { channel: 'msedge' } : {};
+// The committed baselines are Windows Edge captures. Keep this lane explicit
+// so a Linux Chromium run cannot be mistaken for an authoritative comparison.
+if (process.platform !== 'win32') {
+  throw new Error('Visual regression requires the Windows Edge lane; run npm run visual:regression on Windows.');
+}
+const visualBrowserChannel = { channel: 'msedge' };
 
 module.exports = defineConfig({
   testDir: path.join(__dirname, 'playwright-tests'),

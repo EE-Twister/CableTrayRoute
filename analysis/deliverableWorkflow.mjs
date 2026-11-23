@@ -254,8 +254,10 @@ export function buildDeliverableReadinessDiagnostics({
   lifecyclePackages = [],
   designBasis = undefined,
   designGateApprovals = {},
+  designSynthesisReviewDraft = null,
   studyApprovals = {},
   equipment = [],
+  loads = [],
   oneLine = {},
   tccSettings = null,
   enforceDesignBasis = false,
@@ -314,11 +316,13 @@ export function buildDeliverableReadinessDiagnostics({
   });
   const reportSnapshotCount = countObjectRecords(reportSnapshots);
   const lifecyclePackageCount = Array.isArray(lifecyclePackages) ? lifecyclePackages.length : 0;
-  const designReview = (enforceDesignBasis || designBasis !== undefined)
+  const designReview = (enforceDesignBasis || designBasis !== undefined || (designSynthesisReviewDraft !== null && designSynthesisReviewDraft !== undefined))
     ? buildDesignBasisReview({
         designBasis,
         designGateApprovals,
+        designSynthesisReviewDraft,
         equipment,
+        loads,
         oneLine,
         cables: cableRows,
         trays: trayRows,

@@ -12,17 +12,9 @@ import { buildLoadFlowModel } from '../../analysis/loadFlowModel.js';
 import { runShortCircuit as runShortCircuitSync } from '../../analysis/shortCircuit.mjs';
 import { runReliability as runReliabilitySync } from '../../analysis/reliability.js';
 import { createWorkerClient } from './createWorkerClient.js';
+import { normalizeOneLineStudyInput } from './oneLineNormalization.mjs';
 
 const OPS = ['runLoadFlow', 'runShortCircuit', 'runReliability'];
-
-function extractDiagramComponents(oneLineData) {
-  const sheets = Array.isArray(oneLineData?.sheets) ? oneLineData.sheets : [];
-  const hasNestedComponents = Array.isArray(sheets[0]?.components);
-  const components = hasNestedComponents
-    ? sheets.flatMap(sheet => (Array.isArray(sheet?.components) ? sheet.components : []))
-    : sheets;
-  return components.filter(c => c && c.type !== 'annotation' && c.type !== 'dimension');
-}
 
 const client = createWorkerClient({
   workerUrl: 'onelineWorker.js',
@@ -30,12 +22,13 @@ const client = createWorkerClient({
   operations: OPS,
   fallback: {
     runLoadFlow(oneLineData, opts) {
-      const model = buildLoadFlowModel(oneLineData || {});
-      return runLoadFlowSync(model, opts || {});
+      const normalized = normalizeOneLineStudyInput(oneLineData, opts);
+      const model = buildLoadFlowModel(normalized.oneLine);
+      return runLoadFlowSync(model, normalized.options);
     },
     runShortCircuit(oneLineData, opts) {
-      const comps = extractDiagramComponents(oneLineData);
-      return runShortCircuitSync(comps, opts || {});
+      const normalized = normalizeOneLineStudyInput(oneLineData, opts);
+      return runShortCircuitSync(normalized.components, normalized.options);
     },
     runReliability: runReliabilitySync,
   },

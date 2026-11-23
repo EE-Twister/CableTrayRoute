@@ -110,6 +110,14 @@ unreviewed curve calculation-ready. Arc-flash results driven by a record below
 `calculation_ready`, or by a 0.2 s fallback outside the curve domain, carry an
 unresolved required input and are withheld from label eligibility.
 
+Equipment-reference checks also reject out-of-domain currents. Ride-through uses
+the lower protective boundary, while damage comparison uses the upper protective
+boundary and checks the full reference interval, including interior limits.
+Missing coverage remains unknown with no time or margin. An upper curve is not
+thereby verified as total clearing. See the [bounded equipment comparison
+review](tcc-equipment-protection.md) for corrected cases, source discovery and
+remaining evidence requirements.
+
 ## Promotion gate
 
 A device may declare `libraryStatus: "calculation_ready"` only when it includes:

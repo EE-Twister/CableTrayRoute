@@ -1,5 +1,7 @@
 # Bus Duct / Cable Bus Sizing
 
+> **Adequacy status:** `selectedBusway.adequate` is true only when the selected catalog rating and its final derated ampacity meet the requested load. The result reports `catalog-exceeded` or `derated-insufficient` when the corresponding condition is unsatisfied and includes an actionable warning.
+
 > **Screening limitation:** All selected ratings, impedances, derating factors,
 > and mechanical properties are generic. This calculation cannot establish a
 > final busway product selection or compliance result. Manufacturer-certified
@@ -33,7 +35,7 @@ The manufacturer's rated ampacity (at 40 °C ambient, horizontal flat installati
 
 The combined factor = orientation × ambient × stacking.
 
-The tool selects the smallest standard busway rating (800, 1000, 1200, 1350, 1600, 2000, 2500, 3000, 4000, or 5000 A) whose derated ampacity meets or exceeds the load current.
+The tool selects the smallest standard busway rating (800, 1000, 1200, 1350, 1600, 2000, 2500, 3000, 4000, or 5000 A) whose derated ampacity meets or exceeds the load current. The structured result exposes `catalogAdequate`, `deratingAdequate`, `adequate`, and `adequacyStatus`; a rating capped at 5,000 A or a final derated ampacity below load remains inadequate.
 
 ---
 

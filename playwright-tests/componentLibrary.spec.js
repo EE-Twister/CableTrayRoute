@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { startStaticServer } from './staticServer.helper.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as XLSX from 'xlsx';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
-const pageUrl = `file://${path.join(root, 'library.html')}`;
+let staticSite;
 
 const validMccProps = {
   tag: 'MCC-1',
@@ -69,12 +70,20 @@ async function installLibraryApiMock(page, { initialState, latestState = null, c
 }
 
 test.describe('Component Library structured workflows', () => {
+  test.beforeAll(async () => {
+    staticSite = await startStaticServer(root);
+  });
+
+  test.afterAll(async () => {
+    await staticSite?.close();
+  });
+
   test('shows governed protective-device inventory with readiness filters', async ({ page }) => {
     const startupScripts = [];
     page.on('request', request => {
       if (request.resourceType() === 'script') startupScripts.push(new URL(request.url()).pathname);
     });
-    await page.goto(pageUrl);
+    await page.goto(staticSite.url('library.html'));
 
     expect(startupScripts).toHaveLength(2);
     expect(startupScripts.some(pathname => pathname.endsWith('/dist/vendor/xlsx.full.min.js'))).toBe(true);
@@ -116,7 +125,7 @@ test.describe('Component Library structured workflows', () => {
 
     await installLibraryApiMock(page, { initialState: serverState });
 
-    await page.goto(pageUrl);
+    await page.goto(staticSite.url('library.html'));
     await expect(page.locator('#sync-badge')).toContainText('Synced');
     await expect(page.locator('[data-kind="component-label"]').first()).toHaveValue('Motor Control Center');
 
@@ -142,7 +151,7 @@ test.describe('Component Library structured workflows', () => {
   });
 
   test('import handling validates supported/unsupported workbook formats', async ({ page }) => {
-    await page.goto(pageUrl);
+    await page.goto(staticSite.url('library.html'));
     await expect.poll(() => page.evaluate(() => typeof window.XLSX)).toBe('object');
 
     const csvPayload = [
@@ -208,7 +217,7 @@ test.describe('Component Library structured workflows', () => {
 
     await installLibraryApiMock(page, { initialState: initialCloud, latestState: latestCloud, conflictBaseVersion: 'v1' });
 
-    await page.goto(pageUrl);
+    await page.goto(staticSite.url('library.html'));
     await expect(page.locator('#sync-badge')).toContainText('Synced');
 
     await page.click('#add-component-row');
@@ -266,7 +275,7 @@ test.describe('Component Library structured workflows', () => {
       };
     });
 
-    await page.goto(pageUrl);
+    await page.goto(staticSite.url('library.html'));
     await expect(page.getByRole('button', { name: 'Publish Team Release' })).toBeVisible();
     await page.getByRole('button', { name: 'Publish Team Release' }).click();
     await page.locator('#team-release-notes').fill('Approved standard symbols');

@@ -1,7 +1,8 @@
 import { runDifferentialStudy, ZONE_TYPES } from './analysis/differentialProtection.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getStudies, getStudyAssessments, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { downloadCSV } from './reports/reporting.mjs';
+import { studyLifecycleMetadataRows } from './analysis/studyExportMetadata.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -41,16 +42,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!inputs) return;
 
     let result;
+    let runContext;
     try {
+      runContext = captureStudyRunContext('differentialProtection', { inputs, options: inputs });
       result = runDifferentialStudy(inputs);
     } catch (err) {
       showModal('Analysis Error', `<p>${err.message}</p>`, 'error');
       return;
     }
 
-    const studies = getStudies();
-    studies.differentialProtection = result;
-    setStudies(studies);
+    saveStudyResult('differentialProtection', result, runContext);
 
     renderResults(result);
     exportBtn.disabled = false;
@@ -411,7 +412,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function exportCSV(r) {
     const rows = [
-      ['Parameter', 'Value'],
       ['Zone type', r.zoneType],
       ['Zone label', r.zoneLabel],
       ['System label', r.systemLabel || ''],
@@ -432,8 +432,10 @@ document.addEventListener('DOMContentLoaded', () => {
       ['Security margin (%)', r.tripResult.marginPct],
       ['Harmonic restraint active', r.harmonic.restrain ? 'Yes' : 'No'],
       ['Trip determination', r.tripResult.trip ? 'TRIP' : 'NO TRIP'],
-    ];
-    downloadCSV(rows, 'differential-protection.csv');
+      ...studyLifecycleMetadataRows(r, { assessment: getStudyAssessments().differentialProtection })
+        .map(([key, value]) => [`Lifecycle: ${key}`, value]),
+    ].map(([parameter, value]) => ({ parameter, value }));
+    downloadCSV(['Parameter', 'Value'], rows, 'differential-protection.csv');
   }
 
   function escHtml(str) {

@@ -4,18 +4,19 @@ The CableTrayRoute server exposes a public REST API under `/api/v1` for scriptin
 
 ## Authentication
 
-All `/api/v1` endpoints require a Bearer token obtained from the `/login` endpoint.
+Authenticated `/api/v1` endpoints accept the preferred HttpOnly `ctr_auth` cookie or the legacy Bearer token obtained from `/login`. Every state-changing request must also send the matching `X-CSRF-Token` header, regardless of which authentication form is used. `GET /api/v1/library/shared/:token` is intentionally public.
 
 ```bash
 # 1. Log in to get a token
 curl -s -X POST http://localhost:3000/login \
   -H "Content-Type: application/json" \
   -d '{"username":"alice","password":"MySecret123!"}' \
-  | jq -r '.token'
-# → e3f4a1b2c9d0...
+  | jq '{token, csrfToken}'
+# → {"token":"e3f4a1b2c9d0...","csrfToken":"..."}
 
 # 2. Use the token in subsequent requests
 export TOKEN="e3f4a1b2c9d0..."
+export CSRF="returned-csrf-token..."
 ```
 
 Tokens expire after the configured TTL (default: 1 hour). Refresh via `POST /session/refresh`.
@@ -24,7 +25,7 @@ Tokens expire after the configured TTL (default: 1 hour). Refresh via `POST /ses
 
 ## Rate Limiting
 
-All `/api/v1` endpoints share the project rate limiter: **100 requests per 15 minutes per IP** (configurable via `PROJECT_RATE_LIMIT_MAX` and `PROJECT_RATE_LIMIT_WINDOW_MS` environment variables).
+All authenticated `/api/v1` routes use the API rate limiter. Authenticated `/api/v1/library` routes also use the project limiter. The public shared-library route uses the project limiter before the authentication middleware. Each limiter defaults to **100 requests per 15 minutes per IP**, configured through `PROJECT_RATE_LIMIT_MAX` and `PROJECT_RATE_LIMIT_WINDOW_MS`.
 
 ---
 
@@ -105,6 +106,7 @@ double-line-to-ground (DLG) fault currents for each bus.
 ```bash
 curl -s -X POST \
   -H "Authorization: Bearer $TOKEN" \
+  -H "X-CSRF-Token: $CSRF" \
   -H "Content-Type: application/json" \
   http://localhost:3000/api/v1/projects/myproject/studies/short-circuit
 ```
@@ -138,6 +140,7 @@ Supports all starter types: `dol`, `vfd`, `soft_starter`, `wye_delta`, `autotran
 ```bash
 curl -s -X POST \
   -H "Authorization: Bearer $TOKEN" \
+  -H "X-CSRF-Token: $CSRF" \
   -H "Content-Type: application/json" \
   http://localhost:3000/api/v1/projects/myproject/studies/motor-start
 ```
@@ -171,6 +174,7 @@ on process-global browser storage.
 ```bash
 curl -s -X POST \
   -H "Authorization: Bearer $TOKEN" \
+  -H "X-CSRF-Token: $CSRF" \
   -H "Content-Type: application/json" \
   http://localhost:3000/api/v1/projects/myproject/studies/voltage-drop
 ```
@@ -512,7 +516,8 @@ See [layer-management.md](layer-management.md) for full workflow documentation.
 | Status | Meaning |
 |--------|---------|
 | 400 | Invalid project name |
-| 401 | Missing or invalid Bearer token |
+| 401 | Missing or invalid session or Bearer token |
+| 403 | Missing or invalid CSRF token, or insufficient role |
 | 404 | Project or library not found |
 | 409 | Version conflict (include `currentVersion` in response) |
 | 429 | Rate limit exceeded |
@@ -533,7 +538,8 @@ BASE = "http://localhost:3000"
 session = requests.post(f"{BASE}/login", json={
     "username": "alice", "password": "MySecret123!"
 }).json()
-headers = {"Authorization": f"Bearer {session['token']}"}
+headers = {"Authorization": f"Bearer {session['token']}",
+           "X-CSRF-Token": session['csrfToken']}
 
 # Fetch cables
 cables = requests.get(f"{BASE}/api/v1/projects/myproject/cables", headers=headers).json()

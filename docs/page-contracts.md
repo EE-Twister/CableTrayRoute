@@ -41,8 +41,10 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.costEstimateArtifact` (setting, optional): Latest persisted estimate summary, basis, route-scoped quantity ledger, assurance signatures, blockers, and line-item rows.
 - `settings.tccSettings` (setting, optional): Protective device selections, relay settings, chart options, and coordination context.
 - `settings.oneLineScheduleReconcilePending` (setting, optional): Legacy compatibility flag; automatic shared-data synchronization keeps this false.
+- `settings.designSynthesisReviewDraft` (setting, optional): Persistent preliminary review-project status and issue restriction.
 - `settings.activeSampleWorkflow` (setting, optional): Active sample context used to suppress redundant sample-loading guidance.
 - `settings.workflowDashboardFocus` (setting, optional): Routing or full-engineering dashboard focus selected for this project.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `settings.designBasis` (setting): Design basis wizard decisions and project defaults. Consumers: `workflowdashboard.html`, `projectreport.html`.
@@ -96,6 +98,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults` (study-result, optional): Saved study results available for reports, cross-checks, and downstream studies.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.scenarios` (setting, optional): Scenario registry and active scenario selection.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `export-only` (export): Cross-domain scenario change register, engineering-study delta table, and comparison CSV.
@@ -191,6 +194,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.projectMeta` (setting, optional): Canonical project identity, client, site, engineer, revision, and environmental context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.mccLineupActiveId` (setting, optional): Active MCC lineup selection.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `mccLineups` (schedule): Persisted MCC lineup definitions and active lineup selection. Consumers: `equipmentlist.html`, `equipmentarrangements.html`, `projectreport.html`.
@@ -258,6 +262,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `conduitSchedule` (schedule, required): Conduit IDs, trade sizes, fill limits, material, and route geometry.
 - `studyResults` (study-result, optional): Saved study results available for reports, cross-checks, and downstream studies.
 - `settings.tccSettings` (setting, optional): Protective device selections, relay settings, chart options, and coordination context.
+- `settings.designSynthesisReviewDraft` (setting, optional): Persistent preliminary review-project status and issue restriction.
 - `settings.manufacturerDefaults` (setting, optional): Manufacturer default selections for one-line component properties.
 - `settings.diagramScale` (setting, optional): Diagram scale setting.
 - `settings.studySettings` (setting, optional): One-line embedded study settings.
@@ -267,7 +272,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.diagramDatablockConfig` (setting, optional): One-line datablock display configuration.
 - `settings.studyProvenance` (setting, optional): Study scenario, revision, approval, and run metadata used to qualify one-line overlays.
 - `settings.activeSampleWorkflow` (setting, optional): Active sample context used to fit and guide the sample diagram.
-- `settings.gistToken` (setting, optional): Gist import/export token setting.
+- `settings.designSynthesisDeviceEvidence` (setting, optional): Referenced design-synthesis protective-device evidence for the selected linked cable.
 - `settings.liveTelemetryConfig` (setting, optional): Read-only telemetry endpoint, polling interval, operator mode, and component/tag mappings.
 
 **Outputs**
@@ -287,6 +292,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.harmonicNetwork` (study-result): Embedded per-bus, per-branch, and PCC harmonic network screen generated from one-line. Consumers: `harmonics.html`, `projectreport.html`.
 - `studyResults.motorStart` (study-result): Embedded motor-start result generated from one-line. Consumers: `motorStart.html`, `projectreport.html`.
 - `studyResults.reliability` (study-result): Embedded reliability result generated from one-line. Consumers: `reliability.html`, `projectreport.html`.
+- `settings.studyProvenance` (setting): Lifecycle sidecar qualifying embedded study results by source snapshot, model revision, validity, and freshness. Consumers: `oneline.html`, `projectreport.html`.
 - `studyResults.duty` (study-result): Embedded equipment-duty result generated from one-line validation. Consumers: `equipmentevaluation.html`, `projectreport.html`.
 - `settings.scenarios` (setting): Active scenario selection restored during one-line project import. Consumers: `scenarios.html`.
 - `settings.studySettings` (setting): One-line embedded study settings. Consumers: `oneline.html`.
@@ -296,7 +302,6 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.diagramDatablockConfig` (setting): One-line datablock display configuration. Consumers: `oneline.html`.
 - `settings.diagramScale` (setting): Diagram scale setting. Consumers: `oneline.html`.
 - `settings.diagramTitleBlock` (setting): One-line title block fields. Consumers: `oneline.html`.
-- `settings.gistToken` (setting): Gist import/export token setting. Consumers: `oneline.html`.
 - `settings.onelineTemplates` (setting): Reusable one-line component templates saved with project settings. Consumers: `oneline.html`.
 - `settings.activeSampleWorkflow` (setting): Sample workflow layout version saved after the diagram is arranged and fit. Consumers: `oneline.html`.
 - `settings.oneLineScheduleReconcilePending` (setting): Legacy reconcile flag retained as false for compatibility. Consumers: `workflowdashboard.html`.
@@ -395,6 +400,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.cableTagSettings` (setting, optional): Cable tag generation settings.
 - `settings.cableChangeLog` (setting, optional): Cable schedule change log entries.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.designSynthesisReviewDraft` (setting, optional): Persistent preliminary review-project status and issue restriction.
 - `settings.trayHardwareCatalogCustomProducts` (setting, optional): Project-owned governed cable constructions imported from the shared manufacturer catalog.
 
 **Outputs**
@@ -429,7 +435,9 @@ Coverage: 80 contracts for 80 navigation routes.
 - `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
 - `loadList` (schedule, required): Load tags, source relationships, demand values, and operating metadata.
 - `cableSchedule` (schedule, required): Cable tags, endpoints, conductor details, lengths, and raceway assignments.
+- `oneLineDiagram` (model, optional): One-line data is checked for unresolved generated motor protection when exporting.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.designSynthesisReviewDraft` (setting, optional): Persistent preliminary review-project status and issue restriction.
 
 **Outputs**
 - `panelSchedule` (schedule): Panel metadata, circuit schedules, breaker assignments, and served load links. Consumers: `loadlist.html`, `oneline.html`, `cableschedule.html`.
@@ -462,6 +470,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `cableSchedule` (schedule, required): Cable tags, endpoints, conductor details, lengths, and raceway assignments.
 - `studyResults.shortCircuit` (study-result, optional): Fault current results used to seed bracing current inputs.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `export-only` (export): Fault cable bracing requirements and cleat force reports. Consumers: `projectreport.html`.
@@ -629,6 +638,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `cableSchedule` (schedule, required): Cable tags, endpoints, conductor details, lengths, and raceway assignments.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.conduitBendSchedule` (study-result): Conduit bend schedule results, pull-box recommendations, and visual layout inputs. Consumers: `projectreport.html`.
@@ -775,6 +785,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `traySchedule` (schedule, required): Tray IDs, dimensions, fill limits, material, and route geometry.
 - `studyResults.windLoad` (study-result, optional): Wind study results when available.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `export-only` (export): Combined structural load tables and governing case reports. Consumers: `projectreport.html`.
@@ -895,6 +906,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults` (study-result, optional): Saved study results available for reports, cross-checks, and downstream studies.
 - `settings.latestRouteResults` (setting, optional): Latest saved route batch generated by routing automation or Optimal Route.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `settings.drcAcceptedFindings` (setting): Accepted design rule findings with engineer notes. Consumers: `designrulechecker.html`, `projectreport.html`.
@@ -929,6 +941,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `ductbankSchedule` (schedule, optional): Ductbank segments, conduit groups, geometry, and underground routing metadata.
 - `studyResults` (study-result, optional): Saved study results available for reports, cross-checks, and downstream studies.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `settings.coachAuditTrail` (setting): Design coach recommendation audit records. Consumers: `projectreport.html`.
@@ -965,6 +978,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.reportSnapshots` (setting, optional): Saved report package snapshots used by deliverable pages.
 - `settings.lifecyclePackages` (setting, optional): Release package records and lifecycle package history.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `export-only` (export): Spool sheets and geometry handoff packages. Consumers: `projectreport.html`.
@@ -999,6 +1013,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.reportSnapshots` (setting, optional): Saved report package snapshots used by deliverable pages.
 - `settings.lifecyclePackages` (setting, optional): Release package records and lifecycle package history.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `settings.pullPlanArtifact` (setting): Saved per-pull physical inputs, limits, direction comparison, jam screening, results, and coverage warnings. Consumers: `projectreport.html`, `submittal.html`, `fieldview.html`.
@@ -1070,6 +1085,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.customPricing` (setting, optional): Saved custom pricing book used to override default estimator unit prices.
 - `settings.costEstimateBasis` (setting, optional): Saved regional labor and material/labor escalation basis.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `settings.customPricing` (setting): Custom electrical, support, fitting, and civil assembly pricing/productivity book. Consumers: `costestimate.html`.
@@ -1116,6 +1132,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.designGateApprovals` (setting, optional): Review gate status used before deliverable release.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `settings.projectMeta` (setting): Canonical project identity and revision metadata synchronized from the submittal cover. Consumers: `projectreport.html`.
@@ -1164,6 +1181,8 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.tccSettings` (setting, optional): Protective device selections, relay settings, chart options, and coordination context.
 - `settings.projectMeta` (setting, optional): Canonical project identity, client, site, engineer, revision, and environmental context.
 - `settings.oneLineScheduleReconcilePending` (setting, optional): Legacy compatibility flag; automatic shared-data synchronization keeps this false.
+- `settings.designSynthesisReviewDraft` (setting, optional): Persistent preliminary review-project status and issue restriction.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `settings.projectMeta` (setting): Shared project and report metadata edited from the report builder. Consumers: `battery.html`, `generatorsizing.html`, `projectreport.html`.
@@ -1267,6 +1286,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `loadList` (schedule, required): Load tags, source relationships, demand values, and operating metadata.
 - `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
 - `panelSchedule` (schedule, optional): Panel and circuit records used for load, cable, and one-line handoffs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 
 **Outputs**
@@ -1301,6 +1321,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.shortCircuit` (study-result, optional): Fault current used for bus stress screening.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.busDuctSizing` (study-result): Saved bus duct sizing, voltage drop, derating, and fault stress result. Consumers: `projectreport.html`.
@@ -1333,6 +1354,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.iec60287` (study-result, optional): IEC 60287 result used as cable thermal context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.sustainabilityFootprint` (study-result): Saved material and carbon footprint summary with factor provenance and EPD coverage. Consumers: `projectreport.html`.
@@ -1364,6 +1386,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.projectMeta` (setting, optional): Canonical project identity, client, site, engineer, revision, and environmental context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.batterySizing` (study-result): Saved battery/UPS energy screen or manufacturer-data duty-cycle sizing result, including source provenance, controlling-section math, runtime, and rack layout. Consumers: `bessHazard.html`, `projectreport.html`.
@@ -1397,6 +1420,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.motorStart` (study-result, optional): Motor starting results used for starting kVA context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.generatorSizing` (study-result): Saved generator sizing and starting capacity result. Consumers: `projectreport.html`.
@@ -1428,6 +1452,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
 - `settings.trayHardwareCatalogCustomProducts` (setting, optional): Project-owned governed heat-trace rows from the shared manufacturer catalog.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.heatTraceSizing` (study-result): Saved heat trace sizing active result. Consumers: `projectreport.html`.
@@ -1495,9 +1520,11 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
 - `settings.sampleStudyInputs` (setting, optional): Sample-specific IEC thermal assumptions used to seed a demonstration calculation.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.iec60287` (study-result): Saved IEC 60287 ampacity result and input snapshot. Consumers: `projectreport.html`.
+- `studyResults.cableThermalDetailed` (study-result): Saved source-traceable detailed cable thermal screening result, normalized inputs, losses, phase temperatures, and limitations. Consumers: `projectreport.html`.
 - `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
 - `export-only` (export): IEC 60287 calculation report exports. Consumers: `projectreport.html`.
 
@@ -1523,6 +1550,7 @@ Coverage: 80 contracts for 80 navigation routes.
 **Project Inputs**
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.cableThermalEnvironment` (study-result): Saved unified cable thermal environment comparison and load-profile result. Consumers: `designcoach.html`, `projectreport.html`.
@@ -1581,6 +1609,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `cableSchedule` (schedule, required): Cable tags, endpoints, conductor details, lengths, and raceway assignments.
 - `loadList` (schedule, required): Load tags, source relationships, demand values, and operating metadata.
 - `studyResults.loadFlow` (study-result, optional): Operating current or voltage context when available.
+- `settings.studyProvenance` (setting, optional): Input hash and source provenance used to reject stale study context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 
 **Outputs**
@@ -1619,6 +1648,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.shortCircuit` (study-result, optional): Fault current values used for coordination context.
 - `studyResults.arcFlash` (study-result, optional): Arc flash results used for equipment overlays.
 - `settings.tccSettings` (setting, optional): Protective device selections, relay settings, chart options, and coordination context.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `settings.tccSettings` (setting): Protective device selections, settings, annotations, chart options, and assignments. Consumers: `shortCircuit.html`, `arcFlash.html`, `projectreport.html`.
@@ -1655,6 +1685,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.tccSettings` (setting, optional): Protective device selections, relay settings, chart options, and coordination context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.shortCircuit` (study-result): Saved short-circuit duty result by bus or device. Consumers: `arcFlash.html`, `tcc.html`, `equipmentevaluation.html`, `projectreport.html`.
@@ -1691,6 +1722,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.tccSettings` (setting, optional): Protective device selections, relay settings, chart options, and coordination context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.iec60909` (study-result): Saved IEC 60909 short-circuit current result. Consumers: `projectreport.html`.
@@ -1724,6 +1756,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.tccSettings` (setting, optional): Protective device selections, relay settings, chart options, and coordination context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.arcFlash` (study-result): Saved incident energy, boundary, PPE, and label data. Consumers: `tcc.html`, `designcoach.html`, `projectreport.html`.
@@ -1757,6 +1790,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.batterySizing` (study-result, optional): Battery model context for DC fault contribution.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.dcShortCircuit` (study-result): Saved DC short-circuit and DC arc-flash screening result. Consumers: `projectreport.html`.
@@ -1788,6 +1822,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.shortCircuit` (study-result, optional): Through-fault current context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.differentialProtection` (study-result): Saved differential protection settings and operating checks. Consumers: `projectreport.html`.
@@ -1820,6 +1855,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.shortCircuit` (study-result, required): Fault duty results used for equipment rating checks.
 - `studyResults.arcFlash` (study-result, optional): Arc flash context for equipment safety review.
 - `settings.tccSettings` (setting, optional): Protective device selections, relay settings, chart options, and coordination context.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `export-only` (export): Equipment duty, interrupting rating, and evaluation reports. Consumers: `designcoach.html`, `projectreport.html`.
@@ -1850,6 +1886,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.batterySizing` (study-result, optional): Battery sizing result used to seed energy and chemistry.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.bessHazard` (study-result): Saved BESS hazard, separation, propagation, and deflagration venting result. Consumers: `projectreport.html`.
@@ -1879,6 +1916,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.hazAreaClassification` (study-result): Saved hazardous area classification result and compliance snapshot. Consumers: `projectreport.html`.
@@ -1913,6 +1951,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.shortCircuit` (study-result, optional): System strength and voltage context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.insulationCoordination` (study-result): Saved insulation coordination and protective margin result. Consumers: `projectreport.html`.
@@ -1944,6 +1983,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `oneLineDiagram` (model, required): One-line components, connections, sheets, layers, and linked schedule references.
 - `settings.cyberComplianceAssets` (setting, optional): Cyber asset inventory with zones, protocols, remote-access controls, firmware, and evidence metadata.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `settings.cyberComplianceAssets` (setting): Project cyber asset evidence inventory. Consumers: `cybercompliance.html`, `projectreport.html`.
@@ -1978,6 +2018,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.frequencyScan` (study-result, optional): Previously saved resonance sweep restored by the embedded frequency-scan panel.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.harmonics` (study-result): Saved harmonic distortion results and source contributions. Consumers: `designcoach.html`, `projectreport.html`.
@@ -2012,6 +2053,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.shortCircuit` (study-result, optional): Short-circuit strength used for resonance checks.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.capacitorBank` (study-result): Saved capacitor bank sizing, step recommendation, and resonance warning result. Consumers: `frequencyscan.html`, `projectreport.html`.
@@ -2044,8 +2086,10 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.capacitorBank` (study-result, optional): Capacitor bank sizing used as scan context.
 - `studyResults.shortCircuit` (study-result, optional): System fault strength used for impedance estimates.
 - `studyResults.iec60909` (study-result, optional): IEC short-circuit result used as a source-strength fallback.
+- `settings.projectMeta` (setting, optional): Canonical project identity, client, site, engineer, revision, and environmental context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.frequencyScan` (study-result): Saved frequency scan points and resonance warnings. Consumers: `harmonics.html`, `projectreport.html`.
@@ -2079,6 +2123,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.shortCircuit` (study-result, optional): Source strength used to estimate voltage change.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.voltageFlicker` (study-result): Saved flicker screening result and compliance status. Consumers: `projectreport.html`.
@@ -2116,6 +2161,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.voltVarResult` (study-result, optional): IBR volt-var result.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.ibr` (study-result): Saved inverter-based resource model, fault contribution, and ride-through results. Consumers: `derinterconnect.html`, `shortCircuit.html`, `projectreport.html`.
@@ -2149,6 +2195,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.ibr` (study-result, optional): IBR model results used for DER checks.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.derInterconnect` (study-result): Saved DER interconnection screening, checklist, and pass/fail result. Consumers: `projectreport.html`.
@@ -2183,6 +2230,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.loadFlow` (study-result, optional): Prefault voltage context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.motorStart` (study-result): Saved motor starting current, controlling starting kVA/kW, torque, and voltage sag result. Consumers: `battery.html`, `generatorsizing.html`, `projectreport.html`.
@@ -2219,6 +2267,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `cableSchedule` (schedule, required): Cable tags, endpoints, conductor details, lengths, and raceway assignments.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.loadFlow` (study-result): Saved bus voltage, branch loading, and power flow result. Consumers: `quasidynamic.html`, `voltagestability.html`, `capacitorbank.html`, `projectreport.html`.
@@ -2252,6 +2301,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.loadFlow` (study-result, optional): Base load flow model and operating point.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.quasiDynamic` (study-result): Saved quasi-dynamic load flow time-series result. Consumers: `projectreport.html`.
@@ -2281,6 +2331,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `oneLineDiagram` (model, required): One-line components, connections, sheets, layers, and linked schedule references.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.optimalPowerFlow` (study-result): Saved economic dispatch schedule, system lambda, and cost summary. Consumers: `projectreport.html`.
@@ -2312,6 +2363,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.loadFlow` (study-result, optional): Base load flow model and operating point.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.probabilisticLoadFlow` (study-result): Saved Monte Carlo voltage/loss statistics and per-bus violation probabilities. Consumers: `projectreport.html`.
@@ -2343,6 +2395,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.loadFlow` (study-result, optional): Base case load-flow solution.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.voltageStability` (study-result): Saved sequential PV/QV screening sweeps and numerical solver-boundary context; no physical stability margin is established. Consumers: `projectreport.html`.
@@ -2373,6 +2426,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `loadList` (schedule, required): Load tags, source relationships, demand values, and operating metadata.
 - `settings.reliabilityInputs` (setting, optional): Persistent component overrides and governed source basis.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `settings.reliabilityInputs` (setting): Persistent MTBF/MTTR overrides, source references, source dates, and analyst notes. Consumers: `reliability.html`.
@@ -2406,6 +2460,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `conduitSchedule` (schedule, required): Conduit IDs, trade sizes, fill limits, material, and route geometry.
 - `studyResults.loadFlow` (study-result, optional): Operating current context for routed conductors.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `export-only` (export): EMF profile plots, exposure checks, and reports. Consumers: `projectreport.html`.
@@ -2434,7 +2489,9 @@ Coverage: 80 contracts for 80 navigation routes.
 - `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
 - `studyResults.loadFlow` (study-result, optional): Prefault operating point context.
 - `studyResults.shortCircuit` (study-result, optional): Fault context for clearing checks.
+- `settings.projectMeta` (setting, optional): Canonical project identity, client, site, engineer, revision, and environmental context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.transientStability` (study-result): Saved OMIB simulation, equal-area screen, and numerical critical-clearing-time result. Consumers: `projectreport.html`.
@@ -2467,6 +2524,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.reliability` (study-result, optional): Reliability context for outage prioritization.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.contingency` (study-result): Saved N-1 contingency screening result. Consumers: `projectreport.html`.
@@ -2497,6 +2555,7 @@ Coverage: 80 contracts for 80 navigation routes.
 **Project Inputs**
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.sagTension` (study-result): Saved ruling span, design sag-tension, loading cases, and stringing table. Consumers: `projectreport.html`.
@@ -2526,6 +2585,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `oneLineDiagram` (model, required): One-line components, connections, sheets, layers, and linked schedule references.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.substationLayout` (study-result): Saved equipment placement, fenced area, and ground-grid perimeter. Consumers: `groundgrid.html`, `projectreport.html`.
@@ -2559,6 +2619,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `loadList` (schedule, required): Load tags, source relationships, demand values, and operating metadata.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.lighting` (study-result): Saved egress lighting and emergency runtime result. Consumers: `projectreport.html`.
@@ -2590,6 +2651,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
 - `studyResults.shortCircuit` (study-result, optional): Fault current context for ground grid checks.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `export-only` (export): Ground grid safety reports and hazard map exports. Consumers: `projectreport.html`.
@@ -2616,6 +2678,7 @@ Coverage: 80 contracts for 80 navigation routes.
 **Project Inputs**
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.lightningProtection` (study-result): Saved lightning risk, recommended LPL, rolling-sphere sizing, and arrester MCOV. Consumers: `projectreport.html`.
@@ -2647,6 +2710,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.cathodicProtection` (study-result): Saved CP sizing, commissioning plan, compliance history, layout, and report export payload. Consumers: `projectreport.html`.
@@ -2675,6 +2739,7 @@ Coverage: 80 contracts for 80 navigation routes.
 **Project Inputs**
 - `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyProvenance` (setting, optional): Lifecycle sidecar qualifying study source snapshots, revisions, validity, and freshness.
 
 **Outputs**
 - `studyResults.dissimilarMetals` (study-result): Saved galvanic compatibility and mitigation result. Consumers: `projectreport.html`.

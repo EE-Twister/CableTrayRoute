@@ -5,6 +5,8 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'node:fs/promises';
+import XLSX from 'xlsx';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
 const pageUrl = file => 'file://' + path.join(root, file);
@@ -25,7 +27,7 @@ test.describe('Cable Schedule export', () => {
     await page.waitForFunction('window.__CableScheduleInitOK === true');
   });
 
-  test('loads sample cables and exports CSV', async ({ page }) => {
+  test('loads sample cables and exports an XLSX workbook', async ({ page }) => {
     await page.click('#load-sample-cables-btn');
     await page.waitForFunction(() => {
       return document.querySelectorAll('#cableScheduleTable tbody tr').length > 0;
@@ -36,14 +38,37 @@ test.describe('Cable Schedule export', () => {
     await page.click('#export-xlsx-btn');
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/cable/i);
+    const workbook = XLSX.read(await fs.readFile(await download.path()), { type: 'buffer' });
+    expect(workbook.SheetNames.length).toBeGreaterThan(0);
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: '' });
+    expect(rows.length).toBeGreaterThanOrEqual(3);
+    const tags = rows.map(row => row.Tag || row.tag);
+    expect(tags).toEqual(expect.arrayContaining(['CBL-001', 'CBL-002', 'CBL-003']));
   });
 
-  test('import file chooser opens on import button click', async ({ page }) => {
+  test('imports a cable workbook through the file chooser', async ({ page }) => {
     await openToolbarMenu(page, 'Import / Export');
     const fileChooserPromise = page.waitForEvent('filechooser');
     await page.click('#import-xlsx-btn');
     const chooser = await fileChooserPromise;
-    expect(chooser).toBeTruthy();
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{
+      tag: 'C-IMPORT-1',
+      from_tag: 'SWGR-1',
+      to_tag: 'MCC-1',
+      cable_type: 'Power',
+      conductors: 3,
+      conductor_size: '#10 AWG',
+    }]), 'Cables');
+    await chooser.setFiles({
+      name: 'cable-import.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      buffer: XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' }),
+    });
+    const mappingDialog = page.getByRole('dialog', { name: 'Map Cable Import' });
+    await expect(mappingDialog).toBeVisible();
+    await mappingDialog.getByRole('button', { name: 'Import Rows' }).click();
+    await expect(page.locator('#cableScheduleTable tbody tr input[name="tag"], #cableScheduleTable tbody tr input[data-key="tag"], #cableScheduleTable tbody tr input.cable-tag-input').first()).toHaveValue('C-IMPORT-1');
   });
 });
 
@@ -70,13 +95,23 @@ test.describe('Optimal Route tray CSV export', () => {
     await page.click('#export-trays-btn');
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/\.csv$/i);
+    expect(await fs.readFile(await download.path(), 'utf8')).toContain('tray_id');
   });
 
-  test('import trays file chooser opens', async ({ page }) => {
+  test('imports trays through the file chooser', async ({ page }) => {
     const fileChooserPromise = page.waitForEvent('filechooser');
     await page.click('#import-trays-btn');
     const chooser = await fileChooserPromise;
-    expect(chooser).toBeTruthy();
+    await chooser.setFiles({
+      name: 'trays.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from([
+        'tray_id,start_x,start_y,start_z,end_x,end_y,end_z,inside_width,tray_depth\n',
+        'TR-IMPORT-1,0,0,0,100,0,0,12,4\n',
+      ].join('')),
+    });
+    await expect(page.locator('#trayTable tbody tr')).toHaveCount(1);
+    await expect(page.locator('#manual-tray-table-container #trayTable tbody tr .tray-id-input').first()).toHaveValue('TR-IMPORT-1');
   });
 
   test('cable export triggers download', async ({ page }) => {
@@ -85,7 +120,9 @@ test.describe('Optimal Route tray CSV export', () => {
 
     const downloadPromise = page.waitForEvent('download');
     await page.click('#export-cables-btn');
-    await downloadPromise;
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/\.csv$/i);
+    expect(await fs.readFile(await download.path(), 'utf8')).toContain('tag');
   });
 });
 

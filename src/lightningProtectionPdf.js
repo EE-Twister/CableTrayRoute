@@ -1,3 +1,5 @@
+import { studyExportMetadata } from '../analysis/studyExportMetadata.mjs';
+
 const METERS_TO_FEET = 3.280839895;
 const SQUARE_METERS_TO_SQUARE_FEET = 10.763910417;
 const SQUARE_KILOMETERS_PER_SQUARE_MILE = 2.58998811;
@@ -244,11 +246,12 @@ function buildBomModel(result, units) {
  * Build the text model used by the PDF report. This is exported separately so
  * engineering values and unit conversions can be covered by Node tests.
  */
-export function buildLightningProtectionReportModel(result, unitSystem = 'metric', generatedAt = new Date()) {
+export function buildLightningProtectionReportModel(result, unitSystem = 'metric', generatedAt = new Date(), assessment = null) {
   if (!result || !result.inputs || !result.lpl) {
     throw new Error('A valid lightning-protection result is required for PDF export.');
   }
   const units = reportUnits(unitSystem);
+  const lifecycle = studyExportMetadata(result, { assessment: assessment || {} });
   const compliance = result.designCompliance;
   const ratio = result.expectedStrikesPerYear / result.tolerableFrequency;
   const isArray = result.protectionMethod === 'roof-array' && result.terminalArray;
@@ -280,6 +283,19 @@ export function buildLightningProtectionReportModel(result, unitSystem = 'metric
     generated: formatDate(generatedAt),
     unitSystem: units.imperial ? 'Imperial display units' : 'Metric display units',
     status,
+    lifecycle: [
+      row('Result validity', lifecycle.resultValidity),
+      row('Freshness', lifecycle.freshness),
+      row('Eligibility', lifecycle.resultEligibility),
+      row('Result status', lifecycle.resultStatus),
+      row('Calculation version', lifecycle.calculationVersion || 'Not recorded'),
+      row('Calculated at', lifecycle.calculatedAt || 'Not recorded'),
+      row('Input sources', lifecycle.inputSources || 'Not recorded'),
+      row('Assumptions', lifecycle.assumptions || 'Not recorded'),
+      row('Warnings', lifecycle.warnings || 'None recorded'),
+      row('Study options', lifecycle.studyOptions || 'Not recorded'),
+      row('Provenance', lifecycle.provenance || 'Not recorded'),
+    ],
     riskRatio: ratio,
     summary: [
       row('Required protection', result.lpl.required ? `LPL ${result.lpl.level}` : 'Not indicated', result.lpl.note),
@@ -693,8 +709,9 @@ export async function createLightningProtectionPdf({
   svgElement,
   unitSystem = 'metric',
   generatedAt = new Date(),
+  assessment = null,
 } = {}) {
-  const model = buildLightningProtectionReportModel(result, unitSystem, generatedAt);
+  const model = buildLightningProtectionReportModel(result, unitSystem, generatedAt, assessment);
   const [JsPDF, visual] = await Promise.all([
     ensureJsPdf(),
     svgToPngDataUrl(svgElement),
@@ -768,6 +785,10 @@ export async function createLightningProtectionPdf({
     fill: PDF_COLORS.soft,
     accent: PDF_COLORS.navy,
   });
+
+  doc.addPage('letter', 'landscape');
+  y = addHeader(doc, model, 'Result lifecycle and provenance', { compact: true });
+  drawMetricTable(doc, 'Saved-result traceability', model.lifecycle, y);
 
   const pageCount = doc.internal.getNumberOfPages();
   for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {

@@ -21,7 +21,20 @@ import {
   validateSampleProject,
   migrateSampleProject,
   sampleProjectToImportPayload,
+  getSamplePageLabel,
 } from '../analysis/sampleGallery.mjs';
+
+describe('getSamplePageLabel()', () => {
+  it('uses the canonical human labels for workflow destinations', () => {
+    assert.strictEqual(getSamplePageLabel('equipmentlist.html'), 'Equipment List');
+    assert.strictEqual(getSamplePageLabel('loadlist.html?sample=1'), 'Load List');
+    assert.strictEqual(getSamplePageLabel('oneline.html#main'), 'One-Line');
+  });
+
+  it('provides a readable fallback for an unlisted route', () => {
+    assert.strictEqual(getSamplePageLabel('custom-study.html'), 'Custom Study');
+  });
+});
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');

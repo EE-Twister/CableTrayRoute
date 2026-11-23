@@ -41,6 +41,7 @@ function elementStub(){
     value:'',
     href:'',
     id:'',
+    dataset:{},
     removeAttribute(){},
     classList:{add(){},remove(){},toggle(){},contains(){return false;}}
   };

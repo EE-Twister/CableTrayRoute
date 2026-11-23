@@ -6,6 +6,9 @@ module.exports = defineConfig({
     baseURL: 'file://' + __dirname + '/',
     headless: true,
   },
+  // Visual snapshots run in the dedicated visual config so the functional
+  // Firefox/Edge lane cannot silently use a different snapshot root.
+  testIgnore: '**/visual-regression.spec.js',
   timeout: 30000,
   projects: [
     { name: 'firefox', use: { browserName: 'firefox' } },

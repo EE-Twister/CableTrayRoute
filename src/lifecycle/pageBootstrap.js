@@ -28,9 +28,8 @@ import { recordStartupMeasurement } from '../performance/performanceMetrics.js';
  *                        after `onReady` resolves successfully.
  *   bodyReadyDataset     string — name to set on `document.body.dataset`
  *                        (e.g. `onelineReady` ➜ `document.body.dataset.onelineReady = '1'`).
- *   openDetailsInE2E     boolean — when true and running under E2E, open
- *                        every `<details>` element so tests can reach nested
- *                        controls.
+ *   openDetailsInE2E     boolean|string — when enabled under E2E, open all
+ *                        details or the details matching the supplied selector.
  *   beacon               {
  *                          id:        string  — element id for the beacon div
  *                          attr:      string  — attribute to set to '1'
@@ -102,9 +101,9 @@ function setBeaconWhenVisible(selector, attrName, id, timeoutMs = 25000) {
   poll();
 }
 
-function openAllDetails() {
+function openAllDetails(selector = 'details') {
   if (typeof document === 'undefined') return;
-  document.querySelectorAll('details').forEach((d) => { d.open = true; });
+  document.querySelectorAll(selector).forEach((d) => { d.open = true; });
 }
 
 export function bootstrapPage(opts = {}) {
@@ -140,7 +139,7 @@ export function bootstrapPage(opts = {}) {
     }
 
     if (openDetailsInE2E && E2E) {
-      openAllDetails();
+      openAllDetails(typeof openDetailsInE2E === 'string' ? openDetailsInE2E : undefined);
     }
 
     if (initOk) {

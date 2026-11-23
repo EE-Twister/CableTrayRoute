@@ -34,13 +34,16 @@ const incomplete = {
 
 assert.equal(isArcFlashLabelEligible(complete), true);
 assert.equal(isArcFlashLabelEligible(incomplete), false);
+const unevaluated = { equipmentTag: 'BUS3', incidentEnergy: null, calculationStatus: 'unevaluated', requiredInputs: ['Available fault current'] };
+assert.equal(isArcFlashLabelEligible(unevaluated), false);
+assert.equal(arcFlashReadinessLabel(unevaluated), 'Inputs required');
 assert.equal(arcFlashReadinessLabel(complete), 'Label eligible');
 assert.equal(arcFlashReadinessLabel(incomplete), 'Outside model range');
 assert.equal(formatArcFlashClearingBasis(complete), 'Reviewed total-clearing curve');
 assert.equal(formatArcFlashClearingBasis(incomplete), '0.2 s screening assumption');
 
-const results = { BUS1: complete, BUS2: incomplete, _runMetadata: { runAt: '2026-08-24' } };
-assert.equal(arcFlashResultEntries(results).length, 2);
+const results = { BUS1: complete, BUS2: incomplete, BUS3: unevaluated, _runMetadata: { runAt: '2026-08-24' } };
+assert.equal(arcFlashResultEntries(results).length, 3);
 assert.equal(arcFlashResultEntries(results, 'BUS1').length, 1);
 
 const summary = summarizeArcFlashResults(results);
@@ -55,9 +58,9 @@ assert.deepEqual(
   },
   {
     status: 'review',
-    total: 2,
+    total: 3,
     labelEligible: 1,
-    incomplete: 1,
+    incomplete: 2,
     outsideModelRange: 1,
     assumedClearingTime: 1,
   },

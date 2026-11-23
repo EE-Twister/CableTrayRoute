@@ -324,6 +324,19 @@ describe('upsKvaRequired()', () => {
       /upsPowerFactor must be in/
     );
   });
+
+  it('keeps the 1000 kVA catalog boundary exact and rejects the first value above it', () => {
+    const below = upsKvaRequired(899.99, 0.9);
+    const at = upsKvaRequired(900, 0.9);
+    const above = upsKvaRequired(900.01, 0.9);
+    assert.strictEqual(below.standardKva, 1000);
+    assert.strictEqual(at.standardKva, 1000);
+    assert.strictEqual(at.exceedsCatalog, false);
+    assert.strictEqual(above.standardKva, null);
+    assert.strictEqual(above.adequate, false);
+    assert.strictEqual(above.exceedsCatalog, true);
+    assert.strictEqual(above.catalogMaximum, 1000);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -498,6 +511,7 @@ describe('runBatterySizingAnalysis()', () => {
       'selectedBankKwh', 'nextLargerKwh', 'bankOptions', 'exceedsStandard',
       'runtimeCurvePoints',
       'kvaRequired', 'standardKva',
+      'upsAdequate', 'upsExceedsCatalog', 'upsCatalogMaximum',
       'warnings', 'timestamp',
     ];
     requiredKeys.forEach(k => assert.ok(k in r, `Missing key: ${k}`));
@@ -542,6 +556,36 @@ describe('runBatterySizingAnalysis()', () => {
     const rDC = runBatterySizingAnalysis({ ...baseInputs, loadProfilePeriods: periods });
     approx(rDC.kwhNet, 100, 0.001);
     assert.ok(rDC.usingDutyCycle === true, 'usingDutyCycle should be true');
+  });
+
+  it('returns an unavailable UPS selection and warning above the catalog maximum', () => {
+    const result = runBatterySizingAnalysis({ ...baseInputs, peakLoadKw: 900.01 });
+    assert.strictEqual(result.standardKva, null);
+    assert.strictEqual(result.upsAdequate, false);
+    assert.strictEqual(result.upsExceedsCatalog, true);
+    assert.ok(result.warnings.some(w => /no adequate catalog selection/i.test(w)));
+  });
+
+  it('uses the same unavailable UPS state for manufacturer duty-cycle sizing', () => {
+    const inputs = {
+      systemLabel: '125 VDC control battery', averageLoadKw: 10, peakLoadKw: 900.01,
+      runtimeHours: 2, chemistry: 'lead-acid-flooded', ambientTempC: 10, designMarginPct: 10,
+      upsPowerFactor: 0.9,
+      dutyCyclePeriods: [{ currentA: 100, durationMinutes: 60 }, { currentA: 20, durationMinutes: 60 }],
+      manufacturerDischargeTable: [
+        { durationMinutes: 10, ampsPerReferenceCapacity: 300 },
+        { durationMinutes: 60, ampsPerReferenceCapacity: 100 },
+        { durationMinutes: 120, ampsPerReferenceCapacity: 50 },
+      ],
+      referenceCapacityAh: 100, temperatureCapacityFactor: 0.8, endOfLifeCapacityPct: 80,
+      endVoltageVPerCell: 1.75, dischargeTableSource: 'Example manufacturer manual, Rev A',
+      rackLayoutInputs: { dcBusVoltageV: 125, cellCapacityAh: 100 },
+    };
+    const result = runBatterySizingAnalysis({ ...inputs, sizingMethod: 'manufacturer-duty-cycle' });
+    assert.strictEqual(result.standardKva, null);
+    assert.strictEqual(result.upsAdequate, false);
+    assert.strictEqual(result.upsExceedsCatalog, true);
+    assert.ok(result.warnings.some(w => /no adequate catalog selection/i.test(w)));
   });
 
   it('throws with descriptive message on invalid chemistry', () => {

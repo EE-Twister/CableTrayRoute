@@ -205,9 +205,121 @@ assert.equal(isProtectiveDeviceType('load'), false);
   assert.equal(results.length, 1);
   assert.equal(results[0].entry, breaker);
   assert.deepEqual(evaluateEquipmentConstraints([], []), []);
-  assert.equal(evaluateRideThroughConstraint({ kind: 'inrush' }, breaker), null);
-  assert.equal(evaluateDamageLimitConstraint({ kind: 'cable', curve: [] }, breaker), null);
+  const invalidStart = evaluateRideThroughConstraint({ kind: 'inrush' }, breaker);
+  assert.equal(invalidStart.status, 'review');
+  assert.equal(invalidStart.screeningStatus, 'unknown');
+  assert.equal(invalidStart.tripTime, null);
+  assert.equal(invalidStart.margin, null);
+  const invalidDamage = evaluateDamageLimitConstraint({ kind: 'cable', curve: [] }, breaker);
+  assert.equal(invalidDamage.status, 'review');
+  assert.equal(invalidDamage.screeningStatus, 'unknown');
+  assert.equal(invalidDamage.tripTime, null);
+  assert.equal(invalidDamage.margin, null);
   console.log('  ✓ filters non-equipment overlays and incomplete direct constraint inputs');
+}
+
+{
+  const breaker = protectiveEntry('component:CB-1', 'breaker', 0.5, 0.5, 'CB-1');
+  breaker.scaled.minCurve = [
+    { current: 100, time: 1 },
+    { current: 100, time: 0.2 },
+    { current: 1000, time: 0.1 }
+  ];
+  const lower = evaluateRideThroughConstraint({ kind: 'motorStart', current: 100, startTime: 0.1 }, breaker);
+  assert.equal(lower.status, 'ok');
+  assert.equal(lower.curveBoundary, 'lower');
+  assert.equal(lower.tripTime, 0.2);
+  assert.equal(lower.coverage.status, 'complete');
+  const outOfDomain = evaluateRideThroughConstraint({ kind: 'motorStart', current: 2000, startTime: 0.1 }, breaker);
+  assert.equal(outOfDomain.status, 'review');
+  assert.equal(outOfDomain.reason, 'curve-domain-incomplete');
+  assert.equal(outOfDomain.tripTime, null);
+  assert.equal(outOfDomain.margin, null);
+  const invalidCurrent = evaluateRideThroughConstraint({ kind: 'motorStart', current: '100', startTime: 0.1 }, breaker);
+  assert.equal(invalidCurrent.status, 'review');
+  assert.equal(invalidCurrent.reason, 'invalid-constraint-input');
+  assert.equal(invalidCurrent.tripTime, null);
+  const zeroCurrent = evaluateRideThroughConstraint({ kind: 'motorStart', current: 0, lockedRotor: 100, startTime: 0.1 }, breaker);
+  assert.equal(zeroCurrent.status, 'review');
+  assert.equal(zeroCurrent.reason, 'invalid-constraint-input');
+  console.log('  ✓ ride-through uses the minimum duplicate-current boundary and rejects malformed or uncovered points');
+}
+
+{
+  const breaker = protectiveEntry('component:CB-1', 'breaker', 0.5, 0.5, 'CB-1');
+  breaker.scaled.maxCurve = [
+    { current: 100, time: 0.2 },
+    { current: 100, time: 0.6 },
+    { current: 1000, time: 0.3 }
+  ];
+  const result = evaluateDamageLimitConstraint({ kind: 'cable', curve: [
+    { current: 100, time: 1 },
+    { current: 1000, time: 1 }
+  ] }, breaker);
+  assert.equal(result.status, 'ok');
+  assert.equal(result.curveBoundary, 'upper');
+  assert.equal(result.tripTime, 0.6);
+  assert.equal(result.point.current, 100);
+  assert.equal(result.coverage.status, 'complete');
+  const incomplete = evaluateDamageLimitConstraint({ kind: 'cable', curve: [
+    { current: 100, time: 1 },
+    { current: 2000, time: 1 }
+  ] }, breaker);
+  assert.equal(incomplete.status, 'review');
+  assert.equal(incomplete.reason, 'curve-domain-incomplete');
+  assert.equal(incomplete.tripTime, null);
+  assert.equal(incomplete.margin, null);
+  assert.deepEqual(incomplete.coverage.requiredCurrentRangeA, { minimumCurrentA: 100, maximumCurrentA: 2000 });
+  assert.deepEqual(incomplete.coverage.availableCurrentRangeA, { minimumCurrentA: 100, maximumCurrentA: 1000 });
+  console.log('  ✓ damage screening uses the upper protective curve at duplicate current and rejects incomplete curve coverage');
+}
+
+{
+  const breaker = protectiveEntry('component:CB-KNOT', 'breaker', 0.5, 0.5, 'CB-KNOT');
+  breaker.scaled.maxCurve = [
+    { current: 100, time: 1 },
+    { current: 500, time: 20 },
+    { current: 1000, time: 1 }
+  ];
+  const knotResult = evaluateDamageLimitConstraint({ kind: 'cable', curve: [
+    { current: 100, time: 10 },
+    { current: 1000, time: 10 }
+  ] }, breaker);
+  assert.equal(knotResult.status, 'warning');
+  assert.equal(knotResult.limitingComparison.currentA, 500);
+  assert.ok(knotResult.margin < 0);
+
+  const interiorBreaker = protectiveEntry('component:CB-INTERIOR', 'breaker', 0.5, 0.5, 'CB-INTERIOR');
+  interiorBreaker.scaled.maxCurve = [
+    { current: 100, time: 10 },
+    { current: 1000, time: 1 }
+  ];
+  const interiorResult = evaluateDamageLimitConstraint({ kind: 'cable', curve: [
+    { current: 100, time: 10 },
+    { current: 1000, time: 0.1 }
+  ] }, interiorBreaker);
+  assert.equal(interiorResult.status, 'warning');
+  assert.ok(interiorResult.limitingComparison.currentA > 100);
+  assert.ok(interiorResult.limitingComparison.currentA < 1000);
+  assert.ok(interiorResult.margin < -1.8);
+  console.log('  ✓ continuous damage comparison includes device knots and analytic interior minima');
+}
+
+{
+  const breaker = protectiveEntry('component:CB-POINT', 'breaker', 0.5, 0.5, 'CB-POINT');
+  const result = evaluateDamageLimitConstraint({ kind: 'transformerDamage', curve: [
+    { current: 500, time: 1 }
+  ] }, breaker);
+  assert.equal(result.status, 'ok');
+  assert.equal(result.comparison, 'damage-limit-vs-upper-protective-curve');
+  assert.equal(result.coverage.status, 'complete');
+  assert.deepEqual(result.point, { current: 500, time: 1 });
+  assert.equal(result.tripTime, 0.5);
+  assert.equal(result.limitingComparison.protectiveUpperTimeS, 0.5);
+  assert.equal('totalClearingTimeS' in result.limitingComparison, false);
+  assert.match(result.limitation, /applicability are not established/);
+  assert.equal(result.margin, 0.5);
+  console.log('  ✓ evaluates a single documented damage point without interpolation');
 }
 
 {

@@ -22,3 +22,5 @@ Numerical ratings must be greater than zero. Clearing a layer through the batch 
 CSV and XLSX updates match the current model by **Component ID**. The controlled imported columns are `Label`, `Tag`, `Rated Voltage (kV)`, `Rated Current (A)`, `Layer`, and `Position Locked`. The preview lists every field that would change and separately reports unmatched component IDs, duplicate IDs, and invalid values. Nothing is written until **Apply Reviewed Spreadsheet Updates** is selected.
 
 XLSX exports use a `One-Line Data` worksheet. XLSX import prefers that worksheet when it is present, otherwise it reads the first worksheet. Workbooks are limited to 20 worksheets and 10,000 imported rows; all other worksheets are ignored. If the One-Line changes after previewing a file, the import preview is regenerated and must be reviewed again. This prevents applying a review based on an older model state.
+
+CSV exports include the displayed component values under the same column headings, including edited labels and ratings. Exported rows are mapped to those headings before serialization, preventing empty rows when the spreadsheet view uses positional cell arrays.

@@ -1,8 +1,10 @@
 # Competitor Feature Gap Analysis
 
+> **Current-status note (2026-09-16):** This document preserves dated competitor snapshots and their original “missing feature” descriptions. Use later per-gap status entries and current source/tests for present capability; earlier summary paragraphs may describe an obsolete review state.
+
 ## Date: 2026-05-04 (operations/compliance/construction/enterprise refresh added 2026-05-04; website/product competitiveness refresh added 2026-04-26; advanced power systems & DER deep dive added 2026-04-11 / documented 2026-04-12; custom pricing book added 2026-04-11; one-line diagram & TCC deep dive added 2026-04-06; one-line diagram UI pass added 2026-04-05; all prior gaps resolved 2026-04-04; usability/calculation pass added 2026-03-24; original 2026-03-16)
 
-This document identifies features commonly found in major competitor platforms that are currently missing from CableTrayRoute.
+This document records dated comparisons with features commonly found in major competitor platforms. “Missing” descriptions preserve each review's baseline; present implementation status is stated in the later status notes.
 
 ---
 
@@ -10,7 +12,7 @@ This document identifies features commonly found in major competitor platforms t
 
 CableTrayRoute already offers a strong, integrated suite covering cable routing (3D Dijkstra pathfinding), electrical studies (load flow, short circuit, arc flash, harmonics, TCC, motor starting), one-line diagram editing, and comprehensive import/export. Comparison with major competitors — including manufacturer tools (Eaton B-Line, Legrand Cablofil, Panduit, OBO Bettermann, Niedax, Chalfant), power system analysis platforms (ETAP, EasyPower, SKM PowerTools), and dedicated raceway/cable management software (Bentley Raceway, Aeries CARS, MagiCAD, Trimble MEP, Paneldes) — originally revealed **20 feature gaps** across six categories.
 
-**All 20 original gaps have been implemented.** The 4 gaps that previously required external infrastructure (native CAD plugins, live pricing databases) remain deferred pending commercial partnerships.
+The software-addressable items from the original review were implemented in later dated work. Native CAD/BIM plugins and live manufacturer-pricing feeds remain deferred because they require external integration or commercial data partnerships; this document does not claim feature parity with competing platforms.
 
 **The 2026-03-24 refresh of competitor products** (ETAP 2024/2025, EasyPower 2025, MagiCAD 2026, Eplan Platform 2025/2026, Revit 2026, Bentley Raceway 2024/2025, Paneldes 2025) revealed **10 additional feature gaps** across AI/ML interfaces, interoperability standards, field operations, and emerging infrastructure patterns. **All 10 have now been implemented** (AI/LLM Copilot, IFC Export, QR Code generation, REST API, Alert() replacement, navigation consistency, ordered-length procurement, parallel cable support, visual fill gauges, and workflow dashboard). The 4 infrastructure-dependent items (BIM plugins, live pricing) remain deferred.
 
@@ -20,7 +22,7 @@ A **2026-04-05 pass** focused specifically on the **one-line diagram editor UI**
 
 A **2026-04-06 pass** performed a focused deep dive on **one-line diagram connectivity features** and the **TCC (Time-Current Curve) engine**, benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PTW 9, PowerWorld Simulator 23, and DIgSILENT PowerFactory 2024. This revealed **10 new gaps** (Gaps #48–#57) across two areas: (1) multi-sheet diagramming and diagram annotation capabilities missing from the one-line editor and (2) advanced TCC curve types, arc flash integration, ground fault protection, and reporting absent from the coordination study tool. See "One-Line Diagram & TCC Deep Dive (2026-04-06)" below.
 
-A **2026-04-11 pass — advanced power systems & DER analysis** performed a focused review of the `analysis/` module tree against the full study catalogs of **ETAP 2024/2025**, **EasyPower 2025**, **SKM PowerTools 9**, **DIgSILENT PowerFactory 2024**, **PSS/E**, **Siemens PSS SINCAL**, **CYME**, and domain-specific sizing calculators (**Schneider Ecodial**, **Caterpillar SpecSizer**, **Eaton Bussmann OSCAR**). The study catalogs were filtered to identify *core* AC/DC power systems analyses that are commonly expected in any modern engineering deliverable (protection, DC, DER, power quality, insulation coordination, economic dispatch). This revealed **13 new gaps** (**Gaps #58–#70**) across DC systems, battery/UPS sizing, renewable/DER integration, harmonic resonance, voltage stability, differential protection, insulation coordination, protection settings interoperability, IEC cable ampacity, voltage flicker, motor derating, quasi-dynamic time-series simulation, and economic optimization. **Gap #59 (Battery / UPS Sizing per IEEE 485) has been implemented 2026-04-12. Gap #58 (DC Short-Circuit & Arc Flash) has been implemented 2026-04-18. Gap #61 (PV/BESS/IBR Modeling) has been implemented 2026-04-18. Gap #62 (IEEE 1547-2018 DER Interconnection Study) has been implemented 2026-04-18. Gap #63 (Frequency Scan / Harmonic Resonance) has been implemented 2026-04-19. Gap #67 (Differential Protection 87B/87T/87G) has been implemented 2026-04-19. The remaining 4 (Gaps #64, #65, #70, and deferred items) are not yet implemented.** See "Advanced Power Systems & DER Deep Dive (2026-04-11)" below.
+A **2026-04-11 pass — advanced power systems & DER analysis** performed a focused review of the `analysis/` module tree against the full study catalogs of **ETAP 2024/2025**, **EasyPower 2025**, **SKM PowerTools 9**, **DIgSILENT PowerFactory 2024**, **PSS/E**, **Siemens PSS SINCAL**, **CYME**, and domain-specific sizing calculators (**Schneider Ecodial**, **Caterpillar SpecSizer**, **Eaton Bussmann OSCAR**). This is a dated review record; its original gap descriptions are retained below. Later reconciliation entries supersede the obsolete statement that Gaps #64, #65, and #70 were unimplemented.
 
 A separate **2026-04-11 extension** to the Cost Estimation module added **custom pricing book import/export** — closing the "user-configurable pricing" half of the live-pricing gap without requiring commercial licensing.
 
@@ -316,7 +318,8 @@ Six pure calculation functions and a master run function implemented in `analysi
 - `upsKvaRequired()` — UPS kVA = P_peak / PF_UPS with nearest standard kVA selection
 - `runBatterySizingAnalysis()` — unified analysis entry point; persisted to `studies.batterySizing` via `dataStore.mjs`
 
-Study page `battery.html` / `battery.js` provides form inputs for system label, average load kW, peak load kW, runtime hours, battery chemistry (lead-acid-flooded/AGM, lithium-ion, nickel-cadmium), ambient temperature °C, design margin %, and UPS output power factor. Results show the full IEEE 485 energy chain with intermediate values, recommended standard bank size with nearby options, runtime curve table, UPS kVA recommendation, and actionable warnings (cold temperature, large bank, high peak-to-average ratio). Engineer review panel via `initStudyApprovalPanel('batterySizing')`. Navigation entry added to Studies section in `src/components/navigation.js`. Rollup bundle entry added: `battery: 'src/battery.js'`. Tests: `tests/batterySizing.test.mjs` (43 assertions). Docs: `docs/battery-sizing.md`.
+Study page `battery.html` / `battery.js` provides form inputs for system label, average load kW, peak load kW, runtime hours, battery chemistry (lead-acid-flooded/AGM, lithium-ion, nickel-cadmium), ambient temperature °C, design margin %, and UPS output power factor. Results show the implemented generic energy chain with intermediate values, recommended standard bank size with nearby options, runtime curve table, UPS kVA recommendation, and actionable warnings (cold temperature, large bank, high peak-to-average ratio). Engineer review panel via `initStudyApprovalPanel('batterySizing')`. Navigation entry added to Studies section in `src/components/navigation.js`. Rollup bundle entry added: `battery: 'src/battery.js'`. Tests: `tests/batterySizing.test.mjs` (43 assertions). Docs: `docs/battery-sizing.md`.
+The current battery page provides both a generic energy/runtime screen and a manufacturer-discharge-table path for sequential DC duty-cycle sizing. Neither path establishes IEEE compliance certification. The UPS catalog-overflow defect C6 identified on 2026-09-16 has been corrected in both paths: requirements above the catalog return no adequate UPS selection. See [battery-sizing.md](docs/battery-sizing.md) and [correction verification](docs/calculation-correction-verification-2026-09-17.md).
 
 ---
 
@@ -410,6 +413,8 @@ Study page `capacitorbank.html` / `capacitorbank.js` provides form inputs for bu
 ---
 
 ### Gap #68 – IEC 60909 Short-Circuit Calculation Method
+
+> **Current qualification (2026-09-17 UTC):** The [calculation review](docs/calculation-feature-review-2026-09-16.md) identified thermal, unequal-sequence, two-phase-earth, missing-impedance, and output-contract defects (C1–C4, C10). Follow-up repairs and acceptance evidence are in [correction verification](docs/calculation-correction-verification-2026-09-17.md). The historical implementation record below does not establish standards compliance across that scope; the thermal approximation remains screening only. See the [current IEC 60909 guide](docs/iec-60909.md).
 
 | Missing Feature | Competitor(s) | Description |
 |---|---|---|

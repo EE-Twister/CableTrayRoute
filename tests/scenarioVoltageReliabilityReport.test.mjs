@@ -9,6 +9,10 @@ import {
   getAvailableSections,
   PRESET_CONFIGS,
 } from '../analysis/reportPackage.mjs';
+import {
+  buildStudyProvenance,
+  captureStudyRunContext,
+} from '../analysis/studyLifecycle.mjs';
 
 const runMetadata = {
   valid: true,
@@ -42,6 +46,11 @@ const studies = {
       combinedLimitPct: 5,
       combinedStatus: 'fail',
       recommendation: { conductorSize: '2 AWG' },
+      resultContract: {
+        validity: 'evaluated',
+        units: { dropPct: '%', combinedDropPct: '%' },
+        inputSources: { current: 'Load Flow' },
+      },
     }],
     warnings: ['Review the combined path.'],
   },
@@ -77,12 +86,27 @@ const studies = {
   },
 };
 
-const voltageDrop = buildVoltageDropSection(studies, {});
+const studyProvenance = {};
+const currentStudyContexts = {};
+for (const studyKey of Object.keys(studies)) {
+  const context = captureStudyRunContext(studyKey, {
+    projectSnapshot: { project: 'scenario-voltage-reliability-report-test' },
+    inputs: { studyKey, revision: 1 },
+    options: { mode: 'test' },
+    scenario: 'Base',
+    projectIdentity: { projectId: 'scenario-voltage-reliability-report-test', projectName: 'Scenario Report Test' },
+  });
+  currentStudyContexts[studyKey] = context;
+  studyProvenance[studyKey] = buildStudyProvenance(studyKey, studies[studyKey], context, { validity: 'evaluated' });
+}
+
+const lifecycleOptions = { studyProvenance, currentStudyContexts };
+const voltageDrop = buildVoltageDropSection(studies, {}, lifecycleOptions);
 assert.equal(voltageDrop.rows[0].inputSource, 'Load Flow');
 assert.equal(voltageDrop.rows[0].combinedStatus, 'fail');
 assert.equal(voltageDrop.rows[0].recommendation, '2 AWG');
 
-const reliability = buildReliabilitySection(studies, {});
+const reliability = buildReliabilitySection(studies, {}, lifecycleOptions);
 assert.equal(reliability.rows[0].id, 'Critical Pump');
 assert.equal(reliability.cutSets[0].failed, 'CB-1');
 assert.equal(reliability.summary['Reliability source coverage (%)'], 100);

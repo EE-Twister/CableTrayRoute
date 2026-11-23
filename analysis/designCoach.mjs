@@ -472,18 +472,25 @@ function buildFailDetail(checkName, result, entry) {
  * @returns {{ recommendations: Recommendation[], summary: object }}
  */
 export function runDesignCoach(projectData = {}) {
-  const { cables = [], trays = [], components = [], studies = {}, deviceCatalog = [] } = projectData;
+  const { cables = [], trays = [], components = [], studies = {}, studyAssessments = {}, deviceCatalog = [] } = projectData;
+  const usableStudies = { ...studies };
+  Object.entries(studyAssessments || {}).forEach(([studyKey, assessment]) => {
+    const validity = assessment?.validity?.state || assessment?.validity;
+    if (assessment && (assessment.eligible !== true || ['unevaluated', 'unknown', 'partial'].includes(validity))) {
+      delete usableStudies[studyKey];
+    }
+  });
 
   const all = [
     ...extractVoltageDropRecs(cables),
-    ...extractArcFlashRecs(studies.arcFlash),
-    ...extractShortCircuitRecs(studies.shortCircuit),
+    ...extractArcFlashRecs(usableStudies.arcFlash),
+    ...extractShortCircuitRecs(usableStudies.shortCircuit),
     ...extractTrayFillRecs(trays),
-    ...extractHarmonicsRecs(studies.harmonics),
-    ...extractGroundGridRecs(studies.groundGrid),
-    ...extractLoadFlowRecs(studies.loadFlow),
-    ...extractEquipmentEvalRecs(components, cables, studies, deviceCatalog),
-    ...extractThermalEnvRecs(studies.cableThermalEnvironment),
+    ...extractHarmonicsRecs(usableStudies.harmonics),
+    ...extractGroundGridRecs(usableStudies.groundGrid),
+    ...extractLoadFlowRecs(usableStudies.loadFlow),
+    ...extractEquipmentEvalRecs(components, cables, usableStudies, deviceCatalog),
+    ...extractThermalEnvRecs(usableStudies.cableThermalEnvironment),
   ];
 
   const unique = suppressDuplicates(all);

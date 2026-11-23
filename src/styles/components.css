@@ -1627,3 +1627,15 @@ body.dark-mode .approval-badge--pending {
   #rpt-options, .method-panel, .report-status { display: none !important; }
   .report-section { page-break-inside: avoid; }
 }
+
+.oneline-page .connection-protection-review {
+  margin: 0.75rem 0;
+  padding: 0.65rem;
+  border: 1px solid var(--ol-border-color);
+  border-radius: var(--ol-radius);
+}
+
+.oneline-page .connection-protection-review h5 { margin: 0 0 0.5rem; }
+.oneline-page .connection-protection-review dl { margin: 0 0 0.5rem; display: grid; gap: 0.2rem; }
+.oneline-page .connection-protection-review dt { font-weight: 600; }
+.oneline-page .connection-protection-review dd { margin: 0 0 0.3rem; overflow-wrap: anywhere; }

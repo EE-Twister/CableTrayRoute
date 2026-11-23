@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'node:fs/promises';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pageUrl = file => 'file://' + path.join(__dirname, '..', file);
@@ -36,5 +37,9 @@ test('Switching Procedure Planner builds a checked read-only procedure from One-
   expect(stored[0].steps[0].deviceId).toBe('CB-1');
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export CSV' }).click();
-  expect((await downloadPromise).suggestedFilename()).toBe('Isolate-main-feeder.csv');
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('Isolate-main-feeder.csv');
+  const csv = await fs.readFile(await download.path(), 'utf8');
+  expect(csv).toContain('Isolate main feeder');
+  expect(csv).toContain('CB-1');
 });

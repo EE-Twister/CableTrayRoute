@@ -1,5 +1,6 @@
 import * as dataStore from './dataStore.mjs';
 import { showAlertModal } from './src/components/modal.js';
+import { preliminaryMotorNotice } from './src/design-synthesis/preliminaryProjectNotice.mjs';
 
 import { getPanelCircuitCount, getPanelSystem, parsePositiveInt } from './src/panel-schedule/phaseModel.js';
 import { getBreakerBlock, getLoadBreakerSpan, getLoadPoleCount } from './src/panel-schedule/breakerLayoutModel.js';
@@ -50,6 +51,8 @@ export function exportPanelSchedule(panelId) {
   const systemType = getPanelSystem(panel);
 
   const data = [];
+  const notice = preliminaryMotorNotice();
+  if (notice) data.push([notice]);
   data.push(['Panel', panelLabel || panelId]);
   data.push(['Fed From', panel.fedFrom || panel.fed_from || '']);
   data.push(['Voltage', panel.voltage || panel.voltage_rating || '']);

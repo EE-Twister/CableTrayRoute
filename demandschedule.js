@@ -1,6 +1,16 @@
 import { buildDemandSchedule, NEC_CATEGORIES, DEMAND_PROFILES, iecDiversityFactor } from './analysis/demandSchedule.mjs';
-import { getLoads } from './dataStore.mjs';
+import {
+  getLoads,
+  captureStudyRunContext,
+  on as onDataStoreChange,
+  STORAGE_KEYS,
+} from './dataStore.mjs';
 import { downloadCSV } from './reports/reporting.mjs';
+import { studyExportMetadata } from './analysis/studyExportMetadata.mjs';
+import {
+  assessStudyResult,
+  buildStudyProvenance,
+} from './analysis/studyLifecycle.mjs';
 import { showAlertModal } from './src/components/modal.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -20,9 +30,46 @@ document.addEventListener('DOMContentLoaded', () => {
   const breakdownEl = document.getElementById('source-breakdown');
 
   let lastResult = null;
+  let lastRunContext = null;
+  let lastRunProvenance = null;
 
   runBtn.addEventListener('click', runStudy);
   exportBtn.addEventListener('click', exportCSV);
+
+  const watchedProjectKeys = [
+    STORAGE_KEYS.equipment,
+    STORAGE_KEYS.loads,
+    STORAGE_KEYS.panels,
+    STORAGE_KEYS.cables,
+    STORAGE_KEYS.trays,
+    STORAGE_KEYS.conduits,
+    STORAGE_KEYS.ductbanks,
+    STORAGE_KEYS.oneLine,
+    STORAGE_KEYS.projectMeta,
+    STORAGE_KEYS.designBasis,
+  ];
+
+  function clearEphemeralResult() {
+    lastResult = null;
+    lastRunContext = null;
+    lastRunProvenance = null;
+    exportBtn.disabled = true;
+    if (summaryEl) {
+      summaryEl.hidden = true;
+      summaryEl.innerHTML = '';
+    }
+    if (reviewEl) {
+      reviewEl.hidden = true;
+      reviewEl.innerHTML = '';
+    }
+    if (resultsEl) resultsEl.innerHTML = '';
+    if (breakdownEl) breakdownEl.innerHTML = '';
+  }
+
+  watchedProjectKeys.forEach(key => onDataStoreChange(key, clearEphemeralResult));
+  onDataStoreChange('scenario', clearEphemeralResult);
+  modeSelect?.addEventListener('change', clearEphemeralResult);
+  profileSelect?.addEventListener('change', clearEphemeralResult);
 
   function runStudy() {
     const loads = getLoads ? getLoads() : (typeof window !== 'undefined' && window._loads) || [];
@@ -32,6 +79,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const mode = modeSelect ? modeSelect.value : 'nec';
     const profile = profileSelect ? profileSelect.value : 'commercial';
+    const runContext = captureStudyRunContext('demandSchedule', {
+      inputs: loads,
+      options: { mode, profile },
+      inputSources: {
+        loads: 'dataStore.loadList',
+        standard: mode === 'iec' ? 'IEC 60439-1' : 'NEC 220',
+      },
+    });
     let result;
     try {
       result = buildDemandSchedule(loads, { mode, profile });
@@ -40,11 +95,21 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     lastResult = result;
+    lastRunContext = runContext;
+    lastRunProvenance = buildStudyProvenance('demandSchedule', result, {
+      ...runContext,
+      assumptions: result.reviewNotes || [],
+    }, {
+      validity: 'evaluated',
+    });
     exportBtn.disabled = false;
     renderSummary(result);
     renderReviewNotes(result.reviewNotes || []);
     renderTable(result.rows);
     renderBreakdown(result.sourceBreakdown);
+    document.dispatchEvent(new CustomEvent('ctr:study-ephemeral-complete', {
+      detail: { href: 'demandschedule.html' },
+    }));
   }
 
   function fmt(n) {
@@ -202,14 +267,56 @@ document.addEventListener('DOMContentLoaded', () => {
       'Qty', 'Connected kW', 'Connected kVA', 'Demand Factor (%)',
       'Demand kW', 'Demand kVA', 'Code Note'
     ];
-    const csvRows = lastResult.rows.map(r => [
-      r.source, r.tag, r.description, r.loadType, r.categoryLabel,
-      r.quantity,
-      r.connectedKw, r.connectedKva,
-      (r.demandFactor * 100).toFixed(1),
-      r.demandKw, r.demandKva,
-      r.note,
-    ]);
+    const csvRows = lastResult.rows.map(r => ({
+      'Source/Panel': r.source,
+      Tag: r.tag,
+      Description: r.description,
+      'Load Type': r.loadType,
+      'NEC Category': r.categoryLabel,
+      Qty: r.quantity,
+      'Connected kW': r.connectedKw,
+      'Connected kVA': r.connectedKva,
+      'Demand Factor (%)': (r.demandFactor * 100).toFixed(1),
+      'Demand kW': r.demandKw,
+      'Demand kVA': r.demandKva,
+      'Code Note': r.note,
+    }));
+    const resultAtExport = lastResult;
+    const contextAtExport = lastRunContext;
+    const provenanceAtExport = lastRunProvenance;
+    const currentLoads = getLoads ? getLoads() : [];
+    const currentMode = modeSelect ? modeSelect.value : 'nec';
+    const currentProfile = profileSelect ? profileSelect.value : 'commercial';
+    const currentContext = captureStudyRunContext('demandSchedule', {
+      inputs: currentLoads,
+      options: { mode: currentMode, profile: currentProfile },
+      inputSources: {
+        loads: 'dataStore.loadList',
+        standard: currentMode === 'iec' ? 'IEC 60439-1' : 'NEC 220',
+      },
+    });
+    const assessedRun = contextAtExport && provenanceAtExport
+      ? assessStudyResult('demandSchedule', resultAtExport, provenanceAtExport, currentContext)
+      : null;
+    const assessment = assessedRun ? {
+      ...assessedRun,
+      label: assessedRun.eligible
+        ? 'Current in-memory run'
+        : `In-memory run withheld (${assessedRun.reasons.join(', ') || 'freshness not verified'})`,
+    } : {
+        validity: { state: 'unevaluated' },
+        freshness: 'unknown',
+        eligible: false,
+        label: 'In-memory run withheld (missing run context)',
+        reasons: ['missing_run_context'],
+      };
+    const lifecycle = studyExportMetadata(resultAtExport, { assessment });
+    csvRows.push({
+      'Source/Panel': 'Lifecycle',
+      Tag: 'resultStatus',
+      Description: lifecycle.resultStatus,
+      'Code Note': JSON.stringify(lifecycle),
+    });
     downloadCSV(headers, csvRows, 'demand-schedule.csv');
   }
 });

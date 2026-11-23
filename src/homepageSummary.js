@@ -67,7 +67,6 @@ export function averageHomeFill(records) {
   if (!values.length) return null;
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
-
 export function collectHomepageSummary({ readers, services, workflowSteps, onReadError }) {
   const read = (getter, fallback) => safeReadHomeData(getter, fallback, onReadError);
   const equipment = meaningfulHomeRecords(read(readers.getEquipment, []));
@@ -101,6 +100,7 @@ export function collectHomepageSummary({ readers, services, workflowSteps, onRea
     reportSnapshots,
     designBasis: read(readers.getDesignBasis, {}),
     designGateApprovals: read(readers.getDesignGateApprovals, {}),
+    designSynthesisReviewDraft: readers.getDesignSynthesisReviewDraft ? read(readers.getDesignSynthesisReviewDraft, null) : null,
     studyApprovals: read(readers.getStudyApprovals, {}),
     currentInputFingerprint: read(readers.getProjectInputFingerprint, ''),
     reconcilePending

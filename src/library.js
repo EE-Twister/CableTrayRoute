@@ -1,7 +1,7 @@
 import '../cdnFallback.js';
 import './components/navigation.js';
 
-export { getItem, setItem } from '../dataStore.mjs';
+export { getItem, setItem } from './libraryStorage.mjs';
 export { default as openModal, showAlertModal } from './components/modal.js';
 export { getAuthContextState } from '../projectStorage.js';
 export { validateLibraryPayload } from './validation/librarySchema.mjs';

@@ -118,7 +118,7 @@ jobs:
           path: dist/
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium firefox
+        run: npx playwright install --with-deps msedge firefox
 
       - name: Run Playwright E2E tests
         run: npm run e2e:critical
@@ -253,7 +253,7 @@ jobs:
           path: dist/
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium firefox
+        run: npx playwright install --with-deps msedge firefox
 
       - name: Cost Estimator acceptance lane
         run: npm run e2e:next-features-cost

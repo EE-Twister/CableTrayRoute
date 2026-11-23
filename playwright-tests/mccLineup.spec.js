@@ -319,12 +319,6 @@ test.describe("MCC Lineups", () => {
           }]
         }]
       }));
-      localStorage.setItem("base:studyResults", JSON.stringify({
-        shortCircuit: {
-          _meta: { method: "ANSI" },
-          "ol-mcc-1": { equipmentTag: "MCC-1", method: "ANSI", threePhaseKA: 31.5 }
-        }
-      }));
       localStorage.setItem("base:cableSchedule", JSON.stringify([{
         tag: "CBL-SWBD-MCC-1",
         from_tag: "SWBD-1",
@@ -348,6 +342,18 @@ test.describe("MCC Lineups", () => {
     });
 
     await page.goto(pageUrl("mcclineup.html?e2e=1"));
+    await page.evaluate(() => {
+      const result = {
+        "ol-mcc-1": { equipmentTag: "MCC-1", method: "ANSI", threePhaseKA: 31.5 }
+      };
+      const context = window.dataStore.captureStudyRunContext("shortCircuit", {
+        inputs: { fixture: "MCC-1", method: "ANSI", threePhaseKA: 31.5 },
+        options: { frequencyHz: 60, phases: 3 },
+        inputSources: { fixture: "playwright MCC current-source fixture" },
+      });
+      window.dataStore.saveStudyResult("shortCircuit", result, context);
+    });
+    await page.reload();
 
     await expect(page.locator("#mcc-project-data-panel")).toContainText("Equipment List");
     await expect(page.locator("#mcc-project-data-panel")).toContainText("Short Circuit");
@@ -377,6 +383,11 @@ test.describe("MCC Lineups", () => {
     await expect(maximumAmbient).toHaveValue("45");
     await expect(maximumAmbient).toHaveAttribute("data-project-input-state", "linked");
     await expect(anchorage).toHaveValue("Engineer-designed anchors");
+
+    await page.evaluate(() => localStorage.removeItem("base:studyProvenance"));
+    await page.reload();
+    await expect(page.locator('[data-mcc-system-field="availableFaultCurrentKa"]')).toHaveValue("");
+    await expect(page.locator("#mcc-project-data-panel")).toContainText("not eligible");
   });
 
   test("places a standalone MCC lineup without an Equipment List row", async ({ page }) => {

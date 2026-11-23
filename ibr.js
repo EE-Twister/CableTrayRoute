@@ -5,7 +5,8 @@ import {
   bessDispatch,
   BESS_MODES,
 } from './analysis/ibrModeling.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { captureStudyRunContext, getStudies, saveStudyResult } from './dataStore.mjs';
+import { fingerprintStudyValue } from './analysis/studyLifecycle.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -35,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (saved.faultResult) renderFaultResults(saved.faultResult);
     if (saved.voltVarInputs) restoreVoltVarForm(saved.voltVarInputs);
     if (saved.voltVarResult) renderVoltVarResults(saved.voltVarResult);
+    renderIbrTabLifecycle(saved);
   }
 });
 
@@ -62,12 +64,129 @@ function initTabs() {
 // PV Array Tab
 // ---------------------------------------------------------------------------
 
+const IBR_TAB_FIELDS = Object.freeze({
+  pv: ['pvInputs', 'pvResult'],
+  bess: ['bessInputs', 'bessResult'],
+  fault: ['faultInputs', 'faultResult'],
+  voltVar: ['voltVarInputs', 'voltVarResult'],
+});
+
+const IBR_TAB_PANELS = Object.freeze({
+  pv: ['pv-results', 'pv-result-cards'],
+  bess: ['bess-results', 'bess-result-cards'],
+  fault: ['fault-results', 'fault-result-cards'],
+  voltVar: ['voltvar-results', 'vv-result-cards'],
+});
+
+const IBR_CONTEXT_FIELDS = Object.freeze([
+  'inputFingerprint',
+  'optionsFingerprint',
+  'projectSnapshotHash',
+  'settingsFingerprint',
+  'dependencyFingerprint',
+  'calculationRevision',
+  'modelRevision',
+  'scenario',
+]);
+
+function isIbrTabCurrent(saved, tab) {
+  const state = saved?._tabLifecycle?.[tab];
+  if (state?.calculationStatus !== 'evaluated' || !state.context) return false;
+  const inputs = readIbrTabInputs(tab);
+  if (!inputs) return false;
+  const currentContext = captureStudyRunContext('ibr', {
+    inputs,
+    options: { activeTab: tab },
+  });
+  return IBR_CONTEXT_FIELDS.every(field => state.context[field] === currentContext[field]);
+}
+
+function renderIbrTabLifecycle(saved) {
+  Object.entries(IBR_TAB_FIELDS).forEach(([tab, [, resultField]]) => {
+    if (!saved?.[resultField]) return;
+    const [panelId, cardsId] = IBR_TAB_PANELS[tab];
+    const panel = document.getElementById(panelId);
+    const cards = document.getElementById(cardsId);
+    if (!panel || !cards) return;
+    const state = saved._tabLifecycle?.[tab];
+    let current = false;
+    try {
+      current = isIbrTabCurrent(saved, tab);
+    } catch {
+      current = false;
+    }
+    if (current) return;
+    const reason = state?.requiredInputs?.[0]
+      || `Run the ${tab} IBR tab to establish current results.`;
+    cards.innerHTML = `
+      <div class="result-card result-card--warn">
+        <span class="result-label">Not evaluated</span>
+        <span class="result-value">${escHtml(reason)}</span>
+      </div>
+    `;
+    panel.classList.remove('hidden');
+  });
+}
+
+function saveIbrTabResult(tab, inputs, result, runContext) {
+  const [inputField, resultField] = IBR_TAB_FIELDS[tab] || [];
+  if (!inputField || !resultField) throw new Error(`Unknown IBR tab: ${tab}`);
+  const studies = getStudies();
+  const previous = studies.ibr && typeof studies.ibr === 'object' ? studies.ibr : {};
+  const current = {
+    ...previous,
+    [inputField]: inputs,
+    [resultField]: result,
+  };
+  const tabStates = { ...(previous._tabLifecycle || {}) };
+  Object.entries(IBR_TAB_FIELDS).forEach(([otherTab, [otherInputField, otherResultField]]) => {
+    if (otherTab === tab || !previous[otherResultField]) return;
+    const previousInputs = previous[otherInputField];
+    const currentInputs = readIbrTabInputs(otherTab);
+    const previousState = previous._tabLifecycle?.[otherTab];
+    const currentContext = currentInputs
+      ? captureStudyRunContext('ibr', { inputs: currentInputs, options: { activeTab: otherTab } })
+      : null;
+    const contextChanged = !previousState?.context || !currentContext
+      || IBR_CONTEXT_FIELDS.some(field => previousState.context[field] !== currentContext[field]);
+    const inputsChanged = !previousInputs || !currentInputs
+      || fingerprintStudyValue(previousInputs) !== fingerprintStudyValue(currentInputs);
+    tabStates[otherTab] = inputsChanged || contextChanged || previousState?.calculationStatus !== 'evaluated'
+      ? {
+        calculationStatus: 'unevaluated',
+        requiredInputs: [
+          contextChanged && !inputsChanged
+            ? `Re-run the ${otherTab} IBR tab after its project or source inputs change.`
+            : `Re-run the ${otherTab} IBR tab after changing its inputs.`,
+        ],
+        context: previousState?.context || null,
+      }
+      : { calculationStatus: 'evaluated', context: previousState.context };
+  });
+  tabStates[tab] = { calculationStatus: 'evaluated', context: runContext };
+  current._tabLifecycle = tabStates;
+  saveStudyResult('ibr', current, runContext);
+  renderIbrTabLifecycle(current);
+}
+
+function readIbrTabInputs(tab) {
+  if (tab === 'pv') return readPVInputs();
+  if (tab === 'bess') return readBESSInputs();
+  if (tab === 'fault') return readFaultInputs();
+  if (tab === 'voltVar') return readVoltVarInputs();
+  return null;
+}
+
 function initPVForm() {
   const form = document.getElementById('pv-form');
   form.addEventListener('submit', e => {
     e.preventDefault();
     const inputs = readPVInputs();
     if (!inputs) return;
+    const runContext = captureStudyRunContext('ibr', {
+      inputs,
+      options: { activeTab: 'pv' },
+    });
     let result;
     try {
       result = pvArrayOutput(inputs);
@@ -76,11 +195,7 @@ function initPVForm() {
       return;
     }
     renderPVResults(result);
-    const studies = getStudies();
-    if (!studies.ibr) studies.ibr = {};
-    studies.ibr.pvInputs = inputs;
-    studies.ibr.pvResult = result;
-    setStudies(studies);
+    saveIbrTabResult('pv', inputs, result, runContext);
   });
 
   document.getElementById('pv-reset-btn').addEventListener('click', () => {
@@ -159,6 +274,10 @@ function initBESSForm() {
     e.preventDefault();
     const inputs = readBESSInputs();
     if (!inputs) return;
+    const runContext = captureStudyRunContext('ibr', {
+      inputs,
+      options: { activeTab: 'bess' },
+    });
     let result;
     try {
       result = bessDispatch(inputs);
@@ -167,11 +286,7 @@ function initBESSForm() {
       return;
     }
     renderBESSResults(result);
-    const studies = getStudies();
-    if (!studies.ibr) studies.ibr = {};
-    studies.ibr.bessInputs = inputs;
-    studies.ibr.bessResult = result;
-    setStudies(studies);
+    saveIbrTabResult('bess', inputs, result, runContext);
   });
 
   document.getElementById('bess-reset-btn').addEventListener('click', () => {
@@ -235,6 +350,10 @@ function initFaultForm() {
     e.preventDefault();
     const inputs = readFaultInputs();
     if (!inputs) return;
+    const runContext = captureStudyRunContext('ibr', {
+      inputs,
+      options: { activeTab: 'fault' },
+    });
     let result;
     try {
       result = ibrFaultContribution(inputs);
@@ -243,11 +362,7 @@ function initFaultForm() {
       return;
     }
     renderFaultResults(result);
-    const studies = getStudies();
-    if (!studies.ibr) studies.ibr = {};
-    studies.ibr.faultInputs = inputs;
-    studies.ibr.faultResult = result;
-    setStudies(studies);
+    saveIbrTabResult('fault', inputs, result, runContext);
   });
 
   document.getElementById('fault-reset-btn').addEventListener('click', () => {
@@ -308,6 +423,10 @@ function initVoltVarForm() {
     e.preventDefault();
     const inputs = readVoltVarInputs();
     if (!inputs) return;
+    const runContext = captureStudyRunContext('ibr', {
+      inputs,
+      options: { activeTab: 'voltVar' },
+    });
     let result;
     try {
       result = ibrPQCapability(inputs);
@@ -317,11 +436,7 @@ function initVoltVarForm() {
     }
     renderVoltVarResults(result);
     drawPQDiagram(inputs, result);
-    const studies = getStudies();
-    if (!studies.ibr) studies.ibr = {};
-    studies.ibr.voltVarInputs = inputs;
-    studies.ibr.voltVarResult = result;
-    setStudies(studies);
+    saveIbrTabResult('voltVar', inputs, result, runContext);
   });
 
   document.getElementById('vv-reset-btn').addEventListener('click', () => {

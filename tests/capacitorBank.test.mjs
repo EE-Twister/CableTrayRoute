@@ -212,6 +212,17 @@ describe('standardBankSizes — standard kVAR selection', () => {
     const r = standardBankSizes(450);
     assert.ok(r.options.includes(r.recommended), 'options should include recommended');
   });
+
+  it('returns an explicit unavailable state above the 2400 kVAR catalog boundary', () => {
+    const below = standardBankSizes(2399.99);
+    const at = standardBankSizes(2400);
+    const above = standardBankSizes(2400.01);
+    assert.strictEqual(below.recommended, 2400);
+    assert.strictEqual(at.recommended, 2400);
+    assert.strictEqual(above.recommended, null);
+    assert.strictEqual(above.exceedsCatalog, true);
+    assert.strictEqual(above.adequate, false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -262,6 +273,22 @@ describe('runCapacitorBankAnalysis — integration', () => {
     assert.strictEqual(result.resonance, null, 'resonance should be null when SC MVA = 0');
     assert.ok(result.warnings.some(w => w.includes('Short-circuit MVA not provided')),
       'Should warn about missing SC MVA');
+  });
+
+  it('does not treat an oversized requirement as a 2400 kVAR resonance selection', () => {
+    const result = runCapacitorBankAnalysis({
+      pKw: 10000,
+      pfExisting: 0.70,
+      pfTarget: 0.95,
+      voltageKv: 4.16,
+      kvaScMva: 25,
+    });
+    assert.ok(result.kvarRequired > 2400);
+    assert.strictEqual(result.bankSize, null);
+    assert.strictEqual(result.achievedPf, null);
+    assert.strictEqual(result.resonance, null);
+    assert.strictEqual(result.bankSelection.status, 'unavailable');
+    assert.ok(result.warnings.some(w => /no adequate catalog selection/i.test(w)));
   });
 
   it('result object has all expected keys', () => {

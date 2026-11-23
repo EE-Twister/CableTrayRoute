@@ -19,13 +19,16 @@
 // both the browser and Node test environments.
 import { parseRevit } from './src/importers/revit.mjs';
 import { startPerformanceMeasurement } from './src/performance/performanceMetrics.js';
+import { COMPACT_SYNTHESIS_KEYS, isCompactSynthesisKey, isDeviceEvidenceEnvelope, packDeviceEvidence, unpackDeviceEvidence } from './utils/designSynthesisDeviceEvidenceCodec.mjs';
 import { resolveActiveProjectName } from './src/projectContext.js';
+import { isProjectSettingKey, sanitizeProjectSettings } from './src/projectSettingKeys.js';
 import {
   createImportableProjectSnapshot,
   isVersionedProjectSnapshot,
   prepareProjectSnapshotForSave
 } from './src/projectSnapshot.js';
 import { buildOneLineProjectView, hashProjectInputs, normalizeOneLineReferences, normalizeProjectEntities } from './analysis/projectIntegration.mjs';
+import { validateAndNormalizeCanonicalProject } from './src/canonicalProject.mjs';
 import {
   getProjectEntityDeletionImpact as buildProjectEntityDeletionImpact,
   getProjectReferenceDiagnostics as buildProjectReferenceDiagnostics,
@@ -36,6 +39,16 @@ import {
   formatProjectSchemaErrors,
   upgradeProjectImport
 } from './src/projectSchema.js';
+import {
+  assessStudyResult,
+  buildStudyProvenance,
+  captureStudyRunContext as captureLifecycleRunContext,
+  fingerprintStudyValue,
+  getStudyDependencies,
+  getStudyDefinition,
+  normalizeStudySourceSnapshot,
+  STUDY_LIFECYCLE_SCHEMA_VERSION
+} from './analysis/studyLifecycle.mjs';
 import {
   PROJECT_KEY,
   beginProjectMutationBatch,
@@ -48,9 +61,11 @@ import {
   setScenarioListState,
   registerScenario,
   getCurrentScenarioNameState,
+  setProjectKey,
   setCurrentScenarioNameState,
   isValidScenarioName,
   readScenarioValue,
+  refreshScenarioCacheFromStorageEvent,
   writeScenarioValue,
   writeScenarioSessionValue,
   removeScenarioValue,
@@ -59,7 +74,11 @@ import {
   writeSavedProject,
   readSavedProject,
   wasSavedProjectMigrated,
-  clearConduitCache
+  clearConduitCache,
+  captureProjectTransactionSnapshot,
+  restoreProjectTransactionSnapshot,
+  getProjectStorageDiagnostics,
+  onProjectChange
 } from './projectStorage.js';
 
 registerScenario(getCurrentScenarioNameState());
@@ -103,7 +122,7 @@ export function compareStudies(a, b) {
  */
 export function getScenarioSnapshot(scenarioName) {
   const scenario = scenarioName || getCurrentScenarioNameState();
-  return {
+  const snapshot = {
     scenario,
     equipment: read(KEYS.equipment, [], scenario),
     loads: read(KEYS.loads, [], scenario),
@@ -116,7 +135,110 @@ export function getScenarioSnapshot(scenarioName) {
     studies: read(KEYS.studies, {}, scenario),
     studyProvenance: read(EXTRA_KEYS.studyProvenance, {}, scenario),
     studyApprovals: read(EXTRA_KEYS.studyApprovals, {}, scenario),
-    designBasis: read(EXTRA_KEYS.designBasis, {}, scenario),
+    designBasis: read(EXTRA_KEYS.designBasis, null, scenario),
+  };
+  const lifecycle = getScenarioStudyLifecycleContext(scenario, snapshot);
+  return {
+    ...snapshot,
+    projectMeta: lifecycle.projectMeta,
+    settings: lifecycle.settings,
+    studyContext: lifecycle,
+  };
+}
+
+function getScenarioStudyLifecycleContext(scenario, snapshot) {
+  const projectMeta = read(EXTRA_KEYS.projectMeta, {}, scenario) || {};
+  const studies = snapshot.studies && typeof snapshot.studies === 'object' ? snapshot.studies : {};
+  const studyProvenance = snapshot.studyProvenance && typeof snapshot.studyProvenance === 'object'
+    ? snapshot.studyProvenance : {};
+  const settingKeys = new Set(['studySettings', 'tccSettings', 'trayHardwareCatalogCustomProducts']);
+  Object.keys(studies).forEach(studyKey => getStudyDefinition(studyKey).settings.forEach(key => settingKeys.add(key)));
+  Object.keys(studyProvenance).forEach(studyKey => getStudyDefinition(studyKey).settings.forEach(key => settingKeys.add(key)));
+  const settings = Object.fromEntries([...settingKeys].sort().map(key => [key, read(key, null, scenario)]));
+  const sourceSnapshot = normalizeStudySourceSnapshot({
+    projectMeta,
+    designBasis: snapshot.designBasis,
+    equipment: snapshot.equipment,
+    loads: snapshot.loads,
+    cables: snapshot.cables,
+    trays: snapshot.trays,
+    conduits: snapshot.conduits,
+    ductbanks: snapshot.ductbanks,
+    panels: snapshot.panels,
+    oneLine: snapshot.oneLine,
+    settings,
+    scenario,
+  });
+  const projectIdentity = {
+    projectId: projectMeta.id || projectMeta.projectId || null,
+    projectName: projectMeta.name || projectMeta.projectName || null,
+  };
+  const currentContexts = {};
+  const assessments = {};
+  const visiting = new Set();
+  const dependencyAssessments = {};
+  const dependencySnapshots = studyKey => {
+    const savedDependencies = studyProvenance?.[studyKey]?.dependencies;
+    const dependencyKeys = Array.isArray(savedDependencies)
+      ? savedDependencies.map(entry => entry.studyKey).filter(Boolean)
+      : getStudyDependencies(studyKey).filter(dependency => Object.prototype.hasOwnProperty.call(studies, dependency));
+    return Object.fromEntries([...new Set(dependencyKeys)].map(dependency => [dependency, {
+      resultHash: Object.prototype.hasOwnProperty.call(studies, dependency)
+        ? fingerprintStudyValue(studies[dependency]) : null,
+      provenanceHash: studyProvenance?.[dependency]
+        ? fingerprintStudyValue(studyProvenance[dependency]) : null,
+    }]));
+  };
+  const visit = studyKey => {
+    if (assessments[studyKey] || visiting.has(studyKey)) return assessments[studyKey] || null;
+    visiting.add(studyKey);
+    getStudyDependencies(studyKey).forEach(dependency => {
+      if (Object.prototype.hasOwnProperty.call(studies, dependency)
+          || Object.prototype.hasOwnProperty.call(studyProvenance, dependency)) visit(dependency);
+    });
+    const saved = studyProvenance?.[studyKey] || {};
+    const definition = getStudyDefinition(studyKey);
+    const studySettings = definition.settings.length
+      ? Object.fromEntries(definition.settings.map(key => [key, settings[key]])) : undefined;
+    const context = captureLifecycleRunContext(studyKey, {
+      inputs: saved.inputsSnapshot === undefined ? null : saved.inputsSnapshot,
+      options: saved.optionsSnapshot === undefined ? null : saved.optionsSnapshot,
+      settings: studySettings,
+      projectSnapshot: { ...sourceSnapshot, settings: studySettings },
+      dependencies: dependencySnapshots(studyKey),
+      projectIdentity,
+      scenario,
+      modelRevision: definition.modelRevision,
+      calculationRevision: definition.calculationRevision,
+    });
+    currentContexts[studyKey] = context;
+    const assessment = assessStudyResult(
+      studyKey,
+      studies[studyKey],
+      saved,
+      context,
+      dependencyAssessments,
+    );
+    assessments[studyKey] = assessment;
+    dependencyAssessments[studyKey] = assessment;
+    visiting.delete(studyKey);
+    return assessment;
+  };
+  [...new Set([...Object.keys(studies), ...Object.keys(studyProvenance)])]
+    .filter(studyKey => !studyKey.startsWith('_'))
+    .sort()
+    .forEach(visit);
+  return {
+    schemaVersion: STUDY_LIFECYCLE_SCHEMA_VERSION,
+    scenario,
+    projectMeta,
+    projectIdentity,
+    settings,
+    sourceSnapshot,
+    currentContexts,
+    currentStudyContexts: currentContexts,
+    assessments,
+    precomputedAssessments: assessments,
   };
 }
 
@@ -207,6 +329,12 @@ const oneLineProjectViewCache = globalThis[ONE_LINE_VIEW_CACHE_SYMBOL] instanceo
   : new Map();
 globalThis[ONE_LINE_VIEW_CACHE_SYMBOL] = oneLineProjectViewCache;
 
+onProjectChange(() => {
+  projectInputFingerprintCache = null;
+  projectInputFingerprintScenario = '';
+  oneLineProjectViewCache.clear();
+});
+
 export const STORAGE_KEYS = { ...KEYS, ...EXTRA_KEYS };
 
 const listeners = {};
@@ -251,7 +379,8 @@ export function off(event, handler) {
 // our internal event name and emit it.
 const crossWindowKeys = new Set([
   ...Object.values(KEYS),
-  ...Object.values(EXTRA_KEYS)
+  ...Object.values(EXTRA_KEYS),
+  ...COMPACT_SYNTHESIS_KEYS
 ]);
 
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
@@ -263,9 +392,13 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
     if (!key || key.includes(':')) return;
     if (!crossWindowKeys.has(key)) return;
     try {
-      const val = e.newValue ? JSON.parse(e.newValue) : undefined;
+      const stored = e.newValue ? JSON.parse(e.newValue) : undefined;
+      const val = isCompactSynthesisKey(key) ? unpackDeviceEvidence(stored) : stored;
       if (PROJECT_INPUT_KEYS.has(key)) projectInputFingerprintCache = null;
       if (ONE_LINE_VIEW_INPUT_KEYS.has(key)) oneLineProjectViewCache.delete(getCurrentScenarioNameState());
+      // Refresh this bundle's cache before notification, regardless of the
+      // registration order of the separate project-storage listener.
+      if (isCompactSynthesisKey(key)) refreshScenarioCacheFromStorageEvent(key, e.newValue);
       emit(key, val);
     } catch (err) {
       console.warn('storage event: failed to parse value for key', e.key, err);
@@ -274,10 +407,11 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
 }
 
 function read(key, fallback, scenario = getCurrentScenarioNameState()) {
-  return readScenarioValue(key, fallback, scenario);
+  const stored = readScenarioValue(key, fallback, scenario);
+  return isCompactSynthesisKey(key) ? unpackDeviceEvidence(stored) : stored;
 }
 
-function hasNamedProjectContext() {
+export function hasNamedProjectContext() {
   if (typeof window === 'undefined') return true;
   if (!window.location?.href || /jsdom/i.test(window.navigator?.userAgent || '')) return true;
   const params = new URLSearchParams(window.location?.search || '');
@@ -303,11 +437,19 @@ function write(key, value, scenario = getCurrentScenarioNameState(), options = {
       }
       return false;
     }
-    const changed = writeScenarioValue(key, value, scenario, options);
+    const visible = isCompactSynthesisKey(key) ? unpackDeviceEvidence(value) : value;
+    if (isCompactSynthesisKey(key)) {
+      const current = unpackDeviceEvidence(readScenarioValue(key, null, scenario));
+      if (isDeviceEvidenceEnvelope(visible) || isDeviceEvidenceEnvelope(current)) {
+        throw new Error('Device evidence is corrupted or uses an unsupported encoding; the stored data was preserved.');
+      }
+    }
+    const stored = isCompactSynthesisKey(key) ? packDeviceEvidence(visible) : visible;
+    const changed = writeScenarioValue(key, stored, scenario, options);
     if (!changed) return false;
     if (PROJECT_INPUT_KEYS.has(key)) projectInputFingerprintCache = null;
     if (ONE_LINE_VIEW_INPUT_KEYS.has(key)) oneLineProjectViewCache.delete(scenario);
-    emit(key, value);
+    emit(key, visible);
     return true;
   } catch (e) {
     console.error('Failed to store', key, e);
@@ -952,30 +1094,316 @@ export const setOneLine = (data, scenario = getCurrentScenarioNameState(), optio
  * @returns {Object}
  */
 export const getStudies = () => read(KEYS.studies, {});
+
+export function getStudyProjectIdentity() {
+  const meta = getProjectMeta();
+  return {
+    projectId: globalThis.window?.currentProjectId || meta?.id || meta?.projectId || null,
+    projectName: meta?.name || meta?.projectName || getProjectState()?.name || null,
+  };
+}
+
+export function getStudyDependencySnapshots(studyKey, studies = getStudies(), provenance = getStudyProvenance(), dependencyKeys = null) {
+  const keys = Array.isArray(dependencyKeys) ? dependencyKeys : getStudyDependencies(studyKey);
+  return Object.fromEntries(keys
+    .filter(dependency => Object.prototype.hasOwnProperty.call(studies || {}, dependency))
+    .map(dependency => [dependency, {
+    resultHash: Object.prototype.hasOwnProperty.call(studies || {}, dependency)
+      ? fingerprintStudyValue(studies[dependency])
+      : null,
+    provenanceHash: provenance?.[dependency]
+      ? fingerprintStudyValue(provenance[dependency])
+      : null,
+    }]));
+}
+
+function getStudySettingsSnapshot(studyKey) {
+  const settings = getStudyDefinition(studyKey).settings || [];
+  if (!settings.length) return undefined;
+  return Object.fromEntries(settings.map(key => [key, read(key, null)]));
+}
+
+/** Canonical source projection used by lifecycle/report consumers. */
+export const getStudySourceSnapshot = studyKey => ({
+  ...getProjectInputSnapshot(),
+  projectMeta: getProjectMeta(),
+  settings: getStudySettingsSnapshot(studyKey),
+  scenario: getCurrentScenario(),
+});
+
+/**
+ * Capture the source context before an asynchronous solver starts. This
+ * wrapper supplies the active scenario/project snapshot and dependency hashes;
+ * callers can add solver inputs, options, assumptions, and units explicitly.
+ */
+export const captureStudyRunContext = (studyKey, options = {}) => {
+  const projectSnapshot = options.projectSnapshot === undefined
+    ? normalizeStudySourceSnapshot(getStudySourceSnapshot(studyKey))
+    : options.projectSnapshot;
+  const projectIdentity = options.projectIdentity || getStudyProjectIdentity();
+  const dependencies = options.dependencies || getStudyDependencySnapshots(studyKey);
+  const definition = getStudyDefinition(studyKey);
+  const settings = options.settings === undefined ? getStudySettingsSnapshot(studyKey) : options.settings;
+  return captureLifecycleRunContext(studyKey, {
+    ...options,
+    projectSnapshot,
+    projectIdentity,
+    dependencies,
+    settings,
+    scenario: options.scenario || getCurrentScenario(),
+    modelRevision: options.modelRevision === undefined ? definition.modelRevision : options.modelRevision,
+    calculationRevision: options.calculationRevision === undefined
+      ? definition.calculationRevision
+      : options.calculationRevision,
+  });
+};
+
+/** Reject an asynchronous result when the source or run inputs changed while it was solving. */
+export const assertStudyRunContextCurrent = (context, options = {}) => {
+  if (!context?.studyKey) return context;
+  const recordedDependencyKeys = Array.isArray(context.dependencies)
+    ? context.dependencies.map(entry => entry?.studyKey).filter(Boolean)
+    : Object.keys(context.dependencies || {});
+  const dependencyOptions = options.dependencies === undefined
+    ? { dependencies: getStudyDependencySnapshots(context.studyKey, getStudies(), getStudyProvenance(), recordedDependencyKeys) }
+    : { dependencies: options.dependencies };
+  const current = captureStudyRunContext(context.studyKey, {
+    inputs: options.inputs === undefined ? context.inputsSnapshot : options.inputs,
+    options: options.options === undefined ? context.optionsSnapshot : options.options,
+    settings: options.settings,
+    ...dependencyOptions,
+  });
+  const savedIdentity = context.projectIdentity || {};
+  const currentIdentity = current.projectIdentity || {};
+  if ((savedIdentity.projectId && savedIdentity.projectId !== currentIdentity.projectId)
+      || (!savedIdentity.projectId && savedIdentity.projectName !== currentIdentity.projectName)) {
+    throw new Error(`${context.studyKey} project changed while the study was running.`);
+  }
+  if (context.scenario && context.scenario !== current.scenario) {
+    throw new Error(`${context.studyKey} scenario changed while the study was running.`);
+  }
+  const fingerprints = [
+    ['projectSnapshotHash', 'project inputs'],
+    ['inputFingerprint', 'manual inputs'],
+    ['optionsFingerprint', 'study options'],
+    ['manualInputFingerprint', 'manual inputs'],
+    ['settingsFingerprint', 'study settings'],
+    ['dependencyFingerprint', 'study dependencies'],
+  ];
+  for (const [field, label] of fingerprints) {
+    if (context[field] && context[field] !== current[field]) {
+      throw new Error(`${context.studyKey} ${label} changed while the study was running.`);
+    }
+  }
+  return current;
+};
+
+function makeUnknownBulkRestoreProvenance(studyKey, previous = null) {
+  // Preserve one bounded copy of the last run for report traceability. A
+  // previous bulk restore already contains that copy; nesting it again on
+  // every metadata edit would grow the sidecar without adding evidence.
+  const sourceRun = previous?.previousRun && typeof previous.previousRun === 'object'
+    ? previous.previousRun
+    : previous;
+  const previousRun = sourceRun && typeof sourceRun === 'object'
+    ? JSON.parse(JSON.stringify(sourceRun))
+    : null;
+  if (previousRun && Object.prototype.hasOwnProperty.call(previousRun, 'previousRun')) {
+    delete previousRun.previousRun;
+  }
+  return {
+    ...(previousRun || {}),
+    schemaVersion: STUDY_LIFECYCLE_SCHEMA_VERSION,
+    studyKey,
+    capturedAt: previous?.capturedAt || null,
+    scenario: previous?.scenario || getCurrentScenario(),
+    projectIdentity: previous?.projectIdentity || null,
+    resultHash: null,
+    projectSnapshotHash: null,
+    inputFingerprint: null,
+    optionsFingerprint: null,
+    manualInputFingerprint: null,
+    settingsFingerprint: null,
+    dependencyFingerprint: null,
+    dependencies: [],
+    calculationRevision: null,
+    modelRevision: null,
+    previousRun,
+    inputsSnapshot: previous?.inputsSnapshot || null,
+    optionsSnapshot: previous?.optionsSnapshot || null,
+    inputSourcesSnapshot: previous?.inputSourcesSnapshot || null,
+    settingsSnapshot: previous?.settingsSnapshot || null,
+    assumptions: previous?.assumptions === undefined ? [] : JSON.parse(JSON.stringify(previous.assumptions)),
+    warnings: previous?.warnings === undefined ? [] : JSON.parse(JSON.stringify(previous.warnings)),
+    limitations: previous?.limitations === undefined ? [] : JSON.parse(JSON.stringify(previous.limitations)),
+    units: previous?.units && typeof previous.units === 'object' ? { ...previous.units } : {},
+    validity: { state: 'unknown' },
+    evaluation: { state: 'unknown' },
+    freshness: 'unknown',
+    reason: 'bulk_restore_without_run_context',
+  };
+}
+
+function writeStudyState(results, provenance, scenario = getCurrentScenario()) {
+  const changedResults = write(KEYS.studies, results, scenario);
+  const changedProvenance = write(EXTRA_KEYS.studyProvenance, provenance, scenario);
+  return changedResults || changedProvenance;
+}
+
 /**
  * Store study results.
  * @param {Object} results
  */
-export const setStudies = results => {
+export const setStudies = (results, options = {}) => {
   const previous = getStudies();
-  write(KEYS.studies, results);
   const next = results && typeof results === 'object' && !Array.isArray(results) ? results : {};
-  const provenance = getStudyProvenance();
-  const inputHash = getProjectInputFingerprint();
-  const capturedAt = new Date().toISOString();
+  const previousProvenance = getStudyProvenance();
+  const importedProvenance = options.provenance && typeof options.provenance === 'object'
+    ? options.provenance
+    : null;
+  const provenance = {};
   [...new Set([...Object.keys(previous || {}), ...Object.keys(next)])].forEach(studyKey => {
-    if (!(studyKey in next)) {
-      delete provenance[studyKey];
+    if (!(studyKey in next) || studyKey.startsWith('_')) return;
+    if (importedProvenance && importedProvenance[studyKey]) {
+      provenance[studyKey] = importedProvenance[studyKey];
       return;
     }
-    if (JSON.stringify(previous?.[studyKey]) !== JSON.stringify(next[studyKey])) {
-      provenance[studyKey] = { schemaVersion: 1, inputHash, capturedAt };
-    }
+    const unchanged = JSON.stringify(previous?.[studyKey]) === JSON.stringify(next[studyKey]);
+    provenance[studyKey] = unchanged && previousProvenance?.[studyKey]
+      ? previousProvenance[studyKey]
+      : makeUnknownBulkRestoreProvenance(studyKey, previousProvenance?.[studyKey]);
   });
-  write(EXTRA_KEYS.studyProvenance, provenance);
+  const ownsEventBatch = !deferredEvents;
+  if (ownsEventBatch) beginEventBatch();
+  beginProjectMutationBatch();
+  try {
+    writeStudyState(next, provenance);
+  } finally {
+    endProjectMutationBatch();
+    if (ownsEventBatch) flushEventBatch();
+  }
 };
 
 export const getStudyProvenance = () => read(EXTRA_KEYS.studyProvenance, {});
+
+/** Save a completed result and the exact pre-run context atomically. */
+export const saveStudyResult = (studyKey, result, context) => {
+  if (!context || context.studyKey !== studyKey) {
+    throw new Error(`saveStudyResult(${studyKey}) requires a matching pre-run context.`);
+  }
+  const currentScenario = getCurrentScenario();
+  if (context.scenario && context.scenario !== currentScenario) {
+    throw new Error(`Study ${studyKey} completed in scenario ${context.scenario}, but ${currentScenario} is active.`);
+  }
+  const currentIdentity = getStudyProjectIdentity();
+  if (context.projectIdentity?.projectId !== currentIdentity.projectId
+      && (context.projectIdentity?.projectId || currentIdentity.projectId)) {
+    throw new Error(`Study ${studyKey} completed for a different project.`);
+  }
+  if (!context.projectIdentity?.projectId && !currentIdentity.projectId
+      && context.projectIdentity?.projectName !== currentIdentity.projectName) {
+    throw new Error(`Study ${studyKey} completed for a different project.`);
+  }
+  const results = getStudies();
+  const provenance = getStudyProvenance();
+  const nextResults = { ...(results && !Array.isArray(results) ? results : {}), [studyKey]: result };
+  const nextProvenance = {
+    ...provenance,
+    [studyKey]: buildStudyProvenance(studyKey, result, context),
+  };
+  const resultChanged = JSON.stringify(results) !== JSON.stringify(nextResults);
+  const provenanceChanged = JSON.stringify(provenance) !== JSON.stringify(nextProvenance);
+  if (typeof window !== 'undefined'
+      && !getStudyProjectIdentity().projectId
+      && !getStudyProjectIdentity().projectName
+      && !getProjectState()?.name) {
+    throw new Error(`Study ${studyKey} cannot be stored without an active named project.`);
+  }
+  const ownsEventBatch = !deferredEvents;
+  if (ownsEventBatch) beginEventBatch();
+  beginProjectMutationBatch();
+  try {
+    const resultWritten = write(KEYS.studies, nextResults);
+    if (resultChanged && !resultWritten) throw new Error(`Study ${studyKey} result could not be stored.`);
+    const provenanceWritten = write(EXTRA_KEYS.studyProvenance, nextProvenance);
+    if (provenanceChanged && !provenanceWritten) {
+      if (resultChanged) write(KEYS.studies, results);
+      throw new Error(`Study ${studyKey} provenance could not be stored.`);
+    }
+  } finally {
+    endProjectMutationBatch();
+    if (ownsEventBatch) flushEventBatch();
+  }
+  return nextProvenance[studyKey];
+};
+
+function getCurrentAssessmentContext(studyKey, options = {}) {
+  const saved = getStudyProvenance()?.[studyKey];
+  const savedDependencyKeys = Array.isArray(saved?.dependencies)
+    ? saved.dependencies.map(entry => entry?.studyKey).filter(Boolean)
+    : null;
+  const dependencies = options.dependencies === undefined
+    ? getStudyDependencySnapshots(studyKey, getStudies(), getStudyProvenance(), savedDependencyKeys)
+    : options.dependencies;
+  return captureStudyRunContext(studyKey, {
+    inputs: options.inputs === undefined ? saved?.inputsSnapshot : options.inputs,
+    options: options.options === undefined ? saved?.optionsSnapshot : options.options,
+    settings: options.settings === undefined ? getStudySettingsSnapshot(studyKey) : options.settings,
+    projectSnapshot: options.projectSnapshot,
+    dependencies,
+    modelRevision: options.modelRevision,
+    calculationRevision: options.calculationRevision,
+  });
+}
+
+function buildStudyAssessment(studyKey, options, studies, provenance, active = new Set()) {
+  if (active.has(studyKey)) {
+    return assessStudyResult(studyKey, studies?.[studyKey], provenance?.[studyKey], null, {});
+  }
+  const nextActive = new Set(active);
+  nextActive.add(studyKey);
+  const currentContext = options.currentContext || getCurrentAssessmentContext(studyKey, options);
+  const dependencies = {};
+  const recordedDependencies = provenance?.[studyKey]?.dependencies;
+  const dependencyKeys = Array.isArray(recordedDependencies)
+    ? recordedDependencies.map(entry => entry?.studyKey).filter(Boolean)
+    : getStudyDependencies(studyKey);
+  dependencyKeys.forEach(dependency => {
+    const dependencyOptions = { ...options };
+    delete dependencyOptions.currentContext;
+    delete dependencyOptions.inputs;
+    delete dependencyOptions.options;
+    delete dependencyOptions.settings;
+    delete dependencyOptions.projectSnapshot;
+    delete dependencyOptions.modelRevision;
+    delete dependencyOptions.calculationRevision;
+    dependencies[dependency] = buildStudyAssessment(dependency, dependencyOptions, studies, provenance, nextActive);
+  });
+  return assessStudyResult(studyKey, studies?.[studyKey], provenance?.[studyKey], currentContext, dependencies);
+}
+
+export const getStudyAssessment = (studyKey, options = {}) => {
+  const studies = getStudies();
+  const provenance = getStudyProvenance();
+  return buildStudyAssessment(studyKey, options, studies, provenance);
+};
+
+export const getStudyAssessments = (options = {}) => {
+  const studies = getStudies();
+  return Object.keys(studies && !Array.isArray(studies) ? studies : {})
+    .filter(studyKey => !studyKey.startsWith('_'))
+    .reduce((result, studyKey) => {
+      result[studyKey] = getStudyAssessment(studyKey, options);
+      return result;
+    }, {});
+};
+
+export const getEligibleStudies = (options = {}) => Object.values(getStudyAssessments(options))
+  .filter(assessment => assessment.eligible)
+  .reduce((result, assessment) => {
+    result[assessment.studyKey] = assessment;
+    return result;
+  }, {});
 export const getCathodicProtectionDraft = () => read(EXTRA_KEYS.cathodicProtectionDraft, null);
 export const setCathodicProtectionDraft = draft => write(EXTRA_KEYS.cathodicProtectionDraft, draft);
 export const getProjectInputSnapshot = () => ({
@@ -1010,9 +1438,7 @@ export const getProjectInputFingerprint = () => {
     projectInputFingerprintCache = null;
     projectInputFingerprintScenario = scenario;
   }
-  if (projectInputFingerprintCache === null) {
-    projectInputFingerprintCache = hashProjectInputs(getProjectInputSnapshot());
-  }
+  if (projectInputFingerprintCache === null) projectInputFingerprintCache = hashProjectInputs(getProjectInputSnapshot());
   return projectInputFingerprintCache;
 };
 
@@ -1142,7 +1568,7 @@ export function setProjectEntityCollections(collections = {}) {
   try {
     if (Array.isArray(collections.equipment)) setEquipment(collections.equipment);
     if (Array.isArray(collections.panels)) setPanels(collections.panels);
-    if (Array.isArray(collections.loads)) setLoads(collections.loads);
+    if (Array.isArray(collections.loads)) setLoads(collections.loads, { preserveShape: true });
     if (Array.isArray(collections.cables)) setCables(collections.cables);
   } finally {
     endProjectMutationBatch();
@@ -1160,13 +1586,16 @@ export const setItem = (key, value, scenario) => {
   return write(key, value, scenario);
 };
 export const setSessionItem = (key, value, scenario = getCurrentScenarioNameState()) => {
-  writeScenarioSessionValue(key, value, scenario);
-  emit(key, value);
+  const visible = isCompactSynthesisKey(key) ? unpackDeviceEvidence(value) : value;
+  if (isCompactSynthesisKey(key) && isDeviceEvidenceEnvelope(visible)) return false;
+  const stored = isCompactSynthesisKey(key) ? packDeviceEvidence(visible) : visible;
+  if (writeScenarioSessionValue(key, stored, scenario) === false && isCompactSynthesisKey(key)) return false;
+  emit(key, visible);
 };
-export const removeItem = (key, scenario = getCurrentScenarioNameState()) => {
+export const removeItem = (key, scenario = getCurrentScenarioNameState(), options = {}) => {
   try {
     if (PROJECT_INPUT_KEYS.has(key)) projectInputFingerprintCache = null;
-    removeScenarioValue(key, scenario);
+    removeScenarioValue(key, scenario, options);
     emit(key, null);
   } catch (e) {
     console.error('Failed to remove', key, e);
@@ -1211,7 +1640,16 @@ export function saveProject(projectId, scenario = getCurrentScenarioNameState())
       if (typeof window !== 'undefined') window.currentProjectId = activeProjectName;
     }
     const pendingFieldObservationQueue = getFieldObservationQueue();
-    const payload = prepareProjectSnapshotForSave(exportProject(scenario), {
+    const exported = exportProject(scenario);
+    // The versioned envelope already carries the active scenario at its top
+    // level. Do not serialize that same scenario a second time in
+    // scenarioData; large generated one-line/cable records otherwise consume
+    // the browser's storage budget twice on every named-project save.
+    if (exported.scenarioData && typeof exported.scenarioData === 'object') {
+      delete exported.scenarioData[scenario];
+      if (!Object.keys(exported.scenarioData).length) delete exported.scenarioData;
+    }
+    const payload = prepareProjectSnapshotForSave(exported, {
       transientSettingKeys: [EXTRA_KEYS.fieldObservationQueue]
     });
     writeSavedProject(projectId, payload, { replace: true });
@@ -1269,7 +1707,7 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
     try {
       if (Array.isArray(equipment)) setEquipment(equipment); else setEquipment([]);
       if (Array.isArray(panels)) setPanels(panels); else setPanels([]);
-      if (Array.isArray(loads)) setLoads(loads);
+      if (Array.isArray(loads)) setLoads(loads, { preserveShape: true });
       if (Array.isArray(cables)) setCables(cables); else setCables([]);
       if (Array.isArray(cableTypicals)) setCableTypicals(cableTypicals); else setCableTypicals([]);
       if (Array.isArray(cableTemplates)) setCableTemplates(cableTemplates); else setCableTemplates([]);
@@ -1336,57 +1774,54 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
  */
 export function applyRemoteSnapshot(snapshot, projectId) {
   if (!snapshot || typeof snapshot !== 'object') return;
-  let batchStarted = false;
-  try {
-    const { equipment, panels, loads, cables, cableTypicals, cableTemplates, cableTagSettings, cableChangeLog, designBasis, designGateApprovals, workflowArtifacts = {}, mccLineups, raceways = {}, oneLine } = snapshot;
-    beginEventBatch();
-    beginProjectMutationBatch();
-    batchStarted = true;
-    if (Array.isArray(equipment)) setEquipment(equipment);
-    if (Array.isArray(panels)) setPanels(panels);
-    if (Array.isArray(loads)) setLoads(loads);
-    if (Array.isArray(cables)) setCables(cables);
-    if (Array.isArray(cableTypicals)) setCableTypicals(cableTypicals);
-    if (Array.isArray(cableTemplates)) setCableTemplates(cableTemplates);
-    if (cableTagSettings && typeof cableTagSettings === 'object' && !Array.isArray(cableTagSettings)) setCableTagSettings(cableTagSettings);
-    if (Array.isArray(cableChangeLog)) setCableChangeLog(cableChangeLog);
-    if (designBasis && typeof designBasis === 'object' && !Array.isArray(designBasis)) setDesignBasis(designBasis);
-    if (designGateApprovals && typeof designGateApprovals === 'object' && !Array.isArray(designGateApprovals)) setDesignGateApprovals(designGateApprovals);
-    if (workflowArtifacts && typeof workflowArtifacts === 'object') {
-      setDeliverableArtifacts(workflowArtifacts.deliverableArtifacts);
-      setFieldExecutionRecords(workflowArtifacts.fieldExecutionRecords);
-      setFieldObservations(workflowArtifacts.fieldObservations);
-      setFieldObservationQueue(workflowArtifacts.fieldObservationQueue);
-      setProcurementRegister(workflowArtifacts.procurementRegister);
-      if (workflowArtifacts.reportSnapshots && typeof workflowArtifacts.reportSnapshots === 'object') {
-        write(EXTRA_KEYS.reportSnapshots, workflowArtifacts.reportSnapshots);
-      }
-      if (Array.isArray(workflowArtifacts.lifecyclePackages)) {
-        write(EXTRA_KEYS.lifecyclePackages, workflowArtifacts.lifecyclePackages);
-      }
-      if (workflowArtifacts.pullPlanArtifact !== undefined) setItem('pullPlanArtifact', workflowArtifacts.pullPlanArtifact);
-      if (workflowArtifacts.costEstimateArtifact !== undefined) setItem('costEstimateArtifact', workflowArtifacts.costEstimateArtifact);
-      if (workflowArtifacts.latestRouteResults !== undefined) setItem('latestRouteResults', workflowArtifacts.latestRouteResults);
-      setSwitchingProcedures(workflowArtifacts.switchingProcedures);
-    }
-    if (Array.isArray(mccLineups)) setMccLineups(mccLineups); else setMccLineups([]);
-    setTrays(Array.isArray(raceways.trays) ? raceways.trays : []);
-    setConduits(Array.isArray(raceways.conduits) ? raceways.conduits : []);
-    setDuctbanks(Array.isArray(raceways.ductbanks) ? raceways.ductbanks : []);
-    const scenario = getCurrentScenarioNameState();
-    if (oneLine !== undefined) {
-      if (Array.isArray(oneLine)) {
-        setOneLine({ activeSheet: 0, sheets: oneLine }, scenario, { captureRevision: false });
-      } else {
-        setOneLine(oneLine || { activeSheet: 0, sheets: [] }, scenario, { captureRevision: false });
-      }
-    }
-    endProjectMutationBatch();
-    flushEventBatch();
-    batchStarted = false;
-    // Persist to storage so subsequent loadProject() calls see the updated data
+  if (snapshot.schemaVersion !== undefined && Array.isArray(snapshot.cables)
+    && Array.isArray(snapshot.ductbanks) && Array.isArray(snapshot.conduits)) {
+    if (!importProject(snapshot)) throw new Error(getLastProjectImportError() || 'Remote project snapshot is invalid.');
     const pid = projectId || (typeof window !== 'undefined' && window.currentProjectId) || null;
     if (pid) writeSavedProject(pid, snapshot);
+    if (typeof document !== 'undefined') {
+      try { document.dispatchEvent(new CustomEvent('ctr:remote-applied', { detail: { projectId: pid } })); } catch { /* non-critical */ }
+    }
+    return;
+  }
+  const transaction = captureProjectTransactionSnapshot();
+  let batchStarted = false;
+  try {
+    // Collaboration payloads may still carry the legacy storage envelope
+    // alongside the canonical project fields. Remove only those explicitly
+    // supported envelope fields before strict canonical validation; arbitrary
+    // unknown project fields must continue to fail closed.
+    if (snapshot.settings !== undefined && (!snapshot.settings || typeof snapshot.settings !== 'object' || Array.isArray(snapshot.settings))) {
+      throw new Error('Project settings must be an object.');
+    }
+    const canonicalInput = { ...snapshot, settings: { ...(snapshot.settings || {}) } };
+    const legacySettings = ['cableTemplates', 'cableTagSettings', 'cableChangeLog', 'designBasis', 'designGateApprovals', 'workflowArtifacts'];
+    for (const key of legacySettings) {
+      if (canonicalInput[key] !== undefined && canonicalInput.settings[key] === undefined) {
+        canonicalInput.settings[key] = canonicalInput[key];
+      }
+      delete canonicalInput[key];
+    }
+    // Flatten artifact keys into settings as well so a canonical save/reload
+    // can restore scalar artifact entries through the normal importer.
+    if (canonicalInput.settings.workflowArtifacts && typeof canonicalInput.settings.workflowArtifacts === 'object'
+      && !Array.isArray(canonicalInput.settings.workflowArtifacts)) {
+      for (const [key, value] of Object.entries(canonicalInput.settings.workflowArtifacts)) {
+        if (canonicalInput.settings[key] === undefined) canonicalInput.settings[key] = value;
+      }
+    }
+    const canonical = validateAndNormalizeCanonicalProject(canonicalInput, { scenario: getCurrentScenarioNameState() });
+    const { settings = {} } = canonical;
+    if (settings.cableTemplates !== undefined && !Array.isArray(settings.cableTemplates)) throw new Error('cableTemplates must be an array.');
+    if (settings.cableTagSettings !== undefined && (!settings.cableTagSettings || typeof settings.cableTagSettings !== 'object' || Array.isArray(settings.cableTagSettings))) throw new Error('cableTagSettings must be an object.');
+    if (settings.cableChangeLog !== undefined && !Array.isArray(settings.cableChangeLog)) throw new Error('cableChangeLog must be an array.');
+    if (settings.designBasis !== undefined && (!settings.designBasis || typeof settings.designBasis !== 'object' || Array.isArray(settings.designBasis))) throw new Error('designBasis must be an object.');
+    if (settings.designGateApprovals !== undefined && (!settings.designGateApprovals || typeof settings.designGateApprovals !== 'object' || Array.isArray(settings.designGateApprovals))) throw new Error('designGateApprovals must be an object.');
+    if (settings.workflowArtifacts !== undefined && (!settings.workflowArtifacts || typeof settings.workflowArtifacts !== 'object' || Array.isArray(settings.workflowArtifacts))) throw new Error('workflowArtifacts must be an object.');
+    if (!importProject(canonical)) throw new Error(getLastProjectImportError() || 'Remote project snapshot is invalid.');
+    // Persist to storage so subsequent loadProject() calls see the updated data
+    const pid = projectId || (typeof window !== 'undefined' && window.currentProjectId) || null;
+    if (pid) writeSavedProject(pid, canonical);
     // Notify page-level code that remote data has been applied
     if (typeof document !== 'undefined') {
       try {
@@ -1394,6 +1829,7 @@ export function applyRemoteSnapshot(snapshot, projectId) {
       } catch { /* non-critical */ }
     }
   } catch (e) {
+    if (transaction) restoreProjectTransactionSnapshot(transaction);
     if (batchStarted) {
       endProjectMutationBatch();
       flushEventBatch();
@@ -1405,7 +1841,7 @@ export function applyRemoteSnapshot(snapshot, projectId) {
 /**
  * Export current project data.
  */
-export function exportProject(scenario = getCurrentScenarioNameState()) {
+function exportScenarioProject(scenario = getCurrentScenarioNameState()) {
   const project = {
     schemaVersion: PROJECT_SCHEMA_VERSION,
     ductbanks: read(KEYS.ductbanks, [], scenario),
@@ -1422,7 +1858,7 @@ export function exportProject(scenario = getCurrentScenarioNameState()) {
   };
   const reserved = new Set([...Object.values(KEYS), EXTRA_KEYS.mccLineups, REVISION_KEY, 'CTR_PROJECT_V1', LEGACY_STUDIES_SETTING_KEY]);
   for (const key of keys(scenario)) {
-    if (!reserved.has(key)) {
+    if (!reserved.has(key) && isProjectSettingKey(key)) {
       project.settings[key] = read(key, null, scenario);
     }
   }
@@ -1432,6 +1868,16 @@ export function exportProject(scenario = getCurrentScenarioNameState()) {
   }
   const meta = { version: 1, scenario, scenarios: listScenarios() };
   return { meta, ...project };
+}
+
+/** Export a complete, versioned project envelope including every scenario. */
+export function exportProject(scenario = getCurrentScenarioNameState()) {
+  const current = exportScenarioProject(scenario);
+  const scenarioData = {};
+  listScenarios().forEach(name => {
+    scenarioData[name] = exportScenarioProject(name);
+  });
+  return { ...current, scenarioData };
 }
 
 function beginEventBatch() {
@@ -1536,7 +1982,11 @@ export function importProject(obj) {
   });
   let upgraded;
   try {
-    upgraded = upgradeProjectImport(obj);
+    // Normalize legacy aliases and canonical documents once at the import
+    // boundary. The adapter performs final strict schema validation after
+    // aliases and storage-envelope metadata have been separated.
+    upgraded = validateAndNormalizeCanonicalProject(obj);
+    upgraded.settings = sanitizeProjectSettings(upgraded.settings);
   } catch (error) {
     if (Array.isArray(error?.errors)) {
       lastProjectImportError = `Project import is invalid: ${formatProjectSchemaErrors(error.errors)}`;
@@ -1546,11 +1996,32 @@ export function importProject(obj) {
     finishMeasurement({ success: false });
     return false;
   }
+  const candidateScenarioData = upgraded.scenarioData && typeof upgraded.scenarioData === 'object'
+    ? upgraded.scenarioData : null;
+  if (candidateScenarioData) {
+    try {
+      for (const [scenarioName, scenarioSnapshot] of Object.entries(candidateScenarioData)) {
+        if (!isValidScenarioName(scenarioName) || !scenarioSnapshot || typeof scenarioSnapshot !== 'object') {
+          throw new Error(`Invalid scenario snapshot: ${scenarioName}`);
+        }
+        const nested = { ...scenarioSnapshot };
+        if (nested.scenarioData !== undefined) throw new Error(`Nested scenarioData is not supported: ${scenarioName}`);
+        validateAndNormalizeCanonicalProject(nested, { scenario: scenarioName });
+      }
+    } catch (error) {
+      lastProjectImportError = error instanceof Error ? error.message : 'Invalid scenario snapshot.';
+      finishMeasurement({ success: false });
+      return false;
+    }
+  }
 
   const { meta } = upgraded;
+  const scenarioData = candidateScenarioData;
   const data = { ...upgraded };
   delete data.meta;
   delete data.schemaVersion;
+  delete data.scenarioData;
+  const transaction = captureProjectTransactionSnapshot();
   const importScenario = meta && isValidScenarioName(meta.scenario) ? meta.scenario : null;
   if (meta && Array.isArray(meta.scenarios)) {
     setScenarioListState(meta.scenarios);
@@ -1563,6 +2034,8 @@ export function importProject(obj) {
 
   beginEventBatch();
   beginProjectMutationBatch();
+  let mutationBatchStarted = true;
+  let importSucceeded = true;
   try {
     setDuctbanks(data.ductbanks);
     setConduits(data.conduits);
@@ -1572,7 +2045,7 @@ export function importProject(obj) {
     setCableTypicals(Array.isArray(data.cableTypicals) ? data.cableTypicals : []);
     setPanels(Array.isArray(data.panels) ? data.panels : []);
     setEquipment(Array.isArray(data.equipment) ? data.equipment : []);
-    setLoads(Array.isArray(data.loads) ? data.loads : []);
+    setLoads(Array.isArray(data.loads) ? data.loads : [], { preserveShape: true });
     setMccLineups(Array.isArray(data.mccLineups) ? data.mccLineups : []);
     if (Array.isArray(data.oneLine)) {
       setOneLine({ activeSheet: 0, sheets: data.oneLine }, getCurrentScenarioNameState(), { captureRevision: false });
@@ -1593,6 +2066,9 @@ export function importProject(obj) {
     const reserved = new Set([...Object.values(KEYS), EXTRA_KEYS.mccLineups, REVISION_KEY, 'CTR_PROJECT_V1', LEGACY_STUDIES_SETTING_KEY]);
     for (const key of keys()) {
       if (!reserved.has(key) && !(data.settings && key in data.settings)) {
+        if (isCompactSynthesisKey(key) && isDeviceEvidenceEnvelope(getItem(key, null))) {
+          throw new Error('Unsupported or damaged device evidence cannot be removed by import; the project was restored.');
+        }
         removeItem(key);
       }
     }
@@ -1600,13 +2076,70 @@ export function importProject(obj) {
       for (const [k, v] of Object.entries(data.settings)) {
         if (!reserved.has(k)) {
           setItem(k, v);
+          if (isCompactSynthesisKey(k)) {
+            const expected = unpackDeviceEvidence(v);
+            const actual = getItem(k, null);
+            if (isDeviceEvidenceEnvelope(expected) || isDeviceEvidenceEnvelope(actual)
+                || JSON.stringify(actual) !== JSON.stringify(expected)) {
+              throw new Error('Device evidence could not be imported without loss; the project was restored.');
+            }
+          }
         }
       }
     }
+    const persistentStorageExpected = typeof localStorage !== 'undefined';
+    if (persistentStorageExpected && !getProjectStorageDiagnostics().persistentStorageAvailable) {
+      throw new Error('Project import could not be durably saved because persistent storage is unavailable.');
+    }
+    // Capture the complete active projection before inactive scenario imports;
+    // restoring this exact object avoids leaking inactive-only settings and
+    // retains fields that are not part of the comparison helper.
+    const activeProjectProjection = getProjectState();
+    // Restore additional scenarios through the same validated transactional
+    // importer. Each nested document is a single-scenario snapshot and cannot
+    // recursively contain scenarioData.
+    if (scenarioData) {
+      const activeScenario = getCurrentScenarioNameState();
+      for (const [name, scenarioSnapshot] of Object.entries(scenarioData)) {
+        if (!isValidScenarioName(name) || name === activeScenario || !scenarioSnapshot) continue;
+        const imported = importProject({ ...scenarioSnapshot, meta: { ...(scenarioSnapshot.meta || {}), scenario: name, scenarios: listScenarios() } });
+        if (!imported) throw new Error(getLastProjectImportError() || `Could not restore scenario ${name}.`);
+      }
+      switchScenario(importScenario || activeScenario);
+      setProjectState(activeProjectProjection, { captureUndo: false });
+    }
+  } catch (error) {
+    restoreProjectTransactionSnapshot(transaction);
+    lastProjectImportError = error instanceof Error ? error.message : 'Project import failed.';
+    finishMeasurement({ success: false });
+    return false;
   } finally {
-    endProjectMutationBatch();
-    flushEventBatch();
+    // Closing the batch performs the final durable PROJECT_KEY write. A quota
+    // failure here must not escape as a successful import.
+    if (mutationBatchStarted) {
+      try {
+        endProjectMutationBatch();
+        if (typeof localStorage !== 'undefined' && !getProjectStorageDiagnostics().persistentStorageAvailable) {
+          throw new Error('Project import could not be durably saved because persistent storage is unavailable.');
+        }
+        mutationBatchStarted = false;
+      } catch (error) {
+        importSucceeded = false;
+        restoreProjectTransactionSnapshot(transaction);
+        lastProjectImportError = error instanceof Error ? error.message : 'Project import could not be durably saved.';
+        finishMeasurement({ success: false });
+      }
+    }
+    try {
+      flushEventBatch();
+    } catch (error) {
+      importSucceeded = false;
+      restoreProjectTransactionSnapshot(transaction);
+      lastProjectImportError = error instanceof Error ? error.message : 'Project import could not be completed.';
+      finishMeasurement({ success: false });
+    }
   }
+  if (!importSucceeded) return false;
   if (getProjectSchemaLoadError()) {
     removeProjectKey(PROJECT_KEY);
     setProjectState(getProjectState());
@@ -1663,6 +2196,13 @@ if (typeof window !== 'undefined') {
     getStudies,
     setStudies,
     getStudyProvenance,
+    getStudySourceSnapshot,
+    captureStudyRunContext,
+    assertStudyRunContextCurrent,
+    saveStudyResult,
+    getStudyAssessment,
+    getStudyAssessments,
+    getEligibleStudies,
     getProjectInputFingerprint,
     getProjectEntityDeletionImpact,
     getProjectReferenceDiagnostics,

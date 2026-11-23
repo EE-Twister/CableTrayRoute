@@ -1,33 +1,34 @@
 /**
  * Ground Grid / Substation Grounding Analysis
- * Per IEEE 80-2013 — IEEE Guide for Safety in AC Substation Grounding
+ * Rectangular grounding screening workflow based on IEEE 80.
  *
  * Methodology:
- *   Grid resistance (Sverak, IEEE 80-2013 Eq. 57):
+ *   Grid resistance (Sverak, IEEE 80-2000 Eq. 52):
  *     Rg = ρ/L + ρ/√(20A) × (1 + 1/(1 + h × √(20/A)))
  *
- *   Mesh voltage (IEEE 80-2013 Eq. 86):
+ *   Mesh voltage (IEEE 80-2000 Eq. 91; uses rod-aware effective length Lm):
  *     Em = ρ × Ig × Km × Ki / Lm
  *
- *   Step voltage (IEEE 80-2013 Eq. 92):
+ *   Step voltage (IEEE 80-2000 Eq. 93; uses rod-aware effective length Ls):
  *     Es = ρ × Ig × Ks × Ki / Ls
  *
  *   Ground potential rise:
  *     GPR = Ig × Rg
  *
- *   Tolerable touch voltage (50 kg, IEEE 80-2013 Eq. 32):
+ *   Tolerable touch voltage (IEEE 80 tolerable-voltage equation family):
  *     Etouch50 = (1000 + 1.5 × Cs × ρs) × 0.116 / √tf
  *
- *   Tolerable step voltage (50 kg, IEEE 80-2013 Eq. 29):
+ *   Tolerable step voltage (IEEE 80 tolerable-voltage equation family):
  *     Estep50 = (1000 + 6 × Cs × ρs) × 0.116 / √tf
  *
  * References:
- *   IEEE 80-2013 — IEEE Guide for Safety in AC Substation Grounding
- *   ANSI/IEEE Std 80-2013 (Revision of IEEE Std 80-2000)
+ *   IEEE 80-2000 — IEEE Guide for Safety in AC Substation Grounding
+ *   The verified rod-length equations below are from the accessible 2000
+ *   edition; edition mapping to 2013 remains a qualified-review item.
  */
 
 /**
- * Compute the surface layer reduction factor Cs (IEEE 80-2013 Eq. 27).
+ * Compute the surface layer reduction factor Cs.
  *
  * If no surface layer is present (hs = 0 or ρs === ρ), Cs = 1.
  *
@@ -40,12 +41,12 @@ export function surfaceLayerFactor(rho, rhoS, hs) {
   if (hs <= 0 || rhoS <= 0) return 1;
   const K = (rho - rhoS) / (rho + rhoS);
   // Cs = 1 - (0.09 × (1 − ρ/ρs)) / (2hs + 0.09)
-  // Using the simplified IEEE 80-2013 formula:
+  // Using the simplified IEEE 80 surface-layer formula.
   return 1 - (0.09 * (1 - rho / rhoS)) / (2 * hs + 0.09);
 }
 
 /**
- * Compute grid resistance using Sverak formula (IEEE 80-2013 Eq. 57).
+ * Compute grid resistance using the IEEE 80-2000 Sverak formula (Eq. 52).
  *
  * @param {number} rho  Soil resistivity (Ω·m)
  * @param {number} L    Total length of buried conductors (m)
@@ -60,7 +61,7 @@ export function gridResistance(rho, L, A, h) {
 
 /**
  * Compute the n parameter (geometric mean number of parallel conductors)
- * per IEEE 80-2013 Eq. 85 for a rectangular grid.
+ * per the IEEE 80-2000 rectangular-grid relationship (Eq. 85).
  *
  * n = na × nb
  *   na = 2 × L / Lp                  (accounts for conductor density)
@@ -78,9 +79,9 @@ export function effectiveN(L, Lp, A) {
 }
 
 /**
- * Compute the mesh spacing correction factor Km (IEEE 80-2013 Eq. 81).
+ * Compute the mesh spacing correction factor Km.
  *
- * The corner weighting factor Kii (Eq. 82) depends on rod placement:
+ * The corner weighting factor Kii depends on rod placement:
  *   - Grids WITH ground rods along the perimeter, in the corners, or
  *     throughout the area:                    Kii = 1
  *   - Grids with NO ground rods, or only a few rods none of which are at the
@@ -94,8 +95,8 @@ export function effectiveN(L, Lp, A) {
  * @returns {number} Km — geometric mesh factor (dimensionless)
  */
 export function meshFactor(D, h, d, n, hasRods) {
-  // IEEE 80-2013 Eq. 82: Kii = 1 when rods are on the perimeter/corners,
-  // otherwise Kii = 1/(2n)^(2/n).
+  // Kii = 1 when rods are on the perimeter/corners; otherwise
+  // Kii = 1/(2n)^(2/n).
   const Kii = hasRods ? 1 : 1 / Math.pow(2 * n, 2 / n);
   const Kh = Math.sqrt(1 + h / 1.0); // h0 = 1 m reference
   const term1 = Math.log((D * D) / (16 * h * d) + (D + 2 * h) * (D + 2 * h) / (8 * D * d) - h / (4 * d));
@@ -104,7 +105,7 @@ export function meshFactor(D, h, d, n, hasRods) {
 }
 
 /**
- * Compute the step voltage geometric factor Ks (IEEE 80-2013 Eq. 91).
+ * Compute the step voltage geometric factor Ks.
  *
  * @param {number} D  Mesh spacing (m)
  * @param {number} h  Burial depth (m)
@@ -116,7 +117,7 @@ export function stepFactor(D, h, n) {
 }
 
 /**
- * Compute the irregularity correction factor Ki (IEEE 80-2013 Eq. 89).
+ * Compute the irregularity correction factor Ki.
  *
  * @param {number} n  Effective number of parallel conductors
  * @returns {number} Ki — irregularity factor
@@ -126,7 +127,7 @@ export function irregularityFactor(n) {
 }
 
 /**
- * Tolerable touch voltage (IEEE 80-2013 Eq. 32/33).
+ * Tolerable touch voltage using the IEEE 80 equation family.
  *
  * @param {number} Cs    Surface layer reduction factor (1 if no surface layer)
  * @param {number} rhoS  Surface layer resistivity (Ω·m); use soil resistivity if no layer
@@ -140,7 +141,7 @@ export function tolerableTouch(Cs, rhoS, tf, bw) {
 }
 
 /**
- * Tolerable step voltage (IEEE 80-2013 Eq. 29/30).
+ * Tolerable step voltage using the IEEE 80 equation family.
  *
  * @param {number} Cs    Surface layer reduction factor
  * @param {number} rhoS  Surface layer resistivity (Ω·m)
@@ -154,7 +155,7 @@ export function tolerableStep(Cs, rhoS, tf, bw) {
 }
 
 /**
- * Complete ground grid analysis per IEEE 80-2013.
+ * Complete rectangular ground-grid screening analysis using the IEEE 80 equation family.
  *
  * @param {object} params
  * @param {number} params.rho       Soil resistivity (Ω·m)
@@ -208,8 +209,10 @@ export function analyzeGroundGrid(params) {
   const Dy = gridLy / (nx - 1);  // spacing between conductors running in y-direction
   const D = Math.sqrt(Dx * Dy);  // geometric mean spacing
 
-  // Effective n
-  const n = effectiveN(effectiveLength, Lp, A);
+  // IEEE 80-2000 Eq. 85 uses the horizontal grid conductor length Lc for n.
+  // Ground rods affect the voltage effective lengths, but are not folded into
+  // the horizontal-conductor density term.
+  const n = effectiveN(conductorLength, Lp, A);
 
   // Km and Ks
   const Km = meshFactor(D, h, d, n, hasRods);
@@ -220,10 +223,14 @@ export function analyzeGroundGrid(params) {
   if (!Number.isFinite(Ks) || Ks < 0) throw new Error('Computed step factor is invalid for the selected geometry');
   if (!Number.isFinite(Ki) || Ki < 0) throw new Error('Computed irregularity factor is invalid for the selected geometry');
 
-  // Lm and Ls — effective lengths for voltage calculations (IEEE 80-2013 §16.5)
-  // For grids without ground rods: Lm = Ls = L
-  const Lm = effectiveLength;
-  const Ls = effectiveLength;
+  // IEEE 80-2000 Eq. 91/93: rod-aware effective lengths for mesh and step.
+  // The UI model records only a count and common rod length, so rods are
+  // treated as perimeter/corner rods for this bounded approximation.
+  const rodGeometry = Math.hypot(gridLx, gridLy);
+  const Lm = totalRodLength > 0
+    ? conductorLength + (1.55 + 1.22 * (rodLength / rodGeometry)) * totalRodLength
+    : conductorLength;
+  const Ls = (0.75 * conductorLength) + (0.85 * totalRodLength);
 
   // Grid resistance
   const Rg = gridResistance(rho, effectiveLength, A, h);
@@ -283,8 +290,8 @@ export function analyzeGroundGrid(params) {
 /**
  * Run IEEE 80 grid analysis using a fitted two-layer soil model.
  *
- * Per IEEE 80-2013 §12.4, when a two-layer soil model is available the top-layer
- * resistivity rho1 is used as the effective uniform resistivity for mesh/step
+ * When a two-layer soil model is available, the top-layer resistivity rho1 is
+ * used as the effective uniform resistivity for mesh/step
  * voltage calculations (conservative for most cases where rho1 ≥ rho2).
  *
  * @param {object} params          Same as analyzeGroundGrid()

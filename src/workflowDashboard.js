@@ -8,6 +8,7 @@ import {
 import { openModal } from './components/modal.js';
 import {
   getEquipment, getLoads, getCables, getTrays, getConduits, getDuctbanks, getStudies,
+  getStudyAssessments,
   getProjectInputFingerprint,
   getProjectReferenceDiagnostics,
   getStudyApprovals, getOneLine, getDesignBasis, setDesignBasis,
@@ -159,6 +160,7 @@ function getOpenCoachItemCount() {
       cables: getCables() || [],
       trays: getTrays() || [],
       studies: getStudies() || {},
+      studyAssessments: getStudyAssessments(),
     });
     return summary.safety + summary.compliance;
   } catch (_) {
@@ -169,7 +171,7 @@ function getOpenCoachItemCount() {
 function getEquipmentFailCount() {
   try {
     const components = (getOneLine()?.sheets ?? []).flatMap(s => s.components ?? []);
-    const evals = evaluateEquipment(components, getCables() || [], getStudies() || {}, protectiveDevices);
+    const evals = evaluateEquipment(components, getCables() || [], getStudies() || {}, protectiveDevices, { studyAssessments: getStudyAssessments() });
     return summariseEvaluation(evals).fail;
   } catch (_) {
     return 0;
@@ -188,7 +190,9 @@ function currentDesignBasisReview() {
   return buildDesignBasisReview({
     designBasis: getDesignBasis(),
     designGateApprovals: getDesignGateApprovals(),
+    designSynthesisReviewDraft: getItem('designSynthesisReviewDraft', null),
     equipment: getEquipment(),
+    loads: getLoads(),
     oneLine: getOneLine(),
     cables: getCables(),
     trays: getTrays(),
@@ -816,6 +820,7 @@ function currentDashboardProject() {
     latestRouteResults,
     designBasis: getDesignBasis(),
     designGateApprovals: getDesignGateApprovals(),
+    designSynthesisReviewDraft: getItem('designSynthesisReviewDraft', null),
     tccSettings: getItem('tccSettings', null),
     currentInputFingerprint: getProjectInputFingerprint(),
     costEstimateArtifact: getItem('costEstimateArtifact', null),
@@ -1475,6 +1480,7 @@ function initReleasePackageForm() {
       approvals: getStudyApprovals(),
       designBasis: getDesignBasis(),
       designGateApprovals: getDesignGateApprovals(),
+      designSynthesisReviewDraft: getItem('designSynthesisReviewDraft', null),
       tccSettings: getItem('tccSettings', null),
       fieldObservations: getFieldObservations(),
       fieldObservationQueue: getFieldObservationQueue(),

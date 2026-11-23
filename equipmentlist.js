@@ -13,6 +13,8 @@ import {
   summarizeEquipment
 } from './analysis/equipmentWorkflow.mjs';
 import { openOneLineProbe } from './src/crossProbe.js';
+import { openMotorReferencePicker } from './src/equipment-list/motorReferencePicker.js';
+import { openMotorDesignCurrentPicker } from './src/equipment-list/motorDesignCurrentPicker.js';
 
 if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
@@ -27,6 +29,24 @@ if (typeof window !== 'undefined') {
         { key: 'tag', label: 'Equipment Tag', type: 'text' },
         { key: 'description', label: 'Description', type: 'text' },
         { key: 'voltage', label: 'Voltage (V)', type: 'text' },
+        { key: 'kw', label: 'Electrical Input (kW)', type: 'number', step: 'any', validate: 'numeric' },
+        { key: 'powerFactor', label: 'Power Factor', type: 'number', step: 'any', validate: 'numeric' },
+        { key: 'duty', label: 'Duty', type: 'text' },
+        { key: 'ratingsBasis', label: 'Power Rating Basis', type: 'text' },
+        { key: 'motorRatedVoltageV', label: 'Motor Rated Voltage (V)', type: 'number', step: 'any', validate: 'numeric' },
+        { key: 'motorFullLoadCurrentA', label: 'Motor Design FLC (A)', type: 'number', step: 'any', validate: 'numeric' },
+        { key: 'motorFullLoadCurrentReference', label: 'Motor Design FLC Reference', type: 'text' },
+        { key: 'motorNameplateCurrentA', label: 'Motor Nameplate Current (A)', type: 'number', step: 'any', validate: 'numeric' },
+        { key: 'motorNameplateHorsepower', label: 'Motor Nameplate Horsepower', type: 'number', step: 'any', validate: 'numeric' },
+        { key: 'motorNameplateFrequencyHz', label: 'Motor Nameplate Frequency (Hz)', type: 'number', step: 'any', validate: 'numeric' },
+        { key: 'motorLockedRotorCurrentA', label: 'Motor Locked Rotor Current (A)', type: 'number', step: 'any', validate: 'numeric' },
+        { key: 'motorLockedRotorPowerFactor', label: 'Motor Locked Rotor Power Factor', type: 'number', step: 'any', validate: 'numeric' },
+        { key: 'motorDataReference', label: 'Motor Nameplate / Starting Data Reference', type: 'text' },
+        { key: 'motorStarterType', label: 'Motor Starter Type', type: 'text' },
+        { key: 'motorRotorType', label: 'Motor Rotor Type', type: 'text' },
+        { key: 'motorInstantaneousPickupA', label: 'Motor Proposed Instantaneous Pickup (A)', type: 'text' },
+        { key: 'motorBreakerAmbientTemperatureC', label: 'Motor 70 A Breaker Enclosure Temperature (°C)', type: 'text' },
+        { key: 'motorBreakerAmbientReference', label: 'Motor Breaker Enclosure Temperature Reference', type: 'text' },
         { key: 'category', label: 'Category', type: 'text' },
         { key: 'subCategory', label: 'Sub-Category', type: 'text' },
         { key: 'arrangement', label: 'Arrangement', type: 'text' },
@@ -128,7 +148,7 @@ if (typeof window !== 'undefined') {
     const importXlsxInput = document.getElementById('import-xlsx-input');
     const equipmentViewButtons = Array.from(document.querySelectorAll('[data-equipment-view]'));
     const equipmentViews = {
-      core: ['tag', 'description', 'voltage', 'category', 'arrangement', 'lineup'],
+      core: ['tag', 'description', 'voltage', 'kw', 'powerFactor', 'duty', 'category', 'arrangement', 'lineup'],
       layout: ['tag', 'description', 'arrangement', 'width', 'depth', 'height', 'baseElevation', 'x', 'y', 'z'],
       procurement: ['tag', 'description', 'category', 'manufacturer', 'model', 'voltage', 'phases', 'notes'],
       full: null
@@ -431,6 +451,24 @@ if (typeof window !== 'undefined') {
                 <label>Manufacturer<input name="manufacturer" type="text" placeholder="Square D"></label>
                 <label>Model<input name="model" type="text" placeholder="Power-Style QED"></label>
                 <label>Phases<input name="phases" type="text" placeholder="3"></label>
+                <label>Electrical input (kW)<input name="kw" type="number" min="0" step="any" placeholder="Optional"></label>
+                <label>Power factor<input name="powerFactor" type="number" min="0" max="1" step="any" placeholder="Optional"></label>
+                <label>Duty<input name="duty" type="text" placeholder="continuous"></label>
+                <label>Power rating basis<input name="ratingsBasis" type="text" placeholder="electrical-input-kW"></label>
+                <label>Motor rated voltage (V)<input name="motorRatedVoltageV" type="number" min="0" step="any"></label>
+                <label>Motor design FLC (A)<input name="motorFullLoadCurrentA" type="number" min="0" step="any"></label>
+                <label>Motor design FLC reference<input name="motorFullLoadCurrentReference" type="text"></label>
+                <label>Motor nameplate current (A)<input name="motorNameplateCurrentA" type="number" min="0" step="any"></label>
+                <label>Motor nameplate horsepower<input name="motorNameplateHorsepower" type="number" min="0" step="any"></label>
+                <label>Motor nameplate frequency (Hz)<input name="motorNameplateFrequencyHz" type="number" min="0" step="any"></label>
+                <label>Motor locked rotor current (A)<input name="motorLockedRotorCurrentA" type="number" min="0" step="any"></label>
+                <label>Motor locked rotor power factor<input name="motorLockedRotorPowerFactor" type="number" min="0" max="1" step="any"></label>
+                <label>Motor nameplate / starting data reference<input name="motorDataReference" type="text"></label>
+                <label>Motor starter type<input name="motorStarterType" type="text" placeholder="dol"></label>
+                <label>Motor rotor type<input name="motorRotorType" type="text" placeholder="squirrel-cage"></label>
+                <label>Motor proposed instantaneous pickup (A)<input name="motorInstantaneousPickupA" type="text" placeholder="Blank inherits; none suppresses"></label>
+                <label>Motor 70 A breaker enclosure temperature (°C)<input name="motorBreakerAmbientTemperatureC" type="text" placeholder="40–70 in 5 °C steps; none suppresses"></label>
+                <label>Motor breaker enclosure temperature reference<input name="motorBreakerAmbientReference" type="text"></label>
                 <label class="modal-form-field--full">Notes<input name="notes" type="text" placeholder="Main service equipment"></label>
               </div>
             </details>
@@ -564,7 +602,7 @@ if (typeof window !== 'undefined') {
     };
 
     const openImportMappingModal = async headers => {
-      const fields = ['id', 'ref', 'tag', 'description', 'voltage', 'category', 'subCategory', 'arrangement', 'width', 'depth', 'height', 'baseElevation', 'lineup', 'manufacturer', 'model', 'phases', 'notes', 'x', 'y', 'z'];
+      const fields = ['id', 'ref', 'tag', 'description', 'voltage', 'kw', 'powerFactor', 'duty', 'ratingsBasis', 'motorRatedVoltageV', 'motorFullLoadCurrentA', 'motorFullLoadCurrentReference', 'motorNameplateCurrentA', 'motorNameplateHorsepower', 'motorNameplateFrequencyHz', 'motorLockedRotorCurrentA', 'motorLockedRotorPowerFactor', 'motorDataReference', 'motorStarterType', 'motorRotorType', 'motorInstantaneousPickupA', 'motorBreakerAmbientTemperatureC', 'motorBreakerAmbientReference', 'category', 'subCategory', 'arrangement', 'width', 'depth', 'height', 'baseElevation', 'lineup', 'manufacturer', 'model', 'phases', 'notes', 'x', 'y', 'z'];
       const inferred = inferEquipmentMapping(headers);
       headers.forEach(header => {
         if (!inferred[header] && fieldMap[header]) inferred[header] = fieldMap[header];
@@ -733,6 +771,18 @@ if (typeof window !== 'undefined') {
     if (bulkLineupBtn) {
       bulkLineupBtn.addEventListener('click', () => openBulkModal('lineup', 'Assign Equipment Lineup', 'Lineup'));
     }
+
+    document.getElementById('bulk-motor-reference-btn')?.addEventListener('click', () => openMotorReferencePicker({
+      readSelectedIds: () => Array.from(table.tbody.rows).filter(row => row.querySelector('.row-select')?.checked).map(row => row.dataset.rowId),
+      readRows: () => table.getData(),
+      commitRows: commitEquipmentRows,
+    }));
+
+    document.getElementById('bulk-motor-current-btn')?.addEventListener('click', () => openMotorDesignCurrentPicker({
+      readSelectedIds: () => Array.from(table.tbody.rows).filter(row => row.querySelector('.row-select')?.checked).map(row => row.dataset.rowId),
+      readRows: () => table.getData(),
+      commitRows: commitEquipmentRows,
+    }));
 
     if (clearFiltersBtn) {
       clearFiltersBtn.addEventListener('click', () => {

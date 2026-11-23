@@ -14,6 +14,7 @@ async function build() {
   ['pdfjs-dist', 'build', 'pdf.min.mjs', 'pdf.min.mjs'],
   ['pdfjs-dist', 'build', 'pdf.worker.min.mjs', 'pdf.worker.min.mjs'],
   ['svg2pdf.js', 'dist', 'svg2pdf.es.min.js', 'svg2pdf.es.min.js'],
+  ['svg2pdf.js', 'dist', 'svg2pdf.umd.min.js', 'svg2pdf.umd.min.js'],
 ];
 
   for (const [pkg, dir, file, dest] of vendorCopies) {

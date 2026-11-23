@@ -581,7 +581,9 @@ export function buildWorkflowCoreDiagnostics(project = {}) {
   const designReview = buildDesignBasisReview({
     designBasis: project.designBasis || null,
     designGateApprovals: project.designGateApprovals || project.reviewGateApprovals || {},
+    designSynthesisReviewDraft: project.designSynthesisReviewDraft ?? project.settings?.designSynthesisReviewDraft,
     equipment: project.equipment || [],
+    loads: project.loads || [],
     oneLine: project.oneLine || {},
     cables: project.cables || [],
     trays: project.trays || [],
@@ -599,7 +601,11 @@ export function buildWorkflowCoreDiagnostics(project = {}) {
   const cableDeliverables = cableDeliverableReadiness(project.cables || []);
   const designRules = designRuleSummary(project);
   const oneLineComponents = countOneLineComponents(project.oneLine || {});
-  const oneLineValidationIssues = runValidation(flattenOneLineComponents(project.oneLine || {}), project.studies || {});
+  const oneLineValidationIssues = runValidation(
+    flattenOneLineComponents(project.oneLine || {}),
+    project.studies || {},
+    { assessments: project.studyAssessments || project.lifecycleAssessments || {} }
+  );
   const racewayIntegrity = buildRacewayIntegrity({
     trays: project.trays || [],
     conduits: project.conduits || [],
@@ -611,6 +617,7 @@ export function buildWorkflowCoreDiagnostics(project = {}) {
   const studies = countObjectRecords(project.studies);
   const deliverables = countObjectRecords(project.reportSnapshots) + countObjectRecords(project.deliverables);
   const deliverableDiagnostics = buildDeliverableReadinessDiagnostics({
+    loads: project.loads || [],
     cables: project.cables || [],
     trays: project.trays || [],
     conduits: project.conduits || [],

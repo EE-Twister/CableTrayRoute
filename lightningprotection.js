@@ -2,11 +2,12 @@ import {
   runLightningProtection,
   LOCATION_FACTORS,
 } from './analysis/lightningProtection.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getStudies, getStudyAssessments, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
 import { downloadLightningProtectionPdf } from './src/lightningProtectionPdf.js';
+import { studyLifecycleMetadataLines } from './analysis/studyExportMetadata.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -172,9 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
     errorsDiv.hidden = true;
     errorsDiv.textContent = '';
 
-    const studies = getStudies();
-    studies.lightningProtection = result;
-    setStudies(studies);
+    saveStudyResult('lightningProtection', result, captureStudyRunContext('lightningProtection', { inputs: result.inputs || {}, options: {} }));
 
     renderResults(result);
     updateLiveVisual(result);
@@ -209,6 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
         result,
         svgElement: previewSvg,
         unitSystem,
+        assessment: getStudyAssessments().lightningProtection,
       });
       exportStatus.textContent = `Downloaded ${report.filename} (${report.pageCount} pages).`;
     } catch (err) {
@@ -1295,6 +1295,7 @@ document.addEventListener('DOMContentLoaded', () => {
       [],
       ['Scope exclusions'],
       ...bom.exclusions.map(item => [measurementTextForDisplay(item)]),
+      ...studyLifecycleMetadataLines(r, { assessment: getStudyAssessments().lightningProtection }),
     ];
     return lines.map(row => row.map(csvCell).join(',')).join('\r\n');
   }
@@ -1355,6 +1356,7 @@ document.addEventListener('DOMContentLoaded', () => {
         lines.push('Arrester rated standard (kV),n/a');
       }
     }
+    lines.push(...studyLifecycleMetadataLines(r, { assessment: getStudyAssessments().lightningProtection }));
     return lines.join('\n');
   }
 

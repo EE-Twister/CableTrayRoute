@@ -1,5 +1,10 @@
-import { interpolateTime } from '../tccAutoCoord.mjs';
 import { collectNearestDirectionalDeviceUids } from '../tccContext.mjs';
+import {
+  evaluateDamageLimitConstraint,
+  evaluateRideThroughConstraint
+} from './equipmentCurveConstraintModel.mjs';
+
+export { evaluateDamageLimitConstraint, evaluateRideThroughConstraint } from './equipmentCurveConstraintModel.mjs';
 
 export const PROTECTIVE_DEVICE_TYPES = Object.freeze([
   'breaker',
@@ -91,57 +96,6 @@ export function resolveEquipmentProtectiveEntry(
 
 export function isProtectiveDeviceType(value) {
   return PROTECTIVE_TYPE_SET.has(normalizeProtectionType(value));
-}
-
-function protectiveCheckCurve(entry, mode) {
-  if (!entry?.scaled) return [];
-  if (mode === 'rideThrough') {
-    return entry.scaled.minCurve?.length ? entry.scaled.minCurve : (entry.scaled.curve || []);
-  }
-  return entry.scaled.maxCurve?.length ? entry.scaled.maxCurve : (entry.scaled.curve || []);
-}
-
-export function evaluateRideThroughConstraint(overlay, protectiveEntry) {
-  const current = overlay.current || overlay.lockedRotor;
-  const duration = overlay.normalizedDuration || overlay.duration || overlay.startTime;
-  if (!Number.isFinite(current) || current <= 0 || !Number.isFinite(duration) || duration <= 0) return null;
-  const entry = Array.isArray(protectiveEntry) ? protectiveEntry[0] : protectiveEntry;
-  if (!entry) return null;
-  const tripTime = interpolateTime(protectiveCheckCurve(entry, 'rideThrough'), current);
-  const margin = tripTime - duration;
-  return {
-    kind: 'rideThrough',
-    status: margin > 0 ? 'ok' : 'warning',
-    overlay,
-    current,
-    duration,
-    entry,
-    tripTime,
-    margin
-  };
-}
-
-export function evaluateDamageLimitConstraint(overlay, protectiveEntry) {
-  const points = Array.isArray(overlay.curve)
-    ? overlay.curve.filter(point => Number.isFinite(point.current) && point.current > 0 && Number.isFinite(point.time) && point.time > 0)
-    : [];
-  if (!points.length) return null;
-  const entry = Array.isArray(protectiveEntry) ? protectiveEntry[0] : protectiveEntry;
-  if (!entry) return null;
-  let worst = null;
-  points.forEach(point => {
-    const tripTime = interpolateTime(protectiveCheckCurve(entry, 'damage'), point.current);
-    const margin = point.time - tripTime;
-    const evaluation = { entry, tripTime, margin, point };
-    if (!worst || evaluation.margin < worst.margin) worst = evaluation;
-  });
-  if (!worst) return null;
-  return {
-    kind: 'damageLimit',
-    status: worst.margin >= 0 ? 'ok' : 'warning',
-    overlay,
-    ...worst
-  };
 }
 
 export function evaluateEquipmentConstraints(plotted = [], overlays = [], associationContext = {}) {

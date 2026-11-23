@@ -4,7 +4,11 @@ import {
   getLoads,
   getStudies,
   setCables,
-  setStudies,
+  captureStudyRunContext,
+  saveStudyResult,
+  getStudyProvenance,
+  getStudyAssessments,
+  getProjectInputFingerprint,
 } from './dataStore.mjs';
 import {
   createStudyRunMetadata,
@@ -12,6 +16,7 @@ import {
   isStudyResultStale,
 } from './analysis/studyResultReadiness.mjs';
 import { downloadCSV } from './reports/reporting.mjs';
+import { studyExportMetadata } from './analysis/studyExportMetadata.mjs';
 import { openModal, showAlertModal } from './src/components/modal.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -40,11 +45,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function currentSource() {
     const studies = getStudies();
-    const loadFlow = studies.loadFlow?.converged === true ? studies.loadFlow : null;
+    const provenance = getStudyProvenance()?.loadFlow || {};
+    const loadFlow = studies.loadFlow?.converged === true
+      && provenance.inputHash
+      && provenance.inputHash === getProjectInputFingerprint()
+      ? { ...studies.loadFlow, inputHash: provenance.inputHash }
+      : null;
     const source = {
       cables: getCables(),
       loads: getLoads(),
       loadFlow,
+      studyProvenance: provenance,
+      inputHash: getProjectInputFingerprint(),
     };
     return {
       ...source,
@@ -231,7 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ),
     };
     if (complete) {
-      setStudies({ ...getStudies(), voltageDropStudy: study });
+      saveStudyResult('voltageDropStudy', study, captureStudyRunContext('voltageDropStudy', { inputs: study.inputs || {}, options: {} }));
     }
     renderStudy(study);
   }
@@ -269,28 +281,47 @@ document.addEventListener('DOMContentLoaded', () => {
       'Cable', 'From', 'To', 'Conductor', 'Length (ft)', 'Current (A)', 'Current Source',
       'Voltage (V)', 'Individual Drop (%)', 'Individual Limit (%)', 'Individual Status',
       'Connected Path', 'Combined Drop (%)', 'Combined Limit (%)', 'Combined Status',
-      'Recommended Conductor', 'Recommended Drop (%)', 'Basis',
+      'Recommended Conductor', 'Recommended Drop (%)', 'Basis', 'Validity', 'Units',
+      'Input Sources', 'Assumptions', 'Model Limits', 'Warnings', 'Input Fingerprint',
+      'Freshness', 'Eligibility', 'Result Status', 'Calculation Version', 'Calculated At',
+      'Limitations', 'Study Options', 'Provenance',
     ];
-    const rows = lastStudy.results.map(result => [
-      result.tag,
-      result.from,
-      result.to,
-      `${result.conductorSize} ${result.material}`,
-      result.lengthFt || '',
-      result.currentA || '',
-      result.inputSource?.current || '',
-      result.voltageV || '',
-      result.evaluated ? result.dropPct.toFixed(3) : '',
-      result.limit,
-      result.status,
-      result.pathTags.join(' -> '),
-      result.pathEvaluated ? result.combinedDropPct.toFixed(3) : '',
-      result.combinedLimitPct,
-      result.combinedStatus,
-      result.recommendation?.conductorSize || '',
-      result.recommendation?.expectedDropPct?.toFixed(3) || '',
-      result.basis,
-    ]);
+    const lifecycle = studyExportMetadata(lastStudy, { assessment: getStudyAssessments().voltageDropStudy });
+    const rows = lastStudy.results.map(result => ({
+      Cable: result.tag,
+      From: result.from,
+      To: result.to,
+      Conductor: `${result.conductorSize} ${result.material}`,
+      'Length (ft)': result.lengthFt || '',
+      'Current (A)': result.currentA || '',
+      'Current Source': result.inputSource?.current || '',
+      'Voltage (V)': result.voltageV || '',
+      'Individual Drop (%)': result.evaluated ? result.dropPct.toFixed(3) : '',
+      'Individual Limit (%)': result.limit,
+      'Individual Status': result.status,
+      'Connected Path': result.pathTags.join(' -> '),
+      'Combined Drop (%)': result.pathEvaluated ? result.combinedDropPct.toFixed(3) : '',
+      'Combined Limit (%)': result.combinedLimitPct,
+      'Combined Status': result.combinedStatus,
+      'Recommended Conductor': result.recommendation?.conductorSize || '',
+      'Recommended Drop (%)': result.recommendation?.expectedDropPct?.toFixed(3) || '',
+      Basis: result.basis,
+      Validity: result.resultContract?.validity || 'unevaluated',
+      Units: result.resultContract?.units || '%',
+      'Input Sources': JSON.stringify(result.resultContract?.inputSources || {}),
+      Assumptions: JSON.stringify(result.resultContract?.assumptions || {}),
+      'Model Limits': JSON.stringify(result.resultContract?.modelLimits || {}),
+      Warnings: JSON.stringify(result.resultContract?.warnings || []),
+      'Input Fingerprint': result.resultContract?.inputFingerprint || '',
+      Freshness: lifecycle.freshness,
+      Eligibility: lifecycle.resultEligibility,
+      'Result Status': lifecycle.resultStatus,
+      'Calculation Version': lifecycle.calculationVersion,
+      'Calculated At': lifecycle.calculatedAt,
+      Limitations: lifecycle.limitations,
+      'Study Options': lifecycle.studyOptions,
+      Provenance: lifecycle.provenance,
+    }));
     downloadCSV(headers, rows, 'voltage-drop-study.csv');
   }
 

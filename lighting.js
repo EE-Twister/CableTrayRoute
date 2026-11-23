@@ -4,9 +4,10 @@ import {
   generateDefaultFixtureLayout,
   MAX_LIGHTING_FIXTURE_LAYOUT_COUNT,
 } from './analysis/lighting.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getStudies, getStudyAssessments, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { studyLifecycleMetadataRows } from './analysis/studyExportMetadata.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -166,6 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function calculate() {
     const inputs = readInputs();
+    const runContext = captureStudyRunContext('lighting', { inputs, options: inputs });
     const result = runLightingStudy(inputs);
 
     const toStore = {
@@ -174,9 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
       _iesData:     iesData,
       _iesFileName: iesFileInput.files[0]?.name || null,
     };
-    const studies = getStudies();
-    studies.lighting = toStore;
-    setStudies(studies);
+    saveStudyResult('lighting', toStore, runContext);
 
     renderResults(toStore);
     renderLayoutPreview(inputs, toStore);
@@ -665,6 +665,8 @@ document.addEventListener('DOMContentLoaded', () => {
       rows.push(['Point Grid', 'Minimum illuminance', pg.minFc, 'fc', '']);
       rows.push(['Point Grid', 'Grid rows × cols', `${pg.rows} × ${pg.cols}`, '', '']);
     }
+
+    studyLifecycleMetadataRows(saved, { assessment: getStudyAssessments().lighting }).forEach(([key, value]) => rows.push(['Lifecycle', key, value, '', '']));
 
     const csv = rows.map(r =>
       r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','),

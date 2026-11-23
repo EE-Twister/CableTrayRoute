@@ -2,9 +2,10 @@
  * Trust Center — Benchmark Library
  *
  * Canonical known-answer problems (KAPs) covering key calculation engines.
- * Expected values are derived analytically from first-principles formulas so
- * a passing result confirms the engine matches the governing standard — not
- * just that it is internally consistent.
+ * Expected values are derived analytically from first-principles formulas for
+ * each identified fixture. A passing result supports that fixture within the
+ * documented model scope; it does not by itself establish general standard
+ * compliance.
  *
  * Each benchmark:
  *   id          — unique identifier (e.g. 'EMF-001')
@@ -43,6 +44,50 @@ import {
 } from './transientStability.mjs';
 import { DEFAULT_FLEET, runOptimalPowerFlow } from './optimalPowerFlow.mjs';
 import { evaluateTrayFill, table39222AllowableArea } from './trayFill.mjs';
+import { FAULT_PROTECTION_BENCHMARKS } from './benchmarks/faultProtectionEvidence.mjs';
+import { THERMAL_GROUND_BENCHMARKS } from './benchmarks/thermalGroundEvidence.mjs';
+import { CABLE_THERMAL_BENCHMARKS } from './benchmarks/cableThermalEvidence.mjs';
+
+const TCC_SMC20_SOURCE_POINTS = FAULT_PROTECTION_BENCHMARKS
+  .find(benchmark => benchmark.id === 'PROTECTION-SC-SMU20-25E')?.inputs?.curvePoints || [];
+
+const IEC60909_001_INPUTS = {
+  z1: { r: 0.0397, x: 0.397 },
+  z2: { r: 0.0397, x: 0.397 },
+  z0: { r: 0.0397, x: 0.397 },
+  prefaultKV: 10,
+  cMode: 'max',
+  faultDurationS: 1,
+};
+
+const IEC60909_001_SOURCE = {
+  title: 'IEC Webstore — IEC 60909-0:2016 Short-circuit currents in three-phase AC systems',
+  url: 'https://webstore.iec.ch/en/publication/24100',
+  locator: 'IEC 60909-0:2016, three-phase short-circuit current equations and voltage factor c_max',
+  accessedOn: '2026-09-17',
+  kind: 'equation_basis',
+};
+
+const IEC60287_001_INPUTS = {
+  sizeMm2: 95,
+  material: 'Cu',
+  insulation: 'XLPE',
+  insulThickMm: 1.6,
+  nCores: 3,
+  installMethod: 'direct-burial',
+  burialDepthMm: 800,
+  soilResistivity: 1,
+  ambientTempC: 20,
+  frequencyHz: 50,
+};
+
+const IEC60287_001_SOURCE = {
+  title: 'IEC Webstore — IEC 60287-1-1:2023 Electric cables: calculation of the current rating',
+  url: 'https://webstore.iec.ch/en/publication/68118',
+  locator: 'IEC 60287-1-1:2023, steady-state current-rating equations for direct-buried cables',
+  accessedOn: '2026-09-17',
+  kind: 'equation_basis',
+};
 
 export const BENCHMARKS = [
   {
@@ -265,6 +310,8 @@ export const BENCHMARKS = [
         insulation_rating:  '75',
         circuit_type:       'branch',
         phases:             '1',
+        power_factor:       '0.9',
+        wiring_method:      'conduit PVC',
       }, 30);
       return {
         drop_pct:    r.dropPct,
@@ -275,8 +322,8 @@ export const BENCHMARKS = [
       {
         key: 'drop_pct',
         description: 'Voltage drop (%) must be below 3 % recommendation',
-        expectedVal: 1.5,    // Midpoint of expected range; tolerance keeps [0, 3) passing
-        tolerance: 1.5,
+        expectedVal: 0.9118,
+        tolerance: 0.01,
       },
       {
         key: 'status_pass',
@@ -305,6 +352,8 @@ export const BENCHMARKS = [
         insulation_rating:  '75',
         circuit_type:       'branch',
         phases:             '1',
+        power_factor:       '0.9',
+        wiring_method:      'conduit PVC',
       }, 150);
       return {
         drop_pct:         r.dropPct,
@@ -315,8 +364,8 @@ export const BENCHMARKS = [
       {
         key: 'drop_pct',
         description: 'Voltage drop (%) must exceed 3 % recommendation',
-        expectedVal: 12,     // Midpoint of expected range [3, 21 %]; actual ≈ 15 %
-        tolerance: 9,
+        expectedVal: 14.0764,
+        tolerance: 0.02,
       },
       {
         key: 'status_not_pass',
@@ -504,12 +553,8 @@ export const BENCHMARKS = [
       '32.1639 s through 602.961 s. The live evaluator must preserve the vertical segment ' +
       'and select the shortest time for the minimum-melting boundary.',
     run() {
-      const verticalSegment = Array.from({ length: 28 }, (_unused, index) => ({
-        current: 49.5972,
-        time: 32.1639 + (602.961 - 32.1639) * index / 27,
-      }));
-      const lower = evaluateTimeCurrentCurve(verticalSegment, 49.5972, { boundary: 'lower' });
-      const upper = evaluateTimeCurrentCurve(verticalSegment, 49.5972, { boundary: 'upper' });
+      const lower = evaluateTimeCurrentCurve(TCC_SMC20_SOURCE_POINTS, 49.5972, { boundary: 'lower' });
+      const upper = evaluateTimeCurrentCurve(TCC_SMC20_SOURCE_POINTS, 49.5972, { boundary: 'upper' });
       return {
         minimum_melting_s: lower.time,
         maximum_source_time_s: upper.time,
@@ -532,20 +577,26 @@ export const BENCHMARKS = [
     studyType: 'IEC Short Circuit',
     standardRef: 'IEC 60909-0:2016 (version-pinned regression; 2026 edition not yet claimed)',
     sourceUrl: 'https://webstore.iec.ch/en/publication/24100',
+    inputs: IEC60909_001_INPUTS,
+    inputUnits: {
+      z1: 'ohm',
+      z2: 'ohm',
+      z0: 'ohm',
+      prefaultKV: 'kV',
+      cMode: 'enum',
+      faultDurationS: 's',
+    },
+    source: IEC60909_001_SOURCE,
+    limitations: [
+      'Version-pinned to the implemented IEC 60909-0:2016 path; IEC 60909-0:2026 is not claimed.',
+      'This is a balanced three-phase maximum-current regression and does not establish complete installation-specific fault-duty compliance.',
+    ],
     description:
       'A 10 kV bus with positive-, negative-, and zero-sequence impedance 0.0397 + j0.397 ohm ' +
       'uses the maximum voltage factor. This executable case checks initial symmetrical current, ' +
       'peak factor, and peak current. It is intentionally pinned to the implemented 2016 edition.',
     run() {
-      const z1 = { r: 0.0397, x: 0.397 };
-      const result = computeIEC60909Bus({
-        z1,
-        z2: z1,
-        z0: z1,
-        prefaultKV: 10,
-        cMode: 'max',
-        faultDurationS: 1,
-      });
+      const result = computeIEC60909Bus(IEC60909_001_INPUTS);
       return {
         c_factor: result.cFactor,
         kappa: result.kappa,
@@ -554,10 +605,10 @@ export const BENCHMARKS = [
       };
     },
     checks: [
-      { key: 'c_factor', description: 'Maximum voltage factor c', expectedVal: 1.1, tolerance: 0.001 },
-      { key: 'kappa', description: 'Peak factor κ', expectedVal: 1.746, tolerance: 0.001 },
-      { key: 'ik3_ka', description: 'Initial symmetrical three-phase current (kA)', expectedVal: 15.92, tolerance: 0.02 },
-      { key: 'peak_ka', description: 'Peak short-circuit current (kA)', expectedVal: 39.3, tolerance: 0.1 },
+      { key: 'c_factor', description: 'Maximum voltage factor c', expectedVal: 1.1, tolerance: 0.001, unit: 'pu', toleranceBasis: 'IEC 60909 factor rounded to 0.001' },
+      { key: 'kappa', description: 'Peak factor κ', expectedVal: 1.746, tolerance: 0.001, unit: 'pu', toleranceBasis: 'IEC 60909 factor rounded to 0.001' },
+      { key: 'ik3_ka', description: 'Initial symmetrical three-phase current (kA)', expectedVal: 15.92, tolerance: 0.02, unit: 'kA', toleranceBasis: '0.02 kA reporting and floating-point tolerance' },
+      { key: 'peak_ka', description: 'Peak short-circuit current (kA)', expectedVal: 39.3, tolerance: 0.1, unit: 'kA', toleranceBasis: '0.1 kA reporting and floating-point tolerance' },
     ],
   },
 
@@ -568,23 +619,30 @@ export const BENCHMARKS = [
     studyType: 'Cable Ampacity',
     standardRef: 'IEC 60287-1-1:2023 steady-state current-rating equations',
     sourceUrl: 'https://webstore.iec.ch/en/publication/68118',
+    inputs: IEC60287_001_INPUTS,
+    inputUnits: {
+      sizeMm2: 'mm²',
+      material: 'enum',
+      insulation: 'enum',
+      insulThickMm: 'mm',
+      nCores: 'count',
+      installMethod: 'enum',
+      burialDepthMm: 'mm',
+      soilResistivity: 'K·m/W',
+      ambientTempC: '°C',
+      frequencyHz: 'Hz',
+    },
+    source: IEC60287_001_SOURCE,
+    limitations: [
+      'Steady-state direct-burial screening only; installation-specific cable construction, screens, sheath losses, and thermal environment require review.',
+      'The benchmark does not establish ampacity for other cable sizes, formations, soil conditions, or correction-factor combinations.',
+    ],
     description:
       'A 95 mm² copper, three-core XLPE cable is evaluated at IEC reference soil and ambient ' +
       'conditions. The live thermal-resistance engine must reproduce the independently recorded ' +
       'continuous rating and conductor-temperature reverse check.',
     run() {
-      const result = calcAmpacity({
-        sizeMm2: 95,
-        material: 'Cu',
-        insulation: 'XLPE',
-        insulThickMm: 1.6,
-        nCores: 3,
-        installMethod: 'direct-burial',
-        burialDepthMm: 800,
-        soilResistivity: 1,
-        ambientTempC: 20,
-        frequencyHz: 50,
-      });
+      const result = calcAmpacity(IEC60287_001_INPUTS);
       return {
         ampacity_a: result.I_rated,
         conductor_temp_c: result.thetaConductorActual,
@@ -592,9 +650,9 @@ export const BENCHMARKS = [
       };
     },
     checks: [
-      { key: 'ampacity_a', description: 'Continuous current rating (A)', expectedVal: 315.8, tolerance: 0.2 },
-      { key: 'conductor_temp_c', description: 'Conductor temperature at rated current (°C)', expectedVal: 90, tolerance: 0.2 },
-      { key: 'grouping_factor', description: 'Single-circuit grouping factor', expectedVal: 1, tolerance: 0 },
+      { key: 'ampacity_a', description: 'Continuous current rating (A)', expectedVal: 315.8, tolerance: 0.2, unit: 'A', toleranceBasis: '0.2 A reporting and floating-point tolerance' },
+      { key: 'conductor_temp_c', description: 'Conductor temperature at rated current (°C)', expectedVal: 90, tolerance: 0.2, unit: '°C', toleranceBasis: '0.2 °C reporting and floating-point tolerance' },
+      { key: 'grouping_factor', description: 'Single-circuit grouping factor', expectedVal: 1, tolerance: 0, unit: 'pu', toleranceBasis: 'Exact single-circuit factor' },
     ],
   },
 
@@ -695,5 +753,9 @@ export const BENCHMARKS = [
       { key: 'system_lambda', description: 'Equal incremental cost ($/MWh)', expectedVal: 9.1483, tolerance: 0.001 },
       { key: 'cost_per_hour', description: 'Total production cost ($/h)', expectedVal: 8194.36, tolerance: 0.05 },
     ],
-  }
+  },
+
+  ...FAULT_PROTECTION_BENCHMARKS,
+  ...THERMAL_GROUND_BENCHMARKS,
+  ...CABLE_THERMAL_BENCHMARKS,
 ];

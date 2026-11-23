@@ -3,9 +3,10 @@ import {
   CHEMISTRY_PARAMS,
   EXPOSURE_TYPES,
 } from './analysis/bessHazard.mjs';
-import { getStudies, setStudies, getEquipment, getProjectMeta } from './dataStore.mjs';
+import { getStudies, getStudyAssessments, getEquipment, getProjectMeta, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { studyLifecycleMetadataRows } from './analysis/studyExportMetadata.mjs';
 import {
   buildBessHazardProjectInputs,
   createStudyInputSnapshot,
@@ -39,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function readProjectInputModel() {
     return buildBessHazardProjectInputs({
-      equipment: getEquipment(), studies: getStudies(), projectMeta: getProjectMeta(),
+      equipment: getEquipment(), studies: getStudies(), studyAssessments: getStudyAssessments(), projectMeta: getProjectMeta(),
     });
   }
 
@@ -164,14 +165,21 @@ document.addEventListener('DOMContentLoaded', () => {
   // -------------------------------------------------------------------
 
   function calculate() {
+    applyProjectInputs(false);
     const inputs = readInputs();
+    const usesBatteryStudy = Object.entries(projectInputModel?.bindings || {}).some(([fieldName, binding]) => (
+      !projectOverrides.has(fieldName) && binding?.sourcePath?.startsWith('studyResults.batterySizing')
+    ));
+    const runContext = captureStudyRunContext('bessHazard', {
+      inputs,
+      options: inputs,
+      ...(usesBatteryStudy ? {} : { dependencies: [] }),
+    });
     const result = runBessHazardStudy(inputs);
 
     const snapshot = createStudyInputSnapshot('bessHazard', inputs, projectInputModel.bindings, projectOverrides);
     const toStore = withStudyProvenance({ ...result, _inputs: inputs }, snapshot);
-    const studies = getStudies();
-    studies.bessHazard = toStore;
-    setStudies(studies);
+    saveStudyResult('bessHazard', toStore, runContext);
 
     renderResults(toStore);
     exportBtn.disabled = !result.valid;
@@ -417,6 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
     for (const issue of summary.issues) {
       rows.push(['Issues', issue, '', '', '']);
     }
+    studyLifecycleMetadataRows(saved, { assessment: getStudyAssessments().bessHazard }).forEach(([key, value]) => rows.push(['Lifecycle', key, value, '', '']));
 
     const csv = rows.map(r =>
       r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')

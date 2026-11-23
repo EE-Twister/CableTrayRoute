@@ -2,10 +2,11 @@ import {
   runSubstationLayout,
   extractEquipment,
 } from './analysis/substationLayout.mjs';
-import { getStudies, setStudies, getOneLine } from './dataStore.mjs';
+import { getStudies, getOneLine, getStudyAssessments, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { studyLifecycleMetadataLines } from './analysis/studyExportMetadata.mjs';
 
 const TYPE_OPTIONS = [
   ['transformer', 'Power Transformer'],
@@ -148,9 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
     errorsDiv.hidden = true;
     errorsDiv.textContent = '';
 
-    const studies = getStudies();
-    studies.substationLayout = result;
-    setStudies(studies);
+    saveStudyResult('substationLayout', result, captureStudyRunContext('substationLayout', { inputs: result.inputs || {}, options: {} }));
 
     renderResults(result);
     exportBtn.hidden = false;
@@ -291,6 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const ggW = Math.abs(r.groundGridPolygon[1].x - r.groundGridPolygon[0].x);
     const ggH = Math.abs(r.groundGridPolygon[2].y - r.groundGridPolygon[0].y);
     lines.push(`# Ground grid perimeter (ft),${ggW.toFixed(1)},x,${ggH.toFixed(1)}`);
+    lines.push(...studyLifecycleMetadataLines(r, { assessment: getStudyAssessments().substationLayout }));
     lines.push('Tag,Type,kV,X_ft,Y_ft,Width_ft,Depth_ft,Clearance_ft');
     r.footprints.forEach(p => lines.push(
       [p.tag, p.label, p.voltageKv, p.x.toFixed(1), p.y.toFixed(1), p.w, p.h, p.setback].join(',')));

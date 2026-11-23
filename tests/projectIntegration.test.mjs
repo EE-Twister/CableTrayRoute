@@ -48,6 +48,7 @@ assert.equal(meta.ambientTempC, 46);
 const battery = buildBatteryProjectInputs({
   loads,
   studies: { motorStart: { peakLoadKw: 180 } },
+  allowUnassessedStudies: true,
   designBasis: { sizingDefaults: { defaultPowerFactor: 0.92 } },
   projectMeta: { name: 'Project Alpha', batteryRuntimeHours: 1.5, ambientTempC: 30 },
 });
@@ -57,6 +58,21 @@ assert.equal(battery.inputs.peakLoadKw, 180);
 assert.equal(battery.inputs.runtimeHours, 1.5);
 assert.equal(battery.inputs.upsPowerFactor, 0.92);
 assert.equal(battery.missing.length, 0);
+
+const withheldMotorStart = buildBatteryProjectInputs({
+  loads,
+  studies: { motorStart: { peakLoadKw: 180 } },
+});
+assert.equal(withheldMotorStart.inputs.peakLoadKw, withheldMotorStart.inputs.averageLoadKw,
+  'unassessed motor-start results must not drive battery sizing');
+
+const staleMotorStart = buildBatteryProjectInputs({
+  loads: [],
+  studies: { motorStart: { peakLoadKw: 180 } },
+  studyAssessments: { motorStart: { eligible: false, freshness: 'stale', validity: { state: 'evaluated' } } },
+});
+assert.equal(staleMotorStart.inputs.peakLoadKw, null,
+  'stale motor-start values must not remain in an unoverridden battery field');
 
 const generator = buildGeneratorProjectInputs({
   loads,
@@ -77,10 +93,20 @@ const generatorFromMotorStart = buildGeneratorProjectInputs({
       controllingMotor: { id: 'M-300', label: 'Cooling Water Pump', hp: 300, powerFactor: 0.82, efficiency: 0.95 },
     },
   },
+  allowUnassessedStudies: true,
 });
 assert.equal(generatorFromMotorStart.inputs.motorHp, 300);
 assert.equal(generatorFromMotorStart.inputs.motorPf, 0.82);
 assert.equal(generatorFromMotorStart.bindings.motorHp.sourcePath, 'studyResults.motorStart.controllingMotor.hp');
+
+const staleGeneratorMotor = buildGeneratorProjectInputs({
+  loads: [],
+  equipment: [],
+  studies: { motorStart: { controllingMotor: { hp: 300, powerFactor: 0.82, efficiency: 0.95 } } },
+  studyAssessments: { motorStart: { eligible: false, freshness: 'stale', validity: { state: 'evaluated' } } },
+});
+assert.equal(staleGeneratorMotor.inputs.motorHp, 0,
+  'stale motor-start values must not remain in an unoverridden generator field');
 
 const inferredMotor = buildGeneratorProjectInputs({
   loads: [{ tag: 'PMP-101', description: 'Cooling water pump motor', loadType: 'Motor', kw: 18.6, powerFactor: 85, efficiency: 92 }],
@@ -152,6 +178,7 @@ const scopedProject = {
   trays: [{ id: 'TR-1' }],
   conduits: [],
   studies: { shortCircuit: { availableFaultKa: 22.4, xrRatio: 12 } },
+  allowUnassessedStudies: true,
   projectMeta: { maxAmbientTempC: 45 },
   designBasis: { sizingDefaults: { insulationType: 'THWN-2', installationType: 'conduit' } },
 };
@@ -162,6 +189,25 @@ assert.equal(pumpScope.voltageV, 480);
 assert.equal(pumpScope.lengthFt, 95);
 assert.equal(pumpScope.faultCurrentKA, 22.4);
 assert.ok(pumpScope.currentA > 25 && pumpScope.currentA < 30);
+
+const fallbackFaultScope = resolveProjectScope(scopeOptions.find(option => option.kind === 'load').value, {
+  ...scopedProject,
+  studies: {
+    shortCircuit: { availableFaultKa: 22.4 },
+    iec60909: { availableFaultKa: 18.2 },
+  },
+  studyAssessments: {
+    shortCircuit: { eligible: false, validity: { state: 'evaluated' }, freshness: 'stale' },
+    iec60909: { eligible: true, validity: { state: 'evaluated' }, freshness: 'current' },
+  },
+});
+assert.equal(fallbackFaultScope.faultCurrentKA, 18.2,
+  'a current IEC 60909 result must be selected when short-circuit is stale');
+assert.equal(resolveProjectScope(scopeOptions.find(option => option.kind === 'load').value, {
+  ...scopedProject,
+  studies: { shortCircuit: { availableFaultKa: 22.4 } },
+  allowUnassessedStudies: false,
+}).faultCurrentKA, null, 'missing lifecycle assessment must withhold fault current');
 
 const busInputs = buildBusDuctProjectInputs(pumpScope, scopedProject.projectMeta);
 assert.equal(busInputs.inputs.systemVoltageV, 480);
@@ -214,12 +260,21 @@ const bessInputs = buildBessHazardProjectInputs({
   equipment: [],
   projectMeta: { maxAmbientTempC: 42 },
   studies: { batterySizing: { selectedBankKwh: 250, chemistry: 'lead-acid-agm', rackLayoutInputs: { cellsPerModule: 12, modulesPerRack: 40 } } },
+  allowUnassessedStudies: true,
 });
 assert.equal(bessInputs.inputs.ratedKwh, 250);
 assert.equal(bessInputs.inputs.chemistry, 'lead-acid');
 assert.equal(bessInputs.inputs.cellsPerModule, 12);
 assert.equal(bessInputs.inputs.modulesPerRack, 40);
 assert.equal(bessInputs.inputs.ambientC, 42);
+const missingBessInputs = buildBessHazardProjectInputs({
+  equipment: [],
+  studies: {},
+  studyAssessments: {},
+});
+assert.equal(missingBessInputs.inputs.chemistry, null);
+assert.equal(missingBessInputs.inputs.cellsPerModule, null);
+assert.equal(missingBessInputs.inputs.modulesPerRack, null);
 
 const insulationInputs = buildInsulationCoordinationProjectInputs(pumpScope, { altitudeFt: 1250 });
 assert.equal(insulationInputs.inputs.nominalVoltageKv, 0.48);

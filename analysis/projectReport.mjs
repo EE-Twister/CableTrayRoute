@@ -21,6 +21,11 @@
 import { detectClashes, overallSeverity } from './clashDetect.mjs';
 import { buildHeatTraceReport } from './heatTraceReport.mjs';
 import { generateSpoolSheets } from './spoolSheets.mjs';
+import {
+  assessStudyResult,
+  buildStudyContextIndex,
+  decorateStudyRows,
+} from './studyResultContext.mjs';
 
 // ---------------------------------------------------------------------------
 // Fill helpers
@@ -445,10 +450,11 @@ ${heatTrace ? `<section class="report-section" id="rpt-heat-trace">
  * @param {object} studies
  * @param {object} approvals
  */
-export function buildArcFlashSection(studies = {}, approvals = {}) {
+export function buildArcFlashSection(studies = {}, approvals = {}, options = {}) {
   const data = studies.arcFlash || null;
   const approval = approvals.arcFlash || null;
   if (!data) return { key: 'arcFlash', title: 'Arc Flash Study', empty: true };
+  const assessment = assessStudyResult('arcFlash', data, options.studyProvenance?.arcFlash, options);
 
   // data may be a flat results object keyed by bus/component ID
   const entries = Array.isArray(data)
@@ -457,65 +463,169 @@ export function buildArcFlashSection(studies = {}, approvals = {}) {
         .filter(([k]) => !k.startsWith('_'))
         .map(([id, v]) => (typeof v === 'object' && v !== null ? { id, ...v } : { id, value: v }));
 
-  const rows = entries.map(e => ({
-    id:             e.id || e.busId || '—',
-    incidentEnergy: e.incidentEnergy ?? e.incident_energy ?? '—',
-    ppeSelection:   Number(e.minimumArcRatingCalCm2) > 0
-      ? `Arc rating ≥ ${e.minimumArcRatingCalCm2} cal/cm²`
-      : (Number(e.incidentEnergy ?? e.incident_energy) <= 1.2 ? 'Below 1.2 cal/cm² threshold' : '—'),
-    boundary:       e.boundary       ?? e.arc_flash_boundary ?? '—',
-    clearingTime:   e.clearingTime   ?? e.clearing_time   ?? '—',
-    voltage:        e.voltage        ?? e.nominalVoltage   ?? '—',
-  }));
+  const rows = entries.map(e => {
+    const incidentEnergy = e.incidentEnergy ?? e.incident_energy;
+    const incidentEnergyNumber = Number(incidentEnergy);
+    const rowEvaluated = e.validity === undefined
+      ? assessment.validity === 'evaluated'
+      : e.validity === 'evaluated';
+    const ppeRating = Number(e.minimumArcRatingCalCm2);
+    return {
+      id:             e.id || e.busId || '—',
+      incidentEnergy: incidentEnergy ?? '—',
+      ppeSelection:   rowEvaluated && Number.isFinite(ppeRating) && ppeRating > 0
+        ? `Arc rating ≥ ${ppeRating} cal/cm²`
+        : (rowEvaluated && Number.isFinite(incidentEnergyNumber) && incidentEnergyNumber <= 1.2
+          ? 'Below 1.2 cal/cm² threshold' : '—'),
+      boundary:       e.boundary       ?? e.arc_flash_boundary ?? '—',
+      clearingTime:   e.clearingTime   ?? e.clearing_time   ?? '—',
+      voltage:        e.voltage        ?? e.nominalVoltage   ?? '—',
+      ...(e.validity !== undefined ? { validity: e.validity } : {}),
+      ...(Array.isArray(e.warnings) ? { warnings: e.warnings } : {}),
+      ...(e.assumptions !== undefined ? { assumptions: e.assumptions } : {}),
+      ...(e.inputSources !== undefined ? { inputSources: e.inputSources } : {}),
+    };
+  });
+  const metadata = {
+    ...assessment,
+    warnings: [...new Set([
+      ...(Array.isArray(assessment.warnings) ? assessment.warnings : []),
+      ...rows.flatMap(row => Array.isArray(row.warnings) ? row.warnings : []),
+    ])],
+  };
 
-  return { key: 'arcFlash', title: 'Arc Flash Study', rows, approval };
+  return {
+    key: 'arcFlash',
+    title: 'Arc Flash Study',
+    rows: decorateStudyRows(rows, assessment, options),
+    studyMetadata: metadata,
+    approval,
+  };
 }
 
 /**
  * Build a short circuit section from study results.
  */
-export function buildShortCircuitSection(studies = {}, approvals = {}) {
-  const data = studies.shortCircuit || null;
-  const approval = approvals.shortCircuit || null;
-  if (!data) return { key: 'shortCircuit', title: 'Short Circuit Analysis', empty: true };
+function savedProjectFingerprint(inputFingerprint) {
+  const saved = String(inputFingerprint || '').trim();
+  if (!saved) return null;
+  const separator = saved.indexOf('|iec60909:');
+  return separator >= 0 ? saved.slice(0, separator) : saved;
+}
 
+function resultFreshness(inputFingerprint, currentInputFingerprint) {
+  const savedProject = savedProjectFingerprint(inputFingerprint);
+  const current = String(currentInputFingerprint || '').trim();
+  if (!savedProject || !current) return 'unknown';
+  return savedProject === current ? 'current' : 'stale';
+}
+
+export function buildShortCircuitSection(studies = {}, approvals = {}, options = undefined) {
+  options = options || {};
+  const approval = approvals.shortCircuit || null;
   const rowFields = [
     'threePhaseKA', 'i3ph_kA', 'threePhase', 'symmetrical',
     'lineToGroundKA', 'iSlg_kA', 'slg',
     'lineToLineKA', 'iLL_kA', 'll',
-    'doubleLineGroundKA', 'iDLG_kA', 'dlg'
+    'doubleLineGroundKA', 'doubleLineGroundPhaseBKA', 'doubleLineGroundPhaseCKA', 'doubleLineGroundEarthKA', 'iDLG_kA', 'dlg'
   ];
-  const arrays = [data.results, data.buses, data.busResults].find(Array.isArray);
-  let raw = Array.isArray(data) ? data : (arrays || []);
+  const datasets = [
+    { key: 'shortCircuit', data: studies.shortCircuit, defaultMethod: null },
+    { key: 'iec60909', data: studies.iec60909, defaultMethod: 'IEC 60909-0:2016' }
+  ].filter(dataset => dataset.data && typeof dataset.data === 'object');
+  if (!datasets.length) return { key: 'shortCircuit', title: 'Short Circuit Analysis', empty: true };
 
-  if (!raw.length && typeof data === 'object') {
-    if (rowFields.some(field => data[field] != null)) {
-      raw = [data];
-    } else {
-      raw = Object.entries(data)
-        .filter(([key, value]) => !key.startsWith('_')
-          && value
-          && typeof value === 'object'
-          && rowFields.some(field => value[field] != null))
-        .map(([id, value]) => ({ id, ...value }));
+  const rows = [];
+  const summaries = [];
+  for (const { data, defaultMethod, key } of datasets) {
+    const assessment = assessStudyResult(key, data, options.studyProvenance?.[key], options);
+    const arrays = [data.results, data.buses, data.busResults].find(Array.isArray);
+    let raw = Array.isArray(data) ? data : (arrays || []);
+    if (!raw.length && typeof data === 'object') {
+      if (rowFields.some(field => Object.prototype.hasOwnProperty.call(data, field))) {
+        raw = [data];
+      } else {
+        raw = Object.entries(data)
+          .filter(([id, value]) => !id.startsWith('_')
+            && value
+            && typeof value === 'object'
+            && (rowFields.some(field => Object.prototype.hasOwnProperty.call(value, field))
+              || value.validity !== undefined || value.calculationStatus !== undefined
+              || Array.isArray(value.warnings)))
+          .map(([id, value]) => ({ id, ...value }));
+      }
     }
+    const datasetFingerprint = data._meta?.inputFingerprint ?? null;
+    const datasetCalculatedAt = data._meta?.updatedAt ?? data.updatedAt ?? data.generatedAt ?? null;
+    raw.forEach(entry => {
+      const e = entry && typeof entry === 'object' ? entry : { value: entry };
+      const row = {
+        id: e.equipmentTag || e.id || e.busId || '—',
+        i3ph_kA: e.threePhaseKA ?? e.i3ph_kA ?? e.threePhase ?? e.symmetrical ?? null,
+        iSlg_kA: e.lineToGroundKA ?? e.iSlg_kA ?? e.slg ?? null,
+        iLL_kA: e.lineToLineKA ?? e.iLL_kA ?? e.ll ?? null,
+        iDLG_kA: e.doubleLineGroundKA ?? e.iDLG_kA ?? e.dlg ?? null,
+        voltage: e.prefaultKV ?? e.voltage ?? e.nominalVoltage ?? null,
+      };
+      if (Object.prototype.hasOwnProperty.call(e, 'doubleLineGroundPhaseBKA')) row.iDLGPhaseB_kA = e.doubleLineGroundPhaseBKA;
+      if (Object.prototype.hasOwnProperty.call(e, 'doubleLineGroundPhaseCKA')) row.iDLGPhaseC_kA = e.doubleLineGroundPhaseCKA;
+      if (Object.prototype.hasOwnProperty.call(e, 'doubleLineGroundEarthKA')) row.iDLGEarth_kA = e.doubleLineGroundEarthKA;
+      if (Object.prototype.hasOwnProperty.call(e, 'validity')) row.validity = e.validity;
+      if (Object.prototype.hasOwnProperty.call(e, 'calculationStatus')) row.calculationStatus = e.calculationStatus;
+      if (Array.isArray(e.requiredInputs)) row.requiredInputs = e.requiredInputs;
+      if (Array.isArray(e.warnings)) row.warnings = e.warnings;
+      if (Object.prototype.hasOwnProperty.call(e, 'provenance')) row.provenance = e.provenance;
+      if (Object.prototype.hasOwnProperty.call(e, 'modelLimits')) row.modelLimits = e.modelLimits;
+      if (Object.prototype.hasOwnProperty.call(e, 'studyOptions')) row.studyOptions = e.studyOptions;
+      if (Object.prototype.hasOwnProperty.call(e, 'inputFingerprint') || datasetFingerprint) {
+        row.inputFingerprint = e.inputFingerprint ?? datasetFingerprint;
+      }
+      if (options !== undefined) {
+        row.currentInputFingerprint = options?.currentInputFingerprint || null;
+        row.freshness = resultFreshness(row.inputFingerprint, row.currentInputFingerprint);
+      }
+      if (Object.prototype.hasOwnProperty.call(e, 'calculatedAt') || datasetCalculatedAt) {
+        row.calculatedAt = e.calculatedAt ?? datasetCalculatedAt;
+      }
+      if (Object.prototype.hasOwnProperty.call(e, 'method') || defaultMethod) row.method = e.method ?? defaultMethod;
+      if (datasets.length > 1) row.studySource = key;
+      rows.push(...decorateStudyRows([row], assessment, options));
+    });
+    const summary = {
+      status: data.status ?? null,
+      availableFaultKa: data.availableFaultKa ?? data.availableFaultKA ?? data.faultCurrentKA ?? data.faultKa ?? null,
+      updatedAt: data.updatedAt ?? data.generatedAt ?? data._meta?.updatedAt ?? null,
+      inputFingerprint: datasetFingerprint,
+      method: data._meta?.method ?? defaultMethod
+    };
+    if (options !== undefined) {
+      summary.currentInputFingerprint = options?.currentInputFingerprint || null;
+      summary.freshness = resultFreshness(datasetFingerprint, summary.currentInputFingerprint);
+    }
+    if (!assessment.eligible) {
+      summary.status = assessment.label;
+      delete summary.availableFaultKa;
+    }
+    Object.keys(summary).forEach(field => {
+      if (summary[field] == null || summary[field] === '') delete summary[field];
+    });
+    if (Object.values(summary).some(value => value != null && value !== '')) summaries.push(summary);
   }
-
-  const rows = raw.map(e => ({
-    id:       e.equipmentTag || e.id || e.busId || '—',
-    i3ph_kA:  e.threePhaseKA ?? e.i3ph_kA ?? e.threePhase ?? e.symmetrical ?? '—',
-    iSlg_kA:  e.lineToGroundKA ?? e.iSlg_kA ?? e.slg ?? '—',
-    iLL_kA:   e.lineToLineKA ?? e.iLL_kA ?? e.ll ?? '—',
-    iDLG_kA:  e.doubleLineGroundKA ?? e.iDLG_kA ?? e.dlg ?? '—',
-    voltage:  e.prefaultKV ?? e.voltage ?? e.nominalVoltage ?? '—',
-  }));
-
-  const summary = {
-    status: data.status ?? null,
-    availableFaultKa: data.availableFaultKa ?? data.availableFaultKA ?? data.faultCurrentKA ?? data.faultKa ?? null,
-    updatedAt: data.updatedAt ?? data.generatedAt ?? null,
-  };
-  const hasSummary = Object.values(summary).some(value => value != null && value !== '');
+  const summary = summaries.length === 1
+    ? summaries[0]
+    : summaries.length > 1
+      ? {
+        status: 'Multiple short-circuit study results',
+        updatedAt: summaries.map(item => item.updatedAt).filter(Boolean).sort().at(-1) ?? null,
+        ...(options !== undefined ? {
+          currentInputFingerprint: options?.currentInputFingerprint || null,
+          freshness: rows.some(row => row.freshness === 'stale')
+            ? 'stale'
+            : rows.some(row => row.freshness === 'unknown') ? 'unknown' : 'current'
+        } : {})
+      }
+      : null;
+  const hasSummary = Boolean(summary);
 
   return {
     key: 'shortCircuit',
@@ -523,17 +633,19 @@ export function buildShortCircuitSection(studies = {}, approvals = {}) {
     rows,
     summary: hasSummary ? summary : null,
     empty: rows.length === 0 && !hasSummary,
-    approval
+    approval,
+    studyMetadata: buildStudyContextIndex(studies, options.studyProvenance, options),
   };
 }
 
 /**
  * Build a load flow section from study results.
  */
-export function buildLoadFlowSection(studies = {}, approvals = {}) {
+export function buildLoadFlowSection(studies = {}, approvals = {}, options = {}) {
   const data = studies.loadFlow || null;
   const approval = approvals.loadFlow || null;
   if (!data) return { key: 'loadFlow', title: 'Load Flow Analysis', empty: true };
+  const assessment = assessStudyResult('loadFlow', data, options.studyProvenance?.loadFlow, options);
 
   const busResults = Array.isArray(data.buses) ? data.buses
     : Array.isArray(data) ? data
@@ -558,16 +670,24 @@ export function buildLoadFlowSection(studies = {}, approvals = {}) {
     loading_pct: br.loading_pct ?? br.loadingPct ?? '—',
   }));
 
-  return { key: 'loadFlow', title: 'Load Flow Analysis', busRows, branchRows, approval };
+  return {
+    key: 'loadFlow',
+    title: 'Load Flow Analysis',
+    busRows: decorateStudyRows(busRows, assessment, options),
+    branchRows: decorateStudyRows(branchRows, assessment, options),
+    studyMetadata: assessment,
+    approval,
+  };
 }
 
 /**
  * Build a harmonics section from study results.
  */
-export function buildHarmonicsSection(studies = {}, approvals = {}) {
+export function buildHarmonicsSection(studies = {}, approvals = {}, options = {}) {
   const data = studies.harmonics || null;
   const approval = approvals.harmonics || null;
   if (!data) return { key: 'harmonics', title: 'Harmonics Analysis', empty: true };
+  const assessment = assessStudyResult('harmonics', data, options.studyProvenance?.harmonics, options);
 
   const entries = Array.isArray(data?.results)
     ? data.results
@@ -588,16 +708,23 @@ export function buildHarmonicsSection(studies = {}, approvals = {}) {
     calculationStatus: e.calculationStatus ?? 'screening-only',
   }));
 
-  return { key: 'harmonics', title: 'Harmonics Analysis', rows, approval };
+  return {
+    key: 'harmonics',
+    title: 'Harmonics Analysis',
+    rows: decorateStudyRows(rows, assessment, options),
+    studyMetadata: assessment,
+    approval,
+  };
 }
 
 /**
  * Build a motor starting section from study results.
  */
-export function buildMotorStartSection(studies = {}, approvals = {}) {
+export function buildMotorStartSection(studies = {}, approvals = {}, options = {}) {
   const data = studies.motorStart || null;
   const approval = approvals.motorStart || null;
   if (!data) return { key: 'motorStart', title: 'Motor Starting Study', empty: true };
+  const assessment = assessStudyResult('motorStart', data, options.studyProvenance?.motorStart, options);
 
   const entries = typeof data === 'object' && !Array.isArray(data)
     ? Object.entries(data)
@@ -613,16 +740,23 @@ export function buildMotorStartSection(studies = {}, approvals = {}) {
     method:       e.starterType  ?? e.method       ?? e.startMethod  ?? '—',
   }));
 
-  return { key: 'motorStart', title: 'Motor Starting Study', rows, approval };
+  return {
+    key: 'motorStart',
+    title: 'Motor Starting Study',
+    rows: decorateStudyRows(rows, assessment, options),
+    studyMetadata: assessment,
+    approval,
+  };
 }
 
 /**
  * Build a voltage drop section from study results.
  */
-export function buildVoltageDropSection(studies = {}, approvals = {}) {
+export function buildVoltageDropSection(studies = {}, approvals = {}, options = {}) {
   const data = studies.voltageDropStudy || null;
   const approval = approvals.voltageDropStudy || null;
   if (!data) return { key: 'voltageDrop', title: 'Voltage Drop Study', empty: true };
+  const assessment = assessStudyResult('voltageDropStudy', data, options.studyProvenance?.voltageDropStudy, options);
 
   const results = Array.isArray(data.results) ? data.results
     : Array.isArray(data) ? data
@@ -630,35 +764,58 @@ export function buildVoltageDropSection(studies = {}, approvals = {}) {
         .filter(([k]) => !k.startsWith('_'))
         .map(([id, v]) => (typeof v === 'object' ? { id, ...v } : { id }));
 
-  const rows = results.map(r => ({
+  const rows = results.map(r => {
+    const contract = r.resultContract || {};
+    const legacyEvaluated = r.evaluated === true || r.validity === 'evaluated';
+    const evaluated = contract.validity === 'evaluated' || (!r.resultContract && legacyEvaluated);
+    const historicalValues = {
+      dropPct: r.dropPct ?? r.drop_pct ?? null,
+      dropV: r.dropV ?? r.drop_v ?? null,
+      combinedDropPct: r.combinedDropPct ?? null,
+      recommendation: r.recommendation?.conductorSize ?? null,
+    };
+    return {
     id:         r.tag      || r.id        || r.cableId || '—',
     from:       r.from     || r.source    || '—',
     to:         r.to       || r.load      || '—',
     inputSource: r.inputSource?.current || r.input_source || '—',
     path:       Array.isArray(r.pathTags) ? r.pathTags.join(' → ') : '—',
-    dropPct:    r.dropPct  ?? r.drop_pct  ?? '—',
-    dropV:      r.dropV    ?? r.drop_v    ?? '—',
+    dropPct:    evaluated ? (r.dropPct  ?? r.drop_pct  ?? '—') : '—',
+    dropV:      evaluated ? (r.dropV    ?? r.drop_v    ?? '—') : '—',
     limitPct:   r.limitPct ?? r.limit_pct ?? r.limit ?? '—',
-    status:     r.evaluated === false ? 'not evaluated' : (r.status ?? (parseFloat(r.dropPct) > parseFloat(r.limitPct) ? 'fail' : 'pass')),
+    status:     !evaluated ? 'not evaluated' : (r.status ?? (parseFloat(r.dropPct) > parseFloat(r.limitPct) ? 'fail' : 'pass')),
     combinedDropPct: r.pathEvaluated === false ? '—' : (r.combinedDropPct ?? '—'),
     combinedLimitPct: r.combinedLimitPct ?? '—',
     combinedStatus: r.pathEvaluated === false ? 'not evaluated' : (r.combinedStatus || '—'),
-    recommendation: r.recommendation?.conductorSize || '—',
-  }));
+    recommendation: evaluated ? (r.recommendation?.conductorSize || '—') : '—',
+    resultValidity: contract.validity || (r.evaluated === false ? 'unevaluated' : 'unknown'),
+    resultUnits: contract.units || '%',
+    resultInputSources: contract.inputSources || {},
+    resultAssumptions: contract.assumptions || {},
+    resultModelLimits: contract.modelLimits || {},
+    resultWarnings: contract.warnings || [],
+    inputFingerprint: contract.inputFingerprint || '',
+    historicalValues,
+    historicalValuesLabel: 'Saved values retained for audit; eligibility controls display',
+  }; });
 
   return {
     key: 'voltageDrop',
     title: 'Voltage Drop Study',
-    rows,
+    rows: decorateStudyRows(rows, assessment, options),
     approval,
-    readiness: advancedStudyStatus(data),
-    summary: {
+    studyMetadata: assessment,
+    readiness: advancedStudyStatus(data, 'voltageDropStudy', options),
+    summary: assessment.eligible ? {
       'Evaluated cables': `${data.summary?.evaluated ?? rows.length} / ${data.summary?.total ?? rows.length}`,
       'Individual failures': data.summary?.fail ?? '—',
       'Combined path failures': data.summary?.combinedFail ?? '—',
       'Maximum individual drop (%)': data.summary?.maxDropPct ?? '—',
       'Maximum combined drop (%)': data.summary?.maxCombinedDropPct ?? '—',
       'Sizing recommendations': data.summary?.recommendations ?? '—',
+    } : {
+      'Result summary': assessment.label,
+      'Historical summary (withheld)': JSON.stringify(data.summary || {}),
     },
     warnings: Array.isArray(data.warnings) ? data.warnings : [],
   };
@@ -667,9 +824,10 @@ export function buildVoltageDropSection(studies = {}, approvals = {}) {
 /**
  * Build a load-weighted reliability and minimal-cut-set section.
  */
-export function buildReliabilitySection(studies = {}, approvals = {}) {
+export function buildReliabilitySection(studies = {}, approvals = {}, options = {}) {
   const data = studies.reliability || null;
   if (!data) return { key: 'reliability', title: 'Reliability Analysis', empty: true };
+  const assessment = assessStudyResult('reliability', data, options.studyProvenance?.reliability, options);
   const rows = (data.servicePoints || []).map(point => ({
     id: point.label || point.id || '—',
     kw: point.kw ?? '—',
@@ -691,6 +849,19 @@ export function buildReliabilitySection(studies = {}, approvals = {}) {
     criticalKw: impact.criticalKw ?? '—',
     probability: impact.probability ?? '—',
   }));
+  const reliabilitySummary = {
+    'System availability (%)': data.systemAvailability != null && Number.isFinite(Number(data.systemAvailability))
+      ? Number(data.systemAvailability) * 100
+      : '—',
+    'Load-weighted service availability (%)': data.serviceAvailability != null && Number.isFinite(Number(data.serviceAvailability))
+      ? Number(data.serviceAvailability) * 100
+      : '—',
+    'Served load (kW)': data.totalServedKw ?? '—',
+    'EENS (kWh/yr)': data.eensKwh ?? '—',
+    'Critical-load EENS (kWh/yr)': data.criticalLoadEensKwh ?? '—',
+    'Load-weighted outage (hr/yr)': data.serviceInterruptionHours ?? '—',
+    'Reliability source coverage (%)': data.sourceCoveragePct ?? '—',
+  };
   return {
     key: 'reliability',
     title: 'Reliability Analysis',
@@ -703,53 +874,60 @@ export function buildReliabilitySection(studies = {}, approvals = {}) {
       { key: 'interruptionsPerYear', label: 'Interruptions/yr' },
       { key: 'eensKwh', label: 'EENS (kWh/yr)' },
     ],
-    rows,
+    rows: decorateStudyRows(rows, assessment, options),
     cutSets,
-    summary: {
-      'System availability (%)': data.systemAvailability != null && Number.isFinite(Number(data.systemAvailability))
-        ? Number(data.systemAvailability) * 100
-        : '—',
-      'Load-weighted service availability (%)': data.serviceAvailability != null && Number.isFinite(Number(data.serviceAvailability))
-        ? Number(data.serviceAvailability) * 100
-        : '—',
-      'Served load (kW)': data.totalServedKw ?? '—',
-      'EENS (kWh/yr)': data.eensKwh ?? '—',
-      'Critical-load EENS (kWh/yr)': data.criticalLoadEensKwh ?? '—',
-      'Load-weighted outage (hr/yr)': data.serviceInterruptionHours ?? '—',
-      'Reliability source coverage (%)': data.sourceCoveragePct ?? '—',
+    summary: assessment.eligible ? reliabilitySummary : {
+      'Result summary': assessment.label,
+      'Historical summary (withheld)': JSON.stringify(reliabilitySummary),
     },
     warnings: Array.isArray(data.warnings) ? data.warnings : [],
-    readiness: advancedStudyStatus(data),
+    readiness: advancedStudyStatus(data, 'reliability', options),
+    studyMetadata: assessment,
     approval: approvals.reliability || null,
   };
 }
 
-function advancedStudyStatus(data) {
+function advancedStudyStatus(data, studyKey = '', options = {}) {
   const metadata = data?.runMetadata || {};
+  const assessment = assessStudyResult(
+    studyKey,
+    data,
+    options.studyProvenance?.[studyKey],
+    options,
+  );
   return {
-    valid: metadata.valid === true,
-    validityLabel: metadata.valid === true ? 'Valid saved result' : 'Legacy / unverified result',
-    source: metadata.source || 'not recorded',
-    runAt: metadata.runAt || data?.generatedAt || data?.updatedAt || null,
+    ...assessment,
+    valid: assessment.eligible,
+    validityLabel: assessment.label,
+    source: metadata.source || assessment.provenance?.source || 'not recorded',
+    runAt: assessment.runAt,
     convergence: metadata.convergence?.message || null,
   };
 }
 
-function advancedSection({ key, title, data, approvals, headers, rows, summary = {}, warnings = [] }) {
+function advancedSection({ key, title, data, approvals, headers, rows, summary = {}, warnings = [], options = {} }) {
   if (!data) return { key, title, empty: true };
+  const assessment = assessStudyResult(key, data, options.studyProvenance?.[key], options);
+  const visibleSummary = assessment.eligible
+    ? summary
+    : {
+      'Result summary': assessment.label,
+      'Historical summary (withheld)': JSON.stringify(summary),
+    };
   return {
     key,
     title,
     headers,
-    rows,
-    summary,
+    rows: decorateStudyRows(rows, assessment, options),
+    summary: visibleSummary,
     warnings: Array.isArray(warnings) ? warnings : [],
-    readiness: advancedStudyStatus(data),
+    readiness: advancedStudyStatus(data, key, options),
+    studyMetadata: assessment,
     approval: approvals[key] || null,
   };
 }
 
-export function buildAdvancedStudySections(studies = {}, approvals = {}) {
+export function buildAdvancedStudySections(studies = {}, approvals = {}, options = {}) {
   const qd = studies.quasiDynamic;
   const probabilistic = studies.probabilisticLoadFlow;
   const contingency = studies.contingency;
@@ -759,8 +937,10 @@ export function buildAdvancedStudySections(studies = {}, approvals = {}) {
   const opf = studies.optimalPowerFlow;
   const cyber = studies.cyberCompliance;
 
+  const withOptions = value => ({ ...value, options });
+
   return {
-    quasiDynamic: advancedSection({
+    quasiDynamic: advancedSection(withOptions({
       key: 'quasiDynamic',
       title: 'Quasi-Dynamic Load Flow',
       data: qd,
@@ -783,8 +963,8 @@ export function buildAdvancedStudySections(studies = {}, approvals = {}) {
         'Load factor': qd.loadFactor,
       } : {},
       warnings: qd?.warnings,
-    }),
-    probabilisticLoadFlow: advancedSection({
+    })),
+    probabilisticLoadFlow: advancedSection(withOptions({
       key: 'probabilisticLoadFlow',
       title: 'Probabilistic Load Flow',
       data: probabilistic,
@@ -809,8 +989,8 @@ export function buildAdvancedStudySections(studies = {}, approvals = {}) {
         'P95 loss (kW)': probabilistic.lossStats?.p95,
       } : {},
       warnings: probabilistic?.warnings,
-    }),
-    contingency: advancedSection({
+    })),
+    contingency: advancedSection(withOptions({
       key: 'contingency',
       title: 'N-1 Contingency',
       data: contingency,
@@ -831,8 +1011,8 @@ export function buildAdvancedStudySections(studies = {}, approvals = {}) {
       })),
       summary: contingency?.summary || {},
       warnings: contingency?.warnings,
-    }),
-    voltageStability: advancedSection({
+    })),
+    voltageStability: advancedSection(withOptions({
       key: 'voltageStability',
       title: 'Voltage Stability',
       data: voltage,
@@ -856,8 +1036,8 @@ export function buildAdvancedStudySections(studies = {}, approvals = {}) {
         'Solver boundary encountered': voltage.summary?.solverLimitEncountered ? 'Yes' : 'No',
       } : {},
       warnings: voltage?.warnings,
-    }),
-    frequencyScan: advancedSection({
+    })),
+    frequencyScan: advancedSection(withOptions({
       key: 'frequencyScan',
       title: 'Frequency Scan',
       data: frequency,
@@ -881,8 +1061,8 @@ export function buildAdvancedStudySections(studies = {}, approvals = {}) {
         'Short-circuit MVA': frequency.inputs?.scMva,
       } : {},
       warnings: frequency?.warnings,
-    }),
-    transientStability: advancedSection({
+    })),
+    transientStability: advancedSection(withOptions({
       key: 'transientStability',
       title: 'Transient Stability',
       data: transient,
@@ -906,8 +1086,8 @@ export function buildAdvancedStudySections(studies = {}, approvals = {}) {
         'Post-fault Pmax (pu)': transient.inputs?.Pmax_post,
       } : {},
       warnings: transient?.warnings,
-    }),
-    optimalPowerFlow: advancedSection({
+    })),
+    optimalPowerFlow: advancedSection(withOptions({
       key: 'optimalPowerFlow',
       title: 'Optimal Power Flow',
       data: opf,
@@ -933,8 +1113,8 @@ export function buildAdvancedStudySections(studies = {}, approvals = {}) {
         'Feasible': opf.feasible ? 'Yes' : 'No',
       } : {},
       warnings: opf?.warnings,
-    }),
-    cyberCompliance: advancedSection({
+    })),
+    cyberCompliance: advancedSection(withOptions({
       key: 'cyberCompliance',
       title: 'Cyber Compliance Evidence Matrix',
       data: cyber,
@@ -947,7 +1127,7 @@ export function buildAdvancedStudySections(studies = {}, approvals = {}) {
         asset: assessment.asset?.id || '—', standard: item.standard, control: item.title, status: item.status, detail: item.detail,
       }))),
       summary: cyber?.summary || {},
-    }),
+    })),
   };
 }
 
@@ -1077,6 +1257,45 @@ export function renderPackageHTML(pkg, baseReport = {}) {
     })
     .join('');
 
+  const jsonText = value => {
+    if (value == null || value === '') return 'Not recorded';
+    if (typeof value === 'string') return value;
+    try { return JSON.stringify(value); } catch (_) { return String(value); }
+  };
+  const listText = value => Array.isArray(value)
+    ? (value.join('; ') || 'None recorded')
+    : jsonText(value);
+  const studyMetadataHTML = metadata => {
+    if (!metadata) return '';
+    const warnings = Array.isArray(metadata.warnings)
+      ? metadata.warnings.join('; ')
+      : jsonText(metadata.warnings);
+    return `<div class="report-study-metadata">
+      <strong>Result status:</strong> ${esc(metadata.label || 'Freshness unknown')}
+      &nbsp;·&nbsp; <strong>Validity:</strong> ${esc(metadata.validity || 'unevaluated')}
+      &nbsp;·&nbsp; <strong>Freshness:</strong> ${esc(metadata.freshness || 'unknown')}
+      &nbsp;·&nbsp; <strong>Eligibility:</strong> ${esc(metadata.eligible ? 'eligible' : 'withheld')}
+      <details class="report-detail"><summary>Saved result context</summary><dl class="report-summary-list">
+        <div><dt>Input fingerprint</dt><dd>${esc(metadata.sourceFingerprint || 'Not recorded')}</dd></div>
+        <div><dt>Current input fingerprint</dt><dd>${esc(metadata.currentInputFingerprint || 'Not recorded')}</dd></div>
+        <div><dt>Calculation version</dt><dd>${esc(metadata.calculationVersion || 'Not recorded')} (${esc(metadata.calculationVersionStatus || 'unknown')})</dd></div>
+        <div><dt>Calculated at</dt><dd>${esc(metadata.runAt || 'Not recorded')}</dd></div>
+        <div><dt>Input sources</dt><dd>${esc(jsonText(metadata.inputSources))}</dd></div>
+        <div><dt>Source record</dt><dd>${esc(jsonText(metadata.source))}</dd></div>
+        <div><dt>Input source</dt><dd>${esc(jsonText(metadata.inputSource))}</dd></div>
+        <div><dt>Assumptions</dt><dd>${esc(jsonText(metadata.assumptions))}</dd></div>
+        <div><dt>Model limits</dt><dd>${esc(jsonText(metadata.modelLimits))}</dd></div>
+        <div><dt>Limitations</dt><dd>${esc(jsonText(metadata.limitations))}</dd></div>
+        <div><dt>Expected units</dt><dd>${esc(jsonText(metadata.units))}</dd></div>
+        <div><dt>Evidence class</dt><dd>${esc(metadata.evidenceClass || 'Not recorded')}</dd></div>
+        <div><dt>Independent derivation</dt><dd>${esc(jsonText(metadata.independentDerivation))}</dd></div>
+        <div><dt>Warnings</dt><dd>${esc(warnings || 'None recorded')}</dd></div>
+        <div><dt>Study options</dt><dd>${esc(jsonText(metadata.studyOptions))}</dd></div>
+        <div><dt>Provenance</dt><dd>${esc(jsonText(metadata.provenance))}</dd></div>
+      </dl></details>
+    </div>`;
+  };
+
   const sections = pkg.sections;
   const cover    = sections.cover?.data || pkg.config?.coverSheet || {};
   const orderedKeys = pkg.config?.sections || Object.keys(sections);
@@ -1131,6 +1350,27 @@ export function renderPackageHTML(pkg, baseReport = {}) {
 <section class="report-section" id="rpt-assumptions">
   <h2>Assumptions / Basis of Design</h2>
   ${text ? `<div class="report-assumptions">${assumptionsHTML(text)}</div>` : '<p class="report-empty">No assumptions recorded.</p>'}
+</section>`;
+  }
+
+  const studyIndexRows = Object.values(pkg.studyContextIndex || {});
+  if (studyIndexRows.length) {
+    html += `
+<section class="report-section" id="rpt-study-index">
+  <h2>Study Result Lifecycle Index</h2>
+  <p class="report-note">Every stored study key is listed with its validity and source freshness. Ineligible values remain withheld in the detailed sections.</p>
+  <div class="report-scroll"><table class="report-table">
+    <thead><tr><th>Study</th><th>Present</th><th>Validity</th><th>Freshness</th><th>Eligibility</th><th>Status</th><th>Calculation Version</th><th>Calculated At</th><th>Source</th><th>Input Sources</th><th>Assumptions</th><th>Limitations</th><th>Expected Units</th><th>Study Options</th><th>Warnings</th></tr></thead>
+    <tbody>${studyIndexRows.map(row => `<tr>
+      <td>${esc(row.studyKey)}</td><td>${esc(row.present ? 'Yes' : 'No')}</td><td>${esc(row.validity || 'unevaluated')}</td>
+      <td>${esc(row.freshness || 'unknown')}</td><td>${esc(row.eligible ? 'eligible' : 'withheld')}</td>
+      <td>${esc(row.label || 'Freshness unknown')}</td><td>${esc(row.calculationVersion || 'Not recorded')}</td>
+      <td>${esc(row.runAt || 'Not recorded')}</td><td>${esc(jsonText(row.source))}</td>
+      <td>${esc(jsonText(row.inputSources))}</td><td>${esc(jsonText(row.assumptions))}</td>
+      <td>${esc(jsonText(row.limitations))}</td><td>${esc(jsonText(row.units))}</td>
+      <td>${esc(jsonText(row.studyOptions))}</td><td>${esc(jsonText(row.warnings))}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>
 </section>`;
   }
 
@@ -1245,6 +1485,7 @@ export function renderPackageHTML(pkg, baseReport = {}) {
 <section class="report-section" id="rpt-arcFlash">
   <h2>Arc Flash Study</h2>
   ${approvalBadgeHTML(s.approval)}
+  ${studyMetadataHTML(s.studyMetadata)}
   ${s.empty ? emptySection('Arc Flash') : `
   <div class="report-scroll"><table class="report-table">
     <thead><tr><th>Bus / Component</th><th>Incident Energy (cal/cm²)</th><th>PPE Selection</th><th>Boundary (mm)</th><th>Clearing Time (s)</th><th>Voltage</th></tr></thead>
@@ -1268,15 +1509,28 @@ export function renderPackageHTML(pkg, baseReport = {}) {
 <section class="report-section" id="rpt-shortCircuit">
   <h2>Short Circuit Analysis</h2>
   ${approvalBadgeHTML(s.approval)}
+  ${studyMetadataHTML(s.studyMetadata?.shortCircuit || s.studyMetadata?.iec60909)}
   ${s.empty ? emptySection('Short Circuit') : `${summaryHtml}
   ${(s.rows || []).length ? `
-  <div class="report-scroll"><table class="report-table">
-    <thead><tr><th>Bus</th><th>3-Phase (kA)</th><th>SLG (kA)</th><th>L-L (kA)</th><th>DLG (kA)</th><th>Voltage</th></tr></thead>
-    <tbody>${(s.rows || []).map(r => `<tr>
-      <td>${esc(r.id)}</td><td>${fmt(r.i3ph_kA)}</td><td>${fmt(r.iSlg_kA)}</td>
-      <td>${fmt(r.iLL_kA)}</td><td>${fmt(r.iDLG_kA)}</td><td>${fmt(r.voltage)}</td>
-    </tr>`).join('')}</tbody>
-  </table></div>` : ''}`}
+   <div class="report-scroll"><table class="report-table">
+     <thead><tr><th>Bus</th><th>Method</th><th>3-Phase (kA)</th><th>SLG (kA)</th><th>L-L (kA)</th><th>DLG max (kA)</th><th>DLG phase B (kA)</th><th>DLG phase C (kA)</th><th>DLG earth (kA)</th><th>Voltage (kV)</th><th>Validity</th><th>Calculation status</th></tr></thead>
+     <tbody>${(s.rows || []).map(r => `<tr>
+       <td>${esc(r.id)}</td><td>${esc(r.method || '')}</td><td>${fmt(r.i3ph_kA)}</td><td>${fmt(r.iSlg_kA)}</td>
+       <td>${fmt(r.iLL_kA)}</td><td>${fmt(r.iDLG_kA)}</td><td>${fmt(r.iDLGPhaseB_kA)}</td><td>${fmt(r.iDLGPhaseC_kA)}</td><td>${fmt(r.iDLGEarth_kA)}</td><td>${fmt(r.voltage)}</td>
+       <td>${esc(r.validity || '')}</td><td>${esc(r.calculationStatus || '')}</td>
+     </tr>`).join('')}</tbody>
+   </table></div>
+   ${(s.rows || []).map(r => `<details class="report-detail"><summary>${esc(r.id)} calculation contract</summary><dl class="report-summary-list">
+     <div><dt>Required inputs</dt><dd>${esc(listText(r.requiredInputs))}</dd></div>
+     <div><dt>Warnings</dt><dd>${esc(listText(r.warnings))}</dd></div>
+     <div><dt>Input provenance</dt><dd>${esc(JSON.stringify(r.provenance || {}))}</dd></div>
+     <div><dt>Model limits</dt><dd>${esc(JSON.stringify(r.modelLimits || {}))}</dd></div>
+     <div><dt>Study options</dt><dd>${esc(JSON.stringify(r.studyOptions || {}))}</dd></div>
+     <div><dt>Input fingerprint</dt><dd>${esc(r.inputFingerprint || 'Not recorded')}</dd></div>
+     <div><dt>Current input fingerprint</dt><dd>${esc(r.currentInputFingerprint || 'Not recorded')}</dd></div>
+     <div><dt>Freshness</dt><dd>${esc(r.freshness || 'unknown')}</dd></div>
+     <div><dt>Calculated at</dt><dd>${esc(r.calculatedAt || 'Not recorded')}</dd></div>
+   </dl></details>`).join('')}` : ''}`}
 </section>`;
   }
 
@@ -1286,6 +1540,7 @@ export function renderPackageHTML(pkg, baseReport = {}) {
 <section class="report-section" id="rpt-loadFlow">
   <h2>Load Flow Analysis</h2>
   ${approvalBadgeHTML(s.approval)}
+  ${studyMetadataHTML(s.studyMetadata)}
   ${s.empty ? emptySection('Load Flow') : `
   <h3>Bus Results</h3>
   <div class="report-scroll"><table class="report-table">
@@ -1313,6 +1568,7 @@ export function renderPackageHTML(pkg, baseReport = {}) {
 <section class="report-section" id="rpt-harmonics">
   <h2>Harmonics Analysis</h2>
   ${approvalBadgeHTML(s.approval)}
+  ${studyMetadataHTML(s.studyMetadata)}
   ${s.empty ? emptySection('Harmonics') : `
   <div class="report-scroll"><table class="report-table">
     <thead><tr><th>Component</th><th>ITHD (%)</th><th>VTHD (%)</th><th>Reference threshold (%)</th><th>Status</th><th>Basis</th></tr></thead>
@@ -1330,6 +1586,7 @@ export function renderPackageHTML(pkg, baseReport = {}) {
 <section class="report-section" id="rpt-motorStart">
   <h2>Motor Starting Study</h2>
   ${approvalBadgeHTML(s.approval)}
+  ${studyMetadataHTML(s.studyMetadata)}
   ${s.empty ? emptySection('Motor Starting') : `
   <div class="report-scroll"><table class="report-table">
     <thead><tr><th>Motor</th><th>Inrush (kA)</th><th>Voltage Sag (%)</th><th>Accel Time (s)</th><th>Start Method</th></tr></thead>
@@ -1347,6 +1604,7 @@ export function renderPackageHTML(pkg, baseReport = {}) {
 <section class="report-section" id="rpt-voltageDrop">
   <h2>Voltage Drop Study</h2>
   ${approvalBadgeHTML(s.approval)}
+  ${studyMetadataHTML(s.studyMetadata)}
   ${s.empty ? emptySection('Voltage Drop') : `
   <p class="report-readiness-note ${s.readiness?.valid ? 'report-readiness-note--ready' : 'report-readiness-note--warning'}">
     ${esc(s.readiness?.validityLabel || 'Validity not recorded')}
@@ -1356,13 +1614,15 @@ export function renderPackageHTML(pkg, baseReport = {}) {
     `<div><dt>${esc(label)}</dt><dd>${typeof value === 'number' ? fmt(value) : esc(value)}</dd></div>`
   ).join('')}</dl>
   <div class="report-scroll"><table class="report-table">
-    <thead><tr><th>Cable / Circuit</th><th>From</th><th>To</th><th>Current Source</th><th>Path</th><th>Drop (%)</th><th>Limit (%)</th><th>Status</th><th>Combined Drop (%)</th><th>Combined Limit (%)</th><th>Combined Status</th><th>Recommended Size</th></tr></thead>
+     <thead><tr><th>Cable / Circuit</th><th>From</th><th>To</th><th>Current Source</th><th>Path</th><th>Drop (%)</th><th>Limit (%)</th><th>Status</th><th>Combined Drop (%)</th><th>Combined Limit (%)</th><th>Combined Status</th><th>Recommended Size</th><th>Result Validity</th><th>Result Sources</th><th>Diagnostics</th></tr></thead>
     <tbody>${(s.rows || []).map(r => `<tr>
       <td>${esc(r.id)}</td><td>${esc(r.from)}</td><td>${esc(r.to)}</td>
       <td>${esc(r.inputSource)}</td><td>${esc(r.path)}</td>
       <td>${fmt(r.dropPct)}</td><td>${fmt(r.limitPct)}</td><td>${statusBadge(r.status)}</td>
       <td>${fmt(r.combinedDropPct)}</td><td>${fmt(r.combinedLimitPct)}</td>
-      <td>${statusBadge(r.combinedStatus)}</td><td>${esc(r.recommendation)}</td>
+       <td>${statusBadge(r.combinedStatus)}</td><td>${esc(r.recommendation)}</td>
+       <td>${esc(r.resultValidity)}</td><td>${esc(JSON.stringify(r.resultInputSources))}</td>
+       <td>${esc(JSON.stringify({ assumptions: r.resultAssumptions, limits: r.resultModelLimits, warnings: r.resultWarnings, fingerprint: r.inputFingerprint }))}</td>
     </tr>`).join('')}</tbody>
   </table></div>
   ${(s.warnings || []).length ? `<div class="report-alert report-alert--warning"><strong>Study warnings:</strong><ul>${s.warnings.map(warning => `<li>${esc(warning)}</li>`).join('')}</ul></div>` : ''}`}
@@ -1382,6 +1642,7 @@ export function renderPackageHTML(pkg, baseReport = {}) {
 <section class="report-section" id="rpt-${esc(key)}">
   <h2>${esc(s.title || key)}</h2>
   ${approvalBadgeHTML(s.approval)}
+  ${studyMetadataHTML(s.studyMetadata)}
   ${s.empty ? emptySection(s.title || key) : `
   <p class="report-readiness-note ${readinessClass}">
     ${esc(s.readiness?.validityLabel || 'Validity not recorded')}

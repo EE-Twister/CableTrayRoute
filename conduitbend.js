@@ -6,7 +6,7 @@ import {
   normalizePullBoxPosition
 } from './analysis/conduitBendVisualModel.mjs';
 import { sizePullBox, STANDARD_BOX_SIZES } from './analysis/pullBoxSizing.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getStudies, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
 import { renderIsometricSvg } from './src/utils/isometricSvg.js';
@@ -292,6 +292,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function calculate() {
     const runsInput    = readRunInputs();
     const pullboxInput = readPullBoxInputs();
+    const runInputs = { runs: runsInput, pullBoxes: pullboxInput };
+    const runContext = captureStudyRunContext('conduitBendSchedule', { inputs: runInputs, options: {} });
 
     const schedResult = runConduitBendSchedule(runsInput);
 
@@ -303,12 +305,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const result = {
       ...schedResult,
       pullBoxResults: pbResults,
-      _inputs: { runs: runsInput, pullBoxes: pullboxInput },
+      _inputs: runInputs,
     };
 
-    const studies = getStudies();
-    studies.conduitBendSchedule = result;
-    setStudies(studies);
+    saveStudyResult('conduitBendSchedule', result, runContext);
 
     renderResults(result);
     exportBtn.disabled = false;

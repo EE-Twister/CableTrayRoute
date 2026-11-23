@@ -1,5 +1,7 @@
 # Battery / UPS Sizing Guide
 
+> **Catalog boundary:** Required UPS apparent power above the built-in 1,000 kVA catalog limit is reported as unavailable in both study paths. The result returns `standardKva: null`, sets `upsAdequate: false` and `upsExceedsCatalog: true`, and asks for an engineered or manufacturer-specific selection.
+
 ## Overview
 
 The Battery / UPS Sizing study provides two calculation paths:
@@ -244,8 +246,11 @@ screening requirement. Generic increments: 10, 15, 20, 25, 30, 40, 50, 60, 75, 1
 specified average load, for the selected bank. Use this to evaluate load shedding
 strategies.
 
-**UPS kVA** — standard UPS size ≥ peak_kW / UPS_PF. This ensures the UPS
-inverter can supply the peak demand without overloading.
+**UPS kVA** — standard UPS size ≥ peak_kW / UPS_PF. For requirements above the
+1,000 kVA catalog maximum, the standard selection is unavailable and the warning
+identifies the required kVA and the need for an engineered or manufacturer-specific
+selection. This screen does not establish inverter overload, crest-factor,
+harmonic, phase-imbalance, efficiency, or redundancy performance.
 
 **Rack layout views** show a generated top view and elevation view from the
 selected bank size and rack-layout inputs. The top view shows rack envelopes,

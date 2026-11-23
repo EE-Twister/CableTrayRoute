@@ -4,6 +4,7 @@ installErrorTracking();
 import { UndoRedoManager } from "./undoRedo.mjs";
 import { mountCopilot } from "./src/copilot.js";
 import { repairMojibake } from "./src/textEncoding.js";
+import { initReviewDraftBanner } from "./src/design-synthesis/reviewDraftBanner.js";
 
 import "./src/components/navigation.js";
 import "./src/components/commandPalette.js";
@@ -14,7 +15,7 @@ import {
   getLastProjectImportError,
   getOneLine,
   getStudies,
-  getStudyProvenance,
+  getStudyAssessments,
   getProjectInputFingerprint,
   loadProject,
   saveProject,
@@ -35,6 +36,9 @@ import {
   applyRemoteSnapshot
 } from "./dataStore.mjs";
 import { getPageContract } from "./src/pageContracts.js";
+import { initStudyLifecycle } from "./src/components/studyLifecycle.js";
+import { confirmProjectImport } from "./src/projectImport.js";
+import { captureProjectTransactionSnapshot, restoreProjectTransactionSnapshot } from "./projectStorage.js";
 import { normalizeProjectMeta } from "./analysis/projectIntegration.mjs";
 import { applyLinkedValue, attachProjectSourceBadge } from "./src/components/projectInputBinding.js";
 import {
@@ -1060,6 +1064,7 @@ function collectHomepageSummary(){
       getRouteResults:()=>getItem('latestRouteResults',null),
       getDesignBasis,
       getDesignGateApprovals,
+      getDesignSynthesisReviewDraft:()=>getItem('designSynthesisReviewDraft',null),
       getStudyApprovals,
       getProjectInputFingerprint
     },
@@ -1220,8 +1225,6 @@ if(typeof document!=='undefined'){
   }
 }
 
-// History and autosave features have been removed to avoid exceeding
-// localStorage quotas in some browsers. The functions below are
 // retained as no-ops to preserve any external references but they no
 // longer store or restore snapshots.
 function initHistory() {}
@@ -1496,7 +1499,7 @@ function initSettings(){
           downloadCSV(headers,rows,'reports.csv');
           const oneLine=getOneLine();
           const components=(oneLine?.sheets||[]).flatMap(sheet=>Array.isArray(sheet.components)?sheet.components:[]);
-          const issues=runValidation(components,getStudies());
+          const issues=runValidation(components,getStudies(),{assessments:getStudyAssessments()});
           const vHeaders=['component','message'];
           const vRows=issues.length?issues:[{component:'-',message:'No issues'}];
           downloadCSV(vHeaders,vRows,'validation-report.csv');
@@ -2191,41 +2194,7 @@ function initActiveSampleWorkflowGuide(){
 
 globalThis.document?.addEventListener('DOMContentLoaded',initActiveSampleWorkflowGuide);
 
-function initStudyFreshnessBanner(){
-  if(typeof document==='undefined') return;
-  const pageName=(location.pathname.split('/').pop()||'index.html').toLowerCase();
-  if(pageName==='battery.html'||pageName==='generatorsizing.html') return;
-  const contract=getPageContract(pageName);
-  const studyOutput=(contract?.outputs||[]).find(item=>/^studyResults\.[^.]+$/.test(item.key));
-  if(!studyOutput) return;
-  const studyKey=studyOutput.key.slice('studyResults.'.length);
-  const result=getStudies()?.[studyKey];
-  if(!result) return;
-  if(result.sample===true&&!Number.isFinite(Number(result.I_rated))&&!result.projectLink) return;
-  const provenance=getStudyProvenance()?.[studyKey];
-  const currentHash=getProjectInputFingerprint();
-  const stale=Boolean(provenance?.inputHash&&provenance.inputHash!==currentHash);
-  const banner=document.createElement('section');
-  banner.className=`study-global-freshness ${stale?'study-global-freshness--stale':'study-global-freshness--current'}`;
-  banner.setAttribute('role','status');
-  banner.style.cssText=`border:1px solid ${stale?'#d97706':'#16803c'};border-left-width:4px;border-radius:7px;padding:.65rem .8rem;margin:.75rem 0;background:${stale?'rgba(245,158,11,.1)':'rgba(22,128,60,.08)'}`;
-  if(!provenance?.inputHash){
-    banner.textContent='Saved result provenance is unavailable. Re-run this study to link it to the current project inputs.';
-  }else if(stale){
-    banner.textContent='Project data changed since this study was run. Re-run the study before relying on or issuing this result.';
-  }else{
-    const when=provenance.capturedAt?new Date(provenance.capturedAt).toLocaleString():'';
-    banner.textContent=`Result is current with the linked project inputs${when?` (run ${when})`:''}.`;
-  }
-  const main=document.querySelector('main');
-  const pageHeader=main?.querySelector(':scope > .page-header');
-  const heading=main?.querySelector('h1');
-  const anchor=pageHeader||(heading?.closest('header')||heading);
-  if(anchor) anchor.insertAdjacentElement('afterend',banner);
-  else main?.prepend(banner);
-}
-
-globalThis.document?.addEventListener('DOMContentLoaded',initStudyFreshnessBanner);
+globalThis.document?.addEventListener('DOMContentLoaded', initStudyLifecycle);
 
 function initCommonProjectFieldBindings(){
   if(typeof document==='undefined') return;
@@ -2548,6 +2517,10 @@ function initProjectIO(){
     operation:async()=>{
       await loadProjectFromHash();
       applyProjectHash();
+      if(typeof window!=='undefined'){
+        window.__ctrProjectReady=true;
+        window.dispatchEvent(new CustomEvent('ctr:project-ready'));
+      }
     }
   }).catch(()=>{});
   updateSaveButtonState();
@@ -2598,14 +2571,28 @@ function initProjectIO(){
         errorText:'Project import failed',
         operation:()=>new Promise((resolve,reject)=>{
           const reader=new FileReader();
-          reader.onload=ev=>{
+          reader.onload=async ev=>{
             try{
               const obj=JSON.parse(ev.target.result);
+              const confirmed = await confirmProjectImport(obj);
+              if (!confirmed) { resolve(false); return; }
+              const transaction = captureProjectTransactionSnapshot();
+              const activeProjectName = currentProjectFromHash()
+                || (typeof window !== 'undefined' && typeof window.currentProjectId === 'string'
+                  && window.currentProjectId !== 'default' ? window.currentProjectId.trim() : '');
               if(importProject(obj)){
+                // Import is followed by a reload. Persist the imported
+                // canonical state to the active named project first, or the
+                // reload would restore the previous saved snapshot.
+                if (activeProjectName && !saveProject(activeProjectName)) {
+                  restoreProjectTransactionSnapshot(transaction);
+                  reject(new Error('Imported project could not be saved locally.'));
+                  return;
+                }
                 resolve(true);
-                location.reload();
-                return;
+                location.reload(); return;
               }
+              restoreProjectTransactionSnapshot(transaction);
               reject(new Error(getLastProjectImportError() || 'Import canceled or invalid project data.'));
             }catch(err){
               reject(err);
@@ -2723,6 +2710,7 @@ function initSharedShell(){
   initCompactMode();
   initHelpModal('help-btn','help-modal','close-help-btn');
   initNavToggle();
+  initReviewDraftBanner({readDraft:()=>getItem('designSynthesisReviewDraft',null),subscribe:onProjectChange});
 }
 
 function scheduleSharedShellInitialization(){
@@ -2810,11 +2798,8 @@ globalThis.showSelfCheckModal=showSelfCheckModal;
     });
   });
 }());
-
-// ----- AI Copilot -----
 (function initCopilot() {
   if (typeof document === 'undefined') return;
-  // Inject copilot stylesheet
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = 'src/styles/copilot.css';

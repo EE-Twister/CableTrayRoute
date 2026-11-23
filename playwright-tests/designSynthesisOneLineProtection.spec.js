@@ -1,0 +1,86 @@
+import { test, expect } from '@playwright/test';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { startStaticServer } from './staticServer.helper.js';
+
+const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+let server;
+test.beforeAll(async () => { server = await startStaticServer(root); });
+test.afterAll(async () => { await server?.close(); });
+
+test('25-load applied One-Line keeps candidate evidence current across edits and reload', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.goto(server.url('designsynthesis.html'));
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.getByRole('button', { name: 'Load 30-load industrial sample', exact: true }).click();
+  await page.getByText('Advanced equipment JSON / CSV-ready structure').click();
+  const editor = page.locator('#synthesis-equipment');
+  await editor.fill(JSON.stringify(JSON.parse(await editor.inputValue()).slice(0, 25)));
+  await page.locator('#synthesis-generate').click();
+  await expect(page.locator('#synthesis-apply')).toBeEnabled();
+  await page.locator('#synthesis-apply').click();
+  await expect(page.getByRole('heading', { name: 'Create New Project' })).toBeVisible();
+  await page.getByRole('dialog').locator('input[name="projectName"]').fill('One-Line Protection Review');
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Choose a Project Template' })).toBeVisible();
+  await page.locator('[data-template-id="blank"]').click();
+  await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Use Template', exact: true }).click()]);
+  await expect(page.locator('#synthesis-apply')).toBeEnabled({ timeout: 60000 });
+  await page.locator('#synthesis-apply').click();
+  await page.waitForURL(/cableschedule\.html/);
+  await page.goto(server.url('oneline.html'));
+  await expect.poll(async () => page.locator('#diagram g.component').count()).toBeGreaterThan(25);
+  const selected = await page.evaluate(() => {
+    const sheet = window.dataStore.getOneLine().sheets[0];
+    const source = sheet.components.find(row => row.type === 'panel' && row.connections?.length);
+    const connection = source.connections[0];
+    const cable = window.dataStore.getCables().find(row => row.tag.toLowerCase() === connection.cableId.toLowerCase());
+    return { sourceId: source.id, cable, originalCables: window.dataStore.getCables(), drawing: window.dataStore.getOneLine() };
+  });
+  const select = () => page.locator(`#diagram .connection[data-comp="${selected.sourceId}"][data-index="0"]`).dispatchEvent('click');
+  const connectionLabel = page.locator('#diagram .conn-label').filter({ hasText: selected.cable.tag });
+  await expect(connectionLabel).not.toContainText('PROPOSED DEVICE');
+  await page.locator('.drawing-mode-menu > summary').click();
+  await page.getByLabel('Proposed device candidates').check();
+  await expect(connectionLabel).toContainText(`PROPOSED DEVICE: ${selected.cable.protectiveDevice.manufacturer} ${selected.cable.protectiveDevice.catalogNumber}`);
+  const connectionCount = selected.drawing.sheets[0].components.reduce((count, component) => count + (component.connections?.length || 0), 0);
+  await expect(page.locator('#diagram .conn-label').filter({ hasText: 'PROPOSED DEVICE:' })).toHaveCount(connectionCount);
+  await page.getByLabel('Drawing mode').selectOption('engineeringPrint');
+  await expect(connectionLabel).toContainText('PROPOSED DEVICE:');
+  await page.getByLabel('Drawing mode').selectOption('edit');
+  await page.locator('.drawing-mode-menu > summary').click();
+  await select();
+  const review = page.locator('.connection-protection-review');
+  await expect(review).toContainText(selected.cable.protectiveDevice.catalogNumber);
+  await expect(review).toContainText('not an installed device');
+  await page.evaluate(cableId => {
+    const cables = window.dataStore.getCables();
+    cables.find(row => row.id === cableId).to = 'OTHER-LOAD';
+    window.dataStore.setCables(cables);
+  }, selected.cable.id);
+  await expect(review).toContainText('endpoints do not match');
+  await expect(review).not.toContainText(selected.cable.protectiveDevice.catalogNumber);
+  await expect(connectionLabel).toContainText('DEVICE CANDIDATE UNAVAILABLE');
+  await expect(connectionLabel).not.toContainText(selected.cable.protectiveDevice.catalogNumber);
+  await page.evaluate(rows => window.dataStore.setCables(rows), selected.originalCables);
+  await expect(review).toContainText(selected.cable.protectiveDevice.catalogNumber);
+  await expect(connectionLabel).toContainText(selected.cable.protectiveDevice.catalogNumber);
+  await page.evaluate(({ drawing, sourceId }) => {
+    const changed = structuredClone(drawing);
+    changed.sheets[0].components.find(row => row.id === sourceId).connections[0].target = 'OTHER-LOAD';
+    window.dataStore.setOneLine(changed);
+    document.dispatchEvent(new Event('ctr:remote-applied'));
+  }, { drawing: selected.drawing, sourceId: selected.sourceId });
+  await expect(review).toContainText('endpoints do not match');
+  await page.evaluate(drawing => {
+    window.dataStore.setOneLine(drawing);
+    document.dispatchEvent(new Event('ctr:remote-applied'));
+  }, selected.drawing);
+  await expect(review).toContainText(selected.cable.protectiveDevice.catalogNumber);
+  await page.reload();
+  await expect.poll(async () => page.locator('#diagram g.component').count()).toBeGreaterThan(25);
+  await expect(connectionLabel).not.toContainText('PROPOSED DEVICE');
+  await select();
+  await expect(review).toContainText(selected.cable.protectiveDevice.catalogNumber);
+});

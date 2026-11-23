@@ -342,3 +342,41 @@ describe('simulateLoadProfile direct call', () => {
     assert.strictEqual(simulateLoadProfile(tray, { hourly: [] }), null);
   });
 });
+
+describe('simulateLoadProfile thermal units and losses', () => {
+  it('uses volumetric heat capacity and includes dielectric/sheath losses in steady-state target', () => {
+    const inputs = baseInputs();
+    inputs.installations.conduit.included = false;
+    inputs.installations['duct-bank'].included = false;
+    inputs.installations['direct-burial'].included = false;
+    const norm = normalizeEnvironment(inputs);
+    const { cases } = computeInstallationCases(norm);
+    const tray = cases[0];
+    const profile = simulateLoadProfile(tray, { hourly: [1], basis: 'per-unit' });
+    assert.ok(profile.tau_s > 1000, `expected physical τ > 1000 s, got ${profile.tau_s}`);
+    assert.ok(profile.maxTempC > norm.ambient.tempC, 'first-hour temperature rises above ambient');
+    assert.ok(profile.maxTempC < tray.iec60287Raw.thetaConductorActual, 'first-hour temperature remains below steady state');
+  });
+
+  it('matches controlled one-core and three-core RC arithmetic', () => {
+    const makeCase = nCores => ({
+      deratedAmpacity_A: 200,
+      iec60287Raw: {
+        thermalResistances: { T1: 0.2, T2: 0.1, T3: 0.1, T4: 1 },
+        nCores, R_ac: 0.0001, W_d: 0.5, lossFactors: { lambda1: 0.1, lambda2: 0.2 },
+        sizeMm2: 100, material: 'Cu', ambientTempC: 20, thetaMax: 90,
+      },
+    });
+    const one = simulateLoadProfile(makeCase(1), { hourly: [1], basis: 'per-unit' });
+    const three = simulateLoadProfile(makeCase(3), { hourly: [1], basis: 'per-unit' });
+    const tauOne = (1.74 * 345) / 1;
+    const tauThree = (4.82 / 3) * 1035;
+    const expectedOne = 20 + 7.61 * (1 - Math.exp(-3600 / tauOne));
+    const expectedThree = 20 + 21.13 * (1 - Math.exp(-3600 / tauThree));
+    assert.equal(one.tau_s, Math.round(tauOne));
+    assert.equal(three.tau_s, Math.round(tauThree));
+    assert.equal(one.timeline[0].tempC, Math.round(expectedOne * 10) / 10);
+    assert.equal(three.timeline[0].tempC, Math.round(expectedThree * 10) / 10);
+    assert.notEqual(one.tau_s, three.tau_s);
+  });
+});

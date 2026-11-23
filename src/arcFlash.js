@@ -1,5 +1,4 @@
 import '../site.js';
-import './projectManager.js';
 import '../studies/arcFlash.js';
 import './workflowStatus.js';
 import { initStudyApprovalPanel } from './components/studyApproval.js';

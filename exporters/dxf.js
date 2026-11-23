@@ -11,8 +11,13 @@ function toFiniteNumber(value, fallback = 0) {
   return Number.isFinite(numeric) ? numeric : fallback;
 }
 
-function buildDXF(components = []) {
+function buildDXF(components = [], { reviewNotice = '' } = {}) {
   const d = new Drawing();
+  if (reviewNotice) {
+    const x = components.length ? Math.min(...components.map(component => toFiniteNumber(component?.x))) : 0;
+    const y = components.length ? Math.min(...components.map(component => toFiniteNumber(component?.y))) - 20 : -20;
+    d.drawText(x, y, 8, reviewNotice);
+  }
   components.forEach(c => {
     const x = toFiniteNumber(c.x);
     const y = toFiniteNumber(c.y);
@@ -22,8 +27,8 @@ function buildDXF(components = []) {
   return d.toDxfString();
 }
 
-export function exportDXF(components = []) {
-  const content = buildDXF(components);
+export function exportDXF(components = [], options = {}) {
+  const content = buildDXF(components, options);
   const blob = new Blob([content], { type: 'application/dxf' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -32,8 +37,8 @@ export function exportDXF(components = []) {
   URL.revokeObjectURL(a.href);
 }
 
-export function exportDWG(components = []) {
-  const content = buildDXF(components);
+export function exportDWG(components = [], options = {}) {
+  const content = buildDXF(components, options);
   const blob = new Blob([content], { type: 'application/acad' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

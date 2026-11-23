@@ -39,6 +39,7 @@ export function renderCablePrintReport(host, options = {}) {
     columns = [],
     rows = [],
     modeLabel = '',
+    reviewNotice = '',
     generatedAt = new Date(),
     formatValue = defaultFormatValue,
     formatDateTime = defaultFormatDateTime,
@@ -55,6 +56,11 @@ export function renderCablePrintReport(host, options = {}) {
   const generated = document.createElement('span');
   generated.textContent = `Generated ${formatDateTime(generatedAt)}`;
   meta.append(title, generated);
+  if (reviewNotice) {
+    const notice = document.createElement('strong');
+    notice.textContent = reviewNotice;
+    meta.appendChild(notice);
+  }
 
   const tableEl = document.createElement('table');
   tableEl.className = 'cable-print-table';

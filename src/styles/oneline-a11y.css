@@ -1,0 +1,12 @@
+body.dark-mode #palette .palette-filter,
+body.dark-mode #palette .palette-clear-filter {
+  background: #1e293b;
+  border-color: #64748b;
+  color: #f1f5f9;
+}
+
+body.dark-mode #palette .palette-filter.active {
+  background: #93c5fd;
+  border-color: #93c5fd;
+  color: #0f172a;
+}

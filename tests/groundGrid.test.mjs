@@ -268,6 +268,50 @@ describe('analyzeGroundGrid — integration', () => {
     assert.ok(withRods.Rg < withoutRods.Rg);
   });
 
+  it('uses the IEEE rod-aware step effective length for a no-rod grid', () => {
+    const result = analyzeGroundGrid({
+      rho: 100,
+      gridLx: 40,
+      gridLy: 30,
+      nx: 5,
+      ny: 4,
+      h: 0.5,
+      d: 0.01,
+      Ig: 2000,
+      tf: 0.5,
+      hasRods: false,
+      rhoS: 300,
+      hs: 0.1,
+      bw: 50,
+    });
+    approx(result.Es, 413.9786087887692, 1e-6);
+    assert.strictEqual(result.stepSafe, false);
+  });
+
+  it('uses horizontal conductor length for n and rod-aware Lm/Ls', () => {
+    const result = analyzeGroundGrid({
+      rho: 300,
+      gridLx: 90,
+      gridLy: 50,
+      nx: 6,
+      ny: 7,
+      h: 0.6,
+      d: 0.01,
+      Ig: 2000,
+      tf: 0.15,
+      hasRods: true,
+      rodCount: 22,
+      rodLength: 3,
+      rhoS: 3000,
+      hs: 0.1,
+      bw: 70,
+    });
+    approx(result.Em, 960.4084270521508, 1e-6);
+    approx(result.Es, 419.071168551245, 1e-6);
+    assert.strictEqual(result.touchSafe, true);
+    assert.strictEqual(result.stepSafe, true);
+  });
+
   it('throws for negative rod length', () => {
     assert.throws(() => analyzeGroundGrid({ ...base, hasRods: true, rodCount: 4, rodLength: -1 }));
   });
@@ -276,17 +320,15 @@ describe('analyzeGroundGrid — integration', () => {
   it('throws when derived mesh factor yields a non-physical mesh voltage', () => {
     assert.throws(() => analyzeGroundGrid({
       rho: 100,
-      gridLx: 30.48,
-      gridLy: 30.48,
-      nx: 100,
-      ny: 100,
-      h: 0.4572,
-      d: 0.01,
+      gridLx: 1,
+      gridLy: 1,
+      nx: 2,
+      ny: 2,
+      h: 0.5,
+      d: 1,
       Ig: 5000,
       tf: 0.5,
-      hasRods: true,
-      rodCount: 10000,
-      rodLength: 1.3716,
+      hasRods: false,
       bw: 70,
     }), /Computed mesh factor is invalid|Computed mesh voltage is invalid/);
   });

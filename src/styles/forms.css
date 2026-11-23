@@ -409,6 +409,51 @@ body.compact-mode #palette button .palette-icon {
     margin-bottom: 0;
 }
 
+/* Keep the first editable cable rows inside the initial desktop viewport. */
+@media (min-width: 900px) and (max-height: 760px) {
+    body[data-report-title="Cable Schedule"] .cable-schedule-card {
+        margin-top: .5rem;
+        gap: .15rem;
+        padding: .45rem;
+    }
+    body[data-report-title="Cable Schedule"] .schedule-card-header .field-hint,
+    body[data-report-title="Cable Schedule"] .workflow-next-action p {
+        display: none;
+    }
+    body[data-report-title="Cable Schedule"] .workflow-next-action {
+        margin: .2rem 0;
+        padding: .35rem .55rem;
+    }
+    body[data-report-title="Cable Schedule"] .routing-readiness-panel {
+        padding-block: .35rem;
+    }
+    body[data-report-title="Cable Schedule"] .table-search-container {
+        margin-block: 0;
+    }
+    body[data-report-title="Cable Schedule"] #cableScheduleTable tbody td {
+        padding-block: .2rem;
+    }
+    body[data-report-title="Cable Schedule"] #cableScheduleTable tbody input,
+    body[data-report-title="Cable Schedule"] #cableScheduleTable tbody select {
+        padding-block: 2px;
+    }
+    body[data-report-title="Cable Schedule"] .schedule-card-header {
+        gap: .35rem;
+    }
+    body[data-report-title="Cable Schedule"] .cable-toolbar {
+        padding-block: .2rem;
+        row-gap: .2rem;
+    }
+    body[data-report-title="Cable Schedule"] #cableScheduleTable thead th {
+        padding-block: .2rem;
+    }
+    body[data-report-title="Cable Schedule"] #cableScheduleTable .header-sort,
+    body[data-report-title="Cable Schedule"] #cableScheduleTable .filter-btn {
+        min-height: 1.35rem;
+        padding-block: .1rem;
+    }
+}
+
 .cable-toolbar .toolbar-btn,
 .toolbar-menu > summary.toolbar-btn {
     display: inline-flex;
@@ -643,6 +688,44 @@ body.dark-mode .btn-accent.toolbar-btn .control-icon {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-2);
+}
+
+.project-import-preview {
+    display: grid;
+    gap: 0.75rem;
+    white-space: pre-wrap;
+}
+
+.project-import-preview__scenarios {
+    margin: 0;
+    padding: 0.75rem;
+    border: 1px solid var(--color-border, #d8dee8);
+    border-radius: 0.5rem;
+    background: var(--color-surface-muted, #f6f8fb);
+    font: inherit;
+}
+
+.project-import-preview__errors {
+    margin: 0;
+    padding-left: 1.25rem;
+    color: var(--color-error, #b42318);
+}
+
+.cable-guidance-disclosure {
+    margin-block: 0.35rem;
+    border: 1px solid var(--color-border, #d8dee8);
+    border-radius: 0.45rem;
+    background: var(--color-surface-muted, #f6f8fb);
+}
+
+.cable-guidance-disclosure > summary {
+    padding: 0.35rem 0.6rem;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.cable-guidance-disclosure__body {
+    padding: 0.25rem 0.55rem 0.45rem;
 }
 
 .import-mapping-row {

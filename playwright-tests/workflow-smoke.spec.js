@@ -250,7 +250,7 @@ test('equipment list supports add modal, starter records, and workflow navigatio
   await page.getByRole('button', { name: 'Add Equipment' }).first().click();
   const dialog = page.getByRole('dialog', { name: 'Add Equipment' });
   await dialog.getByLabel('Equipment Tag').fill('SWBD-101');
-  await dialog.getByLabel('Voltage').fill('480');
+  await dialog.getByLabel('Voltage', { exact: true }).fill('480');
   await dialog.getByRole('button', { name: 'Add Equipment' }).click();
   await expect(page.locator('#equipment-table input[name="tag"]').first()).toHaveValue('SWBD-101');
   await expect(page.locator('#equipment-summary-cards')).toContainText('Equipment');
@@ -453,6 +453,20 @@ test('workflow guidance stays compact and subordinate to the page workspace', as
   expect(navHeight).toBeLessThanOrEqual(72);
 });
 
+test('mobile project identity stays inside the viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 820 });
+  await page.goto(server.url('equipmentlist.html?e2e=1&e2e_reset=1'), { waitUntil: 'domcontentloaded' });
+
+  const projectTrigger = page.locator('.project-actions-trigger');
+  await expect(projectTrigger).toBeVisible();
+  const geometry = await projectTrigger.evaluate(element => {
+    const box = element.getBoundingClientRect();
+    return { right: box.right, width: box.width, viewport: window.innerWidth };
+  });
+  expect(geometry.width).toBeGreaterThan(0);
+  expect(geometry.right).toBeLessThanOrEqual(geometry.viewport + 1);
+});
+
 test('sample gallery lists the full project workflow sample', async ({ page }) => {
   await page.goto(server.url('samplegallery.html?e2e=1&e2e_reset=1'), { waitUntil: 'domcontentloaded' });
   const sampleCards = page.locator('[data-sample-id]');
@@ -483,6 +497,7 @@ test('sample gallery lists the full project workflow sample', async ({ page }) =
 });
 
 test('guided sample import populates the ordinary workspace before navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.addInitScript(() => {
     if (sessionStorage.getItem('ctr-review-sample-test-reset') === '1') return;
     localStorage.clear();
@@ -500,11 +515,18 @@ test('guided sample import populates the ordinary workspace before navigation', 
 
   await expect(page.getByRole('dialog', { name: 'Create New Project' })).toHaveCount(0);
   await expect(page.locator('#checklist-panel')).toContainText('Guided Workflow: Project Workflow Core');
-  const cableStep = page.locator('#checklist-steps .checklist-step__link').filter({ hasText: /cableschedule/i }).first();
+  const cableStep = page.locator('#checklist-steps .checklist-step__link[href*="cableschedule.html"]').first();
   const cableHref = await cableStep.getAttribute('href');
   await page.goto(new URL(cableHref, page.url()).toString(), { waitUntil: 'domcontentloaded' });
   await expect(page.locator('#routing-readiness-panel [data-metric="total"]')).toHaveText('14');
-  await expect(page.locator('#cableScheduleTable tbody tr')).toHaveCount(14);
+  const cableRows = page.locator('#cableScheduleTable tbody tr');
+  await expect(cableRows).toHaveCount(14);
+  const viewport = await page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }));
+  const firstRows = await cableRows.evaluateAll(rows => rows.slice(0, 3).map(row => {
+    const box = row.getBoundingClientRect();
+    return { top: box.top, bottom: box.bottom, editable: Boolean(row.querySelector('input, select')) };
+  }));
+  expect(firstRows.every(row => row.editable && row.top >= 0 && row.bottom <= viewport.height), JSON.stringify({ viewport, firstRows })).toBe(true);
 });
 
 test('one-line saves shared records automatically and opens the data-link review', async ({ page }) => {

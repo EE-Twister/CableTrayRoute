@@ -2,6 +2,8 @@
 
 ## Overview
 
+Saved and imported result values are displayed as plain text. Labels and numeric-display fields containing markup cannot insert elements or execute scripts when the saved study is reopened.
+
 The DC short-circuit and arc flash module (`analysis/dcShortCircuit.mjs`) calculates:
 
 1. **Bolted DC fault current** (IEEE 946-2004 / IEC 61660-1) — the maximum prospective short-circuit current available at a fault point in a DC distribution system.

@@ -26,6 +26,7 @@ Use the full-regression commands for comprehensive coverage:
 
 - `npm run test:full`
 - `npm run e2e:full`
+- `npm run visual:regression`
 
 This lane is intended for nightly/scheduled runs and release hardening.
 
@@ -46,11 +47,12 @@ Current command mappings:
 - `npm run test:full` -> discovered Node full regression lane via `scripts/runNodeTests.mjs`
 - `npm run e2e:critical` -> curated Playwright smoke lane for high-risk browser journeys
 - `npm run e2e:full` -> full Playwright browser lane
+- `npm run visual:regression` -> dedicated Windows Microsoft Edge desktop snapshot lane; the config rejects other platforms
 - `npm run perf:browser` -> deterministic workflow plus Short Circuit, IEC 60909, Arc Flash, TCC, Harmonics, Load Flow, Motor Start, Contingency, Transient Stability, and Library startup/request budgets
 - `npm run check:bundle-budgets` -> built Workflow Dashboard, Equipment Evaluation, Short Circuit, IEC 60909, Arc Flash, TCC, Harmonics, Load Flow, Motor Start, Contingency, Transient Stability, and Library Manager bundle-size limits
 - `node tests/protectiveDeviceCatalog.test.mjs` -> packed locator schema, sub-1 MB budget, shard hydration/cache, and legacy fallback
 
-On managed Windows environments, a locally installed Playwright Firefox may fail before page creation when the OS blocks its tab subprocess (`Failed to launch tab subprocess`). That is a browser-runtime failure rather than an application assertion. Use the `msedge` project for local diagnosis and retain the Ubuntu Firefox CI result as the cross-browser merge gate.
+On managed Windows environments, a locally installed Playwright Firefox may fail before page creation when the execution host blocks its tab subprocess (`Failed to launch tab subprocess`). That is a browser-runtime failure rather than an application assertion. Run the Firefox lane from a normal local terminal or an appropriately escalated CI runner; do not disable Firefox content sandboxing. The dedicated visual lane uses `playwright.visual.config.cjs`, requires Windows Edge, and remains required alongside the functional Firefox/Edge lane.
 
 The Browser Performance Contracts CI job runs independently after the build, fails on missing or over-budget measurements, and always uploads `performance-report.json`. See `docs/performance-contracts.md` for workloads, thresholds, and local commands.
 
@@ -70,6 +72,7 @@ merge on every PR; the full lane runs nightly.
 | `npm run e2e:heat-trace` | `.github/workflows/ci.yml` | `acceptance-lanes` | push / PR (main, master, claude/**) |
 | `npm test` (full) | `.github/workflows/nightly-full-regression.yml` | `full-regression` | cron `0 6 * * *` + manual |
 | `npm run e2e` (full) | `.github/workflows/nightly-full-regression.yml` | `full-regression` | cron `0 6 * * *` + manual |
+| `npm run visual:regression` | `.github/workflows/ci.yml` | `visual-regression` (Windows/Edge) | push / PR (main, master, claude/**) |
 
 The `acceptance-lanes` job depends on `build` and downloads the same `dist`
 artifact used by `e2e`, so the deterministic acceptance suites and the

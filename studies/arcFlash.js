@@ -1,8 +1,7 @@
 import { runArcFlash } from '../analysis/arcFlash.mjs';
-import { getOneLine, getStudies, setStudies } from '../dataStore.mjs';
+import { getOneLine, getStudies, getStudyAssessments, captureStudyRunContext, assertStudyRunContextCurrent, saveStudyResult } from '../dataStore.mjs';
 import { getProjectState } from '../projectStorage.js';
 import { generateArcFlashReport } from '../reports/arcFlashReport.mjs';
-import { fingerprintStudySource } from '../analysis/studyResultReadiness.mjs';
 import {
   arcFlashReadinessLabel,
   arcFlashResultEntries,
@@ -21,11 +20,23 @@ function projectComponents() {
 
 export async function runArcFlashStudy() {
   if (!projectComponents().length) throw new Error('The active project One-Line has no components to analyze.');
+  const runContext = captureStudyRunContext('arcFlash', {
+    inputs: { oneLine: projectComponents() },
+    options: {},
+    assumptions: ['Arc-flash incident energy is evaluated from the active One-Line fault and protective-device inputs.'],
+  });
   const results = await runArcFlash();
-  const studies = getStudies();
-  studies.arcFlash = results;
-  setStudies(studies);
-  return results;
+  assertStudyRunContextCurrent(runContext);
+  try {
+    saveStudyResult('arcFlash', results, runContext);
+    return { ...results, persisted: true };
+  } catch (error) {
+    return {
+      ...results,
+      persisted: false,
+      persistenceWarning: `Study was calculated but not saved: ${error.message || error}`,
+    };
+  }
 }
 
 function renderResults(results, scope = 'project') {
@@ -39,13 +50,16 @@ function renderResults(results, scope = 'project') {
   tbody.innerHTML = '';
   entries.forEach(([id, result]) => {
     const row = document.createElement('tr');
+    const finite = value => typeof value === 'number' && Number.isFinite(value);
+    const incidentEnergy = finite(result.incidentEnergy) ? `${result.incidentEnergy.toFixed(2)} cal/cm²` : 'Not evaluated';
+    const minimumRating = finite(result.minimumArcRatingCalCm2) ? result.minimumArcRatingCalCm2 : null;
+    const boundary = finite(result.boundary) ? `${result.boundary.toFixed(0)} mm` : 'Not evaluated';
+    const clearingTimeText = finite(result.clearingTime) ? `${result.clearingTime.toFixed(3)} s` : 'Not evaluated';
     [
       result.equipmentTag || id,
-      `${Number(result.incidentEnergy).toFixed(2)} cal/cm²`,
-      result.minimumArcRatingCalCm2 > 0
-        ? `≥ ${Number(result.minimumArcRatingCalCm2).toFixed(2)} cal/cm²`
-        : 'Below 1.2 cal/cm² threshold',
-      `${Number(result.boundary || 0).toFixed(0)} mm`,
+      incidentEnergy,
+      minimumRating == null ? 'Not evaluated' : minimumRating > 0 ? `≥ ${minimumRating.toFixed(2)} cal/cm²` : 'Below 1.2 cal/cm² threshold',
+      boundary,
     ].forEach(value => {
       const cell = document.createElement('td');
       cell.textContent = value;
@@ -54,7 +68,7 @@ function renderResults(results, scope = 'project') {
     const clearingCell = document.createElement('td');
     clearingCell.className = 'arcflash-clearing-basis';
     const clearingTime = document.createElement('span');
-    clearingTime.textContent = `${Number(result.clearingTime || 0).toFixed(3)} s`;
+    clearingTime.textContent = clearingTimeText;
     const clearingBasis = document.createElement('small');
     clearingBasis.textContent = formatArcFlashClearingBasis(result);
     clearingCell.append(clearingTime, clearingBasis);
@@ -141,20 +155,18 @@ function initializeArcFlashPage() {
       });
       if (status) status.textContent = 'Study blocked: the active project One-Line has no components to analyze.';
     } else if (latestResults && arcFlashResultEntries(latestResults).length) {
-      const savedFingerprint = latestResults._runMetadata?.sourceFingerprint;
-      const currentFingerprint = fingerprintStudySource(getOneLine());
-      const stale = Boolean(savedFingerprint && savedFingerprint !== currentFingerprint);
+      const assessment = getStudyAssessments().arcFlash;
+      const stale = assessment?.freshness !== 'current' || assessment?.eligible !== true;
       renderResults(latestResults, scope?.value || 'project');
       renderReadiness(latestResults, { stale });
       if (exportButton) exportButton.disabled = stale;
       if (status) {
         status.textContent = stale
-          ? 'Saved results loaded, but the One-Line has changed. Rerun before export.'
-          : savedFingerprint
-            ? 'Current saved results loaded. Review required inputs and engineer-review status before export.'
-            : 'Saved results loaded. Source freshness was not recorded; rerun before relying on export.';
+          ? assessment?.freshness === 'stale'
+            ? 'Saved results loaded, but the One-Line has changed. Rerun before export.'
+            : 'Saved results loaded. Source freshness was not recorded or required inputs remain incomplete; rerun before relying on export.'
+          : 'Current saved results loaded. Review required inputs and engineer-review status before export.';
       }
-      if (!savedFingerprint && exportButton) exportButton.disabled = true;
     } else {
       renderReadiness();
     }
@@ -168,7 +180,9 @@ function initializeArcFlashPage() {
         const readiness = renderReadiness(latestResults);
         if (exportButton) exportButton.disabled = readiness.total === 0;
         if (status) {
-          status.textContent = readiness.incomplete
+          status.textContent = latestResults.persisted === false
+            ? latestResults.persistenceWarning
+            : readiness.incomplete
             ? `Study saved. ${readiness.incomplete} location(s) need input confirmation; only eligible label drafts will export.`
             : 'Study saved. Results are calculation-complete; engineer review is still required before field use.';
         }
@@ -183,7 +197,7 @@ function initializeArcFlashPage() {
     });
     exportButton?.addEventListener('click', () => {
       if (!latestResults) return;
-      const exportSummary = generateArcFlashReport(latestResults);
+      const exportSummary = generateArcFlashReport(latestResults, { assessment: getStudyAssessments().arcFlash });
       if (status) {
         status.textContent = exportSummary?.omittedLabelCount
           ? `Draft report exported; ${exportSummary.omittedLabelCount} incomplete label draft(s) were withheld.`

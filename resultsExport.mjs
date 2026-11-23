@@ -12,13 +12,16 @@ export function buildSegmentRows(results = []) {
     results.forEach(res => {
         const reasons = (res.exclusions || []).map(e => e.reason).join('; ');
         let cumulative = 0;
-        if (Array.isArray(res.breakdown) && res.breakdown.length) {
-            res.breakdown.forEach((seg, idx) => {
+        const sourceSegments = Array.isArray(res.breakdown) && res.breakdown.length
+            ? res.breakdown
+            : (Array.isArray(res.route_segments) ? res.route_segments : []);
+        if (sourceSegments.length) {
+            sourceSegments.forEach((seg, idx) => {
                 const routeSeg = (res.route_segments || [])[idx] || {};
                 const start = seg.start || seg.from || routeSeg.start;
                 const end = seg.end || seg.to || routeSeg.end;
-                let elementType = 'tray';
-                let elementId = seg.tray_id || '';
+                let elementType = seg.type === 'field' ? 'field' : 'tray';
+                let elementId = seg.type === 'field' ? 'Field Route' : (seg.tray_id || '');
                 if (seg.conduit_id) {
                     elementType = 'conduit';
                     elementId = `${seg.ductbankTag ? seg.ductbankTag + ':' : ''}${seg.conduit_id}`;
@@ -26,7 +29,7 @@ export function buildSegmentRows(results = []) {
                     elementType = 'ductbank';
                     elementId = seg.ductbankTag;
                 }
-                const len = parseFloat(seg.length) || 0;
+                const len = parseFloat(seg.length ?? routeSeg.length) || 0;
                 cumulative += len;
                 rows.push({
                     cable_tag: res.cable,
@@ -79,24 +82,39 @@ export { buildTrayHardwareBOM } from './analysis/trayHardware.mjs';
 
 export function buildBOM(results = [], trayData = [], cableList = [], conductorProps = {}, materialCosts = {}) {
     const trayLookup = new Map();
+    const conduitLookup = new Map();
     trayData.forEach(t => {
-        if (t.tray_id) trayLookup.set(t.tray_id, t);
-        if (t.conduit_id) trayLookup.set(t.conduit_id, t);
+        if (t.tray_id) trayLookup.set(String(t.tray_id), t);
+        if (t.conduit_id) conduitLookup.set(String(t.conduit_id), t);
     });
 
     const racewayMap = new Map();
     results.forEach(res => {
-        (res.breakdown || []).forEach(seg => {
+        const segments = Array.isArray(res.breakdown) && res.breakdown.length
+            ? res.breakdown
+            : (Array.isArray(res.route_segments) ? res.route_segments : []);
+        segments.forEach(seg => {
+            if (!seg || typeof seg !== 'object') return;
+            const segmentType = String(seg.type || seg.containmentType || seg.containment || '').toLowerCase();
+            const trayId = seg.tray_id ?? seg.trayId;
+            const conduitId = seg.conduit_id ?? seg.conduitId;
+            const fieldLabel = String(trayId ?? conduitId ?? '').trim().toLowerCase();
+            if (segmentType === 'field' || segmentType.includes('field') || seg.isFieldRouting === true
+                || fieldLabel === 'field route' || fieldLabel === 'field') {
+                return;
+            }
             const len = parseFloat(seg.length) || 0;
-            if (seg.tray_id) {
-                const tray = trayLookup.get(seg.tray_id) || {};
-                const type = tray.tray_type || tray.type || 'tray';
+            // A conduit-bearing segment can also carry its parent tray/ductbank id.
+            // Prefer the conduit material whenever both ids are present.
+            if (conduitId) {
+                const conduit = conduitLookup.get(String(conduitId)) || {};
+                const type = conduit.type || 'conduit';
                 const r = racewayMap.get(type) || { type, total_length: 0 };
                 r.total_length += len;
                 racewayMap.set(type, r);
-            } else if (seg.conduit_id) {
-                const conduit = trayLookup.get(seg.conduit_id) || {};
-                const type = conduit.type || 'conduit';
+            } else if (trayId) {
+                const tray = trayLookup.get(String(trayId)) || {};
+                const type = tray.tray_type || tray.type || 'tray';
                 const r = racewayMap.get(type) || { type, total_length: 0 };
                 r.total_length += len;
                 racewayMap.set(type, r);
@@ -117,12 +135,17 @@ export function buildBOM(results = [], trayData = [], cableList = [], conductorP
         };
     });
 
-    const cableLookup = new Map(cableList.map(c => [c.tag || c.cable_tag, c]));
+    const cableLookup = new Map();
+    cableList.forEach(c => {
+        const key = c?.tag || c?.cable_tag || c?.name;
+        if (key) cableLookup.set(String(key), c);
+    });
     const cableMap = new Map();
     const CM_TO_SQIN = Math.PI / 4e6;
 
     results.forEach(res => {
-        const cable = cableLookup.get(res.cable);
+        const resultCable = res?.cable ?? res?.cable_tag ?? res?.name;
+        const cable = cableLookup.get(String(resultCable ?? ''));
         if (!cable) return;
         const size = cable.conductor_size || '';
         const material = (cable.conductor_material || '').toLowerCase();

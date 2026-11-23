@@ -413,4 +413,29 @@ describe('runBusDuctStudy() — integration', () => {
     assert.ok(r.selectedBusway.rating >= 2000,
       `Expected upsized selection ≥ 2000 A, got ${r.selectedBusway.rating}`);
   });
+
+  it('reports catalog-exceeded when no standard busway can meet the load', () => {
+    const r = runBusDuctStudy({ ...standardInputs, currentA: 6000 });
+    assert.ok(r.valid);
+    assert.strictEqual(r.selectedBusway.adequate, false);
+    assert.strictEqual(r.selectedBusway.catalogAdequate, false);
+    assert.strictEqual(r.selectedBusway.adequacyStatus, 'catalog-exceeded');
+    assert.ok(r.warnings.some(w => /no adequate standard busway/i.test(w)));
+  });
+
+  it('reports derating-insufficient when the catalog rating is finite but derated ampacity misses load', () => {
+    const r = runBusDuctStudy({
+      ...standardInputs,
+      currentA: 4900,
+      orientation: 'edgeon',
+      ambientC: 70,
+      stackedRuns: 4,
+    });
+    assert.ok(r.valid);
+    assert.strictEqual(r.selectedBusway.catalogAdequate, true);
+    assert.strictEqual(r.selectedBusway.deratingAdequate, false);
+    assert.strictEqual(r.selectedBusway.adequate, false);
+    assert.strictEqual(r.selectedBusway.adequacyStatus, 'derated-insufficient');
+    assert.ok(r.warnings.some(w => /derated ampacity.*below/i.test(w)));
+  });
 });

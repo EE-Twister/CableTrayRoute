@@ -41,6 +41,7 @@ function caseToDiagram(data) {
     };
     if (b.Pd || b.Qd) comp.load = { kw: (b.Pd || 0) * 1000, kvar: (b.Qd || 0) * 1000 };
     if (b.Pg || b.Qg) comp.generation = { kw: (b.Pg || 0) * 1000, kvar: (b.Qg || 0) * 1000 };
+    if (b.Bs) comp.shunt = { b: b.Bs / (b.baseKV * b.baseKV) };
     return comp;
   });
   data.branches.forEach(br => {
@@ -50,6 +51,7 @@ function caseToDiagram(data) {
     const baseZ = (baseKV * baseKV) / baseMVA;
     const baseY = baseMVA / (baseKV * baseKV);
     const conn = { target: br.to.toString(), impedance: { r: br.r * baseZ, x: br.x * baseZ } };
+    if (br.ratio && br.ratio !== 1) conn.tap = { ratio: br.ratio, angle: br.angle || 0 };
     if (br.b && br.b !== 0) conn.shunt = { from: { b: (br.b / 2) * baseY }, to: { b: (br.b / 2) * baseY } };
     from.connections.push(conn);
   });
@@ -72,12 +74,15 @@ function caseToDiagram(data) {
   describe('analysis benchmarks', () => {
     it('matches IEEE 14-bus load flow', () => {
       setOneLine({ activeSheet: 0, sheets: caseToDiagram(lfBench) });
-      const res = runLoadFlow({ baseMVA: lfBench.baseMVA });
+      const res = runLoadFlow({ baseMVA: lfBench.baseMVA, radialOptimization: false, maxIterations: 50 });
+      assert.strictEqual(res.converged, true, `IEEE 14-bus solve did not converge: ${JSON.stringify(res.warnings)}`);
+      assert(Number.isFinite(res.maxMismatch) && res.maxMismatch < 1e-6, `Residual too large: ${res.maxMismatch}`);
+      assert.strictEqual(res.buses.length, lfBench.buses.length);
       Object.entries(lfBench.expected).forEach(([id, exp]) => {
         const bus = res.buses.find(b => b.id === id);
         assert(bus, `Missing bus ${id}`);
-        if (exp.Vm !== undefined) assert(Math.abs(bus.Vm - exp.Vm) < 0.01);
-        if (exp.Va !== undefined) assert(Math.abs(bus.Va - exp.Va) < 0.1);
+        if (exp.Vm !== undefined) assert(Math.abs(bus.Vm - exp.Vm) < 1e-4, `Vm mismatch at ${id}`);
+        if (exp.Va !== undefined) assert(Math.abs(bus.Va - exp.Va) < 1e-3, `Va mismatch at ${id}`);
       });
     });
 
@@ -91,6 +96,9 @@ function caseToDiagram(data) {
         if (exp.lineToGroundKA !== undefined) assert(Math.abs(bus.lineToGroundKA - exp.lineToGroundKA) < 0.1);
         if (exp.lineToLineKA !== undefined) assert(Math.abs(bus.lineToLineKA - exp.lineToLineKA) < 0.1);
         if (exp.doubleLineGroundKA !== undefined) assert(Math.abs(bus.doubleLineGroundKA - exp.doubleLineGroundKA) < 0.1);
+        for (const key of ['doubleLineGroundPhaseBKA', 'doubleLineGroundPhaseCKA', 'doubleLineGroundEarthKA']) {
+          if (exp[key] !== undefined) assert(Math.abs(bus[key] - exp[key]) < 0.1, `${key} mismatch for ${id}`);
+        }
       });
     });
 
@@ -130,6 +138,10 @@ function caseToDiagram(data) {
         reliability: {
           n1Failures: reliability.n1Failures,
           n1FailureDetails: reliability.n1FailureDetails
+        }
+      }, {
+        assessments: {
+          reliability: { freshness: 'current', validity: { state: 'evaluated' }, eligible: true }
         }
       });
       assert.strictEqual(issues.length, 1);

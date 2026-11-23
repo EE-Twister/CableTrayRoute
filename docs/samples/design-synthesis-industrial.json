@@ -1,0 +1,46 @@
+{
+  "provenance": { "kind": "synthetic", "note": "Deterministic industrial acceptance fixture; source documents are not implied." },
+  "supply": { "id": "SWGR-01", "voltage": 480, "phases": 3, "capacityKva": 1200, "availableFaultCurrentKA": 20, "x": 0, "y": 0, "z": 0 },
+  "equipment": [
+    { "id": "M-01", "tag": "P-101A", "kw": 22, "voltage": 480, "phases": 3, "powerFactor": 0.9, "x": 40, "y": -20, "z": 0 },
+    { "id": "M-02", "tag": "P-101B", "kw": 18, "voltage": 480, "phases": 3, "powerFactor": 0.9, "x": 60, "y": -20, "z": 0 },
+    { "id": "M-03", "tag": "P-102A", "kw": 30, "voltage": 480, "phases": 3, "powerFactor": 0.88, "x": 80, "y": -20, "z": 0 },
+    { "id": "M-04", "tag": "P-102B", "kw": 30, "voltage": 480, "phases": 3, "powerFactor": 0.88, "x": 100, "y": -20, "z": 0 },
+    { "id": "M-05", "tag": "P-103A", "kw": 45, "voltage": 480, "phases": 3, "powerFactor": 0.9, "x": 120, "y": -20, "z": 0 },
+    { "id": "M-06", "tag": "P-103B", "kw": 45, "voltage": 480, "phases": 3, "powerFactor": 0.9, "x": 140, "y": -20, "z": 0 },
+    { "id": "M-07", "tag": "P-104A", "kw": 55, "voltage": 480, "phases": 3, "powerFactor": 0.92, "x": 160, "y": -20, "z": 0 },
+    { "id": "M-08", "tag": "P-104B", "kw": 55, "voltage": 480, "phases": 3, "powerFactor": 0.92, "x": 180, "y": -20, "z": 0 },
+    { "id": "M-09", "tag": "P-105A", "kw": 15, "voltage": 480, "phases": 3, "powerFactor": 0.86, "x": 40, "y": 20, "z": 0 },
+    { "id": "M-10", "tag": "P-105B", "kw": 15, "voltage": 480, "phases": 3, "powerFactor": 0.86, "x": 60, "y": 20, "z": 0 },
+    { "id": "M-11", "tag": "P-106A", "kw": 37, "voltage": 480, "phases": 3, "powerFactor": 0.9, "x": 80, "y": 20, "z": 0 },
+    { "id": "M-12", "tag": "P-106B", "kw": 37, "voltage": 480, "phases": 3, "powerFactor": 0.9, "x": 100, "y": 20, "z": 0 },
+    { "id": "M-13", "tag": "P-107A", "kw": 75, "voltage": 480, "phases": 3, "powerFactor": 0.91, "x": 120, "y": 20, "z": 0 },
+    { "id": "M-14", "tag": "P-107B", "kw": 75, "voltage": 480, "phases": 3, "powerFactor": 0.91, "x": 140, "y": 20, "z": 0 },
+    { "id": "M-15", "tag": "P-108A", "kw": 11, "voltage": 480, "phases": 3, "powerFactor": 0.84, "x": 160, "y": 20, "z": 0 },
+    { "id": "M-16", "tag": "P-108B", "kw": 11, "voltage": 480, "phases": 3, "powerFactor": 0.84, "x": 180, "y": 20, "z": 0 },
+    { "id": "M-17", "tag": "FAN-201", "kw": 7.5, "voltage": 480, "phases": 3, "powerFactor": 0.86, "x": 40, "y": 60, "z": 0 },
+    { "id": "M-18", "tag": "FAN-202", "kw": 7.5, "voltage": 480, "phases": 3, "powerFactor": 0.86, "x": 60, "y": 60, "z": 0 },
+    { "id": "M-19", "tag": "FAN-203", "kw": 7.5, "voltage": 480, "phases": 3, "powerFactor": 0.86, "x": 80, "y": 60, "z": 0 },
+    { "id": "M-20", "tag": "FAN-204", "kw": 7.5, "voltage": 480, "phases": 3, "powerFactor": 0.86, "x": 100, "y": 60, "z": 0 },
+    { "id": "M-21", "tag": "HTR-301", "kw": 12, "voltage": 480, "phases": 3, "powerFactor": 1, "x": 120, "y": 60, "z": 0 },
+    { "id": "M-22", "tag": "HTR-302", "kw": 12, "voltage": 480, "phases": 3, "powerFactor": 1, "x": 140, "y": 60, "z": 0 },
+    { "id": "M-23", "tag": "AHU-401", "kw": 25, "voltage": 480, "phases": 3, "powerFactor": 0.9, "x": 160, "y": 60, "z": 0 },
+    { "id": "M-24", "tag": "AHU-402", "kw": 25, "voltage": 480, "phases": 3, "powerFactor": 0.9, "x": 180, "y": 60, "z": 0 },
+    { "id": "M-25", "tag": "UPS-501", "kw": 40, "voltage": 480, "phases": 3, "powerFactor": 0.95, "x": 40, "y": 100, "z": 0 },
+    { "id": "M-26", "tag": "UPS-502", "kw": 40, "voltage": 480, "phases": 3, "powerFactor": 0.95, "x": 80, "y": 100, "z": 0 },
+    { "id": "M-27", "tag": "PKG-601", "kw": 50, "voltage": 480, "phases": 3, "powerFactor": 0.9, "x": 120, "y": 100, "z": 0 },
+    { "id": "M-28", "tag": "PKG-602", "kw": 50, "voltage": 480, "phases": 3, "powerFactor": 0.9, "x": 140, "y": 100, "z": 0 },
+    { "id": "M-29", "tag": "LGT-701", "kw": 8, "voltage": 480, "phases": 3, "powerFactor": 0.98, "x": 160, "y": 100, "z": 0 },
+    { "id": "M-30", "tag": "LGT-702", "kw": 8, "voltage": 480, "phases": 3, "powerFactor": 0.98, "x": 180, "y": 100, "z": 0 }
+  ],
+  "corridors": {
+    "nodes": [
+      { "id": "N0", "x": 0, "y": 0, "z": 0 }, { "id": "N1", "x": 60, "y": 0, "z": 0 }, { "id": "N2", "x": 120, "y": 0, "z": 0 }, { "id": "N3", "x": 180, "y": 0, "z": 0 },
+      { "id": "N4", "x": 60, "y": 50, "z": 0 }, { "id": "N5", "x": 120, "y": 50, "z": 0 }, { "id": "N6", "x": 180, "y": 50, "z": 0 }, { "id": "N7", "x": 120, "y": 100, "z": 0 }, { "id": "N8", "x": 180, "y": 100, "z": 0 }
+    ],
+    "edges": [
+      { "id": "E01", "from": "N0", "to": "N1", "widthIn": 24, "depthIn": 6 }, { "id": "E12", "from": "N1", "to": "N2", "widthIn": 24, "depthIn": 6 }, { "id": "E23", "from": "N2", "to": "N3", "widthIn": 24, "depthIn": 6 }, { "id": "E14", "from": "N1", "to": "N4", "widthIn": 18, "depthIn": 6 }, { "id": "E25", "from": "N2", "to": "N5", "widthIn": 18, "depthIn": 6 }, { "id": "E36", "from": "N3", "to": "N6", "widthIn": 18, "depthIn": 6 }, { "id": "E47", "from": "N4", "to": "N7", "widthIn": 18, "depthIn": 6 }, { "id": "E57", "from": "N5", "to": "N7", "widthIn": 18, "depthIn": 6 }, { "id": "E68", "from": "N6", "to": "N8", "widthIn": 18, "depthIn": 6 }, { "id": "E78", "from": "N7", "to": "N8", "widthIn": 18, "depthIn": 6 }
+    ]
+  },
+  "criteria": { "maxPanelLoadKva": 250, "maxLoadsPerPanel": 10, "maxEndpointAttachmentFt": 90, "voltageDropLimitPct": 3, "conductorMaterial": "cu", "temperatureRatingC": 75, "code": "NEC", "endpointInstallation": { "method": "dedicated-emt", "minimumTradeSize": "1/2", "maximumTradeSize": "4" } }
+}

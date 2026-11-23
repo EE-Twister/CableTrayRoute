@@ -607,7 +607,6 @@ body.oneline-page .modal {
   border-color: #1e40af;
   color: #ffffff;
 }
-
 .palette-pinned {
   border: 1px solid var(--ol-border-color);
   border-radius: var(--ol-radius);
@@ -1320,6 +1319,7 @@ body.compact-mode .palette-section .section-buttons {
 }
 
 .toolbar.refined-toolbar {
+  position: relative; z-index: 3;
   gap: 0.45rem;
   padding: 0.45rem 0.6rem;
   margin-bottom: 0.5rem;

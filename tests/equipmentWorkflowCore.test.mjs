@@ -35,6 +35,16 @@ assert.equal(mapping.EquipmentID, 'id');
 assert.equal(mapping.Description, 'description');
 assert.equal(mapping.Voltage, 'voltage');
 
+const ratingHeaders = ['EquipmentID', 'Electrical Input (kW)', 'Power Factor', 'Duty', 'Rating Basis'];
+const ratingMapping = inferEquipmentMapping(ratingHeaders);
+assert.deepEqual(mapRowsToEquipment([['P-101', '12.5', '0.85', 'continuous', 'electrical-input-kW']], ratingHeaders, ratingMapping)[0], {
+  id: 'P-101', kw: '12.5', powerFactor: '0.85', duty: 'continuous', ratingsBasis: 'electrical-input-kW'
+});
+const motorHeaders = ['Motor Rated Voltage (V)', 'Motor Design FLC (A)', 'Motor Design FLC Reference', 'Motor Nameplate Current (A)', 'Motor Nameplate Horsepower', 'Motor Nameplate Frequency (Hz)', 'Motor Locked Rotor Current (A)', 'Motor Locked Rotor Power Factor', 'Motor Starter Type', 'Motor Rotor Type'];
+assert.deepEqual(mapRowsToEquipment([['460', '14', 'Design reference', '12.8', '10', '60', '90', '0.3', 'dol', 'squirrel-cage']], motorHeaders, inferEquipmentMapping(motorHeaders))[0], {
+  motorRatedVoltageV: '460', motorFullLoadCurrentA: '14', motorFullLoadCurrentReference: 'Design reference', motorNameplateCurrentA: '12.8', motorNameplateHorsepower: '10', motorNameplateFrequencyHz: '60', motorLockedRotorCurrentA: '90', motorLockedRotorPowerFactor: '0.3', motorStarterType: 'dol', motorRotorType: 'squirrel-cage'
+});
+
 const incoming = mapRowsToEquipment([
   ['MCC-101', 'Motor control center', '480', 'Allen-Bradley']
 ], headers, mapping);
@@ -60,6 +70,49 @@ const merged = mergeEquipmentRows(
 assert.equal(merged.length, 3, 'merge must not delete absent existing equipment');
 assert.equal(merged[0].description, 'Existing MCC');
 assert.equal(merged[0].voltage, '480');
+
+const generatedIdMerge = mergeEquipmentRows(
+  [{ id: 'generated-row-id', tag: 'SWBD-101', voltage: '480' }],
+  [{ tag: 'SWBD-101', description: 'Main switchboard' }]
+);
+assert.equal(generatedIdMerge.length, 1, 'ID-less starter rows should merge into an existing same-tag row');
+assert.equal(generatedIdMerge[0].id, 'generated-row-id', 'merging a starter row must preserve the existing row identity');
+assert.equal(generatedIdMerge[0].description, 'Main switchboard');
+
+const sameTagDistinctIds = mergeEquipmentRows(
+  [{ id: 'equipment-a', tag: 'DUP-101' }],
+  [{ id: 'equipment-b', tag: 'DUP-101', description: 'Separate record' }]
+);
+assert.equal(sameTagDistinctIds.length, 2, 'explicitly different IDs must remain distinct even when tags match');
+assert.equal(sameTagDistinctIds[1].id, 'equipment-b');
+
+const sequentialIdentityMerge = mergeEquipmentRows(
+  [{ id: 'equipment-a', tag: 'OLD-101' }],
+  [{ id: 'equipment-a', tag: 'NEW-101' }, { tag: 'NEW-101', description: 'Updated record' }]
+);
+assert.equal(sequentialIdentityMerge.length, 1, 'the merge index should follow identity fields updated earlier in the same batch');
+assert.equal(sequentialIdentityMerge[0].description, 'Updated record');
+
+const staleTagMerge = mergeEquipmentRows(
+  [{ id: 'equipment-a', tag: 'OLD-101' }],
+  [{ id: 'equipment-a', tag: 'NEW-101' }, { tag: 'OLD-101', description: 'Different record' }]
+);
+assert.equal(staleTagMerge.length, 2, 'a retagged row must not retain its old tag as a merge alias');
+assert.equal(staleTagMerge[1].description, 'Different record');
+
+const sequentialPreview = previewEquipmentImport(
+  [{ id: 'equipment-a', tag: 'OLD-101' }],
+  [{ id: 'equipment-a', tag: 'NEW-101' }, { id: 'equipment-a', tag: 'NEW-101' }]
+);
+assert.equal(sequentialPreview.mergeUpdates, 1, 'preview should count the first sequential identity update once');
+assert.equal(sequentialPreview.mergeUnchanged, 1, 'preview should recognize a repeated sequential update as unchanged');
+
+const staleTagPreview = previewEquipmentImport(
+  [{ id: 'equipment-a', tag: 'OLD-101' }],
+  [{ id: 'equipment-a', tag: 'NEW-101' }, { tag: 'OLD-101', description: 'Different record' }]
+);
+assert.equal(staleTagPreview.mergeUpdates, 1);
+assert.equal(staleTagPreview.mergeCreates, 1, 'preview must create a row for a tag released by a retag');
 
 const legacyEndpoint = {
   tag: 'MTR-101',

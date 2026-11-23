@@ -17,7 +17,9 @@ function labelOf(component) {
   return props.tag || props.ref || props.name || props.label || component.id || 'Generator';
 }
 
-export function buildTransientStabilityProjectInputs(oneLine = {}, studies = {}) {
+export function buildTransientStabilityProjectInputs(oneLine = {}, studies = {}, options = {}) {
+  const shortCircuitAssessment = options.studyAssessments?.shortCircuit;
+  const shortCircuitEligible = !shortCircuitAssessment || shortCircuitAssessment.eligible === true;
   const sourceStudies = { shortCircuit: studies.shortCircuit || null };
   const components = (Array.isArray(oneLine.sheets) ? oneLine.sheets : [])
     .flatMap(sheet => Array.isArray(sheet?.components) ? sheet.components : []);
@@ -50,7 +52,7 @@ export function buildTransientStabilityProjectInputs(oneLine = {}, studies = {})
   );
   const baseMva = finite(props.rated_mva, props.kva != null ? Number(props.kva) / 1000 : null);
   const pm = pmaxMw > 0 && operatingMw > 0 ? Math.min(0.95, operatingMw / pmaxMw) : null;
-  const shortCircuit = studies.shortCircuit || {};
+  const shortCircuit = shortCircuitEligible ? (studies.shortCircuit || {}) : {};
   const clearingSeconds = finite(
     shortCircuit.clearingTimeSeconds,
     shortCircuit.summary?.clearingTimeSeconds,
@@ -73,7 +75,9 @@ export function buildTransientStabilityProjectInputs(oneLine = {}, studies = {})
   ];
   if (!Number.isFinite(inputs.H)) warnings.push('Generator inertia constant H is missing.');
   if (!Number.isFinite(inputs.Pm)) warnings.push('Generator operating power could not be normalized to its maximum output.');
-  if (!Number.isFinite(inputs.t_clear)) warnings.push('No clearing time was found in the saved Short Circuit result.');
+  if (!Number.isFinite(inputs.t_clear)) warnings.push(shortCircuitAssessment && !shortCircuitEligible
+    ? 'Saved Short Circuit result is not eligible for this scenario; provide an independent clearing time.'
+    : 'No clearing time was found in the saved Short Circuit result.');
 
   return {
     inputs,

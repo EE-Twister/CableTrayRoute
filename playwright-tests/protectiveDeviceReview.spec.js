@@ -26,7 +26,7 @@ test('engineers can open the graphical protective-device curve review workspace'
   await page.getByRole('button', { name: 'Open Curve Review' }).click();
 
   await expect(page.locator('.protective-review-shell')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Curve comparison' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Curve comparison', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Promotion gate' })).toBeVisible();
   await expect(page.getByText('No source points entered.')).toBeVisible();
 

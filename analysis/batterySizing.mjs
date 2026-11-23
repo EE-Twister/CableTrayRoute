@@ -92,6 +92,7 @@ export function temperatureFactor(chemistry, ambientTempC) {
       `Valid values: ${Object.keys(CHEMISTRY).join(', ')}.`
     );
   }
+  if (!Number.isFinite(ambientTempC)) throw new Error('ambientTempC must be finite.');
   const raw = 1 + chem.coeff * (ambientTempC - 25);
   // Cap at 1.0 (no credit above 25 °C) and floor at 0.5 (below −100 °C is unrealistic)
   return Math.min(1.0, Math.max(0.5, raw));
@@ -115,10 +116,10 @@ export function requiredEnergyKwh(loadProfilePeriods) {
   }
   let total = 0;
   loadProfilePeriods.forEach((period, i) => {
-    if (typeof period.powerKw !== 'number' || period.powerKw <= 0) {
+    if (!Number.isFinite(period.powerKw) || period.powerKw <= 0) {
       throw new Error(`Period [${i}]: powerKw must be a positive number (got ${period.powerKw}).`);
     }
-    if (typeof period.durationHours !== 'number' || period.durationHours <= 0) {
+    if (!Number.isFinite(period.durationHours) || period.durationHours <= 0) {
       throw new Error(`Period [${i}]: durationHours must be a positive number (got ${period.durationHours}).`);
     }
     total += period.powerKw * period.durationHours;
@@ -152,7 +153,7 @@ export function requiredEnergyKwh(loadProfilePeriods) {
  * }}
  */
 export function designCapacityKwh(kwhNet, chemistry, ambientTempC, designMarginPct = 10) {
-  if (kwhNet <= 0) throw new Error('kwhNet must be greater than zero.');
+  if (!Number.isFinite(kwhNet) || kwhNet <= 0) throw new Error('kwhNet must be greater than zero and finite.');
   const chem = CHEMISTRY[chemistry];
   if (!chem) {
     throw new Error(
@@ -160,7 +161,7 @@ export function designCapacityKwh(kwhNet, chemistry, ambientTempC, designMarginP
       `Valid values: ${Object.keys(CHEMISTRY).join(', ')}.`
     );
   }
-  if (designMarginPct < 0) throw new Error('designMarginPct must be ≥ 0.');
+  if (!Number.isFinite(designMarginPct) || designMarginPct < 0) throw new Error('designMarginPct must be ≥ 0 and finite.');
 
   const kwhDesign = kwhNet / (chem.eta * chem.dod);
   const kTempFactor = temperatureFactor(chemistry, ambientTempC);
@@ -258,18 +259,21 @@ export function runtimeCurve(kwhSelected, nominalLoadKw, chemistry) {
  * @returns {{ kvaRequired: number, standardKva: number, powerFactor: number }}
  */
 export function upsKvaRequired(peakKw, upsPowerFactor = 0.9) {
-  if (peakKw <= 0) throw new Error('peakKw must be greater than zero.');
-  if (upsPowerFactor <= 0 || upsPowerFactor > 1) {
+  if (!Number.isFinite(peakKw) || peakKw <= 0) throw new Error('peakKw must be greater than zero and finite.');
+  if (!Number.isFinite(upsPowerFactor) || upsPowerFactor <= 0 || upsPowerFactor > 1) {
     throw new Error('upsPowerFactor must be in (0, 1].');
   }
 
   const kvaRequired = peakKw / upsPowerFactor;
-  const standardKva = STANDARD_UPS_KVA.find(s => s >= kvaRequired)
-    ?? STANDARD_UPS_KVA[STANDARD_UPS_KVA.length - 1];
+  const standardKva = STANDARD_UPS_KVA.find(s => s >= kvaRequired) ?? null;
+  const exceedsCatalog = standardKva === null;
 
   return {
     kvaRequired: Math.round(kvaRequired * 100) / 100,
     standardKva,
+    adequate: !exceedsCatalog,
+    exceedsCatalog,
+    catalogMaximum: STANDARD_UPS_KVA[STANDARD_UPS_KVA.length - 1],
     powerFactor: upsPowerFactor,
   };
 }
@@ -514,9 +518,11 @@ export function runManufacturerDutyCycleAnalysis(inputs) {
     endVoltageVPerCell,
     dischargeTableSource,
   } = inputs;
-  if (!averageLoadKw || averageLoadKw <= 0) throw new Error('averageLoadKw must be greater than zero.');
-  if (!peakLoadKw || peakLoadKw <= 0) throw new Error('peakLoadKw must be greater than zero.');
-  if (!runtimeHours || runtimeHours <= 0) throw new Error('runtimeHours must be greater than zero.');
+  if (!Number.isFinite(averageLoadKw) || averageLoadKw <= 0) throw new Error('averageLoadKw must be greater than zero and finite.');
+  if (!Number.isFinite(peakLoadKw) || peakLoadKw <= 0) throw new Error('peakLoadKw must be greater than zero and finite.');
+  if (!Number.isFinite(runtimeHours) || runtimeHours <= 0) throw new Error('runtimeHours must be greater than zero and finite.');
+  if (!Number.isFinite(ambientTempC)) throw new Error('ambientTempC must be finite.');
+  if (!Number.isFinite(designMarginPct) || designMarginPct < 0) throw new Error('designMarginPct must be ≥ 0 and finite.');
   const chem = CHEMISTRY[chemistry];
   if (!chem) throw new Error(`Unknown chemistry "${chemistry}".`);
   if (!String(dischargeTableSource || '').trim()) {
@@ -558,6 +564,12 @@ export function runManufacturerDutyCycleAnalysis(inputs) {
   if (duty.requiredParallelStrings > 1) {
     warnings.push(`${duty.requiredParallelStrings} parallel strings are required for the entered ${candidateCellCapacityAh} Ah candidate cell.`);
   }
+  if (ups.exceedsCatalog) {
+    warnings.push(
+      `Required UPS capacity (${ups.kvaRequired} kVA) exceeds the largest standard UPS size ` +
+      `(${ups.catalogMaximum} kVA). No adequate catalog selection is available; obtain an engineered or manufacturer-specific selection.`
+    );
+  }
 
   return {
     systemLabel,
@@ -580,6 +592,9 @@ export function runManufacturerDutyCycleAnalysis(inputs) {
     runtimeCurvePoints: [],
     kvaRequired: ups.kvaRequired,
     standardKva: ups.standardKva,
+    upsAdequate: ups.adequate,
+    upsExceedsCatalog: ups.exceedsCatalog,
+    upsCatalogMaximum: ups.catalogMaximum,
     dutyCycleSizing: duty,
     endVoltageVPerCell: endVoltage,
     dischargeTableSource: String(dischargeTableSource).trim(),
@@ -640,9 +655,11 @@ export function runBatterySizingAnalysis(inputs) {
   } = inputs;
 
   // --- Input validation ---
-  if (!averageLoadKw || averageLoadKw <= 0) throw new Error('averageLoadKw must be greater than zero.');
-  if (!peakLoadKw || peakLoadKw <= 0)   throw new Error('peakLoadKw must be greater than zero.');
-  if (!runtimeHours || runtimeHours <= 0) throw new Error('runtimeHours must be greater than zero.');
+  if (!Number.isFinite(averageLoadKw) || averageLoadKw <= 0) throw new Error('averageLoadKw must be greater than zero and finite.');
+  if (!Number.isFinite(peakLoadKw) || peakLoadKw <= 0) throw new Error('peakLoadKw must be greater than zero and finite.');
+  if (!Number.isFinite(runtimeHours) || runtimeHours <= 0) throw new Error('runtimeHours must be greater than zero and finite.');
+  if (!Number.isFinite(ambientTempC)) throw new Error('ambientTempC must be finite.');
+  if (!Number.isFinite(designMarginPct) || designMarginPct < 0) throw new Error('designMarginPct must be ≥ 0 and finite.');
   if (!CHEMISTRY[chemistry]) {
     throw new Error(
       `Unknown chemistry "${chemistry}". ` +
@@ -739,6 +756,12 @@ export function runBatterySizingAnalysis(inputs) {
       'Multiple parallel battery strings will be required. Consult a specialist.'
     );
   }
+  if (ups.exceedsCatalog) {
+    warnings.push(
+      `Required UPS capacity (${ups.kvaRequired} kVA) exceeds the largest standard UPS size ` +
+      `(${ups.catalogMaximum} kVA). No adequate catalog selection is available; obtain an engineered or manufacturer-specific selection.`
+    );
+  }
 
   const chemObj = CHEMISTRY[chemistry];
 
@@ -773,6 +796,9 @@ export function runBatterySizingAnalysis(inputs) {
     // UPS sizing
     kvaRequired:  ups.kvaRequired,
     standardKva:  ups.standardKva,
+    upsAdequate: ups.adequate,
+    upsExceedsCatalog: ups.exceedsCatalog,
+    upsCatalogMaximum: ups.catalogMaximum,
     rackLayoutInputs: rackLayoutInputs && typeof rackLayoutInputs === 'object'
       ? { ...rackLayoutInputs }
       : undefined,

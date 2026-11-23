@@ -1,6 +1,7 @@
 
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getStudies, getStudyAssessments, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { studyExportMetadata } from './analysis/studyExportMetadata.mjs';
 // Worker-routed entry points for user-initiated calculate / export actions.
 // Hot paths (the corrosion-timeline slider's `input` handler and per-row
 // renderMitigationComparison helpers inside renderResults) still call the
@@ -93,9 +94,7 @@ if (typeof document !== 'undefined') {
       if (refreshedSavedResult) {
         applyInputValues(refreshedSavedResult.input);
         updateAreaRoleGuidance();
-        const studies = getStudies();
-        studies.dissimilarMetals = refreshedSavedResult;
-        setStudies(studies);
+        saveStudyResult('dissimilarMetals', refreshedSavedResult, captureStudyRunContext('dissimilarMetals', { inputs: refreshedSavedResult.input, options: {} }));
         renderResults(refreshedSavedResult, resultsEl);
       }
     }
@@ -111,10 +110,10 @@ if (typeof document !== 'undefined') {
     });
 
     async function runSubmitCalculation() {
-      const result = await estimateDissimilarMetalsRiskOffMain(readFormInput());
-      const studies = getStudies();
-      studies.dissimilarMetals = result;
-      setStudies(studies);
+      const inputs = readFormInput();
+      const runContext = captureStudyRunContext('dissimilarMetals', { inputs, options: {} });
+      const result = await estimateDissimilarMetalsRiskOffMain(inputs);
+        saveStudyResult('dissimilarMetals', result, runContext);
       errorsEl.hidden = true;
       errorsEl.textContent = '';
       renderResults(result, resultsEl);
@@ -559,7 +558,10 @@ async function copyTextToClipboard(text) {
 }
 
 async function downloadResultJson(result) {
-  const payload = await buildResultExportPayloadOffMain(result);
+  const payload = {
+    ...(await buildResultExportPayloadOffMain(result)),
+    lifecycle: studyExportMetadata(result, { assessment: getStudyAssessments().dissimilarMetals }),
+  };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

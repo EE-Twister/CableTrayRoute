@@ -159,6 +159,7 @@ export function buildMccProjectInputSuggestions({
   equipment = [],
   oneLine = {},
   studies = {},
+  studyAssessments = {},
   cables = []
 } = {}) {
   const values = {};
@@ -220,8 +221,16 @@ export function buildMccProjectInputSuggestions({
   add('systemRequirements.jurisdiction', codeBasis.jurisdiction, 'designBasis.codeBasis.jurisdiction', 'Design Basis');
   add('systemRequirements.ahj', codeBasis.ahj, 'designBasis.codeBasis.ahj', 'Design Basis');
 
-  const { shortCircuit: rawShortCircuit } = studies && typeof studies === 'object' ? studies : {};
-  const shortCircuit = rawShortCircuit && typeof rawShortCircuit === 'object' ? rawShortCircuit : {};
+  const studyMap = studies && typeof studies === 'object' ? studies : {};
+  const assessmentEligible = assessment => assessment?.eligible === true
+    && assessment.freshness === 'current'
+    && (assessment.validity?.state || assessment.validity) === 'evaluated';
+  const shortCircuitKey = assessmentEligible(studyAssessments.shortCircuit)
+    ? 'shortCircuit'
+    : assessmentEligible(studyAssessments.iec60909) ? 'iec60909' : '';
+  const shortCircuitAssessment = shortCircuitKey ? studyAssessments[shortCircuitKey] : null;
+  const shortCircuit = shortCircuitKey && studyMap[shortCircuitKey] && typeof studyMap[shortCircuitKey] === 'object'
+    ? studyMap[shortCircuitKey] : {};
   const locationResult = Object.entries(shortCircuit).find(([id, result]) => {
     if (!result || typeof result !== 'object' || finite(result.threePhaseKA) === null) return false;
     return targetTokens.has(token(id))
@@ -229,15 +238,15 @@ export function buildMccProjectInputSuggestions({
       || (oneLineComponent?.id && token(id) === token(oneLineComponent.id));
   });
   if (locationResult) {
-    add('systemRequirements.availableFaultCurrentKa', finite(locationResult[1].threePhaseKA), `studyResults.shortCircuit.${locationResult[0]}.threePhaseKA`, 'Short Circuit');
-    add('systemRequirements.faultCurrentMethod', locationResult[1].method || shortCircuit._meta?.method, `studyResults.shortCircuit.${locationResult[0]}.method`, 'Short Circuit');
-    add('systemRequirements.faultCurrentBasis', `Location-specific result for ${locationResult[1].equipmentTag || lineup.equipmentTag || lineup.tag}`, `studyResults.shortCircuit.${locationResult[0]}`, 'Short Circuit');
+    add('systemRequirements.availableFaultCurrentKa', finite(locationResult[1].threePhaseKA), `studyResults.${shortCircuitKey}.${locationResult[0]}.threePhaseKA`, shortCircuitKey === 'iec60909' ? 'IEC 60909' : 'Short Circuit');
+    add('systemRequirements.faultCurrentMethod', locationResult[1].method || shortCircuit._meta?.method, `studyResults.${shortCircuitKey}.${locationResult[0]}.method`, shortCircuitKey === 'iec60909' ? 'IEC 60909' : 'Short Circuit');
+    add('systemRequirements.faultCurrentBasis', `Location-specific result for ${locationResult[1].equipmentTag || lineup.equipmentTag || lineup.tag}`, `studyResults.${shortCircuitKey}.${locationResult[0]}`, shortCircuitKey === 'iec60909' ? 'IEC 60909' : 'Short Circuit');
   } else {
     const summaryFault = finite(firstValue(shortCircuit, ['availableFaultKa', 'availableFaultKA', 'faultCurrentKA', 'faultKa']));
     if (summaryFault !== null) {
-      add('systemRequirements.availableFaultCurrentKa', summaryFault, 'studyResults.shortCircuit.availableFaultKa', 'Short Circuit summary');
-      add('systemRequirements.faultCurrentMethod', shortCircuit._meta?.method, 'studyResults.shortCircuit._meta.method', 'Short Circuit summary');
-      add('systemRequirements.faultCurrentBasis', 'Project summary value; confirm the available fault current at this MCC location.', 'studyResults.shortCircuit.availableFaultKa', 'Short Circuit summary');
+      add('systemRequirements.availableFaultCurrentKa', summaryFault, `studyResults.${shortCircuitKey}.availableFaultKa`, `${shortCircuitKey === 'iec60909' ? 'IEC 60909' : 'Short Circuit'} summary`);
+      add('systemRequirements.faultCurrentMethod', shortCircuit._meta?.method, `studyResults.${shortCircuitKey}._meta.method`, `${shortCircuitKey === 'iec60909' ? 'IEC 60909' : 'Short Circuit'} summary`);
+      add('systemRequirements.faultCurrentBasis', 'Project summary value; confirm the available fault current at this MCC location.', `studyResults.${shortCircuitKey}.availableFaultKa`, `${shortCircuitKey === 'iec60909' ? 'IEC 60909' : 'Short Circuit'} summary`);
     }
   }
 
@@ -265,7 +274,9 @@ export function buildMccProjectInputSuggestions({
 
   const missing = [];
   if (!equipmentRecord && !oneLineComponent) missing.push(`No Equipment List or One-Line record matches ${lineup.equipmentTag || lineup.tag || 'this lineup'}.`);
-  if (!locationResult) missing.push('No location-specific Short Circuit result was found; any project summary duty must be confirmed at the MCC bus.');
+  if (!locationResult) missing.push(!shortCircuitAssessment
+    ? 'Saved Short Circuit result is not eligible for this scenario; confirm MCC duty from a current location-specific study.'
+    : 'No location-specific Short Circuit result was found; any project summary duty must be confirmed at the MCC bus.');
   if (!incomingCables.length) missing.push('No incoming Cable Schedule record terminates at this MCC.');
 
   return {
@@ -300,6 +311,19 @@ export function applyMccProjectInputSuggestions(lineup = {}, suggestions = {}, {
     if (force) overrides.delete(path);
     applied += 1;
   });
+
+  // A previously linked study value must not survive after its source is no
+  // longer eligible. Preserve deliberate MCC overrides, but clear stale
+  // project-linked values and their bindings so a legacy result cannot be
+  // presented as a current location-specific requirement.
+  for (const path of [...linkedFields]) {
+    if (Object.prototype.hasOwnProperty.call(suggestions.values || {}, path) || overrides.has(path)) continue;
+    const binding = sourceBindings[path];
+    if (!String(binding?.sourcePath || '').startsWith('studyResults.')) continue;
+    setPath(next, path, '');
+    linkedFields.delete(path);
+    delete sourceBindings[path];
+  }
 
   next.projectDataOverrides = [...overrides].sort();
   next.projectDataLinkedFields = [...linkedFields].sort();

@@ -7,7 +7,7 @@ import {
   ppeCategoryForEnergy,
   CELL_VOLTAGE,
 } from './analysis/dcShortCircuit.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getStudies, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml as escHtml } from './src/htmlUtils.mjs';
 
@@ -70,16 +70,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!inputs) return;
 
     let result;
+    let runContext;
     try {
+      runContext = captureStudyRunContext('dcShortCircuit', { inputs, options: inputs });
       result = runDcShortCircuitStudy(inputs);
     } catch (err) {
       showModal('Analysis Error', `<p>${escHtml(err.message)}</p>`, 'error');
       return;
     }
 
-    const studies = getStudies();
-    studies.dcShortCircuit = { inputs, result };
-    setStudies(studies);
+    saveStudyResult('dcShortCircuit', { inputs, result }, runContext);
 
     renderResults({ inputs, result });
   });
@@ -214,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <tbody>
         <tr><th>DC System Voltage</th><td>${fc.openCircuitVoltageV.toFixed(0)} V</td></tr>
         <tr><th>Total Circuit Resistance</th><td>${(fc.totalResistanceOhm * 1000).toFixed(2)} mΩ</td></tr>
-        <tr><th>Bolted Fault Current (I<sub>bf</sub>)</th><td><strong>${fc.boltedFaultCurrentA.toLocaleString()} A</strong></td></tr>
+        <tr><th>Bolted Fault Current (I<sub>bf</sub>)</th><td><strong>${escHtml(fc.boltedFaultCurrentA.toLocaleString())} A</strong></td></tr>
         ${fc.timeConstantMs > 0 ? `<tr><th>L/R Time Constant</th><td>${fc.timeConstantMs.toFixed(1)} ms</td></tr>` : ''}
       </tbody>
     </table>`;
@@ -225,11 +225,11 @@ document.addEventListener('DOMContentLoaded', () => {
       html += `<h3>DC Arc Flash (NFPA 70E Annex D.8.1 — Ammerman Method)</h3>`;
       html += `<table class="results-table">
         <tbody>
-          <tr><th>Arcing Current (I<sub>arc</sub>)</th><td>${af.arcCurrentA.toLocaleString()} A</td></tr>
+          <tr><th>Arcing Current (I<sub>arc</sub>)</th><td>${escHtml(af.arcCurrentA.toLocaleString())} A</td></tr>
           <tr><th>Arc Voltage</th><td>${af.arcVoltageV.toFixed(1)} V</td></tr>
           <tr><th>Arc Power</th><td>${(af.arcPowerW / 1000).toFixed(1)} kW</td></tr>
           <tr><th>Arc Duration</th><td>${af.arcDurationMs.toFixed(0)} ms</td></tr>
-          <tr><th>Working Distance</th><td>${af.workingDistanceMm} mm (${(af.workingDistanceMm / 25.4).toFixed(1)} in)</td></tr>
+          <tr><th>Working Distance</th><td>${escHtml(af.workingDistanceMm)} mm (${(af.workingDistanceMm / 25.4).toFixed(1)} in)</td></tr>
           <tr><th>Incident Energy</th><td><strong>${af.incidentEnergyCalCm2.toFixed(2)} cal/cm²</strong></td></tr>
           <tr><th>Arc Flash Boundary</th><td>${af.arcFlashBoundaryMm.toFixed(0)} mm (${(af.arcFlashBoundaryMm / 25.4).toFixed(1)} in)</td></tr>
           <tr><th>PPE Selection Method</th><td><span class="ppe-badge ${ppeBadgeClass}">Incident Energy</span></td></tr>
@@ -256,8 +256,8 @@ document.addEventListener('DOMContentLoaded', () => {
         html += `<tr>
           <td>${escHtml(dev.tag)}</td>
           <td>${escHtml(dev.type)}</td>
-          <td>${dev.ratedCurrentA != null ? dev.ratedCurrentA.toLocaleString() : '—'}</td>
-          <td>${dev.interruptRatingA != null ? dev.interruptRatingA.toLocaleString() : '—'}</td>
+          <td>${dev.ratedCurrentA != null ? escHtml(dev.ratedCurrentA.toLocaleString()) : '—'}</td>
+          <td>${dev.interruptRatingA != null ? escHtml(dev.interruptRatingA.toLocaleString()) : '—'}</td>
           <td class="${statusClass}">${statusLabel}</td>
           <td>${dev.note ? escHtml(dev.note) : '—'}</td>
         </tr>`;

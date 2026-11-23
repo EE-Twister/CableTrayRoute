@@ -32,6 +32,11 @@ export function normalizeDeliverableArtifact(input = {}) {
     generatedAt,
     generatedBy: text(input.generatedBy),
     sourceFingerprint: text(input.sourceFingerprint),
+    sourceStatus: text(input.sourceStatus),
+    calculationVersion: text(input.calculationVersion),
+    assumptions: input.assumptions ?? {},
+    warnings: Array.isArray(input.warnings) ? [...input.warnings] : [],
+    provenance: input.provenance && typeof input.provenance === 'object' ? { ...input.provenance } : {},
     sourcePage: text(input.sourcePage),
     includedSections: uniqueStrings(input.includedSections),
     sourceArtifacts: uniqueStrings(input.sourceArtifacts),
@@ -51,7 +56,7 @@ export function upsertArtifactList(artifacts = [], artifact = {}) {
   return next.sort((a, b) => String(b.generatedAt).localeCompare(String(a.generatedAt)));
 }
 
-export function buildArtifactRegisterRows(artifacts = []) {
+export function buildArtifactRegisterRows(artifacts = [], options = {}) {
   return (Array.isArray(artifacts) ? artifacts : [])
     .map(item => normalizeDeliverableArtifact(item))
     .sort((a, b) => String(b.generatedAt).localeCompare(String(a.generatedAt)))
@@ -65,6 +70,11 @@ export function buildArtifactRegisterRows(artifacts = []) {
       generatedAt: item.generatedAt,
       generatedBy: item.generatedBy,
       sourceFingerprint: item.sourceFingerprint,
+      sourceStatus: artifactSourceStatus(item, options.currentInputFingerprint || options.currentFingerprint || ''),
+      calculationVersion: item.calculationVersion,
+      assumptions: item.assumptions,
+      warnings: item.warnings,
+      provenance: item.provenance,
     }));
 }
 
@@ -73,4 +83,3 @@ export function artifactSourceStatus(artifact = {}, currentFingerprint = '') {
   if (!normalized.sourceFingerprint || !currentFingerprint) return 'unknown';
   return normalized.sourceFingerprint === currentFingerprint ? 'current' : 'stale';
 }
-

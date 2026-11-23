@@ -1,8 +1,9 @@
 import { buildLoadFlowModel } from '../analysis/loadFlowModel.js';
 import { runLoadFlow } from '../analysis/loadFlow.js';
 import { renderLoadFlowResultsHtml } from '../analysis/loadFlowResultsRenderer.js';
-import { getOneLine, getStudies, setStudies } from '../dataStore.mjs';
+import { getOneLine, getStudies, getStudyAssessments, getStudyProvenance, captureStudyRunContext, saveStudyResult } from '../dataStore.mjs';
 import { downloadPDF } from '../reports/reporting.mjs';
+import { studyLifecycleMetadataRows } from '../analysis/studyExportMetadata.mjs';
 
 export function buildModel() {
   return buildLoadFlowModel(getOneLine());
@@ -65,22 +66,58 @@ export function isUsableLoadFlowResult(result) {
 }
 
 export function runLoadFlowStudy(opts = {}) {
-  const model = buildModel();
-  const inputReadiness = validateLoadFlowModel(model);
-  if (!inputReadiness.ready) {
-    return {
+  let model;
+  let inputReadiness;
+  try {
+    model = buildModel();
+    inputReadiness = validateLoadFlowModel(model);
+  } catch (error) {
+    return { blocked: true, converged: false, persisted: false, calculationStatus: 'unevaluated', validity: 'unevaluated', valid: false, errors: [error?.message || String(error)], warnings: [], buses: [], lines: [], inputReadiness: { ready: false, errors: [error?.message || String(error)], warnings: [], counts: {} } };
+  }
+  const requestedIterations = Number(opts.maxIterations);
+  const effectiveOptions = {
+    ...opts,
+    // The ordinary study form does not expose an iteration field. Keep its
+    // explicit solver tolerance and raise only the bounded radial iteration
+    // budget needed by generated 30/50-load cases.
+    maxIterations: Number.isFinite(requestedIterations) && requestedIterations > 0 ? Math.max(1, Math.floor(requestedIterations)) : 60,
+  };
+  const runContext = captureStudyRunContext('loadFlow', {
+    inputs: effectiveOptions,
+    options: effectiveOptions,
+    assumptions: ['Balanced positive-sequence load-flow model when the balanced option is selected.'],
+    warnings: inputReadiness.warnings,
+  });
+  const baseMVA = Number(effectiveOptions.baseMVA);
+  if (!inputReadiness.ready || !Number.isFinite(baseMVA) || baseMVA <= 0) {
+    const result = {
       blocked: true,
       converged: false,
       persisted: false,
+      calculationStatus: 'unevaluated',
+      validity: 'unevaluated',
+      valid: false,
       errors: inputReadiness.errors,
       warnings: inputReadiness.warnings,
       buses: [],
       lines: [],
-      inputReadiness
+      inputReadiness: {
+        ...inputReadiness,
+        ready: false,
+        errors: !Number.isFinite(baseMVA) || baseMVA <= 0
+          ? [...inputReadiness.errors, 'Base MVA is required and must be greater than zero.']
+          : inputReadiness.errors,
+      },
     };
+    try {
+      saveStudyResult('loadFlow', result, runContext);
+    } catch (error) {
+      result.persistenceWarning = `Study was not saved: ${error.message || error}`;
+      result.warnings = [...result.warnings, result.persistenceWarning];
+    }
+    return result;
   }
-
-  const rawResult = runLoadFlow(model, opts);
+  const rawResult = runLoadFlow(model, effectiveOptions);
   const usable = isUsableLoadFlowResult(rawResult);
   const result = {
     ...rawResult,
@@ -88,21 +125,42 @@ export function runLoadFlowStudy(opts = {}) {
     persisted: usable
   };
   if (usable) {
-    const studies = getStudies();
-    studies.loadFlow = result;
-    setStudies(studies);
+    try {
+      // The study store persists JSON. Canonicalize before hashing and saving
+      // so properties whose value is undefined (and non-finite numbers) have
+      // the same representation in provenance as they do after a reload.
+      const storedResult = JSON.parse(JSON.stringify(result));
+      saveStudyResult('loadFlow', storedResult, runContext);
+    } catch (error) {
+      result.persisted = false;
+      result.persistenceWarning = `Study was calculated but not saved: ${error.message || error}`;
+      result.warnings = [...(Array.isArray(result.warnings) ? result.warnings : []), result.persistenceWarning];
+    }
   }
   return result;
 }
 
 export function exportLoadFlowResult(result) {
-  if (!isUsableLoadFlowResult(result)) return false;
-  const headers = ['bus', 'Vm', 'Va'];
+  if (!isUsableLoadFlowResult(result) || result.persisted !== true) return false;
+  const assessment = getStudyAssessments().loadFlow;
+  if (assessment && assessment.eligible !== true) return false;
+  const headers = ['bus', 'Vm', 'Va', 'details'];
   const rows = result.buses.map(bus => ({
     bus: bus.displayLabel || bus.id,
     Vm: Number(bus.Vm.toFixed(4)),
-    Va: Number(bus.Va.toFixed(2))
+    Va: Number(bus.Va.toFixed(2)),
+    details: ''
   }));
+  (result.lines || []).forEach(line => rows.push({
+    bus: `Branch: ${line.from || ''} -> ${line.to || ''}`,
+    Vm: '',
+    Va: '',
+    details: Number.isFinite(line.fromCurrentA) && Number.isFinite(line.toCurrentA)
+      ? `From ${line.fromCurrentA.toFixed(1)} A / To ${line.toCurrentA.toFixed(1)} A; Voltage drop ${Number.isFinite(line.dropPct) ? line.dropPct.toFixed(2) : '--'}%${Number.isFinite(line.dropKV) ? ` (${Math.abs(line.dropKV) < 0.001 ? `${(line.dropKV * 1000).toFixed(1)} V` : `${line.dropKV.toFixed(3)} kV`})` : ''}; rated-voltage terminal bases`
+      : `Current ${Number.isFinite(line.amps) ? line.amps.toFixed(1) : '--'} A; Voltage drop ${Number.isFinite(line.dropPct) ? line.dropPct.toFixed(2) : '--'}%`
+  }));
+  studyLifecycleMetadataRows(result, { assessment: getStudyAssessments().loadFlow })
+    .forEach(([key, value]) => rows.push({ bus: `Lifecycle: ${key}`, Vm: value, Va: '' }));
   downloadPDF('Load Flow Report', headers, rows, 'loadflow.pdf');
   return true;
 }
@@ -135,15 +193,52 @@ if (typeof document !== 'undefined') {
   };
 
   if (form && output) {
-    renderReadiness(validateLoadFlowModel(buildModel()));
+    const saved = getStudies()?.loadFlow;
+    const savedOptions = getStudyProvenance()?.loadFlow?.optionsSnapshot;
+    if (savedOptions && typeof savedOptions === 'object') {
+      if (savedOptions.baseMVA != null && form.baseMVA) form.baseMVA.value = savedOptions.baseMVA;
+      if (savedOptions.balanced != null && form.balanced) form.balanced.checked = savedOptions.balanced === true;
+    }
+    let initialReadiness = null;
+    try {
+      initialReadiness = validateLoadFlowModel(buildModel());
+      renderReadiness(initialReadiness);
+    } catch (error) {
+      initialReadiness = { ready: false, errors: [error?.message || String(error)], warnings: [], counts: {} };
+      renderReadiness(initialReadiness);
+    }
+    if (initialReadiness?.ready !== false && isUsableLoadFlowResult(saved)) {
+      lastValidResult = saved;
+      output.innerHTML = renderLoadFlowResultsHtml(saved);
+      if (exportBtn) exportBtn.disabled = false;
+    }
     form.addEventListener('submit', event => {
       event.preventDefault();
-      const baseMVA = Number(form.baseMVA.value) || 100;
+      const rawBaseMVA = String(form.baseMVA?.value ?? '').trim();
+      const baseMVA = Number(rawBaseMVA);
       const balanced = form.balanced.checked;
-      const result = runLoadFlowStudy({ baseMVA, balanced });
+      if (!rawBaseMVA || !Number.isFinite(baseMVA) || baseMVA <= 0) {
+        const invalidResult = runLoadFlowStudy({ baseMVA: null, balanced });
+        const invalid = invalidResult.inputReadiness;
+        renderReadiness(invalid);
+        output.innerHTML = '<div class="result-card result-warn"><strong>Input review required.</strong><p>Enter a valid positive base MVA before running the study.</p></div>';
+        lastValidResult = null;
+        if (exportBtn) exportBtn.disabled = true;
+        return;
+      }
+      let result;
+      try {
+        result = runLoadFlowStudy({ baseMVA, balanced });
+      } catch (error) {
+        renderReadiness({ ready: false, errors: [error?.message || String(error)], warnings: [], counts: {} });
+        output.innerHTML = '<div class="result-card result-fail"><strong>Study input error.</strong><p>Correct the highlighted model input before running the study.</p></div>';
+        lastValidResult = null;
+        if (exportBtn) exportBtn.disabled = true;
+        return;
+      }
       renderReadiness(result.inputReadiness);
       output.innerHTML = renderLoadFlowResultsHtml(result);
-      lastValidResult = isUsableLoadFlowResult(result) ? result : null;
+      lastValidResult = result.persisted === true && isUsableLoadFlowResult(result) ? result : null;
       if (exportBtn) exportBtn.disabled = !lastValidResult;
     });
     exportBtn?.addEventListener('click', () => exportLoadFlowResult(lastValidResult));

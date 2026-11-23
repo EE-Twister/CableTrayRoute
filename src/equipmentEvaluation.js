@@ -16,8 +16,18 @@ import {
 import {
   getCables,
   getStudies,
+  getStudyAssessments,
   getOneLine,
+  captureStudyRunContext,
+  assertStudyRunContextCurrent,
+  on as onDataStoreChange,
+  STORAGE_KEYS,
 } from '../dataStore.mjs';
+import {
+  assessStudyResult,
+  buildStudyProvenance,
+} from '../analysis/studyLifecycle.mjs';
+import { studyExportMetadata } from '../analysis/studyExportMetadata.mjs';
 import { createCrossProbeLink } from './crossProbe.js';
 import { createProtectiveDeviceCatalogLoader } from './protectiveDevices/catalogLoader.mjs';
 import { loadReferencedProtectiveDevices } from './protectiveDevices/calculationCatalog.mjs';
@@ -41,15 +51,82 @@ document.addEventListener('DOMContentLoaded', () => {
   const emptyMsg       = document.getElementById('equip-empty-msg');
 
   let lastEvaluations = null;
+  let lastRunContext = null;
+  let lastRunProvenance = null;
+  let runSequence = 0;
 
   runBtn.addEventListener('click', runAndRender);
   filterStatus.addEventListener('change', () => { if (lastEvaluations) renderTable(lastEvaluations); });
   filterType.addEventListener('change',   () => { if (lastEvaluations) renderTable(lastEvaluations); });
 
+  function clearEphemeralResult() {
+    runSequence += 1;
+    lastEvaluations = null;
+    lastRunContext = null;
+    lastRunProvenance = null;
+    exportCsvBtn.disabled = true;
+    table.hidden = true;
+    tbody.innerHTML = '';
+    emptyMsg.hidden = false;
+    emptyMsg.textContent = 'Project or study inputs changed. Run the evaluation again.';
+  }
+
+  [
+    STORAGE_KEYS.equipment,
+    STORAGE_KEYS.loads,
+    STORAGE_KEYS.panels,
+    STORAGE_KEYS.cables,
+    STORAGE_KEYS.trays,
+    STORAGE_KEYS.conduits,
+    STORAGE_KEYS.ductbanks,
+    STORAGE_KEYS.oneLine,
+    STORAGE_KEYS.projectMeta,
+    STORAGE_KEYS.designBasis,
+    STORAGE_KEYS.studies,
+    STORAGE_KEYS.studyResults,
+    STORAGE_KEYS.studyProvenance,
+  ].filter(Boolean).forEach(key => onDataStoreChange(key, clearEphemeralResult));
+  onDataStoreChange('scenario', clearEphemeralResult);
+  exportCsvBtn.disabled = true;
+
+  function getCurrentRunAssessment() {
+    const resultAtExport = lastEvaluations;
+    const contextAtExport = lastRunContext;
+    const provenanceAtExport = lastRunProvenance;
+    if (!resultAtExport || !contextAtExport || !provenanceAtExport) return null;
+    const currentInputs = {
+      components: flattenComponents(getOneLine()),
+      cables: getCables() || [],
+      studies: getStudies() || {},
+    };
+    const currentContext = captureStudyRunContext('equipmentEvaluation', {
+      inputs: currentInputs,
+      options: { catalogRevision: 'protective-device-catalog-v1' },
+      dependencies: [],
+      modelRevision: 'equipment-evaluation-v1',
+      calculationRevision: 'calculation-v1',
+    });
+    return assessStudyResult('equipmentEvaluation', resultAtExport, provenanceAtExport, currentContext);
+  }
+
   exportCsvBtn.addEventListener('click', () => {
     if (!lastEvaluations) return;
     const rows  = buildEquipmentReport(lastEvaluations);
-    const lines = [REPORT_HEADERS, ...rows]
+    const assessedRun = getCurrentRunAssessment();
+    const assessment = assessedRun ? {
+      ...assessedRun,
+      label: assessedRun.eligible
+        ? 'Current in-memory run'
+        : `In-memory run withheld (${assessedRun.reasons.join(', ') || 'freshness not verified'})`,
+    } : {
+      validity: { state: 'unevaluated' },
+      freshness: 'unknown',
+      eligible: false,
+      label: 'In-memory run withheld (missing run context)',
+      reasons: ['missing_run_context'],
+    };
+    const metadata = studyExportMetadata(lastEvaluations, { assessment });
+    const lines = [REPORT_HEADERS, ...rows, ['Lifecycle Field', 'Value'], ...Object.entries(metadata)]
       .map(r => r.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
       .join('\n');
     const blob = new Blob([lines], { type: 'text/csv' });
@@ -60,17 +137,52 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   async function runAndRender() {
+    const runToken = ++runSequence;
     runBtn.disabled = true;
     runBtn.textContent = 'Running…';
     try {
       const components = flattenComponents(getOneLine());
       const cables     = getCables() || [];
       const studies    = getStudies() || {};
+      const runContext = captureStudyRunContext('equipmentEvaluation', {
+        inputs: { components, cables, studies },
+        options: { catalogRevision: 'protective-device-catalog-v1' },
+        dependencies: [],
+        modelRevision: 'equipment-evaluation-v1',
+        calculationRevision: 'calculation-v1',
+      });
 
       const protectiveDevices = await loadReferencedProtectiveDevices(components, { catalog: protectiveDeviceCatalog });
-      lastEvaluations = evaluateEquipment(components, cables, studies, protectiveDevices);
+      if (runToken !== runSequence) return;
+      const currentInputs = {
+        components: flattenComponents(getOneLine()),
+        cables: getCables() || [],
+        studies: getStudies() || {},
+      };
+      assertStudyRunContextCurrent(runContext, { inputs: currentInputs });
+      const evaluations = evaluateEquipment(currentInputs.components, currentInputs.cables, currentInputs.studies, protectiveDevices, { studyAssessments: getStudyAssessments() });
+      if (runToken !== runSequence) return;
+      lastEvaluations = evaluations;
+      lastRunContext = runContext;
+      lastRunProvenance = buildStudyProvenance('equipmentEvaluation', evaluations, runContext, { validity: 'evaluated' });
+      exportCsvBtn.disabled = false;
       renderKpis(lastEvaluations);
       renderTable(lastEvaluations);
+      document.dispatchEvent(new CustomEvent('ctr:study-ephemeral-complete', {
+        detail: { href: 'equipmentevaluation.html' },
+      }));
+    } catch (error) {
+      if (runToken === runSequence) {
+        lastEvaluations = null;
+        lastRunContext = null;
+        lastRunProvenance = null;
+        exportCsvBtn.disabled = true;
+        table.hidden = true;
+        tbody.innerHTML = '';
+        emptyMsg.hidden = false;
+        emptyMsg.textContent = `Evaluation could not be completed: ${error?.message || error}`;
+      }
+      console.error('[equipment-evaluation] run failed', error);
     } finally {
       runBtn.disabled = false;
       runBtn.textContent = 'Run Evaluation';

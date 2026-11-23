@@ -1,6 +1,7 @@
 import { downloadCSV, downloadPDF } from './reporting.mjs';
 import { generateArcFlashLabel } from './labels.mjs';
 import { isArcFlashLabelEligible } from '../studies/arcFlashReadiness.mjs';
+import { studyExportMetadata } from '../analysis/studyExportMetadata.mjs';
 
 export { isArcFlashLabelEligible as isArcFlashLabelReady } from '../studies/arcFlashReadiness.mjs';
 
@@ -198,7 +199,8 @@ export function openLabelPrintWindow(results = {}, projectName = '') {
  * Generate CSV and PDF reports from arc flash analysis results.
  * @param {Object<string, {incidentEnergy:number, minimumArcRatingCalCm2:number, boundary:number, clearingTime:number}>} results
  */
-export function generateArcFlashReport(results = {}) {
+export function generateArcFlashReport(results = {}, options = {}) {
+  const lifecycle = studyExportMetadata(results, { assessment: options.assessment });
   const entries = safeEntries(results);
   const labelEntries = entries.filter(([, info]) => isArcFlashLabelEligible(info));
   const headers = [
@@ -233,7 +235,9 @@ export function generateArcFlashReport(results = {}) {
     'gapMM',
     'enclosureDimensionsMM',
     'withinModelRange',
-    'faultCurrentSource'
+    'faultCurrentSource',
+    'resultValidity', 'freshness', 'eligibility', 'calculationVersion', 'calculatedAt',
+    'assumptions', 'warnings', 'provenance'
   ];
   const rows = entries.map(([id, data]) => ({
     bus: id,
@@ -275,7 +279,15 @@ export function generateArcFlashReport(results = {}) {
       ? `${data.calculationInputs.boxHeightMM} x ${data.calculationInputs.boxWidthMM} x ${data.calculationInputs.boxDepthMM}`
       : '',
     withinModelRange: data.calculationInputs?.withinModelRange ?? '',
-    faultCurrentSource: data.calculationInputs?.faultCurrentSource || ''
+    faultCurrentSource: data.calculationInputs?.faultCurrentSource || '',
+    resultValidity: lifecycle.resultValidity,
+    freshness: lifecycle.freshness,
+    eligibility: lifecycle.resultEligibility,
+    calculationVersion: lifecycle.calculationVersion,
+    calculatedAt: lifecycle.calculatedAt,
+    assumptions: lifecycle.assumptions,
+    warnings: lifecycle.warnings,
+    provenance: lifecycle.provenance,
   }));
   if (!rows.length) return { reportCount: 0, labelCount: 0, omittedLabelCount: 0 };
   downloadCSV(headers, rows, 'arcflash.csv');

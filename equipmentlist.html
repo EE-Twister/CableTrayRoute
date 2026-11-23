@@ -22,8 +22,6 @@
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css">
   <script src="dist/vendor/xlsx.full.min.js" defer></script>
-  <script type="module" src="tableUtils.mjs" defer></script>
-  <script type="module" src="dataStore.mjs" defer></script>
   <script type="module" src="dist/equipmentlist.js" defer></script>
 </head>
 <body data-report-title="Equipment List">
@@ -133,6 +131,8 @@
               <button id="bulk-category-btn" class="btn" type="button" title="Apply category to selected rows">Set Category</button>
               <button id="bulk-arrangement-btn" class="btn" type="button" title="Assign selected rows to an equipment arrangement">Set Arrangement</button>
               <button id="bulk-lineup-btn" class="btn" type="button" title="Assign selected rows to a lineup">Set Lineup</button>
+              <button id="bulk-motor-reference-btn" class="btn" type="button" title="Copy an explicitly selected manufacturer motor reference to selected rows">Use Motor Reference Data</button>
+              <button id="bulk-motor-current-btn" class="btn" type="button" title="Review a limited historical motor design-current reference">Review Motor Design Current</button>
             </div>
           </details>
           <p id="equipment-results-count" class="equipment-results-count" aria-live="polite"></p>

@@ -3,6 +3,7 @@ import fsp from 'fs/promises';
 import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import * as XLSX from 'xlsx';
 import { PAGE_CONTRACTS_BY_HREF } from '../src/pageContracts.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -101,6 +102,17 @@ function monitorPage(page, origin) {
     if (response.status() >= 400) failedResponses.push(`${response.status()} ${url}`);
   });
   return { errors, failedResponses };
+}
+
+async function readDownloadBytes(download) {
+  const stream = await download.createReadStream();
+  const chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  return Buffer.concat(chunks);
+}
+
+async function readDownloadText(download) {
+  return (await readDownloadBytes(download)).toString('utf8');
 }
 
 async function gotoWorkflowPage(page, server, file) {
@@ -444,10 +456,11 @@ test('focused palette and report gates reduce overload and expose blocked action
   await gotoWorkflowPage(page, server, 'oneline.html');
   await page.waitForSelector('#oneline-ready-beacon');
   await expect(page.locator('#palette')).toBeVisible();
+  await expect(page.locator('[data-palette-filter="all"]')).toHaveAttribute('aria-pressed', 'true');
+  const allCount = await page.locator('#component-buttons [data-testid="palette-button"]:visible').count();
+  await page.locator('[data-palette-filter="common"]').click();
   await expect(page.locator('[data-palette-filter="common"]')).toHaveAttribute('aria-pressed', 'true');
   const commonCount = await page.locator('#component-buttons [data-testid="palette-button"]:visible').count();
-  await page.locator('[data-palette-filter="all"]').click();
-  const allCount = await page.locator('#component-buttons [data-testid="palette-button"]:visible').count();
   expect(commonCount).toBeGreaterThan(0);
   expect(commonCount).toBeLessThan(allCount);
 
@@ -480,6 +493,7 @@ test('focused palette and report gates reduce overload and expose blocked action
 });
 
 test('sample project satisfies contract handoffs from equipment through deliverables', async ({ page }) => {
+  test.setTimeout(90000);
   assertContractHandoffs();
   const monitor = monitorPage(page, server.origin);
 
@@ -494,6 +508,13 @@ test('sample project satisfies contract handoffs from equipment through delivera
   expect(imported.loadTags).toEqual(expect.arrayContaining(['PMP-101', 'LTG-101', 'REC-101']));
   expect(imported.cableTags).toEqual(expect.arrayContaining(['CBL-SWBD-MCC-101', 'CBL-MCC-PMP-101']));
   expect(imported.studyKeys).toEqual(expect.arrayContaining(['demandSchedule', 'shortCircuit']));
+  const stripRouteDerivedCableFields = cable => {
+    const input = { ...cable };
+    delete input.route_segments;
+    delete input.voltage_drop_pct;
+    return input;
+  };
+  const canonicalCableInputs = importedProject.cables.map(stripRouteDerivedCableFields);
 
   await gotoWorkflowPage(page, server, 'equipmentlist.html');
   await expect(page.locator('.sample-workflow-guide')).toBeVisible();
@@ -581,11 +602,216 @@ test('sample project satisfies contract handoffs from equipment through delivera
   await expect(page.locator('.optimal-route-sidebar')).toBeVisible();
   await expect(page.locator('#calculate-route-btn')).toBeEnabled();
   await page.locator('#calculate-route-btn').click();
+  await expect(page.locator('#progress-label')).toContainText('Complete', { timeout: 30000 });
   await expect(page.locator('#route-summary-panel')).toContainText(`${cables.cableTags.length} routed`);
   await expect(page.locator('#route-summary-panel')).toContainText('0 overloads');
   await expect(page.locator('body')).toHaveClass(/route-review-mode/);
   await expect(page.locator('.optimal-route-sidebar')).toBeHidden();
   await expect(page.locator('#route-mode-toggle')).toHaveText('Edit routing setup');
+
+  await page.locator('#route-mode-toggle').click();
+  await expect(page.locator('.optimal-route-sidebar')).toBeVisible();
+  await page.locator('#calculate-route-btn').click();
+  await expect(page.locator('#progress-label')).toContainText('cached');
+  await expect(page.locator('#route-summary-panel')).toContainText(`${cables.cableTags.length} routed`);
+
+  const generatedRoutes = await page.evaluate(() => {
+    const saved = window.dataStore.getItem('latestRouteResults', null);
+    const currentFingerprint = window.dataStore.getProjectInputFingerprint?.() || null;
+    return {
+      saved,
+      currentFingerprint,
+      cables: window.dataStore.getCables().map(cable => ({
+        tag: cable.tag || cable.name || cable.id || '',
+        routeSegments: Array.isArray(cable.route_segments) ? cable.route_segments.length : 0,
+      })),
+    };
+  });
+  const generatedRows = generatedRoutes.saved?.batchResults || [];
+  expect(generatedRows).toHaveLength(cables.cableTags.length);
+  expect(generatedRoutes.saved?.inputFingerprint).toBeTruthy();
+  expect(generatedRoutes.saved.inputFingerprint).toBe(generatedRoutes.currentFingerprint);
+  expect(generatedRows.map(row => row.cable)).toEqual(expect.arrayContaining(cables.cableTags));
+  expect(generatedRows.every(row => row.status === 'Routed')).toBe(true);
+  expect(generatedRows.every(row => Number.isFinite(Number(row.total_length)) && Number(row.total_length) > 0)).toBe(true);
+  expect(generatedRows.every(row => Number.isFinite(Number(row.field_length)) && Number(row.field_length) >= 0)).toBe(true);
+  expect(generatedRows.every(row => Array.isArray(row.route_segments) && row.route_segments.length > 0)).toBe(true);
+  expect(generatedRows.every(row => row.route_segments.every(segment => (
+    Number.isFinite(Number(segment.length))
+    && Number(segment.length) > 0
+    && Array.isArray(segment.start)
+    && Array.isArray(segment.end)
+    && segment.start.concat(segment.end).every(Number.isFinite)
+  )))).toBe(true);
+  expect(generatedRows.every(row => row.voltage_drop_pct === null || (
+    row.voltage_drop_pct !== '' && Number.isFinite(Number(row.voltage_drop_pct))
+  ))).toBe(true);
+  const validVoltageDropFixture = await page.evaluate(async () => {
+    const { calculateVoltageDrop } = await import('./src/voltageDrop.js');
+    return calculateVoltageDrop({
+      est_load: 300,
+      operating_voltage: 480,
+      conductor_size: '500 kcmil',
+      conductor_material: 'Copper',
+      raceway_material: 'Aluminum',
+      power_factor: 0.9,
+    }, 145, 3);
+  });
+  expect(Number.isFinite(validVoltageDropFixture)).toBe(true);
+  expect(validVoltageDropFixture).toBeGreaterThan(0);
+  expect(generatedRoutes.cables.filter(cable => cables.cableTags.includes(cable.tag))
+    .every(cable => cable.routeSegments > 0)).toBe(true);
+
+  const routeCsvDownloadPromises = [
+    page.waitForEvent('download', download => download.suggestedFilename() === 'route_data.csv'),
+    page.waitForEvent('download', download => download.suggestedFilename() === 'route_data.xlsx'),
+  ];
+  await page.locator('#export-csv-btn').click();
+  const routeCsvDownloads = await Promise.all(routeCsvDownloadPromises);
+  const [routeCsvDownload, routeXlsxDownload] = routeCsvDownloads;
+  expect(routeCsvDownload.suggestedFilename()).toBe('route_data.csv');
+  const routeCsv = await readDownloadText(routeCsvDownload);
+  const routeCsvLines = routeCsv.trim().split(/\r?\n/);
+  expect(routeCsvLines[0]).toContain('cable_tag');
+  expect(routeCsvLines[0]).toContain('length');
+  const routeCsvHeaders = routeCsvLines[0].split(',');
+  const routeCsvRows = routeCsvLines.slice(1).map(line => line.split(','));
+  const routeCsvRecords = routeCsvRows.map(row => Object.fromEntries(routeCsvHeaders.map((header, index) => [header, row[index] ?? ''])));
+  expect(routeCsvRecords.length).toBe(generatedRows.reduce((count, row) => count + row.route_segments.length, 0));
+  for (const tag of cables.cableTags) {
+    expect(routeCsvRecords.some(row => row.cable_tag === tag), `CSV should contain ${tag}`).toBe(true);
+  }
+  expect(routeCsvRecords.every(row => Number.isFinite(Number(row.length)) && Number(row.length) > 0)).toBe(true);
+  const expectedElement = segment => {
+    if (segment.type === 'field') return { type: 'field', id: 'Field Route' };
+    if (segment.conduit_id) return { type: 'conduit', id: `${segment.ductbankTag ? `${segment.ductbankTag}:` : ''}${segment.conduit_id}` };
+    if (segment.ductbankTag) return { type: 'ductbank', id: segment.ductbankTag };
+    return { type: 'tray', id: segment.tray_id || '' };
+  };
+  for (const route of generatedRows) {
+    for (const [index, segment] of route.route_segments.entries()) {
+      const csvRow = routeCsvRecords.find(row => row.cable_tag === route.cable && Number(row.segment_order) === index + 1);
+      expect(csvRow, `CSV should contain ${route.cable} segment ${index + 1}`).toBeTruthy();
+      expect(Number(csvRow.length)).toBeCloseTo(Number(segment.length), 2);
+      expect(Number(csvRow.cumulative_length)).toBeCloseTo(
+        route.route_segments.slice(0, index + 1).reduce((sum, item) => sum + Number(item.length), 0),
+        2
+      );
+      const element = expectedElement(segment);
+      expect(csvRow.element_type).toBe(element.type);
+      expect(csvRow.element_id).toBe(element.id);
+      const start = Array.isArray(segment.start) ? segment.start : [];
+      const end = Array.isArray(segment.end) ? segment.end : [];
+      ['start_x', 'start_y', 'start_z'].forEach((field, coordinate) => expect(Number(csvRow[field])).toBeCloseTo(Number(start[coordinate]), 6));
+      ['end_x', 'end_y', 'end_z'].forEach((field, coordinate) => expect(Number(csvRow[field])).toBeCloseTo(Number(end[coordinate]), 6));
+    }
+  }
+  const routeWorkbook = XLSX.read(await readDownloadBytes(routeXlsxDownload));
+  expect(routeWorkbook.SheetNames).toEqual(expect.arrayContaining(['Segments', 'Summary']));
+  const workbookSegmentRows = XLSX.utils.sheet_to_json(routeWorkbook.Sheets.Segments);
+  expect(workbookSegmentRows).toHaveLength(routeCsvRecords.length);
+  for (const csvRow of routeCsvRecords) {
+    const workbookRow = workbookSegmentRows.find(row => row.cable_tag === csvRow.cable_tag && Number(row.segment_order) === Number(csvRow.segment_order));
+    expect(workbookRow, `workbook should contain ${csvRow.cable_tag} segment ${csvRow.segment_order}`).toBeTruthy();
+    expect(Number(workbookRow.length)).toBeCloseTo(Number(csvRow.length), 2);
+    expect(workbookRow.element_id).toBe(csvRow.element_id);
+  }
+  const summaryRows = XLSX.utils.sheet_to_json(routeWorkbook.Sheets.Summary);
+  expect(summaryRows).toHaveLength(cables.cableTags.length);
+  for (const row of summaryRows) {
+    const saved = generatedRows.find(candidate => candidate.cable === row.cable_tag);
+    expect(saved, `workbook should contain ${row.cable_tag}`).toBeTruthy();
+    expect(Number(row.total_length)).toBeCloseTo(Number(saved.total_length), 2);
+    expect(Number(row.segments_count)).toBe(Number(saved.segments_count));
+  }
+
+  const routeJsonDownloadPromises = [
+    page.waitForEvent('download', download => download.suggestedFilename() === 'routes.json'),
+    page.waitForEvent('download', download => download.suggestedFilename() === 'routes.dxf'),
+  ];
+  await page.locator('#export-routes-btn').click();
+  const routeJsonDownloads = await Promise.all(routeJsonDownloadPromises);
+  const [routeJsonDownload, routeDxfDownload] = routeJsonDownloads;
+  expect(routeJsonDownload.suggestedFilename()).toBe('routes.json');
+  const exportedRoutes = JSON.parse(await readDownloadText(routeJsonDownload));
+  const dxfText = await readDownloadText(routeDxfDownload);
+  expect(dxfText).toContain('SECTION');
+  expect(dxfText).toContain('EOF');
+  expect(exportedRoutes).toHaveLength(cables.cableTags.length);
+  expect(exportedRoutes.map(route => route.cable)).toEqual(expect.arrayContaining(cables.cableTags));
+  expect(exportedRoutes.every(route => Array.isArray(route.segments) && route.segments.length > 0)).toBe(true);
+  expect(exportedRoutes.every(route => route.segments.every(segment => (
+    Array.isArray(segment.start)
+    && Array.isArray(segment.end)
+    && segment.start.concat(segment.end).every(Number.isFinite)
+  )))).toBe(true);
+  let dxfLineEntityCount = 0;
+  const dxfLines = dxfText.split(/\r?\n/);
+  dxfLines.forEach((line, index) => {
+    if (line === 'LINE' && dxfLines[index - 1] === '0') dxfLineEntityCount += 1;
+  });
+  const exportedSegmentCount = exportedRoutes.reduce((count, route) => count + route.segments.length, 0);
+  expect(dxfLineEntityCount).toBe(exportedSegmentCount);
+  for (const exportedRoute of exportedRoutes) {
+    const savedRoute = generatedRows.find(row => row.cable === exportedRoute.cable);
+    expect(savedRoute, `saved route should contain ${exportedRoute.cable}`).toBeTruthy();
+    expect(exportedRoute.segments).toHaveLength(savedRoute.route_segments.length);
+    let endpointLength = 0;
+    exportedRoute.segments.forEach((segment, index) => {
+      const savedSegment = savedRoute.route_segments[index];
+      expect(segment.start).toEqual(savedSegment.start);
+      expect(segment.end).toEqual(savedSegment.end);
+      endpointLength += Math.hypot(
+        Number(segment.end[0]) - Number(segment.start[0]),
+        Number(segment.end[1]) - Number(segment.start[1]),
+        Number(segment.end[2]) - Number(segment.start[2])
+      );
+    });
+    expect(Math.abs(endpointLength - Number(savedRoute.total_length))).toBeLessThanOrEqual(0.01);
+  }
+
+  const bomDownload = page.waitForEvent('download', download => download.suggestedFilename() === 'bom.xlsx');
+  await page.locator('#download-bom-btn').click();
+  const bomWorkbook = XLSX.read(await readDownloadBytes(await bomDownload));
+  expect(bomWorkbook.SheetNames).toEqual(expect.arrayContaining(['Raceways', 'Cables']));
+  const bomRaceways = XLSX.utils.sheet_to_json(bomWorkbook.Sheets.Raceways);
+  const bomCables = XLSX.utils.sheet_to_json(bomWorkbook.Sheets.Cables);
+  expect(bomRaceways.length).toBeGreaterThan(0);
+  expect(bomCables.length).toBeGreaterThan(0);
+  expect(bomCables.reduce((sum, row) => sum + Number(row.count || 0), 0)).toBe(cables.cableTags.length);
+  const expectedBomCableLength = generatedRows.reduce((sum, row) => sum + Number(row.total_length), 0);
+  const actualBomCableLength = bomCables.reduce((sum, row) => sum + Number(row.total_length || 0), 0);
+  expect(actualBomCableLength).toBeCloseTo(expectedBomCableLength, 2);
+
+  await page.reload();
+  await page.waitForFunction(expectedCount => (
+    window.dataStore?.getItem?.('latestRouteResults', null)?.batchResults?.length === expectedCount
+  ), cables.cableTags.length);
+  await expect(page.locator('#route-breakdown-container .route-list-row')).toHaveCount(cables.cableTags.length);
+  const reloadedRoutes = await page.evaluate(() => {
+    const saved = window.dataStore.getItem('latestRouteResults', null);
+    return {
+      saved,
+      cables: window.dataStore.getCables().map(cable => ({
+        tag: cable.tag || cable.name || cable.id || '',
+        routeSegments: Array.isArray(cable.route_segments) ? cable.route_segments.length : 0,
+      })),
+      project: window.projectStorage.getProjectState(),
+    };
+  });
+  expect(reloadedRoutes.saved?.batchResults).toHaveLength(cables.cableTags.length);
+  expect(reloadedRoutes.saved.inputFingerprint).toBe(generatedRoutes.saved.inputFingerprint);
+  expect(reloadedRoutes.saved.batchResults.map(row => row.cable)).toEqual(expect.arrayContaining(cables.cableTags));
+  expect(reloadedRoutes.saved.batchResults.every(row => Number.isFinite(Number(row.total_length)) && Number(row.total_length) > 0)).toBe(true);
+  expect(reloadedRoutes.saved.batchResults.every(row => row.voltage_drop_pct === null || Number.isFinite(Number(row.voltage_drop_pct)))).toBe(true);
+  expect(reloadedRoutes.cables.filter(cable => cables.cableTags.includes(cable.tag))
+    .every(cable => cable.routeSegments > 0)).toBe(true);
+  expect(reloadedRoutes.project.cables.map(stripRouteDerivedCableFields)).toEqual(canonicalCableInputs);
+  await fsp.mkdir(path.join(process.cwd(), 'output', 'routing-workflow-2026-09-17'), { recursive: true });
+  await page.screenshot({
+    path: path.join(process.cwd(), 'output', 'routing-workflow-2026-09-17', 'luna-core-route-reload.png'),
+    fullPage: true,
+  });
 
   await gotoWorkflowPage(page, server, 'loadFlow.html');
   await expect(page.locator('#loadflow-form')).toBeVisible();
@@ -605,11 +831,15 @@ test('sample project satisfies contract handoffs from equipment through delivera
   await expect(page.locator('#shortcircuit-results-table')).toBeVisible();
   await expect(page.locator('#shortcircuit-results-table tbody tr')).toHaveCount(savedShortCircuitCount);
   await expect(page.locator('#shortcircuit-details')).toContainText('Calculation details and provenance');
-  await expect(page.locator('#shortcircuit-export-btn')).toBeEnabled();
+  // The sample carries a previous run whose project fingerprint is stale.
+  // Preserve the calculated rows for comparison, but withhold export until
+  // the explicit rerun below records a current v2 lifecycle context.
+  await expect(page.locator('#shortcircuit-export-btn')).toBeDisabled();
   await expect(page.locator('#shortcircuit-status')).toContainText('Saved study result loaded');
   await page.getByRole('button', { name: 'Run Study' }).click();
   await expect(page.locator('#shortcircuit-results-table')).toBeVisible();
   await expect(page.locator('#shortcircuit-results-table tbody tr')).not.toHaveCount(0);
+  await expect(page.locator('#shortcircuit-export-btn')).toBeEnabled();
   const studies = await readWorkflowSnapshot(page);
   expect(studies.studyKeys).toEqual(expect.arrayContaining(['shortCircuit']));
 
@@ -618,6 +848,21 @@ test('sample project satisfies contract handoffs from equipment through delivera
   await page.locator('#plot-btn').click();
   await expect(page.locator('#tcc-chart')).toBeAttached();
   await expect(page.locator('.tcc-device-layer path[tabindex="0"]')).not.toHaveCount(0);
+
+  const expectedSwbdShortCircuit = await page.evaluate(() => {
+    const studies = window.dataStore.getStudies().shortCircuit || {};
+    const row = studies['SWBD-101'] || Object.values(studies).find(entry => (
+      entry && typeof entry === 'object'
+      && (entry.equipmentTag === 'SWBD-101' || entry.tag === 'SWBD-101'
+        || entry.bus === 'SWBD-101' || entry.busTag === 'SWBD-101')
+    ));
+    return {
+      value: Number(row?.threePhaseKA),
+      status: String(row?.calculationStatus || row?.validity || '').trim(),
+    };
+  });
+  expect(Number.isFinite(expectedSwbdShortCircuit.value)).toBe(true);
+  expect(expectedSwbdShortCircuit.status).toBeTruthy();
 
   await gotoWorkflowPage(page, server, 'arcFlash.html');
   await expect(page.locator('#arcflash-form')).toBeVisible();
@@ -663,7 +908,23 @@ test('sample project satisfies contract handoffs from equipment through delivera
   await page.locator('#rpt-generate-btn').click();
   await expect(page.locator('#report-preview #rpt-shortCircuit')).toContainText('Short Circuit Analysis');
   await expect(page.locator('#report-preview #rpt-shortCircuit')).toContainText('SWBD-101');
-  await expect(page.locator('#report-preview #rpt-shortCircuit')).toContainText('25.26');
+  const swbdReportRow = page.locator('#report-preview #rpt-shortCircuit tbody tr').filter({
+    has: page.locator('td:first-child').filter({ hasText: /^SWBD-101$/ }),
+  });
+  await expect(swbdReportRow).toHaveCount(1);
+  // The report correctly withholds stale numeric cells while retaining the
+  // canonical value for audit and downstream consumers.
+  await expect(page.locator('#report-preview #rpt-shortCircuit')).toContainText('Stale saved result');
+  await expect(swbdReportRow.locator('td').nth(2)).toHaveText('—');
+  await expect(swbdReportRow).toContainText(expectedSwbdShortCircuit.status);
+  const persistedSwbdShortCircuitKA = await page.evaluate(() => {
+    const studies = window.dataStore.getStudies().shortCircuit || {};
+    const row = studies['SWBD-101'] || Object.values(studies).find(entry => (
+      entry && typeof entry === 'object' && entry.equipmentTag === 'SWBD-101'
+    ));
+    return Number(row?.threePhaseKA);
+  });
+  expect(persistedSwbdShortCircuitKA).toBe(expectedSwbdShortCircuit.value);
   await expect(page.locator('#report-preview #rpt-loadFlow')).toContainText('Load Flow');
   await expect(page.locator('#report-preview #rpt-arcFlash')).toContainText('Arc Flash');
   await expect(page.locator('#report-preview')).toContainText('Cable Schedule');
@@ -678,6 +939,101 @@ test('sample project satisfies contract handoffs from equipment through delivera
 
   expect(monitor.failedResponses).toEqual([]);
   expect(monitor.errors).toEqual([]);
+});
+
+test('project routing edits preserve cable inputs and lock state while built-in samples stay isolated', async ({ page }) => {
+  await gotoWorkflowPage(page, server, 'samplegallery.html');
+  await page.locator('[data-sample-id="project-workflow-core"] .primary-btn').click();
+  await expect(page.locator('#checklist-panel')).toContainText('Guided Workflow: Project Workflow Core');
+  await gotoWorkflowPage(page, server, 'optimalRoute.html');
+  await waitForDataStore(page);
+  await expect(page.locator('#route-mode-toggle')).toHaveText('Edit routing setup');
+  await page.locator('#route-mode-toggle').click();
+  await expect(page.locator('.optimal-route-sidebar')).toBeVisible();
+
+  const stripRouteDerivedCableFields = cable => Object.fromEntries(
+    Object.entries(cable).filter(([key]) => !['route_segments', 'voltage_drop_pct'].includes(key))
+  );
+  const openCableEditor = async () => {
+    const sourceDetails = page.locator('details.route-source-data-panel');
+    if ((await sourceDetails.getAttribute('open')) === null) await sourceDetails.locator(':scope > summary').click();
+    const cableDetails = page.locator('#cable-list-details');
+    if ((await cableDetails.getAttribute('open')) === null) await cableDetails.locator(':scope > summary').click();
+    await expect(page.locator('#cable-list-container tbody tr')).not.toHaveCount(0);
+  };
+  await openCableEditor();
+  const beforeProject = await readCanonicalProject(page);
+  const beforeCable = beforeProject.cables.find(cable => (cable.tag || cable.name) === 'CBL-SWBD-MCC-101');
+  expect(beforeCable).toBeTruthy();
+  const cableTagInputs = page.locator('#cable-list-container .cable-tag-input');
+  const targetIndex = await cableTagInputs.evaluateAll((inputs, targetTag) => (
+    inputs.findIndex(input => input.value === targetTag)
+  ), 'CBL-SWBD-MCC-101');
+  expect(targetIndex).toBeGreaterThanOrEqual(0);
+  const targetRow = page.locator('#cable-list-container tbody tr').nth(targetIndex);
+  const originalDiameter = Number(await targetRow.locator('.cable-diameter-input').inputValue());
+  const originalStartX = Number(await targetRow.locator('.cable-start-input[data-coord="0"]').inputValue());
+  const editedDiameter = (originalDiameter + 0.11).toFixed(2);
+  const editedStartX = (originalStartX + 1.25).toFixed(2);
+  await targetRow.locator('.cable-diameter-input').fill(editedDiameter);
+  await targetRow.locator('.cable-start-input[data-coord="0"]').fill(editedStartX);
+  if (await targetRow.locator('.unlock-cable').count()) {
+    await targetRow.locator('.unlock-cable').click();
+    await expect(targetRow.locator('.relock-cable')).toBeVisible();
+  }
+  if (await targetRow.locator('.relock-cable').count()) {
+    await targetRow.locator('.relock-cable').click();
+    await expect(targetRow.locator('.unlock-cable')).toBeVisible();
+  } else {
+    const routeRow = page.locator('#route-breakdown-container .route-list-row').filter({ hasText: 'CBL-SWBD-MCC-101' }).first();
+    await routeRow.locator('.lock-route-btn').click();
+  }
+  await expect(page.locator('#calculate-route-btn')).toBeVisible();
+  await page.locator('#calculate-route-btn').click();
+  await expect(page.locator('#progress-label')).toContainText(/Complete|cached/i);
+  await expect(page.locator('#route-summary-panel')).toContainText('routed');
+
+  await page.reload();
+  await waitForDataStore(page);
+  await page.waitForFunction(() => window.dataStore?.getItem?.('latestRouteResults', null)?.batchResults?.length > 0);
+  await expect(page.locator('#route-mode-toggle')).toHaveText('Edit routing setup');
+  await page.locator('#route-mode-toggle').click();
+  await expect(page.locator('.optimal-route-sidebar')).toBeVisible();
+  await openCableEditor();
+  const reloadedTagInputs = page.locator('#cable-list-container .cable-tag-input');
+  const reloadedIndex = await reloadedTagInputs.evaluateAll((inputs, targetTag) => (
+    inputs.findIndex(input => input.value === targetTag)
+  ), 'CBL-SWBD-MCC-101');
+  expect(reloadedIndex).toBeGreaterThanOrEqual(0);
+  const reloadedRow = page.locator('#cable-list-container tbody tr').nth(reloadedIndex);
+  await expect(reloadedRow.locator('.cable-diameter-input')).toHaveValue(editedDiameter);
+  await expect(reloadedRow.locator('.cable-start-input[data-coord="0"]')).toHaveValue(editedStartX);
+  await expect(reloadedRow.locator('.unlock-cable')).toBeVisible();
+  const afterProject = await readCanonicalProject(page);
+  const afterCable = afterProject.cables.find(cable => (cable.tag || cable.name) === 'CBL-SWBD-MCC-101');
+  expect(afterCable).toBeTruthy();
+  expect(afterCable.locked).toBe(true);
+  expect(Number(afterCable.diameter)).toBeCloseTo(Number(editedDiameter), 2);
+  expect(Number(afterCable.start?.[0] ?? afterCable.start_x)).toBeCloseTo(Number(editedStartX), 2);
+  const expectedCable = {
+    ...stripRouteDerivedCableFields(beforeCable),
+    diameter: Number(editedDiameter),
+    start_x: Number(editedStartX),
+    locked: true,
+  };
+  expect(stripRouteDerivedCableFields(afterCable)).toEqual(expectedCable);
+
+  const canonicalBeforeBuiltInSample = await readCanonicalProject(page);
+  await openCableEditor();
+  await page.locator('#load-sample-trays-btn').click();
+  await page.locator('#load-sample-cables-btn').click();
+  await openCableEditor();
+  const builtInSampleRow = page.locator('#cable-list-container tbody tr').first();
+  const sampleDiameter = Number(await builtInSampleRow.locator('.cable-diameter-input').inputValue());
+  await builtInSampleRow.locator('.cable-diameter-input').fill((sampleDiameter + 0.17).toFixed(2));
+  const canonicalAfterBuiltInSample = await readCanonicalProject(page);
+  expect(canonicalAfterBuiltInSample.cables.map(stripRouteDerivedCableFields))
+    .toEqual(canonicalBeforeBuiltInSample.cables.map(stripRouteDerivedCableFields));
 });
 
 test('mobile workflow shell keeps commands reachable without page-level horizontal scrolling', async ({ page }) => {

@@ -3,10 +3,11 @@ import {
   CONDUCTOR_LIBRARY,
   NESC_DISTRICTS,
 } from './analysis/sagTension.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getStudies, getStudyAssessments, captureStudyRunContext, saveStudyResult } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { studyLifecycleMetadataLines } from './analysis/studyExportMetadata.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -100,9 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
     errorsDiv.hidden = true;
     errorsDiv.textContent = '';
 
-    const studies = getStudies();
-    studies.sagTension = result;
-    setStudies(studies);
+    saveStudyResult('sagTension', result, captureStudyRunContext('sagTension', { inputs: result.inputs || {}, options: {} }));
 
     renderResults(result);
     exportBtn.hidden = false;
@@ -256,6 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
     lines.push(`# Conductor,${r.inputs.conductor.name}`);
     lines.push(`# Ruling span (ft),${r.rulingSpan.toFixed(2)}`);
     lines.push(`# Design,${r.designTensionPctUts.toFixed(1)}% UTS @ ${r.district.label} (${r.designTensionLb.toFixed(0)} lb)`);
+    lines.push(...studyLifecycleMetadataLines(r, { assessment: getStudyAssessments().sagTension }));
     lines.push('# --- NESC Loading Cases ---');
     lines.push('District,TempF,UnitLoad_lbft,Tension_lb,Pct_UTS,Sag_ft');
     r.loadingCases.forEach(c => lines.push(

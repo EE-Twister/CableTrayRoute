@@ -137,24 +137,67 @@ function renderBenchmarks(benchmarks) {
         <p><em>${esc(b.standard)} ${b.clause ? `— ${esc(b.clause)}` : ''}</em></p>
         ${b.evidence ? `<p><strong>Evidence:</strong> ${esc(b.evidence.evidenceClass.replaceAll('_', ' '))} · ${esc(b.evidence.evidenceStrength)} strength · ${esc(b.evidence.sourceAccess.replaceAll('_', ' '))}</p>` : ''}
         <p>${esc(b.description)}</p>
+        ${b.independentDerivation || b.derivation ? `<p><strong>Independent derivation:</strong> ${esc(b.independentDerivation || b.derivation)}</p>` : ''}
+        ${b.assumptions ? `<p><strong>Assumptions:</strong></p>${renderBulletList(b.assumptions)}` : ''}
+        ${b.inputs ? renderInputs(b.inputs, b.inputUnits) : ''}
         ${b.expectedOutputs ? renderExpectedOutputs(b.expectedOutputs) : ''}
+        ${b.source ? renderSource(b.source) : (b.sourceUrl ? `<p><a href="${esc(b.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open primary/reference source</a></p>` : '')}
+        ${b.inputSource ? `<p><strong>Input source:</strong></p>${renderSource(b.inputSource)}` : ''}
+        ${b.additionalSources?.length ? `<p><strong>Additional sources:</strong></p>${b.additionalSources.map(renderSource).join('')}` : ''}
+        ${b.limitations ? `<p><strong>Known Limitations:</strong></p>${renderBulletList(b.limitations, 'study-basis__list study-basis__list--warn')}` : ''}
         <p class="field-hint">${esc(b.reference)}</p>
-        ${b.sourceUrl ? `<p><a href="${esc(b.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open primary/reference source</a></p>` : ''}
         ${b.evidence?.implementationModules?.length ? `<p class="field-hint">Implementation: ${b.evidence.implementationModules.map(esc).join(', ')}</p>` : ''}
         ${b.sampleFile ? `<p><a href="${esc(b.sampleFile)}" download>Download fixture project (JSON)</a></p>` : ''}
       </div>
     </details>`).join('');
 }
 
+function formatEvidenceValue(value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
+function renderInputs(inputs, inputUnits = {}) {
+  const rows = flattenEvidenceInputs(inputs, '', inputUnits).map(({ key, value, unit }) => `
+    <tr><td><code>${esc(key)}</code></td><td>${esc(formatEvidenceValue(value))}</td><td>${esc(unit || '—')}</td></tr>`).join('');
+  return `
+    <p><strong>Executable inputs:</strong></p>
+    <table class="results-table" aria-label="Executable benchmark inputs">
+      <thead><tr><th>Input</th><th>Value</th><th>Unit</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function flattenEvidenceInputs(value, prefix, inputUnits) {
+  const unit = inputUnits?.[prefix];
+  if (value === null || typeof value !== 'object' || unit) {
+    return [{ key: prefix || 'value', value, unit }];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((item, index) => flattenEvidenceInputs(item, `${prefix}[${index}]`, inputUnits));
+  }
+  return Object.entries(value).flatMap(([key, child]) =>
+    flattenEvidenceInputs(child, prefix ? `${prefix}.${key}` : key, inputUnits));
+}
+
+function renderSource(source) {
+  return `
+    <p><strong>Evidence source:</strong> ${esc(source.title)} (${esc(source.kind)})</p>
+    <p><a href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">Open primary/reference source</a> · ${esc(source.locator)} · accessed ${esc(source.accessedOn)}</p>`;
+}
+
 function renderExpectedOutputs(outputs) {
   const rows = Object.entries(outputs).map(([key, spec]) => {
     const val = typeof spec === 'object' ? spec.value : spec;
     const tol = typeof spec === 'object' && spec.tolerance != null ? ` ± ${spec.tolerance}` : '';
-    return `<tr><td><code>${esc(key)}</code></td><td>${esc(String(val))}${esc(tol)}</td></tr>`;
+    const unit = typeof spec === 'object' && spec.unit ? spec.unit : '—';
+    const basis = typeof spec === 'object' && spec.toleranceBasis ? spec.toleranceBasis : '—';
+    return `<tr><td><code>${esc(key)}</code></td><td>${esc(String(val))}</td><td>${esc(unit)}</td><td>${esc(tol || '—')}</td><td>${esc(basis)}</td></tr>`;
   });
   return `
     <table class="results-table" aria-label="Expected outputs">
-      <thead><tr><th>Output</th><th>Expected value</th></tr></thead>
+      <thead><tr><th>Output</th><th>Expected value</th><th>Unit</th><th>Tolerance</th><th>Tolerance basis</th></tr></thead>
       <tbody>${rows.join('')}</tbody>
     </table>`;
 }

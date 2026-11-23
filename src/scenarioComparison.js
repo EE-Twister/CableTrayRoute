@@ -163,13 +163,14 @@ function studyState(study, side) {
   const summary = study[side];
   const approval = study[`${side}Approval`];
   if (!summary.present) return 'Not run';
-  const validity = summary.valid === true
-    ? 'valid'
-    : (summary.valid === false ? 'invalid / incomplete' : 'legacy / unverified');
+  const validity = summary.validity === 'evaluated'
+    ? 'evaluated'
+    : (summary.validity === 'partial' ? 'partial' : 'unevaluated');
+  const freshness = summary.freshness || 'unknown';
   const approvalText = approval?.status
     || approval?.decision
     || (approval?.approved === true ? 'approved' : 'not approved');
-  return `${validity}; ${approvalText}`;
+  return `${validity}; ${freshness}; ${summary.eligibility || 'withheld'}; ${approvalText}`;
 }
 
 function metricText(summary) {
@@ -279,46 +280,84 @@ function runComparison() {
 
 function exportComparison() {
   if (!lastComparison) return;
+  const headers = [
+    'Type', 'Domain / Study', 'Status', 'Record', 'Details', 'Scenario A', 'Scenario B',
+    'Validity A', 'Freshness A', 'Eligibility A', 'Source Fingerprint A', 'Calculation Version A',
+    'Assumptions A', 'Warnings A', 'Model Limits A', 'Limitations A', 'Expected Units A', 'Input Sources A', 'Source A', 'Input Source A', 'Evidence Class A', 'Independent Derivation A', 'Provenance A',
+    'Validity B', 'Freshness B', 'Eligibility B', 'Source Fingerprint B', 'Calculation Version B',
+    'Assumptions B', 'Warnings B', 'Model Limits B', 'Limitations B', 'Expected Units B', 'Input Sources B', 'Source B', 'Input Source B', 'Evidence Class B', 'Independent Derivation B', 'Provenance B',
+  ];
+  const serialise = value => value == null ? '' : (typeof value === 'string' ? value : JSON.stringify(value));
   const rows = [];
   lastComparison.domains.forEach(domain => {
     domain.changes.forEach(change => {
-      rows.push([
-        'project-record',
-        domain.label,
-        change.status,
-        change.label,
-        change.fields.join('; '),
-        lastComparison.beforeScenario,
-        lastComparison.afterScenario,
-      ]);
+      rows.push({
+        Type: 'project-record',
+        'Domain / Study': domain.label,
+        Status: change.status,
+        Record: change.label,
+        Details: change.fields.join('; '),
+        'Scenario A': lastComparison.beforeScenario,
+        'Scenario B': lastComparison.afterScenario,
+      });
     });
   });
-  lastComparison.studies
-    .filter(study => study.status !== 'unchanged')
-    .forEach(study => {
-      rows.push([
-        'study-result',
-        study.label,
-        study.status,
-        '',
-        `${studyState(study, 'before')} -> ${studyState(study, 'after')}`,
-        lastComparison.beforeScenario,
-        lastComparison.afterScenario,
-      ]);
+  lastComparison.studies.forEach(study => {
+      rows.push({
+        Type: 'study-result',
+        'Domain / Study': study.label,
+        Status: study.status,
+        Record: '',
+        Details: `${studyState(study, 'before')} -> ${studyState(study, 'after')}`,
+        'Scenario A': lastComparison.beforeScenario,
+        'Scenario B': lastComparison.afterScenario,
+        'Validity A': study.before.validity,
+        'Freshness A': study.before.freshness,
+        'Eligibility A': study.before.eligibility,
+        'Source Fingerprint A': study.before.sourceFingerprint,
+        'Calculation Version A': study.before.calculationVersion,
+        'Assumptions A': serialise(study.before.assumptions),
+        'Warnings A': serialise(study.before.warnings),
+        'Model Limits A': serialise(study.before.modelLimits),
+        'Limitations A': serialise(study.before.limitations),
+        'Expected Units A': serialise(study.before.units),
+        'Input Sources A': serialise(study.before.inputSources),
+        'Source A': serialise(study.before.source),
+        'Input Source A': serialise(study.before.inputSource),
+        'Evidence Class A': study.before.evidenceClass,
+        'Independent Derivation A': serialise(study.before.independentDerivation),
+        'Provenance A': serialise(study.before.provenance),
+        'Validity B': study.after.validity,
+        'Freshness B': study.after.freshness,
+        'Eligibility B': study.after.eligibility,
+        'Source Fingerprint B': study.after.sourceFingerprint,
+        'Calculation Version B': study.after.calculationVersion,
+        'Assumptions B': serialise(study.after.assumptions),
+        'Warnings B': serialise(study.after.warnings),
+        'Model Limits B': serialise(study.after.modelLimits),
+        'Limitations B': serialise(study.after.limitations),
+        'Expected Units B': serialise(study.after.units),
+        'Input Sources B': serialise(study.after.inputSources),
+        'Source B': serialise(study.after.source),
+        'Input Source B': serialise(study.after.inputSource),
+        'Evidence Class B': study.after.evidenceClass,
+        'Independent Derivation B': serialise(study.after.independentDerivation),
+        'Provenance B': serialise(study.after.provenance),
+      });
     });
   lastComparison.impact.forEach(impact => {
-    rows.push([
-      'study-impact',
-      impact.label,
-      impact.action,
-      impact.priority,
-      `${impact.targetState}; changed domains: ${impact.domains.join('; ')}`,
-      lastComparison.beforeScenario,
-      lastComparison.afterScenario,
-    ]);
+    rows.push({
+      Type: 'study-impact',
+      'Domain / Study': impact.label,
+      Status: impact.action,
+      Record: impact.priority,
+      Details: `${impact.targetState}; changed domains: ${impact.domains.join('; ')}`,
+      'Scenario A': lastComparison.beforeScenario,
+      'Scenario B': lastComparison.afterScenario,
+    });
   });
   downloadCSV(
-    ['Type', 'Domain / Study', 'Status', 'Record', 'Details', 'Scenario A', 'Scenario B'],
+    headers,
     rows,
     `scenario-comparison-${lastComparison.beforeScenario}-vs-${lastComparison.afterScenario}.csv`,
   );

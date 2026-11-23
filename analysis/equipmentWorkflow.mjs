@@ -4,6 +4,24 @@ const EQUIPMENT_FIELDS = [
   'tag',
   'description',
   'voltage',
+  'kw',
+  'powerFactor',
+  'duty',
+  'ratingsBasis',
+  'motorRatedVoltageV',
+  'motorFullLoadCurrentA',
+  'motorFullLoadCurrentReference',
+  'motorNameplateCurrentA',
+  'motorNameplateHorsepower',
+  'motorNameplateFrequencyHz',
+  'motorLockedRotorCurrentA',
+  'motorLockedRotorPowerFactor',
+  'motorDataReference',
+  'motorStarterType',
+  'motorRotorType',
+  'motorInstantaneousPickupA',
+  'motorBreakerAmbientTemperatureC',
+  'motorBreakerAmbientReference',
   'category',
   'subCategory',
   'arrangement',
@@ -95,6 +113,24 @@ const FIELD_ALIASES = {
   tag: ['tag', 'equipment tag', 'equipment_tag', 'name'],
   description: ['description', 'desc', 'equipment description'],
   voltage: ['voltage', 'voltage (v)', 'volts', 'rated voltage', 'voltage rating'],
+  kw: ['kw', 'kw input', 'electrical input kw', 'electrical input (kw)', 'input power (kw)'],
+  powerFactor: ['power factor', 'powerfactor', 'pf'],
+  duty: ['duty', 'load duty'],
+  ratingsBasis: ['rating basis', 'ratings basis', 'power basis'],
+  motorRatedVoltageV: ['motor rated voltage', 'motor rated voltage (v)', 'motor nameplate voltage (v)'],
+  motorFullLoadCurrentA: ['motor design flc', 'motor design flc (a)', 'motor full load current (a)'],
+  motorFullLoadCurrentReference: ['motor design flc reference', 'motor full load current reference'],
+  motorNameplateCurrentA: ['motor nameplate current', 'motor nameplate current (a)'],
+  motorNameplateHorsepower: ['motor nameplate horsepower', 'motor nameplate hp'],
+  motorNameplateFrequencyHz: ['motor nameplate frequency', 'motor nameplate frequency (hz)'],
+  motorLockedRotorCurrentA: ['motor locked rotor current', 'motor locked rotor current (a)'],
+  motorLockedRotorPowerFactor: ['motor locked rotor power factor', 'motor locked rotor pf'],
+  motorDataReference: ['motor nameplate / starting data reference', 'motor data reference', 'motorDataReference'],
+  motorStarterType: ['motor starter type'],
+  motorRotorType: ['motor rotor type'],
+  motorInstantaneousPickupA: ['motor instantaneous pickup', 'motor instantaneous pickup (a)', 'motor proposed instantaneous pickup (a)'],
+  motorBreakerAmbientTemperatureC: ['motor breaker enclosure temperature', 'motor breaker enclosure temperature (°c)', 'motor 70 a breaker enclosure temperature (°c)', 'motorbreakerambienttemperaturec'],
+  motorBreakerAmbientReference: ['motor breaker enclosure temperature reference', 'motorbreakerambientreference'],
   category: ['category', 'type', 'equipment type'],
   subCategory: ['sub-category', 'subcategory', 'sub category', 'equipment subtype'],
   arrangement: ['arrangement', 'equipment arrangement', 'layout', 'area', 'location'],
@@ -156,12 +192,32 @@ function canonicalHeader(header) {
   return normalize(header).replace(/\s+/g, ' ');
 }
 
-function identityValue(row) {
-  for (const key of ['ref', 'id', 'tag']) {
+function identityCandidates(row) {
+  const candidates = [];
+  ['ref', 'id', 'tag'].forEach(key => {
     const value = normalize(row?.[key]);
-    if (value) return value;
-  }
-  return '';
+    if (value) candidates.push(`${key}:${value}`);
+  });
+  return candidates;
+}
+
+function mergeIdentityCandidates(row) {
+  const explicit = [];
+  ['ref', 'id'].forEach(key => {
+    const value = normalize(row?.[key]);
+    if (value) explicit.push(`${key}:${value}`);
+  });
+  return explicit.length ? explicit : identityCandidates(row).filter(candidate => candidate.startsWith('tag:'));
+}
+
+function buildIdentityIndex(rows) {
+  const index = new Map();
+  rows.forEach((row, rowIndex) => {
+    identityCandidates(row).forEach(candidate => {
+      if (!index.has(candidate)) index.set(candidate, rowIndex);
+    });
+  });
+  return index;
 }
 
 function mergeRow(existing = {}, incoming = {}) {
@@ -272,24 +328,26 @@ export function mapRowsToEquipment(rows = [], headers = [], mapping = inferEquip
 }
 
 export function previewEquipmentImport(currentRows = [], incomingRows = []) {
-  const current = Array.isArray(currentRows) ? currentRows.filter(isMeaningfulEquipment) : [];
+  const current = (Array.isArray(currentRows) ? currentRows : [])
+    .filter(isMeaningfulEquipment)
+    .map(row => ({ ...row }));
   const incoming = Array.isArray(incomingRows) ? incomingRows.filter(isMeaningfulEquipment) : [];
-  const index = new Map();
-  current.forEach(row => {
-    const id = identityValue(row);
-    if (id) index.set(id, row);
-  });
+  const working = current.map(row => ({ ...row }));
 
   let mergeCreates = 0;
   let mergeUpdates = 0;
   let mergeUnchanged = 0;
   incoming.forEach(row => {
-    const id = identityValue(row);
-    const existing = id ? index.get(id) : null;
-    if (!existing) {
+    const index = buildIdentityIndex(working);
+    const matchIndex = mergeIdentityCandidates(row)
+      .map(candidate => index.get(candidate))
+      .find(indexValue => indexValue !== undefined);
+    if (matchIndex === undefined) {
       mergeCreates += 1;
-    } else if (rowChanged(existing, row)) {
+      working.push({ ...row });
+    } else if (rowChanged(working[matchIndex], row)) {
       mergeUpdates += 1;
+      working[matchIndex] = mergeRow(working[matchIndex], row);
     } else {
       mergeUnchanged += 1;
     }
@@ -307,18 +365,13 @@ export function previewEquipmentImport(currentRows = [], incomingRows = []) {
 
 export function mergeEquipmentRows(currentRows = [], incomingRows = []) {
   const result = (Array.isArray(currentRows) ? currentRows : []).map(row => ({ ...row }));
-  const index = new Map();
-  result.forEach((row, idx) => {
-    const id = identityValue(row);
-    if (id) index.set(id, idx);
-  });
 
   (Array.isArray(incomingRows) ? incomingRows : []).filter(isMeaningfulEquipment).forEach(row => {
-    const id = identityValue(row);
-    const matchIndex = id ? index.get(id) : undefined;
+    const index = buildIdentityIndex(result);
+    const candidates = mergeIdentityCandidates(row);
+    const matchIndex = candidates.map(candidate => index.get(candidate)).find(indexValue => indexValue !== undefined);
     if (matchIndex === undefined) {
       result.push({ ...row });
-      if (id) index.set(id, result.length - 1);
       return;
     }
     result[matchIndex] = mergeRow(result[matchIndex], row);

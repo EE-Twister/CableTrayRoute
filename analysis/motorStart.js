@@ -1,5 +1,6 @@
-import { getEquipment, getLoads, getOneLine, getStudies, setStudies } from '../dataStore.mjs';
+import { getEquipment, getLoads, getOneLine, getStudies, getStudyAssessments, captureStudyRunContext, saveStudyResult } from '../dataStore.mjs';
 import { downloadCSV } from '../reports/reporting.mjs';
+import { studyExportMetadata } from './studyExportMetadata.mjs';
 import {
   createStudyInputSnapshot,
   withStudyProvenance,
@@ -246,6 +247,11 @@ if (typeof document !== 'undefined') {
         return;
       }
 
+      const runContext = captureStudyRunContext('motorStart', {
+        inputs: { criteria, cases },
+        options: { criteria },
+        assumptions: ['Thevenin motor-start screening uses the selected motor cases and active project network inputs.'],
+      });
       const results = cases.map(input => calculateMotorStartCase(input, criteria));
       const demand = summarizeMotorStartDemand(cases, results);
       const snapshot = createStudyInputSnapshot(
@@ -262,9 +268,7 @@ if (typeof document !== 'undefined') {
         results,
         ...demand,
       }, snapshot);
-      const studies = getStudies();
-      studies.motorStart = lastStudy;
-      setStudies(studies);
+      saveStudyResult('motorStart', lastStudy, runContext);
       const passes = results.filter(result => result.status === 'pass').length;
       readiness.innerHTML = `<div class="result-card ${passes === results.length ? 'result-ok' : 'result-warn'}"><strong>${passes} of ${results.length} motors meet both screening criteria.</strong><p>Result saved to this project. Controlling starting demand: ${demand.startingKva.toFixed(1)} kVA / ${demand.startingKw.toFixed(1)} kW.</p></div>`;
       resultsElement.innerHTML = `<div class="table-scroll"><table class="data-table">
@@ -277,7 +281,8 @@ if (typeof document !== 'undefined') {
 
     exportBtn?.addEventListener('click', () => {
       if (!lastStudy) return;
-      const headers = ['motor', 'starter', 'fullLoadAmps', 'startingKA', 'voltageSagPct', 'accelerationTimeSec', 'status'];
+      const headers = ['motor', 'starter', 'fullLoadAmps', 'startingKA', 'voltageSagPct', 'accelerationTimeSec', 'status', 'freshness', 'eligibility', 'resultStatus', 'calculationVersion', 'calculatedAt', 'assumptions', 'warnings', 'provenance'];
+      const lifecycle = studyExportMetadata(lastStudy, { assessment: getStudyAssessments().motorStart });
       const rows = lastStudy.results.map(result => ({
         motor: result.label,
         starter: result.starterType,
@@ -285,7 +290,15 @@ if (typeof document !== 'undefined') {
         startingKA: result.inrushKA,
         voltageSagPct: result.voltageSagPct,
         accelerationTimeSec: result.accelTime,
-        status: result.status
+        status: result.status,
+        freshness: lifecycle.freshness,
+        eligibility: lifecycle.resultEligibility,
+        resultStatus: lifecycle.resultStatus,
+        calculationVersion: lifecycle.calculationVersion,
+        calculatedAt: lifecycle.calculatedAt,
+        assumptions: lifecycle.assumptions,
+        warnings: lifecycle.warnings,
+        provenance: lifecycle.provenance,
       }));
       downloadCSV(headers, rows, 'motor-start-results.csv');
     });

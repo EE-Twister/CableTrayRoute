@@ -12,6 +12,10 @@
     z-index: 1000;
 }
 
+#palette-context-menu {
+    position: fixed;
+}
+
 .context-menu li {
     padding: 4px 12px;
     cursor: pointer;

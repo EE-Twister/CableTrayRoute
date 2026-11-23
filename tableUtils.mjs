@@ -167,6 +167,7 @@ class TableManager {
     this.compactActionMenu = opts.compactActionMenu === true;
     this.contextMenuViewLabel = opts.contextMenuViewLabel || 'View / Edit Row';
     this.customFilters = new Map();
+    this.rowRecords = new Map();
     this.sortColumnIndex = null;
     this.sortDirection = 'asc';
     this.sortButtons = [];
@@ -238,7 +239,7 @@ class TableManager {
   initButtons(opts){
     if (opts.addRowBtnId) document.getElementById(opts.addRowBtnId).addEventListener('click', () => { this.addRow(); if (this.onChange) this.onChange(); });
     if (opts.saveBtnId) document.getElementById(opts.saveBtnId).addEventListener('click', () => { this.save(); if (this.onSave) this.onSave(); });
-    if (opts.loadBtnId) document.getElementById(opts.loadBtnId).addEventListener('click', () => { this.tbody.innerHTML=''; this.load(); if (this.onSave) this.onSave(); });
+    if (opts.loadBtnId) document.getElementById(opts.loadBtnId).addEventListener('click', () => { this.tbody.innerHTML=''; this.rowRecords.clear(); this.load(); if (this.onSave) this.onSave(); });
     if (opts.clearFiltersBtnId) document.getElementById(opts.clearFiltersBtnId).addEventListener('click', () => this.clearFilters());
     if (opts.exportBtnId) document.getElementById(opts.exportBtnId).addEventListener('click', () => { this.exportXlsx(); if (this.onSave) this.onSave(); });
     if (opts.importBtnId && opts.importInputId){
@@ -978,6 +979,7 @@ class TableManager {
     const data = this.getData();
     this.buildHeader();
     this.tbody.innerHTML = '';
+    this.rowRecords.clear();
     data.forEach(row => this.addRow(row));
     this.save();
   }
@@ -988,6 +990,7 @@ class TableManager {
     this.persistColumns();
     this.buildHeader();
     this.tbody.innerHTML = '';
+    this.rowRecords.clear();
     data.forEach(row => this.addRow(row));
     this.save();
     this.updateRowCount();
@@ -1003,6 +1006,7 @@ class TableManager {
     this.persistColumns();
     this.buildHeader();
     this.tbody.innerHTML = '';
+    this.rowRecords.clear();
     data.forEach(row => this.addRow(row));
     this.save();
     this.updateRowCount();
@@ -1197,6 +1201,16 @@ class TableManager {
 
   addRow(data = {}) {
     const tr = this.tbody.insertRow();
+    // Keep a record identity on the row so sorting, filtering, and edits never
+    // make us pair visible controls with the wrong engineering record.  Older
+    // imports may not have an id; assign one once and carry it through saves.
+    const suppliedId = data.id ?? data._rowId ?? data.row_id;
+    const generatedId = (suppliedId && !this.rowRecords.has(String(suppliedId))) ? suppliedId : (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `row-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    tr.dataset.rowId = String(generatedId);
+    if (!Object.keys(data).length) tr.dataset.generatedPlaceholder = 'true';
+    this.rowRecords.set(tr.dataset.rowId, { ...data, id: tr.dataset.rowId });
     const rowNumber = this.tbody.rows.length;
     const rowIdentity = String(data.tag || data.name || data.id || data.ref || '').trim();
     const rowLabel = rowIdentity ? `${rowIdentity}, row ${rowNumber}` : `row ${rowNumber}`;
@@ -1272,6 +1286,19 @@ class TableManager {
             o.textContent = opt;
             el.appendChild(o);
           });
+          // Imported projects can contain a valid, more specific enum value
+          // that this UI version does not know yet (for example “VFD Power”).
+          // Keep it selectable and visible so an unrelated edit cannot erase
+          // detail during the next save.
+          const importedValue = data[col.key];
+          if (importedValue !== undefined && importedValue !== null && importedValue !== ''
+            && !Array.from(el.options).some(o => o.value === String(importedValue))) {
+            const importedOption = document.createElement('option');
+            importedOption.value = String(importedValue);
+            importedOption.textContent = `${importedValue} (imported)`;
+            importedOption.dataset.imported = 'true';
+            el.appendChild(importedOption);
+          }
         }
       } else {
         el = document.createElement('input');
@@ -1340,6 +1367,7 @@ class TableManager {
       }
       td.appendChild(el);
       const handleValueChange = () => {
+        delete tr.dataset.generatedPlaceholder;
         if (this.onChange) this.onChange();
         if (this.sortColumnIndex !== null) this.applySort();
       };
@@ -1565,7 +1593,7 @@ class TableManager {
   }
 
   getRowData(tr) {
-    const row = {};
+    const row = { ...(this.rowRecords.get(tr?.dataset?.rowId) || {}) };
     const offset = this.colOffset;
     this.columns.forEach((col,i) => {
       const el = tr.cells[i + offset] ? tr.cells[i + offset].firstChild : null;
@@ -1577,48 +1605,62 @@ class TableManager {
           row[col.key] = Array.from(el.selectedOptions || []).map(o=>o.value);
         }
       } else {
-        row[col.key] = el.value;
+        const value = el.value;
+        if (col.type === 'number') {
+          row[col.key] = value === '' ? '' : (Number.isNaN(Number(value)) ? null : Number(value));
+        } else {
+          row[col.key] = value;
+        }
       }
     });
     row.typical_id = tr.dataset.typicalId || '';
+    row.id = tr.dataset.rowId || row.id || '';
+    this.rowRecords.set(row.id, { ...row });
     return row;
   }
 
   getData() {
     const rows = [];
-    const offset = this.colOffset;
     Array.from(this.tbody.rows).forEach(tr => {
-      const row = {};
-      this.columns.forEach((col,i) => {
-        const el = tr.cells[i + offset].firstChild;
-        if (el) {
-          const val = el.value;
-          if (col.multiple) {
-            if (typeof el.getSelectedValues === 'function') {
-              row[col.key] = el.getSelectedValues();
-            } else {
-              row[col.key] = Array.from(el.selectedOptions || []).map(o => o.value);
-            }
-          } else if (col.type === 'number') {
-            const num = parseFloat(val);
-            if (val === '') {
-              row[col.key] = '';
-            } else {
-              row[col.key] = isNaN(num) ? null : num;
-            }
-          } else {
-            row[col.key] = val;
-          }
-        } else {
-          row[col.key] = '';
-        }
-      });
-      row.typical_id = tr.dataset.typicalId || '';
-      rows.push(row);
+      const row = this.getRowData(tr);
       if (tr.dataset.ref !== undefined) row.ref = tr.dataset.ref;
-      if (tr.dataset.id !== undefined && row.id === undefined) row.id = tr.dataset.id;
+      if (tr.dataset.id !== undefined && !row.id) row.id = tr.dataset.id;
+      this.rowRecords.set(tr.dataset.rowId, { ...row });
+      // Keep an empty inserted row editable in the DOM without persisting it
+      // as a real engineering record during auto-save.
+      if (tr.dataset.generatedPlaceholder !== 'true' && this.hasMeaningfulRecord(row)) rows.push(row);
     });
     return rows;
+  }
+
+  hasMeaningfulRecord(row) {
+    if (!row || typeof row !== 'object') return false;
+    return Object.entries(row).some(([key, value]) => {
+      if (['id', '_rowId', 'row_id'].includes(key)) return false;
+      if (Array.isArray(value)) return value.length > 0;
+      return value !== undefined && value !== null && String(value).trim() !== '';
+    });
+  }
+
+  updateRowRecord(tr, patch = {}) {
+    const id = tr?.dataset?.rowId;
+    if (!id) return;
+    const row = { ...(this.rowRecords.get(id) || {}), ...patch, id };
+    if (Object.prototype.hasOwnProperty.call(patch, 'impedance')) {
+      if (patch.impedance === '' || patch.impedance === null || patch.impedance === undefined) {
+        delete row.impedance_per_1000ft;
+      } else {
+        row.impedance_per_1000ft = patch.impedance;
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'parallel_count')) {
+      if (patch.parallel_count === '' || patch.parallel_count === null || patch.parallel_count === undefined) {
+        delete row.parallel_runs;
+      } else {
+        row.parallel_runs = patch.parallel_count;
+      }
+    }
+    this.rowRecords.set(id, row);
   }
 
   save() {
@@ -1637,6 +1679,7 @@ class TableManager {
 
   setData(data = []) {
     this.tbody.innerHTML = '';
+    this.rowRecords.clear();
     (Array.isArray(data) ? data : []).forEach(row => this.addRow(row));
     this.applyFilters();
     this.updateRowCount();
@@ -1791,18 +1834,18 @@ class TableManager {
   deleteAll() {
     const rows = Array.from(this.tbody.rows);
     if (!rows.length) return false;
-    return this.runDeletionReview('all', rows, () => { this.tbody.innerHTML = ''; });
+    return this.runDeletionReview('all', rows, () => { rows.forEach(row => this.rowRecords.delete(row.dataset.rowId)); this.tbody.innerHTML = ''; });
   }
 
   deleteSelected() {
     const rows = this.getSelectedRows(true);
     if (!rows.length) return false;
-    return this.runDeletionReview('selected', rows, () => rows.forEach(tr => tr.remove()));
+    return this.runDeletionReview('selected', rows, () => rows.forEach(tr => { this.rowRecords.delete(tr.dataset.rowId); tr.remove(); }));
   }
 
   deleteRow(row) {
     if (!row) return false;
-    return this.runDeletionReview('row', [row], () => row.remove());
+    return this.runDeletionReview('row', [row], () => { this.rowRecords.delete(row.dataset.rowId); row.remove(); });
   }
 
   initContextMenu() {
@@ -2000,6 +2043,7 @@ class TableManager {
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const json = XLSX.utils.sheet_to_json(sheet, {defval:''});
       this.tbody.innerHTML='';
+      this.rowRecords.clear();
       json.forEach(obj => {
         const row = {};
         this.columns.forEach(col => row[col.key] = obj[col.label] || '');

@@ -97,9 +97,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('run-cyber-study-btn').addEventListener('click', () => {
     persistAssets();
-    study = runCyberComplianceStudy(readAssets());
-    const studies = dataStore.getStudies();
-    dataStore.setStudies({ ...studies, [STUDY_KEY]: study });
+    const inputs = readAssets();
+    const context = dataStore.captureStudyRunContext(STUDY_KEY, { inputs, options: {} });
+    study = runCyberComplianceStudy(inputs);
+    dataStore.saveStudyResult(STUDY_KEY, study, context);
     renderResults(study);
   });
   document.getElementById('export-cyber-csv-btn').addEventListener('click', exportCsv);

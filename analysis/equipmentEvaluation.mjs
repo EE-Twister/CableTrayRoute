@@ -229,11 +229,18 @@ const ENCLOSURE_TYPES  = new Set(['switchboard', 'panel', 'mcc', 'busway', 'dc_b
  * @param {object[]} cables       - cable schedule entries from getCables()
  * @param {{ shortCircuit?: object, arcFlash?: object }} studies
  * @param {object[]} [deviceCatalog] - protectiveDevices array for rating lookup
+ * @param {{studyAssessments?: object}} [options] - lifecycle assessments for stored study inputs
  * @returns {EvalEntry[]}
  */
-export function evaluateEquipment(components, cables, studies, deviceCatalog = []) {
-  const sc     = studies?.shortCircuit ?? {};
-  const afRaw  = studies?.arcFlash ?? {};
+export function evaluateEquipment(components, cables, studies, deviceCatalog = [], options = {}) {
+  const studyIsEligible = studyKey => {
+    const assessment = options.studyAssessments?.[studyKey];
+    if (!assessment) return true;
+    const validity = assessment.validity?.state || assessment.validity;
+    return assessment.eligible === true && validity !== 'unevaluated' && validity !== 'unknown';
+  };
+  const sc     = studyIsEligible('shortCircuit') ? (studies?.shortCircuit ?? {}) : {};
+  const afRaw  = studyIsEligible('arcFlash') ? (studies?.arcFlash ?? {}) : {};
   const afMap  = Array.isArray(afRaw)
     ? Object.fromEntries(afRaw.map(e => [e.busId ?? e.id, e]))
     : afRaw;

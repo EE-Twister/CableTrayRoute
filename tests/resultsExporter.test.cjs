@@ -14,6 +14,7 @@ function it(name, fn) {
   } catch (err) {
     console.log("  \u2717", name);
     console.error(err);
+    process.exitCode = 1;
   }
 }
 
@@ -82,6 +83,40 @@ function it(name, fn) {
       assert.strictEqual(rows[0].end_y, 2);
       assert.strictEqual(rows[0].end_z, 3);
     });
+
+    it("uses matching route geometry when a derived breakdown length is absent", () => {
+      const rows = buildSegmentRows([{
+        cable: "C3",
+        route_segments: [{ length: 12.5, start: [0, 0, 0], end: [12.5, 0, 0] }],
+        breakdown: [{ tray_id: "T3", start: [0, 0, 0], end: [12.5, 0, 0] }],
+      }]);
+      assert.strictEqual(rows[0].length, 12.5);
+      assert.strictEqual(rows[0].cumulative_length, 12.5);
+    });
+
+    it("derives export rows from route_segments when breakdown is absent", () => {
+      const rows = buildSegmentRows([{
+        cable: "C4",
+        route_segments: [{ type: "tray", tray_id: "TR-1", length: 5, start: [0, 0, 0], end: [3, 4, 0] }],
+      }]);
+      assert.strictEqual(rows.length, 1);
+      assert.strictEqual(rows[0].element_id, "TR-1");
+      assert.strictEqual(rows[0].length, 5);
+      assert.strictEqual(rows[0].start_x, 0);
+      assert.strictEqual(rows[0].end_x, 3);
+      assert.strictEqual(rows[0].end_y, 4);
+    });
+
+    it("keeps legacy breakdown rows while using route geometry for missing lengths", () => {
+      const rows = buildSegmentRows([{
+        cable: "C5",
+        route_segments: [{ type: "conduit", conduit_id: "C-1", length: 7, start: [1, 2, 3], end: [1, 9, 3] }],
+        breakdown: [{ conduit_id: "C-1", type: "conduit", start: [1, 2, 3], end: [1, 9, 3] }],
+      }]);
+      assert.strictEqual(rows[0].element_type, "conduit");
+      assert.strictEqual(rows[0].length, 7);
+      assert.strictEqual(rows[0].start_z, 3);
+    });
   });
 
   describe("buildSummaryRows", () => {
@@ -145,6 +180,56 @@ function it(name, fn) {
       assert.strictEqual(cables[0].total_length, 10);
       assert.ok(cables[0].weight > 0);
       assert.ok(cables[0].cost > 0);
+    });
+
+    it("builds fresh route BOMs from route_segments and cable name aliases", () => {
+      const results = [{
+        cable: "FRESH-1",
+        total_length: 9,
+        route_segments: [
+          { type: "tray", tray_id: "TRAY-1", length: 3 },
+          { type: "field", tray_id: "TRAY-1", length: 2 },
+          { type: "conduit", tray_id: "PARENT-1", conduit_id: "COND-1", length: 4 },
+        ],
+      }];
+      const trayData = [
+        { tray_id: "TRAY-1", tray_type: "Ladder (50 % fill)" },
+        { tray_id: "PARENT-1", tray_type: "Unwanted parent tray" },
+        { conduit_id: "COND-1", type: "RMC" },
+      ];
+      const cableList = [{
+        name: "FRESH-1",
+        conductor_size: "#12 AWG",
+        conductor_material: "Copper",
+        conductors: 3,
+      }];
+
+      const { raceways, cables } = buildBOM(
+        results,
+        trayData,
+        cableList,
+        conductorProps,
+        materialCosts,
+      );
+      assert.deepStrictEqual(
+        raceways.map(row => [row.type, row.total_length]),
+        [["Ladder (50 % fill)", 3], ["RMC", 4]],
+      );
+      assert.ok(!raceways.some(row => /field|unwanted/i.test(row.type)));
+      assert.strictEqual(cables.length, 1);
+      assert.strictEqual(cables[0].total_length, 9);
+    });
+
+    it("excludes field containment even when it carries a raceway id", () => {
+      const { raceways } = buildBOM([
+        {
+          cable: "FIELD-1",
+          route_segments: [
+            { containmentType: "field", tray_id: "TRAY-1", length: 8 },
+          ],
+        },
+      ], [{ tray_id: "TRAY-1", tray_type: "Ladder (50 % fill)" }]);
+      assert.deepStrictEqual(raceways, []);
     });
   });
 })();

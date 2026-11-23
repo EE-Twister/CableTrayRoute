@@ -1,0 +1,475 @@
+{
+  "provenance": {
+    "kind": "synthetic",
+    "note": "Deterministic industrial acceptance fixture; source documents are not implied."
+  },
+  "supply": {
+    "id": "SWGR-01",
+    "voltage": 480,
+    "phases": 3,
+    "capacityKva": 10000,
+    "availableFaultCurrentKA": 20,
+    "x": 0,
+    "y": 0,
+    "z": 0
+  },
+  "equipment": [
+    {
+      "id": "LOAD-01",
+      "tag": "LOAD-01",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-02",
+      "tag": "LOAD-02",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-03",
+      "tag": "LOAD-03",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-04",
+      "tag": "LOAD-04",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-05",
+      "tag": "LOAD-05",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-06",
+      "tag": "LOAD-06",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-07",
+      "tag": "LOAD-07",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-08",
+      "tag": "LOAD-08",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-09",
+      "tag": "LOAD-09",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-10",
+      "tag": "LOAD-10",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-11",
+      "tag": "LOAD-11",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-12",
+      "tag": "LOAD-12",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-13",
+      "tag": "LOAD-13",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-14",
+      "tag": "LOAD-14",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-15",
+      "tag": "LOAD-15",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-16",
+      "tag": "LOAD-16",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-17",
+      "tag": "LOAD-17",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-18",
+      "tag": "LOAD-18",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-19",
+      "tag": "LOAD-19",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-20",
+      "tag": "LOAD-20",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-21",
+      "tag": "LOAD-21",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-22",
+      "tag": "LOAD-22",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-23",
+      "tag": "LOAD-23",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-24",
+      "tag": "LOAD-24",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "id": "LOAD-25",
+      "tag": "LOAD-25",
+      "kw": 10,
+      "voltage": 480,
+      "phases": 3,
+      "powerFactor": 0.9,
+      "x": 250,
+      "y": 0,
+      "z": 0
+    }
+  ],
+  "corridors": {
+    "nodes": [
+      {
+        "id": "S",
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      {
+        "id": "P",
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      {
+        "id": "L",
+        "x": 250,
+        "y": 0,
+        "z": 0
+      }
+    ],
+    "edges": [
+      {
+        "id": "SP",
+        "from": "S",
+        "to": "P",
+        "widthIn": 48,
+        "depthIn": 6
+      },
+      {
+        "id": "PL",
+        "from": "P",
+        "to": "L",
+        "widthIn": 48,
+        "depthIn": 6
+      }
+    ]
+  },
+  "criteria": {
+    "loadFlow": { "minimumVoltagePu": 0.995 },
+    "maxPanelLoadKva": 250,
+    "maxLoadsPerPanel": 1,
+    "maxEndpointAttachmentFt": 90,
+    "voltageDropLimitPct": 3,
+    "conductorMaterial": "cu",
+    "temperatureRatingC": 75,
+    "code": "NEC",
+    "endpointInstallation": {
+      "method": "dedicated-emt",
+      "minimumTradeSize": "1/2",
+      "maximumTradeSize": "4"
+    }
+  },
+  "overrides": {
+    "panelLocations": {
+      "DP-01": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-02": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-03": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-04": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-05": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-06": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-07": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-08": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-09": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-10": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-11": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-12": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-13": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-14": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-15": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-16": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-17": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-18": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-19": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-20": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-21": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-22": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-23": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-24": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      },
+      "DP-25": {
+        "x": 100,
+        "y": 0,
+        "z": 0
+      }
+    }
+  }
+}

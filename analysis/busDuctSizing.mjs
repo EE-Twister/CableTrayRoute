@@ -513,6 +513,27 @@ export function runBusDuctStudy(inputs) {
   const finalDerated   = finalDerating.deratedAmpacity;
   const utilization    = round2((I / finalDerated) * 100);
 
+  // A catalog rating alone does not establish adequacy.  The final installed
+  // ampacity must still meet the load after every requested derating factor.
+  const catalogAdequate = prelimSelected.adequate && finalRating <= STANDARD_BUSWAY_RATINGS[STANDARD_BUSWAY_RATINGS.length - 1];
+  const deratingAdequate = finalDerated >= I;
+  const adequate = catalogAdequate && deratingAdequate;
+  const adequacyStatus = adequate
+    ? 'adequate'
+    : !catalogAdequate
+    ? 'catalog-exceeded'
+    : 'derated-insufficient';
+
+  if (!catalogAdequate) {
+    warnings.push(
+      `Required busway load (${I} A) exceeds the available catalog after derating; no adequate standard busway is available.`
+    );
+  } else if (!deratingAdequate) {
+    warnings.push(
+      `Final derated ampacity (${finalDerated} A) is below the ${I} A load; the selected busway is inadequate under the applied derating.`
+    );
+  }
+
   if (utilization > 100) {
     warnings.push(`Busway utilization ${utilization}% exceeds 100%. Specify a larger rating.`);
   } else if (utilization > 80) {
@@ -532,7 +553,10 @@ export function runBusDuctStudy(inputs) {
 
   const selectedBuswayResult = {
     rating: finalRating,
-    adequate: finalRating <= STANDARD_BUSWAY_RATINGS[STANDARD_BUSWAY_RATINGS.length - 1],
+    adequate,
+    catalogAdequate,
+    deratingAdequate,
+    adequacyStatus,
     material: mat,
     rMohmPerFt: finalLibEntry[mat]?.r ?? finalLibEntry.Al.r,
     xMohmPerFt: finalLibEntry[mat]?.x ?? finalLibEntry.Al.x,

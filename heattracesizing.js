@@ -24,10 +24,24 @@ import {
   buildHeatTraceBOM as buildHeatTraceBOMOffMain,
   buildControllerSchedule as buildControllerScheduleOffMain,
 } from './src/workers/heatTraceClient.js';
-import { getStudies, getStudyApprovals, getTrayHardwareCatalogCustomProducts, setStudies } from './dataStore.mjs';
+import {
+  captureStudyRunContext,
+  getStudies,
+  getStudyApprovals,
+  getTrayHardwareCatalogCustomProducts,
+  saveStudyResult,
+} from './dataStore.mjs';
 import { getProjectState } from './projectStorage.js';
+import { fingerprintStudyValue } from './analysis/studyLifecycle.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
+import {
+  assessHeatTraceCase,
+  buildHeatTraceCaseProvenance,
+} from './src/components/heatTraceLifecycle.mjs';
+import { showAlertModal } from './src/components/modal.js';
+
+const showModal = (title, message, variant = 'info') => showAlertModal(title, message, { variant });
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -232,21 +246,31 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   async function runSubmitCalculation() {
+    const inputs = readInputs();
+    const runUnitSystem = activeUnitSystem;
+    const runInputFingerprint = fingerprintStudyValue(inputs);
+    const runContext = captureStudyRunContext('heatTraceSizing', {
+      inputs,
+      options: { unitSystem: activeUnitSystem },
+    });
     let result;
     try {
-      result = await runHeatTraceSizingAnalysisOffMain(readInputs());
+      result = await runHeatTraceSizingAnalysisOffMain(inputs);
     } catch (err) {
       showModal('Input Error', `<p>${escHtml(err.message)}</p>`, 'error');
       return;
     }
+    if (runUnitSystem !== activeUnitSystem || runInputFingerprint !== fingerprintStudyValue(readInputs())) {
+      showModal('Calculation Discarded', '<p>The heat trace inputs changed while the calculation was running. No result was saved; run the calculation again for the current inputs.</p>', 'warning');
+      return;
+    }
     result.unitSystem = activeUnitSystem;
 
-    const studies = getStudies();
-    studies.heatTraceSizing = {
+    const completedResult = {
       ...result,
       reportExport: buildCurrentHeatTraceReport(result),
     };
-    setStudies(studies);
+    saveStudyResult('heatTraceSizing', completedResult, runContext);
 
     renderResults(result);
     renderSystemOverview(result);
@@ -1830,7 +1854,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function addCurrentCircuitCase() {
-    const result = getLiveAnalysisResult() || currentHeatTraceResult || getStudies().heatTraceSizing || null;
+    // A branch case must be built from the current form values. Reusing an
+    // older saved result after an invalid edit would attach stale quantities
+    // to new inputs and falsely qualify the branch for schedules/BOMs.
+    const result = getLiveAnalysisResult();
     if (!result) {
       showModal('Input Error', '<p>Enter valid heat trace inputs before adding a branch to the schedule.</p>', 'error');
       return;
@@ -1858,7 +1885,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ? circuitCases.map((item, index) => index === existingIndex ? nextCase : item)
       : [...circuitCases, nextCase];
     editingCircuitCaseId = null;
-    persistCircuitCases();
+    persistCircuitCases(new Set([nextCase.id]));
     updateCircuitCaseActionState();
     renderCircuitCaseList();
     refreshReportIfVisible();
@@ -2045,10 +2072,36 @@ document.addEventListener('DOMContentLoaded', () => {
     setControlValue(id, roundForDisplay(nextValue, id));
   }
 
-  function persistCircuitCases() {
-    const studies = getStudies();
-    studies.heatTraceSizingCircuits = circuitCases;
-    setStudies(studies);
+  function persistCircuitCases(updatedCaseIds = new Set()) {
+    const updated = updatedCaseIds instanceof Set ? updatedCaseIds : new Set(updatedCaseIds);
+    if (updated.size) {
+      circuitCases = circuitCases.map(caseItem => {
+        if (!updated.has(caseItem.id)) return caseItem;
+        const caseContext = captureStudyRunContext('heatTraceSizing', {
+          inputs: caseItem.inputs,
+          options: { unitSystem: caseItem.unitSystem || activeUnitSystem },
+        });
+        return { ...caseItem, _provenance: buildHeatTraceCaseProvenance(caseItem, caseContext) };
+      });
+    }
+    const runContext = captureStudyRunContext('heatTraceSizingCircuits', {
+      inputs: circuitCases,
+      options: { source: 'branch-schedule-edit' },
+    });
+    saveStudyResult('heatTraceSizingCircuits', circuitCases, runContext);
+  }
+
+  function getQualifiedCircuitCases() {
+    return circuitCases.map(caseItem => {
+      const currentContext = captureStudyRunContext('heatTraceSizing', {
+        inputs: caseItem.inputs,
+        options: { unitSystem: caseItem.unitSystem || activeUnitSystem },
+      });
+      return {
+        ...caseItem,
+        _lifecycleAssessment: assessHeatTraceCase(caseItem, currentContext),
+      };
+    });
   }
 
   function updateCircuitCaseActionState() {
@@ -2059,7 +2112,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderCircuitCaseList() {
     if (!circuitCaseList) return;
-    const schedule = buildHeatTraceBranchSchedule(circuitCases);
+    const schedule = buildHeatTraceBranchSchedule(getQualifiedCircuitCases());
     if (!schedule.rows.length) {
       circuitCaseList.innerHTML = '<p class="field-hint heattrace-circuit-empty">No heat-trace branches added yet. Configure the current run, then add it here to build a branch schedule.</p>';
       return;
@@ -2162,7 +2215,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return buildHeatTraceReport({
       activeResult: getReportActiveResult(preferredResult),
       activeInputs: readInputs(),
-      circuitCases,
+      circuitCases: getQualifiedCircuitCases(),
       approval: getStudyApprovals().heatTraceSizing || null,
       projectName: getProjectName(),
     });
@@ -2274,7 +2327,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function getNormalizedCircuits() {
     const { buildHeatTraceBranchSchedule: buildSchedule } = { buildHeatTraceBranchSchedule: buildHeatTraceBranchSchedule };
-    const schedule = buildSchedule(circuitCases);
+    const qualified = getQualifiedCircuitCases().filter(caseItem => caseItem._lifecycleAssessment?.eligible === true);
+    const schedule = buildSchedule(qualified);
     return schedule.rows || [];
   }
 

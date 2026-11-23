@@ -1,0 +1,231 @@
+{
+  "schemaVersion": 1,
+  "revision": "2026-09-18.1",
+  "retrievedAt": "2026-09-18",
+  "sources": [
+    {
+      "id": "cableizer-tb880-0-1",
+      "publisher": "Cableizer",
+      "title": "Case study 0-1: Introductory (touching trefoil)",
+      "url": "https://www.cableizer.com/static/pdf/tb880/CIGRE_TB_880_Case_0-1.284dc317ccef.pdf",
+      "documentDate": "2025-05-14",
+      "softwareVersion": "51cac",
+      "pages": "3-5, 8-12",
+      "sha256": "2fd9cf3bf506a93496c18e858a695e6a94ac69daef9d44c47299d20d1330af3c",
+      "evidenceClass": "published_cross_tool_reference"
+    },
+    {
+      "id": "cableizer-tb880-0-1-single-point",
+      "publisher": "Cableizer",
+      "title": "Case study 0-1, section 4.6.3 single-point bonding variant",
+      "url": "https://www.cableizer.com/static/pdf/tb880/CIGRE_TB_880_Case_0-1_4.6.3_ssb.aa98687bf91c.pdf",
+      "documentDate": "2025-05-14",
+      "softwareVersion": "51cac",
+      "pages": "3-5, 8-12",
+      "sha256": "089f7a7b9bb3adfe7fc18bab439d37d5117dbfc77a96328a416fcf89409c0d8c",
+      "evidenceClass": "published_cross_tool_reference"
+    },
+    {
+      "id": "eland-n2xsy-12-20kv",
+      "publisher": "Eland Cables",
+      "title": "N2XSY XLPE PVC - 12/20 (24)kV Cable Technical Datasheet",
+      "url": "https://www.elandcables.com/media/l3lbgopw/n2xsy-xlpe-pvc-12-20-24-kv-cable-datasheet.pdf",
+      "documentDate": null,
+      "pages": "1-2",
+      "sha256": "58a82533b97c11e8c06112a7aa979bdf27a81e44b39f1de3cc9c0f7c97134893",
+      "evidenceClass": "manufacturer_published_data"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "tb880-case0-both-ends",
+      "label": "132 kV, 630 mm² Cu — published both-end bonding losses",
+      "evidenceClass": "published_cross_tool_reference",
+      "sourceIds": ["cableizer-tb880-0-1"],
+      "cable": {
+        "id": "tb880-case0-both-ends",
+        "name": "Cableizer TB 880 Case 0 reference cable",
+        "sizeMm2": 630,
+        "material": "Cu",
+        "maxTempC": 90,
+        "acResistanceOhmPerKm": 0.039522,
+        "acResistanceTempC": 90,
+        "acResistanceFrequencyHz": 50,
+        "dielectricLossWPerM": 0.385,
+        "lambdaSheath": 0.2939,
+        "outerDiameterMm": 75.5,
+        "insulationLayers": [
+          { "name": "Conductor screen", "innerDiameterMm": 30.3, "outerDiameterMm": 33.3, "resistivityKmPerW": 2.5 },
+          { "name": "XLPE insulation", "innerDiameterMm": 33.3, "outerDiameterMm": 64.3, "resistivityKmPerW": 3.5 },
+          { "name": "Insulation screen", "innerDiameterMm": 64.3, "outerDiameterMm": 66.9, "resistivityKmPerW": 2.5 }
+        ],
+        "jacketInnerDiameterMm": 68.5,
+        "jacketResistivityKmPerW": 3.5,
+        "metallicSheath": true,
+        "source": {
+          "id": "cableizer-tb880-0-1",
+          "url": "https://www.cableizer.com/static/pdf/tb880/CIGRE_TB_880_Case_0-1.284dc317ccef.pdf",
+          "pages": "3-5, 8-12",
+          "retrievedAt": "2026-09-18",
+          "voltageBasis": "132 kV line-to-line; supplied dielectric loss per cable",
+          "bondingBasis": "Both-end bonding; published total screen/sheath loss factor"
+        },
+        "assumptions": [
+          "AC resistance, dielectric loss and sheath loss factor are supplied reference inputs, not recalculated electromagnetic losses.",
+          "The metallic sheath between 66.9 and 68.5 mm is thermally neglected."
+        ]
+      },
+      "installation": {
+        "formation": "trefoil-touching",
+        "burialDepthMm": 1000,
+        "spacingMm": null,
+        "soilResistivityKmPerW": 1,
+        "ambientTempC": 20,
+        "frequencyHz": 50
+      },
+      "reference": {
+        "ampacityA": 821.78,
+        "T1KmPerW": 0.4199,
+        "T3BaseKmPerW": 0.0542,
+        "T3EffectiveKmPerW": 0.0867,
+        "T4EffectiveKmPerW": 1.5947,
+        "ampacityToleranceA": 0.05,
+        "thermalToleranceKmPerW": 0.00005,
+        "scope": "Thermal-circuit comparison with published loss inputs. Not independent validation of electrical-loss equations or the complete IEC/CIGRE method.",
+        "toleranceBasis": "Allows rounding of published four-decimal loss factors and thermal resistances; no tuning to the production solver."
+      }
+    },
+    {
+      "id": "tb880-case0-single-point",
+      "label": "132 kV, 630 mm² Cu — published single-point bonding losses",
+      "evidenceClass": "published_cross_tool_reference",
+      "sourceIds": ["cableizer-tb880-0-1-single-point"],
+      "cable": {
+        "id": "tb880-case0-single-point",
+        "name": "Cableizer TB 880 Case 0 single-point reference cable",
+        "sizeMm2": 630,
+        "material": "Cu",
+        "maxTempC": 90,
+        "acResistanceOhmPerKm": 0.039522,
+        "acResistanceTempC": 90,
+        "acResistanceFrequencyHz": 50,
+        "dielectricLossWPerM": 0.385,
+        "lambdaSheath": 0.0777,
+        "outerDiameterMm": 75.5,
+        "insulationLayers": [
+          { "name": "Conductor screen", "innerDiameterMm": 30.3, "outerDiameterMm": 33.3, "resistivityKmPerW": 2.5 },
+          { "name": "XLPE insulation", "innerDiameterMm": 33.3, "outerDiameterMm": 64.3, "resistivityKmPerW": 3.5 },
+          { "name": "Insulation screen", "innerDiameterMm": 64.3, "outerDiameterMm": 66.9, "resistivityKmPerW": 2.5 }
+        ],
+        "jacketInnerDiameterMm": 68.5,
+        "jacketResistivityKmPerW": 3.5,
+        "metallicSheath": true,
+        "source": {
+          "id": "cableizer-tb880-0-1-single-point",
+          "url": "https://www.cableizer.com/static/pdf/tb880/CIGRE_TB_880_Case_0-1_4.6.3_ssb.aa98687bf91c.pdf",
+          "pages": "3-5, 8-12",
+          "retrievedAt": "2026-09-18",
+          "voltageBasis": "132 kV line-to-line; supplied dielectric loss per cable",
+          "bondingBasis": "Single-point bonding: circulating loss zero; eddy-current loss factor 0.0777"
+        },
+        "assumptions": [
+          "Single-point bonding does not imply zero total sheath loss; the published eddy-current contribution is retained.",
+          "AC resistance and all loss inputs remain fixed when installation parameters change.",
+          "The metallic sheath between 66.9 and 68.5 mm is thermally neglected."
+        ]
+      },
+      "installation": {
+        "formation": "trefoil-touching",
+        "burialDepthMm": 1000,
+        "spacingMm": null,
+        "soilResistivityKmPerW": 1,
+        "ambientTempC": 20,
+        "frequencyHz": 50
+      },
+      "reference": {
+        "ampacityA": 886.18,
+        "T1KmPerW": 0.4199,
+        "T3BaseKmPerW": 0.0542,
+        "T3EffectiveKmPerW": 0.0867,
+        "T4EffectiveKmPerW": 1.5947,
+        "ampacityToleranceA": 0.05,
+        "thermalToleranceKmPerW": 0.00005,
+        "scope": "Thermal-circuit comparison with published loss inputs; no full electrical-loss or standards validation.",
+        "toleranceBasis": "Published-input rounding, not empirical calibration."
+      }
+    }
+  ],
+  "manufacturerRecords": [
+    {
+      "id": "eland-a9x20kv1095",
+      "label": "Eland N2XSY 12/20 kV 1 × 95 mm² Cu",
+      "partNumber": "A9X20KV1095",
+      "sourceId": "eland-n2xsy-12-20kv",
+      "sizeMm2": 95,
+      "screenSizeMm2": 16,
+      "insulationThicknessMm": 5.5,
+      "jacketThicknessMm": 1.9,
+      "outerDiameterMm": 29.3,
+      "dcResistance20OhmPerKm": 0.193,
+      "acResistance90OhmPerKm": 0.247,
+      "capacitanceMicrofaradPerKm": 0.227,
+      "dielectricLossWPerKm": 41.03,
+      "publishedBuriedAmpacityA": 337,
+      "publishedAirAmpacityA": 378
+    },
+    {
+      "id": "eland-a9x20kv1240",
+      "label": "Eland N2XSY 12/20 kV 1 × 240 mm² Cu",
+      "partNumber": "A9X20KV1240",
+      "sourceId": "eland-n2xsy-12-20kv",
+      "sizeMm2": 240,
+      "screenSizeMm2": 25,
+      "insulationThicknessMm": 5.5,
+      "jacketThicknessMm": 2.2,
+      "outerDiameterMm": 36.8,
+      "dcResistance20OhmPerKm": 0.0754,
+      "acResistance90OhmPerKm": 0.098,
+      "capacitanceMicrofaradPerKm": 0.321,
+      "dielectricLossWPerKm": 58.08,
+      "publishedBuriedAmpacityA": 553,
+      "publishedAirAmpacityA": 669
+    },
+    {
+      "id": "eland-a9x20kv1630",
+      "label": "Eland N2XSY 12/20 kV 1 × 630 mm² Cu",
+      "partNumber": "A9X20KV1630",
+      "sourceId": "eland-n2xsy-12-20kv",
+      "sizeMm2": 630,
+      "screenSizeMm2": 35,
+      "insulationThicknessMm": 5.5,
+      "jacketThicknessMm": 2.5,
+      "outerDiameterMm": 50.7,
+      "dcResistance20OhmPerKm": 0.0283,
+      "acResistance90OhmPerKm": 0.039,
+      "capacitanceMicrofaradPerKm": 0.498,
+      "dielectricLossWPerKm": 90.08,
+      "publishedBuriedAmpacityA": 866,
+      "publishedAirAmpacityA": 1153
+    }
+  ],
+  "manufacturerRecordConditions": {
+    "sourceId": "eland-n2xsy-12-20kv",
+    "formation": "trefoil",
+    "phaseToEarthVoltageKv": 12,
+    "maxConductorTempC": 90,
+    "frequencyHz": 50,
+    "soilResistivityKmPerW": 1.2,
+    "soilResistivityConversion": "120 °C·cm/W × 0.01 m/cm = 1.2 K·m/W",
+    "burialDepthMm": 500,
+    "groundTempC": 15,
+    "airTempC": 25,
+    "modelReady": false,
+    "missingInputs": [
+      "Conductor and semiconducting-layer diameters",
+      "Layer thermal resistivities",
+      "Screen coverage, bonding configuration and screen loss factor",
+      "Exact formation spacing and burial-depth reference"
+    ],
+    "use": "Source reference only. These records are not complete thermal-model presets, fitted targets, or validated ampacity results."
+  }
+}

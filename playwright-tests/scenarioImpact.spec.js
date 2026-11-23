@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import fs from 'fs/promises';
+import Papa from 'papaparse';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -38,5 +40,14 @@ test('Scenario Comparison turns model deltas into a read-only study rerun checkl
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export Comparison CSV' }).click();
-  expect((await downloadPromise).suggestedFilename()).toBe('scenario-comparison-base-vs-future.csv');
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('scenario-comparison-base-vs-future.csv');
+  const csv = await fs.readFile(await download.path(), 'utf8');
+  const rows = Papa.parse(csv, { header: true, skipEmptyLines: true }).data;
+  expect(rows.length).toBeGreaterThan(0);
+  expect(rows.every(row => Object.values(row).some(value => String(value || '').trim()))).toBe(true);
+  expect(rows.some(row => row.Type === 'project-record' && row.Record === 'LOAD-1')).toBe(true);
+  expect(rows.some(row => row.Type === 'study-result' && row['Domain / Study'] === 'Load Flow')).toBe(true);
+  expect(rows.some(row => row.Type === 'study-impact' && row['Domain / Study'] === 'Load Flow' && row.Status === 'rerun')).toBe(true);
+  expect(rows.some(row => row.Type === 'study-impact' && row['Domain / Study'] === 'Voltage Drop' && row.Status === 'consider')).toBe(true);
 });

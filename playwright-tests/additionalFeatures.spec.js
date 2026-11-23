@@ -11,50 +11,13 @@
  */
 import { test, expect } from '@playwright/test';
 import fs from 'fs/promises';
-import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { startStaticServer } from './staticServer.helper.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
 const pageUrl = file => 'file://' + path.join(root, file);
 const startupScriptsByPage = new WeakMap();
-
-async function startStaticServer() {
-  const server = http.createServer(async (req, res) => {
-    try {
-      const url = new URL(req.url, 'http://127.0.0.1');
-      const requested = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
-      const filePath = path.resolve(root, `.${requested}`);
-      if (!(filePath === root || filePath.startsWith(root + path.sep))) {
-        res.writeHead(403);
-        res.end('Forbidden');
-        return;
-      }
-      const body = await fs.readFile(filePath);
-      const ext = path.extname(filePath).toLowerCase();
-      const type = {
-        '.html': 'text/html; charset=utf-8',
-        '.js': 'text/javascript; charset=utf-8',
-        '.mjs': 'text/javascript; charset=utf-8',
-        '.css': 'text/css; charset=utf-8',
-        '.json': 'application/json; charset=utf-8',
-        '.svg': 'image/svg+xml',
-        '.png': 'image/png',
-      }[ext] || 'application/octet-stream';
-      res.writeHead(200, { 'Content-Type': type });
-      res.end(body);
-    } catch {
-      res.writeHead(404);
-      res.end('Not found');
-    }
-  });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const { port } = server.address();
-  return {
-    url: file => new URL(file, `http://127.0.0.1:${port}/`).toString(),
-    close: () => new Promise(resolve => server.close(resolve)),
-  };
-}
 
 async function dismissOnboarding(page) {
   const modal = page.locator('.component-modal').first();
@@ -131,13 +94,23 @@ test.describe('Wind Load Analysis', () => {
 // Transient Stability Analysis
 // -------------------------------------------------------------------------
 test.describe('Transient Stability Analysis', () => {
+  let staticSite;
+
+  test.beforeAll(async () => {
+    staticSite = await startStaticServer(root);
+  });
+
+  test.afterAll(async () => {
+    await staticSite?.close();
+  });
+
   test.beforeEach(async ({ page }) => {
     const startupScripts = [];
     startupScriptsByPage.set(page, startupScripts);
     page.on('request', request => {
       if (request.resourceType() === 'script') startupScripts.push(new URL(request.url()).pathname);
     });
-    await page.goto(pageUrl('transientstability.html?e2e=1&e2e_reset=1'));
+    await page.goto(staticSite.url('transientstability.html?e2e=1&e2e_reset=1'));
     await page.waitForLoadState('networkidle');
   });
 
@@ -197,13 +170,23 @@ test.describe('Transient Stability Analysis', () => {
 // N-1 Contingency Analysis
 // -------------------------------------------------------------------------
 test.describe('N-1 Contingency Analysis', () => {
+  let staticSite;
+
+  test.beforeAll(async () => {
+    staticSite = await startStaticServer(root);
+  });
+
+  test.afterAll(async () => {
+    await staticSite?.close();
+  });
+
   test.beforeEach(async ({ page }) => {
     const startupScripts = [];
     startupScriptsByPage.set(page, startupScripts);
     page.on('request', request => {
       if (request.resourceType() === 'script') startupScripts.push(new URL(request.url()).pathname);
     });
-    await page.goto(pageUrl('contingency.html?e2e=1&e2e_reset=1'));
+    await page.goto(staticSite.url('contingency.html?e2e=1&e2e_reset=1'));
     await page.waitForLoadState('networkidle');
   });
 
@@ -317,7 +300,7 @@ test.describe('Pull Cards', () => {
   let staticSite;
 
   test.beforeAll(async () => {
-    staticSite = await startStaticServer();
+    staticSite = await startStaticServer(root);
   });
 
   test.afterAll(async () => {
@@ -473,7 +456,7 @@ test.describe('Conduit Bend Schedule 3D layout', () => {
   let staticSite;
 
   test.beforeAll(async () => {
-    staticSite = await startStaticServer();
+    staticSite = await startStaticServer(root);
   });
 
   test.afterAll(async () => {
@@ -516,7 +499,7 @@ test.describe('Spool Sheets', () => {
   let staticSite;
 
   test.beforeAll(async () => {
-    staticSite = await startStaticServer();
+    staticSite = await startStaticServer(root);
   });
 
   test.afterAll(async () => {
@@ -788,7 +771,7 @@ test.describe('Procurement route quantity basis', () => {
   let staticSite;
 
   test.beforeAll(async () => {
-    staticSite = await startStaticServer();
+    staticSite = await startStaticServer(root);
   });
 
   test.afterAll(async () => {

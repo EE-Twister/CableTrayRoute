@@ -111,3 +111,15 @@
 - Improved form control consistency by standardizing control height, spacing, and focus-visible outlines for text/number inputs, selects, and textareas.
 - Improved modal readability and action layout by adding description styling, spacing, responsive stacked actions on small screens, and stronger modal elevation.
 - Improved keyboard accessibility by adding explicit focus-visible styling to modal close controls.
+
+## 2026-09-14
+
+- Preserved imported cable classifications such as `VFD Power` as visible schedule options, including values unknown to the current option catalog.
+- Added stable row identities to table records so sorting, renaming, and unrelated edits retain hidden engineering fields.
+- Added an import preview with record counts and structural validation messages, clearer saved-locally/cloud-synced status labels, and compact cable schedule spacing for shorter desktop viewports.
+
+## 2026-09-17
+
+- Improved contrast for the Home next-action label and link, dark-theme One-Line palette filters, TCC selected-device roles, and Cathodic Protection's sizing-input label in both themes.
+- Added explicit ARIA roles for the Optimal Route cable-class legend and secondary engineering review region.
+- Stabilized accessibility checks with an explicit light theme, reduced motion, page readiness, font readiness, and two render frames before scanning. Cathodic Protection additionally waits for full body opacity so its initial fade cannot distort measured contrast. The separate dark-form workflow still checks the theme switch; production transitions remain enabled.

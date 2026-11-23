@@ -4,7 +4,17 @@ import {
   equalAreaCriterion,
   initialRotorAngle,
 } from './analysis/transientStability.mjs';
-import { getOneLine, getStudies, setStudies } from './dataStore.mjs';
+import {
+  getOneLine,
+  getStudies,
+  getStudyAssessments,
+  getStudyProvenance,
+  getStudySourceSnapshot,
+  getStudyDependencySnapshots,
+  captureStudyRunContext,
+  assertStudyRunContextCurrent,
+  saveStudyResult,
+} from './dataStore.mjs';
 import { buildTransientStabilityProjectInputs } from './analysis/transientStabilityProjectInputs.mjs';
 import { createStudyRunMetadata, isStudyResultStale } from './analysis/studyResultReadiness.mjs';
 import { showAlertModal } from './src/components/modal.js';
@@ -21,6 +31,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsDiv = document.getElementById('results');
   const sourceDiv = document.getElementById('transient-input-source');
   let importedSourceFingerprint = null;
+  let importedSourceStudyKey = null;
+  let importedSourceDependencies = null;
+  let importedExpectedContext = null;
+  let importedContextUnavailable = false;
 
   calcBtn.addEventListener('click', () => runSimulation(false));
   cctBtn.addEventListener('click',  () => runSimulation(true));
@@ -31,8 +45,16 @@ document.addEventListener('DOMContentLoaded', () => {
     restoreInputs(saved.inputs);
     renderResults(saved.inputs, saved.simulation, saved.equalArea, saved.cct, saved.delta0);
     renderPlot(saved.simulation, saved.inputs);
-    const currentFingerprint = buildTransientStabilityProjectInputs(getOneLine(), getStudies()).sourceFingerprint;
+    const currentFingerprint = buildTransientStabilityProjectInputs(getOneLine(), getStudies(), { studyAssessments: getStudyAssessments() }).sourceFingerprint;
     const stale = isStudyResultStale(saved, currentFingerprint);
+    if (saved.runMetadata?.source === 'project-one-line') {
+      importedSourceFingerprint = saved.runMetadata.sourceFingerprint || 'saved-project-source';
+      const provenance = getStudyProvenance()?.transientStability;
+      importedSourceDependencies = provenance?.dependencies || [];
+      importedSourceStudyKey = importedSourceDependencies[0]?.studyKey || 'shortCircuit';
+      importedExpectedContext = provenance || null;
+      importedContextUnavailable = !provenance?.studyKey;
+    }
     sourceDiv.className = stale ? 'result-warn' : 'field-hint';
     sourceDiv.textContent = stale
       ? 'Saved simulation is stale because its project source data changed. Import and rerun.'
@@ -57,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function importProjectInputs() {
-    const imported = buildTransientStabilityProjectInputs(getOneLine(), getStudies());
+    const imported = buildTransientStabilityProjectInputs(getOneLine(), getStudies(), { studyAssessments: getStudyAssessments() });
     if (!imported.inputs) {
       sourceDiv.className = 'result-fail';
       sourceDiv.textContent = imported.warnings.join(' ');
@@ -66,6 +88,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     restoreInputs(imported.inputs);
     importedSourceFingerprint = imported.sourceFingerprint;
+    importedSourceStudyKey = getStudies().shortCircuit ? 'shortCircuit' : null;
+    importedSourceDependencies = importedSourceStudyKey
+      ? getStudyDependencySnapshots('transientStability', getStudies(), getStudyProvenance(), [importedSourceStudyKey])
+      : {};
+    const importedSourceSnapshot = getStudySourceSnapshot('transientStability');
+    importedExpectedContext = captureStudyRunContext('transientStability', {
+      inputs: imported.inputs,
+      options: imported.inputs,
+      projectSnapshot: importedSourceSnapshot,
+      dependencies: importedSourceDependencies,
+    });
+    importedContextUnavailable = false;
     sourceDiv.className = 'result-warn';
     sourceDiv.textContent = `Imported available data for ${imported.inputs.generatorLabel}. ${imported.warnings.join(' ')}`;
   }
@@ -115,6 +149,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const inp = getInputs();
     if (!validate(inp)) return;
 
+    let runContext;
+    try {
+      if (importedContextUnavailable) {
+        throw new Error('Saved project source has no run context. Import the project inputs again before rerunning transient stability.');
+      }
+      if (importedExpectedContext) {
+        // The restored form is only a starting point. Use the original
+        // sidecar snapshots for source/dependency validation so operators can
+        // complete transfer limits or tune other imported values before the
+        // run; the current project and recorded dependency hashes are checked
+        // independently by the lifecycle guard.
+        assertStudyRunContextCurrent(importedExpectedContext);
+      }
+      runContext = captureStudyRunContext('transientStability', {
+        inputs: inp,
+        options: inp,
+        dependencies: importedSourceFingerprint ? (importedSourceDependencies || {}) : [],
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unable to run transient stability.';
+      const sourceChanged = Boolean(importedSourceFingerprint);
+      sourceDiv.className = sourceChanged ? 'result-warn' : 'result-fail';
+      sourceDiv.textContent = sourceChanged
+        ? 'Project source changed or its run context is unavailable. Import project inputs again before rerunning.'
+        : msg;
+      showAlertModal(sourceChanged ? 'Project Source Changed' : 'Simulation Error', sourceDiv.textContent, { variant: 'danger' });
+      return;
+    }
+
     // EAC analytical estimate
     let eac;
     try {
@@ -160,9 +223,12 @@ document.addEventListener('DOMContentLoaded', () => {
         { source: importedSourceFingerprint ? 'project-one-line' : 'manual', persisted: true }
       ),
     };
-    const studies = getStudies();
-    studies.transientStability = result;
-    setStudies(studies);
+    try {
+      saveStudyResult('transientStability', result, runContext);
+    } catch (err) {
+      showAlertModal('Simulation Error', err instanceof Error ? err.message : 'Unable to save transient stability result.', { variant: 'danger' });
+      return;
+    }
 
     renderResults(inp, simResult, eac, cctResult, delta0);
     renderPlot(simResult, inp);

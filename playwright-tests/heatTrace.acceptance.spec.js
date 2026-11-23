@@ -202,4 +202,44 @@ test.describe('heat trace sizing acceptance', () => {
     expect(workbook.rowsBySheet['Line List'].flat()).toContain('HT-A101');
     expect(workbook.rowsBySheet.Assumptions.flat().join(' ')).toMatch(/manufacturer/i);
   });
+
+  test('acceptance HT-07 [heat trace] [AT-HT-07]: invalid edits cannot reuse old branches and async edits are rejected', async ({ page }) => {
+    test.setTimeout(60_000);
+    // Keep the real worker path while making the completion window observable.
+    await page.addInitScript(() => {
+      const nativePostMessage = Worker.prototype.postMessage;
+      Worker.prototype.postMessage = function delayedPostMessage(message, transfer) {
+        window.setTimeout(() => {
+          if (transfer === undefined) nativePostMessage.call(this, message);
+          else nativePostMessage.call(this, message, transfer);
+        }, 250);
+      };
+    });
+    await navigateHeatTrace(page);
+    await fillHeatTraceInputs(page, HEAT_TRACE_FIXTURES.normal);
+    await runHeatTraceAnalysis(page);
+
+    await page.locator('#circuit-case-name').fill('HT-valid');
+    await page.locator('#add-circuit-case').click();
+    await expect(page.locator('#circuit-case-list')).toContainText('1 heat-trace branch');
+
+    // Make the current form invalid; Add must not fall back to the prior run.
+    await page.locator('#maintain-temp-c').fill('20');
+    await page.locator('#circuit-case-name').fill('HT-invalid');
+    await page.locator('#add-circuit-case').click();
+    await expect(page.locator('.component-modal')).toContainText('Input Error');
+    await expect(page.locator('.component-modal')).toContainText('Enter valid heat trace inputs');
+    await page.locator('.component-modal .primary-btn').click();
+    expect((await readStoredStudies(page)).heatTraceSizingCircuits).toHaveLength(1);
+
+    // A real worker completion after an input edit is discarded and does not
+    // overwrite the last valid result.
+    await fillHeatTraceInputs(page, HEAT_TRACE_FIXTURES.normal);
+    const before = JSON.stringify(await readStoredHeatTraceResult(page));
+    await page.getByRole('button', { name: 'Run Analysis' }).click();
+    await page.locator('#line-length-ft').fill('175');
+    await expect(page.locator('.component-modal')).toContainText('Calculation Discarded');
+    await page.locator('.component-modal .primary-btn').click();
+    expect(JSON.stringify(await readStoredHeatTraceResult(page))).toBe(before);
+  });
 });

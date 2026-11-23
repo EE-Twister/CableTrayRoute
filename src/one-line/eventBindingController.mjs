@@ -1,3 +1,4 @@
+import { preliminaryMotorNotice } from '../design-synthesis/preliminaryProjectNotice.mjs';
 export function createEventStateAdapter(descriptors) {
   const state = {};
   Object.defineProperties(state, Object.fromEntries(Object.entries(descriptors).map(([name, descriptor]) => [
@@ -11,7 +12,6 @@ export function createEventStateAdapter(descriptors) {
   ])));
   return state;
 }
-
 export async function initializeOneLineEvents(context, state) {
   const { documentRef: document } = context;
   const {
@@ -359,12 +359,11 @@ export async function initializeOneLineEvents(context, state) {
 
   const prefixBtn = document.getElementById('prefix-settings-btn');
   if (prefixBtn) prefixBtn.addEventListener('click', editPrefixes);
-
   const defaultsBtn = document.getElementById('update-defaults-btn');
   if (defaultsBtn) defaultsBtn.addEventListener('click', editManufacturerDefaults);
 
   const exportReportsBtn = document.getElementById('export-reports-btn');
-  if (exportReportsBtn) exportReportsBtn.addEventListener('click', () => exportAllReports());
+  if (exportReportsBtn) exportReportsBtn.addEventListener('click', () => { if (preliminaryMotorNotice({ oneLine: { sheets: state.sheets } })) showToast('Report export blocked: generated motor protection is unresolved. Use Design Synthesis preliminary exports for review.'); else exportAllReports(); });
 
   scheduleNoncriticalWork(() => { buildPalette(); loadTemplates(); renderTemplates(); setupLibraryTools(); });
   const customComponentStorageSuffix = `:${customComponentStorageKey}`;
@@ -515,7 +514,6 @@ export async function initializeOneLineEvents(context, state) {
   if (bgClearBtn) {
     bgClearBtn.addEventListener('click', clearBackground);
   }
-
   document.getElementById('align-left-btn').addEventListener('click', () => alignSelection('left'));
   document.getElementById('align-right-btn').addEventListener('click', () => alignSelection('right'));
   document.getElementById('align-top-btn').addEventListener('click', () => alignSelection('top'));
@@ -537,18 +535,20 @@ export async function initializeOneLineEvents(context, state) {
       if (!format) return;
       exportMenu.classList.remove('show');
       exportBtn.setAttribute('aria-expanded', 'false');
+      const reviewNotice = preliminaryMotorNotice({ oneLine: { sheets: state.sheets } });
       if (format === 'pdf') {
         exportPDF({
           svgEl: document.getElementById('diagram'),
           sheets: state.sheets,
           loadSheet,
           serializeDiagram,
-          activeSheet: state.activeSheet
+          activeSheet: state.activeSheet,
+          reviewNotice
         });
       } else if (format === 'dxf') {
-        exportDXF(state.sheets[state.activeSheet]?.components || []);
+        exportDXF(state.sheets[state.activeSheet]?.components || [], { reviewNotice });
       } else if (format === 'dwg') {
-        exportDWG(state.sheets[state.activeSheet]?.components || []);
+        exportDWG(state.sheets[state.activeSheet]?.components || [], { reviewNotice });
       }
     });
   }

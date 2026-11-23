@@ -150,22 +150,42 @@ function topLevelNumber(source, keys) {
   return null;
 }
 
-export function buildBatteryProjectInputs({ loads = [], studies = {}, designBasis = {}, projectMeta = {} } = {}) {
+function studyIsEligible(studyAssessments, studyKey, allowUnassessedStudies = false) {
+  const assessment = studyAssessments?.[studyKey];
+  if (!assessment) return allowUnassessedStudies;
+  const validity = assessment.validity?.state || assessment.validity;
+  return assessment.eligible === true && assessment.freshness === 'current'
+    && validity === 'evaluated';
+}
+
+export function buildBatteryProjectInputs({ loads = [], studies = {}, studyAssessments = {}, designBasis = {}, projectMeta = {}, allowUnassessedStudies = false } = {}) {
   const linkedLoads = projectLoadRows(loads);
   const averageLoadKw = linkedLoads.reduce((sum, load) => sum + load.kw * load.demandFactor, 0);
-  const motorStart = studies && typeof studies === 'object' ? studies.motorStart || {} : {};
+  const motorStart = studyIsEligible(studyAssessments, 'motorStart', allowUnassessedStudies)
+    && studies && typeof studies === 'object' ? studies.motorStart || {} : {};
   const peakFromStudy = topLevelNumber(motorStart, ['peakLoadKw', 'startingKw', 'maximumKw', 'peakKw']);
   const sizingDefaults = designBasis?.sizingDefaults || {};
   const meta = normalizeProjectMeta(projectMeta);
+  const rawMeta = projectMeta && typeof projectMeta === 'object' ? projectMeta : {};
+  const rawAmbient = rawMeta.batteryAmbientTempC ?? rawMeta.minAmbientTempC ?? rawMeta.ambientTempC;
+  const hasAmbient = rawAmbient !== undefined && rawAmbient !== null && String(rawAmbient).trim() !== '';
+  const hasRuntime = rawMeta.batteryRuntimeHours !== undefined
+    && rawMeta.batteryRuntimeHours !== null
+    && String(rawMeta.batteryRuntimeHours).trim() !== '';
+  const hasPowerFactor = sizingDefaults.defaultPowerFactor !== undefined
+    && sizingDefaults.defaultPowerFactor !== null
+    && String(sizingDefaults.defaultPowerFactor).trim() !== '';
   const inputs = {
     systemLabel: meta.site || meta.name,
     averageLoadKw: linkedLoads.length ? Number(averageLoadKw.toFixed(3)) : null,
     peakLoadKw: linkedLoads.length || peakFromStudy
       ? Number(Math.max(averageLoadKw, peakFromStudy || 0).toFixed(3))
       : null,
-    runtimeHours: meta.batteryRuntimeHours,
-    ambientTempC: finite(projectMeta?.batteryAmbientTempC, finite(projectMeta?.minAmbientTempC, finite(projectMeta?.ambientTempC, 25))),
-    upsPowerFactor: Math.max(0.5, Math.min(1, finite(sizingDefaults.defaultPowerFactor, 0.9)))
+    runtimeHours: hasRuntime ? Math.max(0.01, finite(rawMeta.batteryRuntimeHours, 2)) : null,
+    ambientTempC: hasAmbient ? finite(rawAmbient, 25) : null,
+    upsPowerFactor: hasPowerFactor
+      ? Math.max(0.5, Math.min(1, finite(sizingDefaults.defaultPowerFactor, 0.9)))
+      : null
   };
   return {
     inputs,
@@ -181,9 +201,9 @@ export function buildBatteryProjectInputs({ loads = [], studies = {}, designBasi
   };
 }
 
-export function buildGeneratorProjectInputs({ loads = [], equipment = [], studies = {}, projectMeta = {} } = {}) {
+export function buildGeneratorProjectInputs({ loads = [], equipment = [], studies = {}, studyAssessments = {}, projectMeta = {}, allowUnassessedStudies = false } = {}) {
   const linkedLoads = projectLoadRows(loads);
-  const motorStart = studies && typeof studies === 'object' ? studies.motorStart || {} : {};
+  const motorStart = studyIsEligible(studyAssessments, 'motorStart', allowUnassessedStudies) && studies && typeof studies === 'object' ? studies.motorStart || {} : {};
   const studiedMotor = motorStart.controllingMotor?.hp > 0 ? {
     id: text(motorStart.controllingMotor.id, 'motor-start'),
     label: text(motorStart.controllingMotor.label, 'Motor Start controlling motor'),
@@ -440,8 +460,12 @@ function voltageV(value) {
   return source.includes('kv') ? parsed * 1000 : parsed;
 }
 
-function scopedFaultCurrent(studies = {}, identities = []) {
-  const shortCircuit = studies?.shortCircuit || studies?.iec60909 || {};
+function scopedFaultCurrent(studies = {}, identities = [], studyAssessments = {}, allowUnassessedStudies = false) {
+  const selectedKey = studyIsEligible(studyAssessments, 'shortCircuit', allowUnassessedStudies)
+    ? 'shortCircuit'
+    : studyIsEligible(studyAssessments, 'iec60909', allowUnassessedStudies) ? 'iec60909' : '';
+  if (!selectedKey) return null;
+  const shortCircuit = studies?.[selectedKey] || {};
   const direct = topLevelNumber(shortCircuit, [
     'availableFaultKa', 'availableFaultKA', 'faultCurrentKA', 'faultKa', 'ikssKA', 'ikKA'
   ]);
@@ -467,7 +491,7 @@ function scopedFaultCurrent(studies = {}, identities = []) {
     }
     return null;
   };
-  return visit(shortCircuit) || 0;
+  return visit(shortCircuit) || null;
 }
 
 export function buildProjectScopeOptions({ equipment = [], loads = [], cables = [] } = {}, kinds = ['load', 'circuit', 'equipment']) {
@@ -500,7 +524,7 @@ export function buildProjectScopeOptions({ equipment = [], loads = [], cables = 
   return options.sort((a, b) => (b.powerKw || 0) - (a.powerKw || 0) || a.label.localeCompare(b.label));
 }
 
-export function resolveProjectScope(scopeValue, { equipment = [], loads = [], cables = [], studies = {} } = {}) {
+export function resolveProjectScope(scopeValue, { equipment = [], loads = [], cables = [], studies = {}, studyAssessments = {}, allowUnassessedStudies = false } = {}) {
   const normalized = normalizeProjectEntities({ equipment, loads, cables });
   const [kind, id] = String(scopeValue || '').split(':');
   let load = null;
@@ -543,12 +567,13 @@ export function resolveProjectScope(scopeValue, { equipment = [], loads = [], ca
     loadKw: kw,
     currentA: Number(current.toFixed(2)),
     lengthFt: finite(cable?.length_ft || cable?.length, 0),
-    faultCurrentKA: scopedFaultCurrent(studies, identities),
+    faultCurrentKA: scopedFaultCurrent(studies, identities, studyAssessments, allowUnassessedStudies),
   };
 }
 
 export function buildBusDuctProjectInputs(scope, projectMeta = {}) {
   const meta = normalizeProjectMeta(projectMeta);
+  const faultCurrentLinked = Number.isFinite(scope.faultCurrentKA) && scope.faultCurrentKA > 0;
   return {
     inputs: {
       label: scope.label,
@@ -566,7 +591,10 @@ export function buildBusDuctProjectInputs(scope, projectMeta = {}) {
       currentA: { sourcePath: `${scope.scopeValue}.load`, sourceLabel: 'Load List / circuit' },
       lengthFt: { sourcePath: `${scope.scopeValue}.length`, sourceLabel: 'Cable Schedule' },
       ambientC: { sourcePath: 'projectMeta.maxAmbientTempC', sourceLabel: 'Maximum ambient' },
-      faultCurrentKA: { sourcePath: 'studyResults.shortCircuit', sourceLabel: 'Short Circuit' },
+      faultCurrentKA: {
+        sourcePath: faultCurrentLinked ? 'studyResults.shortCircuit' : 'manual.faultCurrentKA',
+        sourceLabel: faultCurrentLinked ? 'Short Circuit' : 'Manual fault current',
+      },
     },
     missing: [
       ...(!scope.voltageV ? ['Voltage is missing.'] : []),
@@ -742,7 +770,8 @@ export function buildCableThermalProjectInputs(scope, project = {}) {
 }
 
 export function buildBessHazardProjectInputs(project = {}) {
-  const battery = project.studies?.batterySizing || {};
+  const battery = studyIsEligible(project.studyAssessments, 'batterySizing', project.allowUnassessedStudies)
+    ? (project.studies?.batterySizing || {}) : {};
   const equipment = (Array.isArray(project.equipment) ? project.equipment : []).find(item => (
     /battery|bess|ups|energy storage/i.test([item.category, item.subCategory, item.description, item.tag].filter(Boolean).join(' '))
   )) || {};
@@ -753,6 +782,9 @@ export function buildBessHazardProjectInputs(project = {}) {
         : rawChemistry.includes('nmc') ? 'NMC'
           : 'LFP';
   const rack = battery.rackLayoutInputs || {};
+  const cellsPerModule = finite(equipment.cellsPerModule, rack.cellsPerModule, Number.NaN);
+  const modulesPerRack = finite(equipment.modulesPerRack, rack.modulesPerRack, Number.NaN);
+  const hasBatterySource = Object.keys(battery).length > 0 || Boolean(equipment.id);
   const ratedKwh = finite(
     equipment.ratedKwh || equipment.capacityKwh || equipment.energyKwh
       || battery.selectedBankKwh || battery.selectedKwh || battery.kwhSelected,
@@ -761,9 +793,9 @@ export function buildBessHazardProjectInputs(project = {}) {
   return {
     inputs: {
       ratedKwh,
-      chemistry,
-      cellsPerModule: Math.max(1, Math.round(finite(equipment.cellsPerModule || rack.cellsPerModule, 16))),
-      modulesPerRack: Math.max(1, Math.round(finite(equipment.modulesPerRack || rack.modulesPerRack, 8))),
+      chemistry: hasBatterySource ? chemistry : null,
+      cellsPerModule: hasBatterySource && Number.isFinite(cellsPerModule) ? Math.max(1, Math.round(cellsPerModule)) : null,
+      modulesPerRack: hasBatterySource && Number.isFinite(modulesPerRack) ? Math.max(1, Math.round(modulesPerRack)) : null,
       ambientC: normalizeProjectMeta(project.projectMeta).maxAmbientTempC,
     },
     bindings: {

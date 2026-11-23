@@ -2,6 +2,7 @@ import { toCSV } from './reporting.mjs';
 import { generateArcFlashLabel } from './labels.mjs';
 import { buildArcFlashLabelData, getArcFlashLabelBaseName, isArcFlashLabelReady } from './arcFlashReport.mjs';
 import * as dataStore from '../dataStore.mjs';
+import { decorateStudyRows, studyMetadataColumns } from '../analysis/studyResultContext.mjs';
 
 let jsPDF = null;
 const loadScriptPromises = new Map();
@@ -51,6 +52,11 @@ async function ensureHandlebars() {
 }
 
 let branding = { title: 'Project Report', logo: null, company: '' };
+const printableCell = value => {
+  if (value == null) return '';
+  if (typeof value !== 'object') return String(value);
+  try { return JSON.stringify(value); } catch (_) { return String(value); }
+};
 // Default template builder
 let pdfTemplate = (ctx) => {
   const lines = [];
@@ -58,7 +64,7 @@ let pdfTemplate = (ctx) => {
   ctx.sections.forEach(sec => {
     lines.push(sec.title);
     sec.rows.forEach(row => {
-      const line = sec.headers.map(h => row[h] ?? '').join(', ');
+      const line = sec.headers.map(h => printableCell(row[h])).join(', ');
       lines.push(line);
     });
     lines.push('');
@@ -117,9 +123,38 @@ function buildSections(data = {}) {
         });
       }
       if (Array.isArray(arr) && arr.length) {
-        const headers = Object.keys(arr[0]);
-        sections.push({ title: `${name} Analysis`, headers, rows: arr });
+        const assessment = data.studyAssessments?.[name];
+        const reportRows = assessment
+          ? decorateStudyRows(arr, assessment)
+          : arr;
+        const headers = [...new Set([...Object.keys(reportRows[0]), ...(assessment ? studyMetadataColumns() : [])])];
+        sections.push({ title: `${name} Analysis`, headers, rows: reportRows });
       }
+    });
+  }
+  if (data.studyAssessments && Object.keys(data.studyAssessments).length) {
+    const rows = Object.values(data.studyAssessments).map(assessment => ({
+      studyKey: assessment.studyKey,
+      present: assessment.present,
+      validity: assessment.validity?.state || assessment.validity || 'unevaluated',
+      freshness: assessment.freshness || 'unknown',
+      eligible: assessment.eligible === true ? 'eligible' : 'withheld',
+      resultStatus: assessment.label || 'Freshness unknown',
+      calculationVersion: assessment.calculationVersion || null,
+      calculatedAt: assessment.runAt || null,
+      source: assessment.source || null,
+      inputSources: assessment.inputSources || {},
+      assumptions: assessment.assumptions || [],
+      limitations: assessment.limitations || [],
+      units: assessment.units || {},
+      warnings: assessment.warnings || [],
+      studyOptions: assessment.studyOptions || {},
+      provenance: assessment.provenance || {},
+    }));
+    sections.push({
+      title: 'Study Result Lifecycle Index',
+      headers: Object.keys(rows[0] || {}),
+      rows,
     });
   }
   if (Array.isArray(data.tcc) && data.tcc.length) {
@@ -267,7 +302,9 @@ export function buildReportZip(data = {}) {
   const usedLabelNames = new Set();
   if (data.arcFlash) {
     Object.entries(data.arcFlash)
-      .filter(([key, value]) => key && typeof value === 'object' && value !== null && !key.startsWith('_') && isArcFlashLabelReady(value))
+      .filter(([key, value]) => key && typeof value === 'object' && value !== null && !key.startsWith('_')
+        && data.studyAssessments?.arcFlash?.eligible !== false
+        && isArcFlashLabelReady(value))
       .forEach(([id, info]) => {
         const svg = generateArcFlashLabel(buildArcFlashLabelData(id, info));
         const baseName = getArcFlashLabelBaseName(id, info);
@@ -294,6 +331,7 @@ export async function exportAllReports() {
     panels: dataStore.getPanels ? dataStore.getPanels() : [],
     cables: dataStore.getCables(),
     analyses: dataStore.getStudies(),
+    studyAssessments: dataStore.getStudyAssessments(),
     arcFlash: (dataStore.getStudies().arcFlash) || {}
   };
   const zip = buildReportZip(data);

@@ -21,6 +21,8 @@ data.setCables([{ tag: 'ORIGINAL', conductor_size: '#10 AWG', length: 100 }]);
 data.setEquipment([{ id: 'EQ-ORIGINAL', tag: 'EQ-ORIGINAL' }]);
 data.setOneLine({ activeSheet: 0, sheets: [{ name: 'Original', components: [], connections: [] }] });
 data.setStudies({ voltageDrop: { marker: 'original-study' } });
+globalThis.localStorage.setItem('units', 'imperial');
+globalThis.sessionStorage.setItem('units', 'metric');
 data.cloneScenario('future');
 data.switchScenario('future');
 data.setCables([{ tag: 'FUTURE', conductor_size: '#8 AWG', length: 150 }]);
@@ -65,6 +67,8 @@ assert.equal(storage.readAppSetting('review-unrelated-preference'), 'keep-latest
 assert.equal(storage.getAuthContextState().user, 'new-account');
 assert.equal(storage.getAuthContextState().csrfToken, 'new-csrf');
 assert.equal(globalThis.localStorage.getItem('imported-scenario:cableSchedule'), null);
+assert.equal(globalThis.localStorage.getItem('units'), 'imperial');
+assert.equal(globalThis.sessionStorage.getItem('units'), 'metric');
 
 storage.writeProjectSessionValue('ctr-review-token', { version: '1' });
 assert.deepEqual(storage.readProjectSessionValue('ctr-review-token'), { version: '1' });

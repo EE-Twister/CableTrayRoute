@@ -40,7 +40,7 @@ function add(a, b) {
 }
 
 function mag(z) {
-  return Math.sqrt((z.r || 0) ** 2 + (z.x || 0) ** 2) || 1e-6;
+  return Math.sqrt((z.r || 0) ** 2 + (z.x || 0) ** 2);
 }
 
 function mult(a, b) {
@@ -48,12 +48,14 @@ function mult(a, b) {
 }
 
 function div(a, b) {
-  const denom = (b.r || 0) ** 2 + (b.x || 0) ** 2 || 1e-6;
+  const denom = (b.r || 0) ** 2 + (b.x || 0) ** 2;
+  if (!Number.isFinite(denom) || denom <= 1e-24) return null;
   return { r: (a.r * b.r + a.x * b.x) / denom, x: (a.x * b.r - a.r * b.x) / denom };
 }
 
 function parallel(a, b) {
-  return div(mult(a, b), add(a, b));
+  const product = mult(a, b);
+  return div(product, add(a, b));
 }
 
 function toImpedance(value) {
@@ -81,10 +83,14 @@ function toImpedance(value) {
  * @returns {number} c factor
  */
 export function cFactor(kV, mode = 'max', lvTolerancePct = 10) {
-  if (kV <= 1.0) {
+  const nominalKV = Number(kV);
+  if (!Number.isFinite(nominalKV) || nominalKV <= 0) return null;
+  const tolerancePct = Number(lvTolerancePct);
+  if (!Number.isFinite(tolerancePct) || tolerancePct < 0) return null;
+  if (nominalKV <= 1.0) {
     // Low voltage (100 V to 1000 V)
     if (mode === 'min') return 0.95;
-    return lvTolerancePct >= 6 ? 1.10 : 1.05;
+    return tolerancePct >= 6 ? 1.10 : 1.05;
   }
   // Medium voltage (>1 kV to ≤35 kV) and high voltage (>35 kV)
   return mode === 'min' ? 1.00 : 1.10;
@@ -105,8 +111,10 @@ export function cFactor(kV, mode = 'max', lvTolerancePct = 10) {
  * @returns {number} κ factor
  */
 export function kappaIEC(xr) {
+  const ratio = Number(xr);
+  if (!Number.isFinite(ratio) || ratio <= 0) return null;
   // Guard against zero / very small X/R (purely resistive — κ → 1.02)
-  const safeXR = Math.max(xr, 0.01);
+  const safeXR = Math.max(ratio, 0.01);
   return 1.02 + 0.98 * Math.exp(-3 / safeXR);
 }
 
@@ -115,12 +123,13 @@ export function kappaIEC(xr) {
 // ---------------------------------------------------------------------------
 
 /**
- * Calculates the thermal factor m for DC component heating (IEC 60909-0 Fig. 22).
+ * Calculates the thermal factor m for DC component heating using the current
+ * implementation's exponential time-constant screening approximation.
  *
- * Uses the analytical approximation:
- *   m = (1 / (2 × f × Tk × ln(κ²))) × (e^(2 × f × Tk × ln(κ²)) − 1)
- *
- * This is exact for the IEC exponential DC decay model.
+ * The stable form is m = (1 - exp(-2Tk/τ)) / (2Tk/τ), with τ derived from
+ * the supplied κ/X/R relationship. This documents the numerical model used
+ * by the application; it is not a claim that the approximation replaces the
+ * governing IEC thermal-equivalent calculation for every source topology.
  *
  * @param {number} kappa - Peak factor κ
  * @param {number} faultDurationS - Fault duration Tk in seconds (default 1.0 s)
@@ -128,21 +137,28 @@ export function kappaIEC(xr) {
  * @returns {number} m factor (≥ 0)
  */
 export function thermalMFactor(kappa, faultDurationS = 1.0, freqHz = 50) {
-  const Tk = Math.max(faultDurationS, 0.02);
+  const k = Number(kappa);
+  const duration = Number(faultDurationS);
+  const frequency = Number(freqHz);
+  if (!Number.isFinite(k) || k < 1.02 || k > 2.0
+    || !Number.isFinite(duration) || duration <= 0
+    || !Number.isFinite(frequency) || frequency <= 0) return null;
+  const Tk = duration;
   // DC component decrement: lnKsq = ln(κ²) but derived from κ = 1.02 + 0.98×e^(−3/xr)
   // Equivalent: the DC time constant τ = X / (ω × R) = X/R / (2πf)
   // From κ: κ − 1.02 = 0.98 × e^(−3/xr) → 3/xr = −ln((κ−1.02)/0.98)
   // xr = −3 / ln((κ−1.02)/0.98)
-  const inner = (kappa - 1.02) / 0.98;
-  if (inner <= 0 || inner >= 1) {
-    // κ at boundary — m approaches 0
-    return 0;
-  }
+  const inner = (k - 1.02) / 0.98;
+  if (inner <= 0) return 0;
+  if (inner >= 1) return 1;
   const xr = -3 / Math.log(inner);
-  const tau = xr / (2 * Math.PI * freqHz); // DC time constant in seconds
+  const tau = xr / (2 * Math.PI * frequency); // DC time constant in seconds
   const exponent = 2 * Tk / tau;
-  if (exponent < 1e-9) return 0;
-  return (tau / (2 * Tk)) * (Math.exp(exponent) - 1) * Math.exp(-exponent);
+  if (!Number.isFinite(exponent) || exponent < 0) return null;
+  // (1 - exp(-x)) / x, evaluated with expm1 to avoid cancellation as x→0.
+  if (exponent < 1e-12) return 1;
+  const m = -Math.expm1(-exponent) / exponent;
+  return Number.isFinite(m) ? Math.min(Math.max(m, 0), 1) : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -330,6 +346,111 @@ function xrFromImpedance(z) {
   return Math.max(x / r, 0.01);
 }
 
+function scaleComplex(z, scalar) {
+  return { r: z.r * scalar, x: z.x * scalar };
+}
+
+function sequenceImpedance(value, name) {
+  if (!value || typeof value !== 'object') {
+    return { value: null, error: `${name} is required.` };
+  }
+  const coordinate = coordinateValue => {
+    if (coordinateValue === null || coordinateValue === undefined
+      || coordinateValue === '' || typeof coordinateValue === 'boolean') return null;
+    const number = Number(coordinateValue);
+    return Number.isFinite(number) ? number : null;
+  };
+  const r = coordinate(value.r);
+  const x = coordinate(value.x);
+  if (r === null || x === null) {
+    return { value: null, error: `${name} must contain finite resistance and reactance.` };
+  }
+  if (Math.hypot(r, x) <= 1e-12) {
+    return { value: null, error: `${name} must have a finite, non-zero impedance.` };
+  }
+  return { value: { r, x }, error: null };
+}
+
+function roundFinite(value, digits = 2) {
+  return Number.isFinite(value) ? Number(value.toFixed(digits)) : null;
+}
+
+function invalidIECResult(requiredInputs, warnings = [], provenance = {}) {
+  const uniqueInputs = [...new Set(requiredInputs.filter(Boolean))];
+  const uniqueWarnings = [...new Set(warnings.filter(Boolean))];
+  const modelLimits = {
+    thermalEquivalent: 'Screening-only simplified m+n approximation; verify against the adopted study method before issue.',
+    nearGeneratorThermal: 'Near-generator thermal decay is not a validated time-domain integration.'
+  };
+  return {
+    validity: 'unevaluated',
+    calculationStatus: 'incomplete',
+    requiredInputs: uniqueInputs,
+    warnings: uniqueWarnings,
+    provenance: { ...provenance, standard: 'IEC 60909-0:2016', method: 'equivalent-voltage-source' },
+    modelLimits,
+    cFactor: null,
+    kappa: null,
+    mu: null,
+    nearToGenerator: false,
+    generatorRatioIkgIrg: null,
+    threePhaseKA: null,
+    lineToLineKA: null,
+    lineToGroundKA: null,
+    doubleLineGroundKA: null,
+    doubleLineGroundPhaseBKA: null,
+    doubleLineGroundPhaseCKA: null,
+    doubleLineGroundEarthKA: null,
+    ip: null,
+    Ib: null,
+    Ith: null,
+    asymKA: null
+  };
+}
+
+function phaseCurrentsForDoubleLineGround(i0, i1, i2) {
+  const a = { r: -0.5, x: Math.sqrt(3) / 2 };
+  const a2 = { r: -0.5, x: -Math.sqrt(3) / 2 };
+  return {
+    a: add(add(i0, i1), i2),
+    b: add(add(i0, mult(a2, i1)), mult(a, i2)),
+    c: add(add(i0, mult(a, i1)), mult(a2, i2))
+  };
+}
+
+/**
+ * Calculates the physical B/C phase currents and earth residual for a bolted
+ * B-C-to-earth fault. `phaseVoltage` is the positive-sequence Thevenin source
+ * voltage in kV. The returned values are RMS magnitudes in kA.
+ */
+export function computeDoubleLineGroundCurrents({ phaseVoltage, z1, z2, z0 } = {}) {
+  const voltage = Number(phaseVoltage);
+  const z1Result = sequenceImpedance(z1, 'Positive-sequence impedance z1');
+  const z2Result = sequenceImpedance(z2, 'Negative-sequence impedance z2');
+  const z0Result = sequenceImpedance(z0, 'Zero-sequence impedance z0');
+  if (!Number.isFinite(voltage) || voltage <= 0 || z1Result.error || z2Result.error || z0Result.error) return null;
+  const z1n = z1Result.value;
+  const z2n = z2Result.value;
+  const z0n = z0Result.value;
+  const z2z0 = add(z2n, z0n);
+  const z2z0Parallel = parallel(z2n, z0n);
+  const i1 = z2z0Parallel ? div({ r: voltage, x: 0 }, add(z1n, z2z0Parallel)) : null;
+  const i2 = i1 ? div(scaleComplex(mult(i1, z0n), -1), z2z0) : null;
+  const i0 = i1 ? div(scaleComplex(mult(i1, z2n), -1), z2z0) : null;
+  if (!i1 || !i2 || !i0) return null;
+  const phases = phaseCurrentsForDoubleLineGround(i0, i1, i2);
+  const phaseBKA = mag(phases.b);
+  const phaseCKA = mag(phases.c);
+  const earthKA = 3 * mag(i0);
+  if (![phaseBKA, phaseCKA, earthKA].every(Number.isFinite)) return null;
+  return {
+    phaseBKA,
+    phaseCKA,
+    earthKA,
+    compatibilityKA: Math.max(phaseBKA, phaseCKA)
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Main IEC 60909-0:2016 engine
 // ---------------------------------------------------------------------------
@@ -367,39 +488,72 @@ export function computeIEC60909Bus(params) {
     xrOverride = null,
     generatorContributionKA = null,
     generatorRatedCurrentKA = null,
-    minTimeDelayS = 0.05
-  } = params;
+    minTimeDelayS = 0.05,
+    provenance = {}
+  } = params || {};
 
-  const c = cFactor(prefaultKV, cMode, lvTolerancePct);
+  const requiredInputs = [];
+  const impedances = [
+    sequenceImpedance(z1, 'Positive-sequence impedance z1'),
+    sequenceImpedance(z2, 'Negative-sequence impedance z2'),
+    sequenceImpedance(z0, 'Zero-sequence impedance z0')
+  ];
+  impedances.forEach(item => { if (item.error) requiredInputs.push(item.error); });
+  const nominalKV = Number(prefaultKV);
+  if (!Number.isFinite(nominalKV) || nominalKV <= 0) {
+    requiredInputs.push('prefaultKV must be a finite, positive line-to-line voltage.');
+  }
+  const c = cFactor(nominalKV, cMode, lvTolerancePct);
+  if (requiredInputs.length || c === null) {
+    if (c === null && !requiredInputs.some(input => input.includes('voltage'))) {
+      requiredInputs.push('Voltage factor inputs must be finite and valid.');
+    }
+    return invalidIECResult(requiredInputs, [], provenance);
+  }
+  const [z1n, z2n, z0n] = impedances.map(item => item.value);
+
   // Phase voltage with IEC c-factor: V = c × Un / √3
-  const V = (prefaultKV * c) / Math.sqrt(3); // kV
+  const V = (nominalKV * c) / Math.sqrt(3); // kV
 
   // Determine X/R at fault point from positive-sequence impedance
-  const xr = (xrOverride !== null && xrOverride > 0)
-    ? xrOverride
-    : xrFromImpedance(z1);
+  const requestedXR = Number(xrOverride);
+  const xr = (xrOverride !== null && Number.isFinite(requestedXR) && requestedXR > 0)
+    ? requestedXR
+    : xrFromImpedance(z1n);
+  const kappa = kappaIEC(xr);
+  if (!Number.isFinite(kappa)) {
+    return invalidIECResult(['X/R ratio must be finite and positive.'], [], provenance);
+  }
 
   // --- Four fault type initial short-circuit currents ---
 
   // IEC 60909-0 §4.2 (Eq. 29): Three-phase
-  const Ik3 = V / mag(z1);
+  const Ik3 = V / mag(z1n);
 
-  // IEC 60909-0 §4.4 (Eq. 38): Line-to-line (Z1 = Z2 assumed)
-  const Ik2 = Ik3 * (Math.sqrt(3) / 2); // = c×Un / (2×|Z1|) = (√3/2) × I"k3
+  // IEC 60909-0 §4.4: use the supplied complex positive/negative sequence
+  // impedances. The √3/2 shortcut is valid only when Z2 = Z1.
+  const z1z2 = add(z1n, z2n);
+  const Ik2 = (Math.sqrt(3) * V) / mag(z1z2);
 
   // IEC 60909-0 §4.3 (Eq. 35): Line-to-ground
   // I"k1 = √3 × c × Un / |2Z1 + Z0|  (with Z2 = Z1)
-  const z1z2z0 = add(add(z1, z2), z0);
+  const z1z2z0 = add(add(z1n, z2n), z0n);
   const Ik1 = (3 * V) / mag(z1z2z0);
 
   // IEC 60909-0 §4.5: Two-phase-to-earth (double-line-to-ground)
   // Using symmetrical components: Ia1 = V / (Z1 + Z2||Z0)
-  // Reported value = 3×|Ia1| — the reference fault current for the 2LG sequence network
-  const Z2Z0 = parallel(z2, z0);
-  const Ik2E = (3 * V) / mag(add(z1, Z2Z0));
+  // Physical B/C phase and earth-return RMS currents are derived below from
+  // the three sequence currents; no 3×|I1| surrogate is reported.
+  const doubleLineGroundCurrents = computeDoubleLineGroundCurrents({ phaseVoltage: V, z1: z1n, z2: z2n, z0: z0n });
+  if (mag(z1z2) <= 1e-12 || mag(z1z2z0) <= 1e-12 || !doubleLineGroundCurrents) {
+    return invalidIECResult(['Sequence impedance network contains a zero or singular denominator.'], [], provenance);
+  }
+  const doubleLineGroundPhaseB = doubleLineGroundCurrents.phaseBKA;
+  const doubleLineGroundPhaseC = doubleLineGroundCurrents.phaseCKA;
+  const doubleLineGroundEarth = doubleLineGroundCurrents.earthKA;
+  const doubleLineGround = doubleLineGroundCurrents.compatibilityKA;
 
   // --- Peak factor and peak current (IEC 60909-0 §4.3.1.1) ---
-  const kappa = kappaIEC(xr);
   const ip = kappa * Math.sqrt(2) * Ik3; // kA
 
   // --- Breaking current (IEC 60909-0 §8) ---
@@ -415,32 +569,58 @@ export function computeIEC60909Bus(params) {
 
   // --- Thermal equivalent current (IEC 60909-0 §4.8.1) ---
   // Ith = I"k3 × √(m + n)
-  // m = DC component factor from IEC Fig. 22
+  // m = DC component factor from the documented exponential screening model
   // n accounts for AC decay. It is 1.0 for a far-from-generator fault; for a
   // near-to-generator fault the AC component decays, which IEC represents with
   // n < 1. Using n = 1 there would overstate Ith, so scale it by the same decay
   // ratio μ that sets Ib (n ≈ (Ib/I"k)²).
   const m = thermalMFactor(kappa, faultDurationS, freqHz);
+  if (!Number.isFinite(m)) {
+    return invalidIECResult(['faultDurationS and freqHz must be finite and positive.'], [], provenance);
+  }
   const decayRatio = Ik3 > 0 ? Math.min(Ib / Ik3, 1) : 1;
   const n = decayRatio * decayRatio;
   const Ith = Ik3 * Math.sqrt(m + n);
 
+  const warnings = breaking.nearToGenerator
+    ? ['Near-generator Ith uses a simplified m+n screening approximation; verify with an authoritative time-domain study before issue.']
+    : [];
+  const modelLimits = {
+    thermalEquivalent: 'Screening-only simplified m+n approximation; verify against the adopted study method before issue.',
+    nearGeneratorThermal: 'Near-generator AC decay is represented by n=(Ib/I″k3)²; no time-domain thermal integration is performed.',
+    doubleLineGround: 'B/C faulted-phase RMS currents and earth residual are computed from complex symmetrical components; compatibility current is max(B,C).'
+  };
+  const resultProvenance = {
+    ...provenance,
+    standard: 'IEC 60909-0:2016',
+    method: 'equivalent-voltage-source',
+    sequenceImpedances: 'caller-supplied positive, negative, and zero sequence impedances'
+  };
   return {
+    validity: 'evaluated',
+    calculationStatus: 'screening-only',
+    requiredInputs: [],
+    warnings,
+    provenance: resultProvenance,
+    modelLimits,
     cFactor: c,
     kappa: Number(kappa.toFixed(4)),
     mu: Number(breaking.mu.toFixed(4)),
     nearToGenerator: breaking.nearToGenerator,
     generatorRatioIkgIrg: breaking.ratio === null ? null : Number(breaking.ratio.toFixed(3)),
     // IEC standard notation
-    threePhaseKA: Number(Ik3.toFixed(2)),
-    lineToLineKA: Number(Ik2.toFixed(2)),
-    lineToGroundKA: Number(Ik1.toFixed(2)),
-    doubleLineGroundKA: Number(Ik2E.toFixed(2)),
-    ip: Number(ip.toFixed(2)),
-    Ib: Number(Ib.toFixed(2)),
-    Ith: Number(Ith.toFixed(2)),
+    threePhaseKA: roundFinite(Ik3),
+    lineToLineKA: roundFinite(Ik2),
+    lineToGroundKA: roundFinite(Ik1),
+    doubleLineGroundKA: roundFinite(doubleLineGround),
+    doubleLineGroundPhaseBKA: roundFinite(doubleLineGroundPhaseB),
+    doubleLineGroundPhaseCKA: roundFinite(doubleLineGroundPhaseC),
+    doubleLineGroundEarthKA: roundFinite(doubleLineGroundEarth),
+    ip: roundFinite(ip),
+    Ib: roundFinite(Ib),
+    Ith: roundFinite(Ith),
     // asymKA kept as alias for ip to remain compatible with arc flash / TCC consumers
-    asymKA: Number(ip.toFixed(2))
+    asymKA: roundFinite(ip)
   };
 }
 
@@ -482,9 +662,10 @@ export function runIEC60909Batch(busData, opts = {}) {
       generatorRatedCurrentKA: bus.generatorRatedCurrentKA ?? null,
       minTimeDelayS: bus.minTimeDelayS ?? minTimeDelayS
     });
+    const busVoltage = Number(bus.prefaultKV);
     results[bus.id] = {
       method: 'IEC',
-      prefaultKV: Number((bus.prefaultKV || 1).toFixed(3)),
+      prefaultKV: Number.isFinite(busVoltage) && busVoltage > 0 ? Number(busVoltage.toFixed(3)) : null,
       ...iecResult
     };
   }

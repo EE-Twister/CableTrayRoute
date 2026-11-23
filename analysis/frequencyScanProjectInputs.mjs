@@ -37,14 +37,24 @@ function findFirstNumber(value, keys, seen = new Set()) {
   return null;
 }
 
-export function buildFrequencyScanProjectInputs(oneLine = {}, studies = {}, cableSchedule = []) {
+export function buildFrequencyScanProjectInputs(oneLine = {}, studies = {}, cableSchedule = [], options = {}) {
   const model = buildLoadFlowModel(oneLine);
   const components = componentsFrom(oneLine);
   const systemKv = finite(
     model.buses.find(bus => String(bus.busType || bus.type).toLowerCase() === 'slack')?.baseKV,
     model.buses[0]?.baseKV
   );
-  const shortCircuit = studies.shortCircuit || studies.iec60909 || {};
+  const scAssessment = options.studyAssessments?.shortCircuit;
+  const iecAssessment = options.studyAssessments?.iec60909;
+  const shortCircuitReady = studies.shortCircuit
+    && (!scAssessment || scAssessment.eligible === true);
+  const iecReady = studies.iec60909
+    && (!iecAssessment || iecAssessment.eligible === true);
+  const shortCircuitKey = shortCircuitReady ? 'shortCircuit' : iecReady ? 'iec60909' : '';
+  const rawShortCircuit = shortCircuitKey ? studies[shortCircuitKey] || {} : {};
+  const shortCircuitAssessment = shortCircuitKey ? options.studyAssessments?.[shortCircuitKey] : null;
+  const shortCircuit = !shortCircuitAssessment || shortCircuitAssessment.eligible === true
+    ? rawShortCircuit : {};
   const faultKa = findFirstNumber(shortCircuit, [
     'availableFaultKa', 'availableFaultKA', 'faultCurrentKA', 'faultKa', 'ikssKA', 'ikKA', 'threePhaseKA',
   ]);
@@ -84,7 +94,9 @@ export function buildFrequencyScanProjectInputs(oneLine = {}, studies = {}, cabl
 
   const warnings = [];
   if (!(systemKv > 0)) warnings.push('No valid One-Line bus voltage was found.');
-  if (!(scMva > 0)) warnings.push('Run Short Circuit or provide short-circuit MVA at the scanned bus.');
+  if (!(scMva > 0)) warnings.push(shortCircuitAssessment && shortCircuitAssessment.eligible !== true
+    ? 'Saved Short Circuit result is not eligible for this scenario; rerun it or provide independent short-circuit MVA.'
+    : 'Run Short Circuit or provide short-circuit MVA at the scanned bus.');
   if (!capacitorBanks.length && !filters.length) warnings.push('No capacitor banks or detuned filters were found.');
   if (!cables.length) warnings.push('No cable rows with R and length were found; the scan will use source impedance only.');
 
@@ -101,6 +113,7 @@ export function buildFrequencyScanProjectInputs(oneLine = {}, studies = {}, cabl
     },
     ready: systemKv > 0 && scMva > 0,
     warnings,
+    sourceStudyKey: shortCircuitKey || null,
     sourceFingerprint: fingerprintStudySource({ oneLine, shortCircuit, cableSchedule: scheduleRows }),
   };
 }

@@ -14,6 +14,7 @@
 @import "./src/styles/dashboard.css" layer(layout);
 @import "./src/styles/workflow-core.css" layer(layout);
 @import "./src/styles/oneline.css?v=mobile-workflow-drawer-v2" layer(pages);
+@import "./src/styles/oneline-a11y.css" layer(pages);
 @import "./src/styles/ductbank.css" layer(pages);
 @import "./src/styles/tray-fill.css" layer(pages);
 @import "./src/styles/dissimilar-metals.css" layer(pages);
@@ -26,6 +27,7 @@
 @import "./src/styles/routing.css" layer(pages);
 @import "./src/styles/scenarioComparison.css" layer(pages);
 @import "./src/styles/dataManager.css" layer(pages);
+@import "./src/styles/designSynthesis.css" layer(pages);
 @import "./src/styles/groundgrid.css" layer(pages);
 @import "./src/styles/print.css" layer(overrides);
 @layer tokens, base, layout, components, pages, utilities, overrides;
@@ -978,6 +980,8 @@ body.theme-high-contrast .mcc-spec-details {
   letter-spacing: .08em;
   text-transform: uppercase;
 }
+.cathodicprotection-page .cp-eyebrow { color: #1e3a8a; }
+body.dark-mode.cathodicprotection-page .cp-eyebrow { color: #bfdbfe; }
 .cp-quick-start {
   display: grid;
   gap: .65rem;
