@@ -36,7 +36,7 @@ export function applyCableSizingHighlight({ tbody, table, tableData = [], limit 
       || {};
     const row = { ...storedRow, ...renderedRow };
     const phaseLabels = normalizeCablePhases(row);
-    const phaseCount = phaseLabels.length || parseInt(row.phases, 10) || 0;
+    const phaseCount = phaseLabels.length || 3;
     const impedanceOverride = row.impedance_per_1000ft ?? row.impedance;
     const conduitMaterial = row.conduit_material || row.raceway_material || row.conduit_type;
     const rawVoltage = parseFloat(voltIn?.value);

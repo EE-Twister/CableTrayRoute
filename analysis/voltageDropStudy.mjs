@@ -124,7 +124,7 @@ export function resolveCableStudyInputs(cables = [], loads = [], loadFlowResult 
     );
     const ratingVoltage = finiteNumber(cable.cable_rating);
     const phaseLabels = normalizeCablePhases(cable?.phases ?? cable?.num_phases);
-    const phases = phaseLabels.length || finiteNumber(load?.phases);
+    const phases = phaseLabels.length || finiteNumber(load?.phases, 3);
     const flowVoltage = finiteNumber(flowBus?.voltageV, Number(flowBus?.baseKV) * 1000);
     const loadVoltage = finiteNumber(load?.voltage, load?.voltageV, load?.nominal_voltage);
     const voltage = explicitVoltage || flowVoltage || loadVoltage || ratingVoltage;
@@ -190,7 +190,9 @@ export function evaluateCable(cable, lengthFt) {
   const len = finiteNumber(rawLength);
   const phaseLabels = normalizeCablePhases(cable?.phases ?? cable?.num_phases ?? cable);
   const rawPhase = cable?.phases ?? cable?.num_phases;
-  const phase = phaseLabels.length || (rawPhase == null || rawPhase === '' ? 0 : 0);
+  // A missing phase defaults to three-phase; an explicit but unsupported value
+  // (for example 4) stays unevaluated with a diagnostic.
+  const phase = phaseLabels.length || (rawPhase == null || rawPhase === '' ? 3 : 0);
   const currentA = finiteNumber(cable?.est_load, cable?.current, cable?.load_current);
   const voltageV = finiteNumber(cable?.operating_voltage, cable?.voltage, cable?.cable_rating);
   const conductorSize = cable?.conductor_size || '';
