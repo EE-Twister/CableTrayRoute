@@ -47,6 +47,10 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('One-Line Short Circuit (worker) and Arc Flash basis include Cable Schedule impedance', async ({ page }) => {
+  // The Arc Flash button exports CSV, PDF and SVG files that this test does not
+  // inspect. Cancel them as they start: closing the context with downloads
+  // still pending crashes headless Edge (exit 0xC0000005) and breaks the next test.
+  page.on('download', download => { download.cancel().catch(() => {}); });
   await page.goto(pageUrl('oneline.html?e2e=1'));
   await page.waitForSelector('[data-oneline-ready="1"]');
   await openToolbarMenu(page, 'Review');
