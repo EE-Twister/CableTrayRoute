@@ -135,11 +135,11 @@ export function createStudyExecutionController({
       resultHash: fingerprintStudyValue(shortCircuit),
       provenanceHash: fingerprintStudyValue(actualShortCircuitProvenance),
       status: null,
-    }] : arcFlashContext.dependencies;
+    }] : arcFlashContext?.dependencies;
     const arcFlashSaveContext = {
       ...contextAfterOverlay('arcFlash', arcFlashContext),
       dependencies: arcFlashDependencies,
-      dependencyFingerprint: fingerprintStudyValue(arcFlashDependencies),
+      ...(fingerprintStudyValue ? { dependencyFingerprint: fingerprintStudyValue(arcFlashDependencies) } : {}),
     };
     commitStudy('shortCircuit', shortCircuit, shortCircuitSaveContext);
     commitStudy('arcFlash', arcFlash, arcFlashSaveContext);

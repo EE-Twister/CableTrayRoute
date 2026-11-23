@@ -6,6 +6,7 @@ export const STUDY_ROUTE_METADATA = Object.freeze([
   ['intlCableSize.html', 'Intl Cable Sizing', []],
   ['iec60287.html', 'IEC 60287 Ampacity', ['iec60287', 'cableThermalDetailed']],
   ['cablethermalenv.html', 'Cable Thermal Environment', ['cableThermalEnvironment']],
+  ['directburial.html', 'Direct Burial Circuits', []],
   ['tcc.html', 'TCC', ['shortCircuit', 'tcc']],
   ['harmonics.html', 'Harmonics', ['harmonics', 'harmonicNetwork', 'frequencyScan']],
   ['capacitorbank.html', 'Capacitor Bank', ['capacitorBank']],

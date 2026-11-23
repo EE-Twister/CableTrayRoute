@@ -15,12 +15,13 @@ function htmlIds(href) {
 
 test('every study route has an explicit lifecycle registry entry', () => {
   const coverage = getStudyLifecycleCoverage();
-  assert.equal(coverage.totalRoutes, 45);
-  assert.equal(coverage.registryRoutes, 45);
+  assert.equal(coverage.totalRoutes, 46);
+  assert.equal(coverage.registryRoutes, 46);
   assert.deepEqual(coverage.missing, []);
   assert.deepEqual(coverage.ephemeral.sort(), [
     'autosize.html',
     'demandschedule.html',
+    'directburial.html',
     'emf.html',
     'equipmentevaluation.html',
     'groundgrid.html',

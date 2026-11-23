@@ -13,6 +13,7 @@ const EPHEMERAL_ROUTES = new Set([
   'groundgrid.html',
   'autosize.html',
   'emf.html',
+  'directburial.html',
 ]);
 
 const DOM_ADAPTERS = Object.freeze({
@@ -28,6 +29,7 @@ const DOM_ADAPTERS = Object.freeze({
     hiddenControlPolicy: 'exclude-hidden-disabled',
   },
   'cablethermalenv.html': { inputScope: 'form', formIds: ['ctenv-form'], runControlIds: ['ctenv-run-btn'], exportControlIds: ['ctenv-export-csv-btn'] },
+  'directburial.html': { inputScope: 'form', formIds: ['db-form'], runControlIds: ['db-run-btn'], exportControlIds: ['db-export-btn'] },
   'tcc.html': { inputScope: 'page', runControlIds: [], exportControlIds: ['export-svg-btn', 'export-png-btn', 'export-review-btn', 'export-cti-btn', 'export-relay-settings-btn'], exportPolicy: 'controller-managed' },
   'harmonics.html': {
     inputScope: 'page',

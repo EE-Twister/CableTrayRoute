@@ -3473,45 +3473,45 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.designBasis`
   - src/components/studyBasis.js:37 getDesignBasis()
 - `settings.studyApprovals`
-  - heattracesizing.js:2219 getStudyApprovals()
+  - heattracesizing.js:2218 getStudyApprovals()
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `settings.studyProvenance`
   - analysis/studyLifecycle.mjs:182 captureStudyRunContext()
   - analysis/studyLifecycle.mjs:379 captureStudyRunContext()
-  - heattracesizing.js:2080 captureStudyRunContext()
-  - heattracesizing.js:2087 captureStudyRunContext()
-  - heattracesizing.js:2096 captureStudyRunContext()
+  - heattracesizing.js:2079 captureStudyRunContext()
+  - heattracesizing.js:2086 captureStudyRunContext()
+  - heattracesizing.js:2095 captureStudyRunContext()
   - ... 1 more
 - `settings.trayHardwareCatalogCustomProducts`
-  - heattracesizing.js:2312 getTrayHardwareCatalogCustomProducts()
+  - heattracesizing.js:2311 getTrayHardwareCatalogCustomProducts()
 - `studyResults`
+  - heattracesizing.js:112 getStudies()
   - heattracesizing.js:113 getStudies()
-  - heattracesizing.js:114 getStudies()
-  - heattracesizing.js:1818 getStudies()
-  - heattracesizing.js:199 getStudies()
-  - heattracesizing.js:2207 getStudies()
+  - heattracesizing.js:1817 getStudies()
+  - heattracesizing.js:198 getStudies()
+  - heattracesizing.js:2206 getStudies()
   - ... 4 more
 - `studyResults.heatTraceSizing`
-  - heattracesizing.js:1818 getStudies().heatTraceSizing
-  - heattracesizing.js:199 getStudies().heatTraceSizing
-  - heattracesizing.js:2207 getStudies().heatTraceSizing
-  - heattracesizing.js:236 getStudies().heatTraceSizing
-  - heattracesizing.js:245 getStudies().heatTraceSizing
+  - heattracesizing.js:1817 getStudies().heatTraceSizing
+  - heattracesizing.js:198 getStudies().heatTraceSizing
+  - heattracesizing.js:2206 getStudies().heatTraceSizing
+  - heattracesizing.js:235 getStudies().heatTraceSizing
+  - heattracesizing.js:244 getStudies().heatTraceSizing
   - ... 2 more
 - `studyResults.heatTraceSizingCircuits`
+  - heattracesizing.js:112 getStudies().heatTraceSizingCircuits
   - heattracesizing.js:113 getStudies().heatTraceSizingCircuits
-  - heattracesizing.js:114 getStudies().heatTraceSizingCircuits
 
 **Detected Writes**
 - `settings.studyApprovals`
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `settings.studyProvenance`
-  - heattracesizing.js:2091 saveStudyResult()
-  - heattracesizing.js:285 saveStudyResult()
+  - heattracesizing.js:2090 saveStudyResult()
+  - heattracesizing.js:284 saveStudyResult()
 - `studyResults`
-  - heattracesizing.js:2091 saveStudyResult()
-  - heattracesizing.js:285 saveStudyResult()
+  - heattracesizing.js:2090 saveStudyResult()
+  - heattracesizing.js:284 saveStudyResult()
 
 ### Reliability (`reliability.html`)
 
