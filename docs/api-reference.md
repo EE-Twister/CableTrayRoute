@@ -460,11 +460,18 @@ Produces one row per adjacent device pair × test-current level from a `greedyCo
 | `Upstream Device` | Name of the upstream (source-side) protective device |
 | `Downstream Device` | Name of the downstream (load-side) protective device |
 | `Test Current (A)` | Fault current level for this row |
-| `Upstream Time (s)` | Upstream device trip time at this current |
-| `Downstream Time (s)` | Downstream device trip time at this current |
-| `Margin (s)` | Upstream time − Downstream time |
+| `Upstream Time (s)` | Upstream device operating time at this current (minimum curve, fastest time at a vertical segment), or `No trip`, `Above curve range`, or `No curve data` |
+| `Downstream Time (s)` | Downstream device operating time at this current (maximum/clearing curve, slowest time at a vertical segment), or `No trip`, `Above curve range`, or `No curve data` |
+| `Margin (s)` | Upstream time − Downstream time when both devices operate; otherwise `N/A` |
 | `Required CTI (s)` | Minimum required margin (from `margin` argument) |
-| `Pass/Fail` | `PASS` if Margin ≥ Required CTI, else `FAIL` |
+| `Pass/Fail` | `PASS` if Margin ≥ Required CTI, else `FAIL`. `PASS (upstream does not operate)` when only the upstream device is below its pickup. `NOT EVALUATED (downstream does not operate)` when the downstream device is below its pickup. `NOT EVALUATED (outside curve data)` when the current is above a curve's range (other than an instantaneous plateau) or a curve has no usable points |
+
+A device does not operate below its curve's minimum current (pickup), so the report prints `No trip` instead of the first curve point's time. Above a curve's maximum current:
+
+- A device whose curve ends on its instantaneous plateau keeps operating at its instantaneous time. `scaleCurve()` cuts that plateau at the instantaneous-max setting, the interrupting rating, or a 10× pickup plotting fallback, but the instantaneous element operates at any current above its pickup. Interrupting-rating duty is checked separately.
+- Any other curve, such as a fuse or IEC inverse-time relay curve that ends while still sloping, prints `Above curve range`. Its last time is not held and its slope is not extrapolated.
+
+Times come from `evaluateOperatingTime(curve, current, { boundary, instantaneousCeilingA })` in `analysis/tccAutoCoord.mjs`.
 
 **Usage with `downloadCSV`:**
 

@@ -9,9 +9,11 @@ import {
   buildArcFlashSection,
   buildLoadFlowSection,
   buildMotorStartSection,
+  formatReportNumber,
   generateProjectReport,
   renderPackageHTML,
 } from '../analysis/projectReport.mjs';
+import { sectionToAOA } from '../analysis/reportPackage.mjs';
 
 // Report sections must read the shapes the study pages actually save, not
 // hand-written fixtures, so these tests feed real engine output through them.
@@ -146,6 +148,67 @@ function lifecycleOptions(studyKey, result) {
   const lp = section.rows.find(row => row.id === 'LP-101');
   assert.strictEqual(lp.boundary, 300, 'a plausible boundary below 1.2 cal/cm² is reported');
   console.log('✓ arc flash section withholds an implausible boundary');
+})();
+
+(function testReportNumberFormattingKeepsConclusions() {
+  assert.strictEqual(formatReportNumber(0.9496), '0.9496', 'not rounded up into a 0.95 pu band');
+  assert.strictEqual(formatReportNumber(0.0004), '0.0004');
+  assert.strictEqual(formatReportNumber(9e-5), '9.00e-5', 'small probabilities are not printed as 0');
+  assert.strictEqual(formatReportNumber(99.99991), '99.9999', 'availability is not rounded to 100');
+  assert.strictEqual(formatReportNumber(1757), (1757).toLocaleString());
+  assert.strictEqual(formatReportNumber(0), '0');
+  assert.strictEqual(formatReportNumber(Number.NaN), '—');
+  console.log('✓ report number formatting keeps conclusions');
+})();
+
+(function testCableSectionUsesTagsVoltagesAndRouteResults() {
+  const cables = [
+    { id: 'cbl-a', tag: 'CBL-A', from: 'SWBD', to: 'MCC', conductor_size: '#2 AWG', insulation_type: 'THHN', cable_rating: 600, voltage: '480', length: 100, raceway_ids: ['TR-1'] },
+    { id: 'cbl-b', tag: 'CBL-B', from: 'SWBD', to: 'LP', conductor_size: '#4 AWG', insulation_type: 'THHN', cable_rating: 600, operating_voltage: 208, length: 50, raceway_ids: ['TR-1'] },
+    { id: 'cbl-c', tag: 'CBL-C', from: 'MCC', to: 'PMP', conductor_size: '#6 AWG', insulation_type: 'THHN', cable_rating: 600, length: 40 },
+  ];
+  const routeResults = { batchResults: [
+    { cable: 'CBL-A', status: 'Routed', total_length: 130, route_segments: [{ raceway_id: 'TR-1' }] },
+    { cable: 'CBL-B', status: 'Routed', total_length: 52, route_segments: [{ raceway_id: 'TR-1' }] },
+  ] };
+  const { cables: section } = generateProjectReport({ cables, routeResults });
+  const byTag = Object.fromEntries(section.rows.map(row => [row.id, row]));
+  assert.deepStrictEqual(Object.keys(byTag), ['CBL-A', 'CBL-B', 'CBL-C'], 'rows use cable tags, not internal ids');
+  assert.strictEqual(byTag['CBL-A'].ratedVoltage, 600);
+  assert.strictEqual(byTag['CBL-A'].operatingVoltage, 480, 'legacy voltage field is the operating voltage');
+  assert.strictEqual(byTag['CBL-B'].operatingVoltage, 208);
+  assert.strictEqual(byTag['CBL-A'].routeStatus, 'Routed');
+  assert.strictEqual(byTag['CBL-A'].routedLengthFt, 130);
+  assert.strictEqual(byTag['CBL-A'].lengthMismatch, true, '130 ft routed vs 100 ft scheduled is flagged');
+  assert.strictEqual(byTag['CBL-B'].lengthMismatch, false, '2 ft difference is within tolerance');
+  assert.strictEqual(byTag['CBL-C'].routeStatus, 'Not routed');
+  assert.strictEqual(section.summary.routed, 2);
+  assert.strictEqual(section.summary.unrouted, 1);
+  assert.strictEqual(section.summary.lengthMismatches, 1);
+
+  // Without saved route results, assignment is not reported as routing.
+  const { cables: assignedOnly } = generateProjectReport({ cables });
+  assert.strictEqual(assignedOnly.summary.routed, null);
+  assert.strictEqual(assignedOnly.summary.assigned, 2);
+  assert.strictEqual(assignedOnly.rows[0].routeStatus, 'Assigned');
+  console.log('✓ cable section uses tags, separate voltages, and route results');
+})();
+
+(function testWorkbookHeadersUseKeysAndLabels() {
+  const aoa = sectionToAOA({
+    key: 'cyberCompliance',
+    headers: [{ key: 'asset', label: 'Asset' }, { key: 'status', label: 'Status' }],
+    rows: [{ asset: 'RTU-1', status: 'gap' }],
+  });
+  assert.deepStrictEqual(aoa, [['Asset', 'Status'], ['RTU-1', 'gap']], 'header objects map to labels and values');
+  const exported = sectionToAOA({
+    key: 'routing',
+    headers: [{ key: 'cable', label: 'Cable' }],
+    exportHeaders: [{ key: 'cable', label: 'Cable' }, { key: 'routeSignature', label: 'Route signature' }, { key: 'meta', label: 'Meta' }],
+    rows: [{ cable: 'CBL-A', routeSignature: 'abc123', meta: { a: 1 } }],
+  });
+  assert.deepStrictEqual(exported, [['Cable', 'Route signature', 'Meta'], ['CBL-A', 'abc123', '{"a":1}']]);
+  console.log('✓ workbook headers use keys and labels');
 })();
 
 console.log('project report study section tests passed');

@@ -63,9 +63,9 @@ function persistProjectInfo() {
   setProjectMeta({
     ...current,
     projectName: info.projectName === '(Untitled Project)' ? '' : info.projectName,
-    projectNumber: info.projectNumber === 'â€”' ? '' : info.projectNumber,
-    client: info.client === 'â€”' ? '' : info.client,
-    engineer: info.engineer === 'â€”' ? '' : info.engineer,
+    projectNumber: info.projectNumber === '—' ? '' : info.projectNumber,
+    client: info.client === '—' ? '' : info.client,
+    engineer: info.engineer === '—' ? '' : info.engineer,
     revision: info.revision,
   });
 }

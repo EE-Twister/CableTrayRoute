@@ -242,7 +242,7 @@ The **Hazardous Area Report** preset in the Report Package Builder includes:
 - Table of contents
 - Revision history
 - Assumptions / design basis
-- Hazardous area classification summary (area table + equipment matrix)
+- Hazardous area classification summary: overall status and counts, plus one combined area/equipment matrix (one row per equipment item with its area's classification, and one row for each area with no equipment assigned)
 - Design rule check results (DRC-08 findings)
 
 ---

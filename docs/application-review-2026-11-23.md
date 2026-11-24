@@ -11,7 +11,28 @@ Reviewed commit `e4da1f678fa65d50e966876f1cbb84870c304193`. The working tree con
 - **R6:** report heat-trace branches are re-assessed for freshness before totalling.
 - **R7:** withheld report rows lose their verdict, reliability cut sets are withheld with their study, and voltage-drop rows are gated on their own result. Arc Flash chart bars and headline cards show readiness instead of "Pass" when a result is not current and label-ready. The Short Circuit and Load Flow page charts were not changed and still need the same treatment, so R7 is partly done.
 
-R8–R11, E1–E8 and U1–U5 remain open.
+R8–R11 were then corrected:
+
+- **R8:** a numeric legacy `voltage` fills a blank `operating_voltage` on import, project load, and `migrateProject`, without overwriting or deleting anything. The Cable Schedule KPI uses the step header's schedule-ready definition and reports missing operating voltage separately. The report shows Rated (V) and Operating (V) columns.
+- **R9:** report numbers keep up to six significant figures and use exponent notation below 1e-4.
+- **R10:**
+  - Sustainability, TCC, Hazardous Area, Insulation Coordination and Egress Lighting now build real report sections.
+  - The Cable Schedule section uses tags, counts "routed" from saved route results, and flags schedule/route length mismatches.
+  - The Routing Summary prints readable columns and keeps signatures in the XLSX.
+  - Garbled characters were fixed in the report, Submittal, Catalog Browser and Trust Center.
+  - XLSX header objects and the arc-flash PPE column now export.
+- **R11:**
+  - The Cost Estimate section states whether the estimate matches current inputs.
+  - CTI rows print "No trip" below a device's curve instead of a clamped time.
+  - Load Flow losses within numerical tolerance print as 0.
+
+Still open from R8–R11:
+
+- A stricter third schedule-ready definition remains in the Cable Schedule readiness panel (`summarizeCableWorkflow`).
+- Auto-Coordinate's `checkCoordination` still treats an upstream device below pickup as unevaluated, while the CTI report passes it.
+- The TCC report section carries pair data only; device settings are not included.
+
+E1–E8 and U1–U5 remain open.
 
 **Scope:** what a user sees, what the issued report says, and what the export files contain.
 

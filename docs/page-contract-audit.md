@@ -1722,7 +1722,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Deliverables
-- Source files: `analysis/arcFlashResultUnits.mjs`, `analysis/autoSize.mjs`, `analysis/clashDetect.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableArtifacts.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designRuleChecker.mjs`, `analysis/designSynthesisMotorReadiness.mjs`, `analysis/ductbankConduitAssignment.mjs`, `analysis/equipmentWorkflow.mjs`, `analysis/fieldObservations.mjs`, `analysis/heatTraceReport.mjs`, `analysis/heatTraceSizing.mjs`, `analysis/loadWorkflow.mjs`, `analysis/projectReport.mjs`, `analysis/projectWorkflowCore.mjs`, `analysis/pullBoxSizing.mjs`, `analysis/pullCards.mjs`, `analysis/pullConstructability.mjs`, `analysis/racewayAssurance.mjs`, `analysis/reportPackage.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/studyLifecycle.mjs`, `analysis/studyResultContext.mjs`, `analysis/trayFill.mjs`, `src/components/heatTraceLifecycle.mjs`, `src/components/projectInputBinding.js`, `src/projectManagerEntry.js`, `src/projectreport.js`, `src/pullCalc.js`, `utils/componentLabels.js`, `validation/rules.js`
+- Source files: `analysis/arcFlashResultUnits.mjs`, `analysis/autoSize.mjs`, `analysis/clashDetect.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableArtifacts.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designRuleChecker.mjs`, `analysis/designSynthesisMotorReadiness.mjs`, `analysis/ductbankConduitAssignment.mjs`, `analysis/equipmentWorkflow.mjs`, `analysis/fieldObservations.mjs`, `analysis/heatTraceReport.mjs`, `analysis/heatTraceSizing.mjs`, `analysis/lighting.mjs`, `analysis/loadWorkflow.mjs`, `analysis/projectReport.mjs`, `analysis/projectWorkflowCore.mjs`, `analysis/pullBoxSizing.mjs`, `analysis/pullCards.mjs`, `analysis/pullConstructability.mjs`, `analysis/racewayAssurance.mjs`, `analysis/reportPackage.mjs`, `analysis/reportSupplementalSections.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/studyLifecycle.mjs`, `analysis/studyResultContext.mjs`, `analysis/trayFill.mjs`, `src/components/heatTraceLifecycle.mjs`, `src/components/projectInputBinding.js`, `src/projectManagerEntry.js`, `src/projectreport.js`, `src/pullCalc.js`, `utils/componentLabels.js`, `validation/rules.js`
 
 **Undocumented Reads**
 - None
@@ -1744,134 +1744,144 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - src/projectreport.js:290 getCables()
-  - src/projectreport.js:294 getCables()
+  - src/projectreport.js:292 getCables()
+  - src/projectreport.js:296 getCables()
 - `conduitSchedule`
-  - src/projectreport.js:296 getConduits()
+  - src/projectreport.js:298 getConduits()
 - `ductbankSchedule`
-  - src/projectreport.js:313 getDuctbanks()
+  - src/projectreport.js:315 getDuctbanks()
 - `equipment`
-  - src/projectreport.js:1030 getEquipment()
-  - src/projectreport.js:314 getEquipment()
+  - src/projectreport.js:1085 getEquipment()
+  - src/projectreport.js:316 getEquipment()
 - `loadList`
-  - src/projectreport.js:1031 getLoads()
-  - src/projectreport.js:315 getLoads()
+  - src/projectreport.js:1086 getLoads()
+  - src/projectreport.js:317 getLoads()
 - `oneLineDiagram`
-  - src/projectreport.js:1032 getOneLine()
-  - src/projectreport.js:316 getOneLine()
+  - src/projectreport.js:1087 getOneLine()
+  - src/projectreport.js:318 getOneLine()
 - `settings.costEstimateArtifact`
-  - src/projectreport.js:329 getItem(costEstimateArtifact)
+  - src/projectreport.js:331 getItem(costEstimateArtifact)
 - `settings.deliverableArtifacts`
-  - src/projectreport.js:333 getDeliverableArtifacts()
+  - src/projectreport.js:335 getDeliverableArtifacts()
 - `settings.designBasis`
-  - src/projectreport.js:1037 getDesignBasis()
-  - src/projectreport.js:321 getDesignBasis()
+  - src/projectreport.js:1092 getDesignBasis()
+  - src/projectreport.js:323 getDesignBasis()
 - `settings.designGateApprovals`
-  - src/projectreport.js:1038 getDesignGateApprovals()
-  - src/projectreport.js:322 getDesignGateApprovals()
+  - src/projectreport.js:1093 getDesignGateApprovals()
+  - src/projectreport.js:324 getDesignGateApprovals()
 - `settings.designSynthesisReviewDraft`
-  - src/projectreport.js:1039 getItem(designSynthesisReviewDraft)
-  - src/projectreport.js:323 getItem(designSynthesisReviewDraft)
+  - src/projectreport.js:1094 getItem(designSynthesisReviewDraft)
+  - src/projectreport.js:325 getItem(designSynthesisReviewDraft)
 - `settings.fieldExecutionRecords`
-  - src/projectreport.js:330 getFieldExecutionRecords()
+  - src/projectreport.js:332 getFieldExecutionRecords()
 - `settings.latestRouteResults`
-  - src/projectreport.js:1070 getItem(latestRouteResults)
-  - src/projectreport.js:1099 getItem(latestRouteResults)
-  - src/projectreport.js:1113 getItem(latestRouteResults)
-  - src/projectreport.js:290 getItem(latestRouteResults)
-  - src/projectreport.js:325 getItem(latestRouteResults)
+  - src/projectreport.js:1125 getItem(latestRouteResults)
+  - src/projectreport.js:1154 getItem(latestRouteResults)
+  - src/projectreport.js:1168 getItem(latestRouteResults)
+  - src/projectreport.js:292 getItem(latestRouteResults)
+  - src/projectreport.js:327 getItem(latestRouteResults)
 - `settings.lifecyclePackages`
-  - src/projectreport.js:1072 getLifecyclePackages()
-  - src/projectreport.js:1110 getLifecyclePackages()
-  - src/projectreport.js:1270 getLifecyclePackages()
-  - src/projectreport.js:1284 getLifecyclePackages()
-  - src/projectreport.js:994 getLifecyclePackages()
+  - src/projectreport.js:1049 getLifecyclePackages()
+  - src/projectreport.js:1127 getLifecyclePackages()
+  - src/projectreport.js:1165 getLifecyclePackages()
+  - src/projectreport.js:1325 getLifecyclePackages()
+  - src/projectreport.js:1339 getLifecyclePackages()
 - `settings.oneLineScheduleReconcilePending`
-  - src/projectreport.js:1116 getItem(oneLineScheduleReconcilePending)
+  - src/projectreport.js:1171 getItem(oneLineScheduleReconcilePending)
 - `settings.procurementRegister`
-  - src/projectreport.js:328 getProcurementRegister()
+  - src/projectreport.js:330 getProcurementRegister()
 - `settings.projectMeta`
-  - src/projectreport.js:159 getProjectMeta()
-  - src/projectreport.js:180 getProjectMeta()
-  - src/projectreport.js:209 getProjectMeta()
+  - src/projectreport.js:161 getProjectMeta()
+  - src/projectreport.js:182 getProjectMeta()
+  - src/projectreport.js:211 getProjectMeta()
 - `settings.pullPlanArtifact`
-  - src/projectreport.js:327 getItem(pullPlanArtifact)
+  - src/projectreport.js:329 getItem(pullPlanArtifact)
 - `settings.reportSnapshots`
-  - src/projectreport.js:1071 getReportSnapshots()
-  - src/projectreport.js:1109 getReportSnapshots()
-  - src/projectreport.js:902 getReportSnapshots()
-  - src/projectreport.js:937 getReportSnapshots()
+  - src/projectreport.js:1126 getReportSnapshots()
+  - src/projectreport.js:1164 getReportSnapshots()
+  - src/projectreport.js:957 getReportSnapshots()
+  - src/projectreport.js:992 getReportSnapshots()
 - `settings.studyApprovals`
-  - src/projectreport.js:320 getStudyApprovals()
+  - src/projectreport.js:322 getStudyApprovals()
 - `settings.studyProvenance`
   - analysis/studyLifecycle.mjs:182 captureStudyRunContext()
   - analysis/studyLifecycle.mjs:379 captureStudyRunContext()
-  - src/projectreport.js:318 getStudyProvenance()
-  - src/projectreport.js:319 getStudyAssessments()
-  - src/projectreport.js:646 captureStudyRunContext()
+  - src/projectreport.js:320 getStudyProvenance()
+  - src/projectreport.js:321 getStudyAssessments()
+  - src/projectreport.js:693 captureStudyRunContext()
 - `settings.tccSettings`
-  - src/projectreport.js:1040 getItem(tccSettings)
-  - src/projectreport.js:324 getItem(tccSettings)
+  - src/projectreport.js:1095 getItem(tccSettings)
+  - src/projectreport.js:326 getItem(tccSettings)
 - `studyResults`
-  - src/projectreport.js:317 getStudies()
-  - src/projectreport.js:319 getStudyAssessments()
+  - src/projectreport.js:319 getStudies()
+  - src/projectreport.js:321 getStudyAssessments()
 - `studyResults.arcFlash`
-  - analysis/projectReport.mjs:508 studies.arcFlash
+  - analysis/projectReport.mjs:580 studies.arcFlash
 - `studyResults.bessHazard`
-  - analysis/projectReport.mjs:1259 studies.bessHazard
+  - analysis/projectReport.mjs:1331 studies.bessHazard
 - `studyResults.contingency`
-  - analysis/projectReport.mjs:1028 studies.contingency
+  - analysis/projectReport.mjs:1100 studies.contingency
 - `studyResults.cyberCompliance`
-  - analysis/projectReport.mjs:1033 studies.cyberCompliance
+  - analysis/projectReport.mjs:1105 studies.cyberCompliance
 - `studyResults.duty`
   - validation/rules.js:703 studies.duty
   - validation/rules.js:703 studies?.duty
   - validation/rules.js:707 studies?.duty
 - `studyResults.frequencyScan`
-  - analysis/projectReport.mjs:1030 studies.frequencyScan
+  - analysis/projectReport.mjs:1102 studies.frequencyScan
 - `studyResults.harmonics`
-  - analysis/projectReport.mjs:766 studies.harmonics
+  - analysis/projectReport.mjs:838 studies.harmonics
+- `studyResults.hazAreaClassification`
+  - analysis/reportSupplementalSections.mjs:302 studies?.hazAreaClassification
 - `studyResults.heatTraceSizing`
-  - analysis/projectReport.mjs:273 studies.heatTraceSizing
+  - analysis/projectReport.mjs:355 studies.heatTraceSizing
 - `studyResults.heatTraceSizingCircuits`
-  - analysis/projectReport.mjs:274 studies.heatTraceSizingCircuits
+  - analysis/projectReport.mjs:356 studies.heatTraceSizingCircuits
 - `studyResults.iec60909`
-  - analysis/projectReport.mjs:603 studies.iec60909
+  - analysis/projectReport.mjs:675 studies.iec60909
+- `studyResults.insulationCoordination`
+  - analysis/reportSupplementalSections.mjs:418 studies?.insulationCoordination
+- `studyResults.lighting`
+  - analysis/reportSupplementalSections.mjs:549 studies?.lighting
 - `studyResults.loadFlow`
-  - analysis/projectReport.mjs:714 studies.loadFlow
+  - analysis/projectReport.mjs:786 studies.loadFlow
 - `studyResults.motorStart`
-  - analysis/projectReport.mjs:803 studies.motorStart
+  - analysis/projectReport.mjs:875 studies.motorStart
 - `studyResults.optimalPowerFlow`
-  - analysis/projectReport.mjs:1032 studies.optimalPowerFlow
+  - analysis/projectReport.mjs:1104 studies.optimalPowerFlow
 - `studyResults.probabilisticLoadFlow`
-  - analysis/projectReport.mjs:1027 studies.probabilisticLoadFlow
+  - analysis/projectReport.mjs:1099 studies.probabilisticLoadFlow
 - `studyResults.quasiDynamic`
-  - analysis/projectReport.mjs:1026 studies.quasiDynamic
+  - analysis/projectReport.mjs:1098 studies.quasiDynamic
 - `studyResults.reliability`
-  - analysis/projectReport.mjs:922 studies.reliability
+  - analysis/projectReport.mjs:994 studies.reliability
   - validation/rules.js:712 studies?.reliability
   - validation/rules.js:713 studies.reliability
   - validation/rules.js:715 studies?.reliability
   - validation/rules.js:728 studies?.reliability
 - `studyResults.shortCircuit`
-  - analysis/projectReport.mjs:602 studies.shortCircuit
+  - analysis/projectReport.mjs:674 studies.shortCircuit
+- `studyResults.sustainabilityFootprint`
+  - analysis/reportSupplementalSections.mjs:144 studies?.sustainabilityFootprint
+- `studyResults.tcc`
+  - analysis/reportSupplementalSections.mjs:240 studies?.tcc
 - `studyResults.transientStability`
-  - analysis/projectReport.mjs:1031 studies.transientStability
+  - analysis/projectReport.mjs:1103 studies.transientStability
 - `studyResults.voltageDropStudy`
-  - analysis/projectReport.mjs:842 studies.voltageDropStudy
+  - analysis/projectReport.mjs:914 studies.voltageDropStudy
 - `studyResults.voltageStability`
-  - analysis/projectReport.mjs:1029 studies.voltageStability
+  - analysis/projectReport.mjs:1101 studies.voltageStability
 - `traySchedule`
-  - src/projectreport.js:295 getTrays()
+  - src/projectreport.js:297 getTrays()
 
 **Detected Writes**
 - `settings.deliverableArtifacts`
-  - src/projectreport.js:1371 upsertDeliverableArtifact()
+  - src/projectreport.js:1426 upsertDeliverableArtifact()
 - `settings.projectMeta`
-  - src/projectreport.js:211 setProjectMeta()
+  - src/projectreport.js:213 setProjectMeta()
 - `settings.reportSnapshots`
-  - src/projectreport.js:1370 setReportSnapshot()
-  - src/projectreport.js:930 deleteReportSnapshot()
+  - src/projectreport.js:1425 setReportSnapshot()
+  - src/projectreport.js:985 deleteReportSnapshot()
 - `studyResults.duty`
   - validation/rules.js:703 studies.duty
 

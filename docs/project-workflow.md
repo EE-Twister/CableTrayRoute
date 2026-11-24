@@ -11,6 +11,16 @@ The workflow uses four separate readiness signals:
 
 A complete data workflow is not automatically issue-ready. The Dashboard and Report Package Builder both expose blocking DRC errors and missing cable insulation or voltage-rating fields.
 
+### Report Package Builder content
+
+- **Cable Schedule:** each row is identified by its cable tag, the same identifier used by the Routing Summary and DRC.
+  - Rated (insulation) voltage and operating voltage are separate columns.
+  - "Routed" counts cables with a saved route result. Without route results, the section reports raceway assignment instead, and says so.
+  - The routed length is shown beside the schedule length, and differences of more than 5 ft and 10 % are flagged. The total uses schedule lengths.
+- **Routing Summary:** the printed table uses readable column names. Route and pull-constructability signatures, conduit assignment detail, and pull-point records remain in the XLSX and JSON exports.
+- **Cost Estimate:** an "Estimate freshness" line compares the saved estimate with the current cable and raceway inputs, so stale totals are labelled rather than read as current.
+- **Numbers:** printed values keep up to six significant figures, and magnitudes below 0.0001 use exponent notation. A value such as 0.9496 pu, a 9 × 10⁻⁵ probability, or 99.99991 % availability therefore does not round into a different conclusion. XLSX and JSON keep full precision.
+
 Workflow and issue-readiness indicators do not establish engineering accuracy or standards compliance. The [2026-09-16 calculation and feature review](calculation-feature-review-2026-09-16.md) preserves the original findings; subsequent outcomes are recorded in [calculation correction verification](calculation-correction-verification-2026-09-17.md) and [routing workflow verification](routing-workflow-verification-2026-09-17.md). Review each study's model/evidence limits before relying on saved studies or exported deliverables.
 
 Home, the Workflow Dashboard, guided workflow strips, DRC, and the Report Package Builder derive their completion and next-action state from the same core workflow diagnostics. A saved route therefore advances routing consistently on each surface, and active DRC counts remain consistent when moving between them.

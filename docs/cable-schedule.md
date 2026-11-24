@@ -74,7 +74,23 @@ The Cable Schedule page is optimized for fast entry first, with deeper routing a
 
 ## Summary strip
 
-A strip at the top of the page shows cable count, total length, and how many rows are missing a length or voltage. It also shows the voltage-class mix. It refreshes as you edit the table. The Raceway Schedule page has a matching strip that counts trays, conduits and ductbanks.
+A strip at the top of the page shows four cards. It refreshes as you edit the table.
+
+- **Cables:** the row count, with the voltage-class mix taken from **Operating Voltage (V)**.
+- **Total length:** the sum of the row lengths.
+- **Schedule-ready:** how many rows have Tag, From/To, Conductor Size, and Length. This is the same check, and the same count, as the Cable Schedule step in the workflow header. Blank rows are not counted.
+- **Missing operating voltage:** rows with no positive **Operating Voltage (V)**. Routing does not need it, so it does not affect schedule-ready status. Sizing and voltage-drop checks do need it.
+
+The Raceway Schedule page has a matching strip that counts trays, conduits and ductbanks.
+
+## Operating voltage on import
+
+**Operating Voltage (V)** is the nominal system voltage of the circuit. **Cable Rating (V)** is the insulation rating, a separate value. Some projects and samples record the system voltage only in a `voltage` field. Loading or importing such a project fills a blank Operating Voltage from that field. This covers loading a sample from the gallery, importing a project file, **Load Project**, and server copies. The fill happens only when the value is a plain number such as `480`, `"480"`, `"480 V"`, or `"480V"`.
+
+- An Operating Voltage that is already entered is never replaced.
+- The original `voltage` field is kept.
+- Values such as `480/277` or `13.8 kV` are not converted. Enter those directly.
+- Reloading the browser page does not fill the column for a project that is already open. Load the sample again, use **Load Project**, or import the project file.
 
 ## Linking to raceways
 

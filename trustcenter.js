@@ -193,8 +193,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <h2>${escapeHtml(r.id)}: ${escapeHtml(r.label)}</h2>
         <p style="font-size:.85rem; color:var(--color-text-muted,#666)">
           <strong>Standard:</strong> ${escapeHtml(r.standardRef)}
-          ${r.evidenceClass ? ` &nbsp;Â·&nbsp; Evidence: ${escapeHtml(r.evidenceClass.replaceAll('_', ' '))}` : ''}
-          ${r.fixtureId ? ` &nbsp;Â·&nbsp; Fixture: <code>${escapeHtml(r.fixtureId)}</code>` : ''}
+          ${r.evidenceClass ? ` &nbsp;·&nbsp; Evidence: ${escapeHtml(r.evidenceClass.replaceAll('_', ' '))}` : ''}
+          ${r.fixtureId ? ` &nbsp;·&nbsp; Fixture: <code>${escapeHtml(r.fixtureId)}</code>` : ''}
         </p>
         <p>${escapeHtml(r.description)}</p>
         ${r.independentDerivation ? `<p><strong>Independent derivation:</strong> ${escapeHtml(r.independentDerivation)}</p>` : ''}

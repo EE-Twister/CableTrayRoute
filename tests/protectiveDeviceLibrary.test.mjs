@@ -168,6 +168,7 @@ check('S&C SMU-20 65E reduced curves reproduce official source spot checks withi
   ];
   sourceSpotChecks.forEach(([profileId, current, expected]) => {
     const actual = interpolateTime(profiles[profileId], current);
+    assert.ok(Number.isFinite(actual), `${profileId} at ${current} A is below the stored curve`);
     const relativeError = Math.abs(actual - expected) / expected;
     assert.ok(relativeError <= 0.025, `${profileId} at ${current} A has ${(relativeError * 100).toFixed(2)}% error`);
   });
@@ -188,6 +189,7 @@ check('S&C SMU-20 25E and 100E reduced curves reproduce official source spot che
     const entry = devices.find(device => device.id === entryId);
     const profile = entry.curveProfiles.find(item => item.id === profileId);
     const actual = interpolateTime(profile.curve, current);
+    assert.ok(Number.isFinite(actual), `${entryId}/${profileId} at ${current} A is below the stored curve`);
     const relativeError = Math.abs(actual - expected) / expected;
     assert.ok(relativeError <= 0.025, `${entryId}/${profileId} at ${current} A has ${(relativeError * 100).toFixed(2)}% error`);
   });

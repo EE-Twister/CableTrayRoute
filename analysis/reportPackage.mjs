@@ -378,9 +378,16 @@ export function sectionToAOA(section) {
   const rows = section.rows || section.cables?.rows || [];
   if (!rows.length) return null;
 
-  const headers = section.headers || Object.keys(rows[0]);
+  // Headers may be plain field names or { key, label } objects (advanced and
+  // construction sections). `exportHeaders` lets a section keep technical
+  // columns in the workbook that its printed table leaves out.
+  const columns = (section.exportHeaders || section.headers || Object.keys(rows[0]))
+    .map(header => (header && typeof header === 'object'
+      ? { key: header.key, label: header.label || header.key }
+      : { key: header, label: header }));
+  const cell = value => (value !== null && typeof value === 'object' ? JSON.stringify(value) : value ?? '');
   return [
-    headers,
-    ...rows.map(r => headers.map(h => r[h] ?? '')),
+    columns.map(column => column.label),
+    ...rows.map(r => columns.map(column => cell(r[column.key]))),
   ];
 }

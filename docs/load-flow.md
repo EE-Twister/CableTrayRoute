@@ -24,6 +24,10 @@ Newton-Raphson remains the default for smaller cases and is retained for meshed 
 
 The enforced large-project contract converts and solves one common utility bus, 1,000 downstream buses, and 2,000 attached devices in less than 2 seconds. A numerical regression runs the same supported network through both solvers and compares every bus voltage magnitude and angle plus real and reactive losses.
 
+## System loss display
+
+The results summary and the **Total Losses** line print a negative real-power loss as `0.00 kW` when it is within numerical tolerance of zero. The tolerance is the larger of 0.05 kW and the number of buses × the solver's reported maximum mismatch (kW). Ideal (zero-impedance) ties are solved as a very large admittance, and the round-off can appear as a slightly negative loss. The bundled Project Workflow Core sample, with two ideal-tie fuses, computes -0.007 kW. A more negative loss is printed as computed, with a warning that passive branches cannot generate real power. Negative reactive loss can be legitimate (line charging or shunt capacitance) and is shown unchanged. Saved study values are not modified.
+
 ## Balanced three-phase study
 
 **Balanced three-phase** is selected by default. The solver uses the total kW and kvar on each connected bus as a single three-phase load.

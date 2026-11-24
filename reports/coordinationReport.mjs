@@ -13,9 +13,73 @@
  *
  * The margin value used comes from the greedyCoordinate() options and is
  * stored in the coord state by the TCC UI.
+ *
+ * A device does not operate below its curve's minimum current (pickup), so
+ * its time is reported as "No trip" rather than the first curve point's
+ * time. Margins are computed only when both devices operate:
+ *   - downstream does not operate  → NOT EVALUATED (nothing to coordinate)
+ *   - only upstream does not operate → PASS (upstream does not operate)
+ *   - the current is above a curve's range, or a curve has no usable
+ *     points → NOT EVALUATED (outside curve data)
+ * Above the range, a device whose curve ends on its instantaneous plateau
+ * keeps operating at the instantaneous time. See evaluateOperatingTime() in
+ * analysis/tccAutoCoord.mjs.
  */
 
-import { interpolateTime } from '../analysis/tccAutoCoord.mjs';
+import { evaluateOperatingTime } from '../analysis/tccAutoCoord.mjs';
+
+const TIME_STATUS_TEXT = {
+  'no-trip': 'No trip',
+  'above-domain': 'Above curve range',
+  'no-curve': 'No curve data'
+};
+
+export const CTI_RESULT = Object.freeze({
+  PASS: 'PASS',
+  FAIL: 'FAIL',
+  PASS_UPSTREAM_NO_TRIP: 'PASS (upstream does not operate)',
+  NOT_EVALUATED_DOWNSTREAM_NO_TRIP: 'NOT EVALUATED (downstream does not operate)',
+  NOT_EVALUATED_OUTSIDE_CURVE: 'NOT EVALUATED (outside curve data)'
+});
+
+/**
+ * Current at which scaleCurve() cut a device's instantaneous plateau, or null
+ * when the device has no instantaneous element.
+ */
+function instantaneousCeiling(scaled) {
+  const settings = scaled?.settings ?? {};
+  return Number(settings.instantaneous) > 0 && Number(settings.instantaneousMax) > 0
+    ? Number(settings.instantaneousMax)
+    : null;
+}
+
+function formatOperatingTime(evaluation) {
+  return evaluation.status === 'operates'
+    ? evaluation.time.toFixed(4)
+    : TIME_STATUS_TEXT[evaluation.status] ?? TIME_STATUS_TEXT['no-curve'];
+}
+
+/**
+ * Compare one upstream/downstream pair at one test current.
+ *
+ * @returns {{ margin: number|null, result: string }}
+ */
+function assessPairAtCurrent(upstream, downstream, requiredMargin) {
+  if (downstream.status === 'no-trip') {
+    return { margin: null, result: CTI_RESULT.NOT_EVALUATED_DOWNSTREAM_NO_TRIP };
+  }
+  if (downstream.status !== 'operates') {
+    return { margin: null, result: CTI_RESULT.NOT_EVALUATED_OUTSIDE_CURVE };
+  }
+  if (upstream.status === 'no-trip') {
+    return { margin: null, result: CTI_RESULT.PASS_UPSTREAM_NO_TRIP };
+  }
+  if (upstream.status !== 'operates') {
+    return { margin: null, result: CTI_RESULT.NOT_EVALUATED_OUTSIDE_CURVE };
+  }
+  const margin = upstream.time - downstream.time;
+  return { margin, result: margin >= requiredMargin ? CTI_RESULT.PASS : CTI_RESULT.FAIL };
+}
 
 /** Column headers for the CTI report table. */
 export const CTI_HEADERS = [
@@ -97,16 +161,19 @@ export function buildCTIRows(deviceEntries, coordResult, faultCurrentA, margin =
     if (!downstreamScaled || !upstreamScaled) continue;
 
     // Use tolerance (max) curves for downstream and minimum curves for upstream,
-    // matching the conservative coordination check in tccAutoCoord.mjs.
+    // with the same duplicate-current boundaries (downstream 'upper', upstream
+    // 'lower') as the conservative coordination check in tccAutoCoord.mjs.
     const downCurve = downstreamScaled.maxCurve ?? downstreamScaled.curve ?? [];
     const upCurve = upstreamScaled.minCurve ?? upstreamScaled.curve ?? [];
 
+    const upCeiling = instantaneousCeiling(upstreamScaled);
+    const downCeiling = instantaneousCeiling(downstreamScaled);
+
     for (const fraction of TEST_FRACTIONS) {
       const testCurrent = faultCurrentA * fraction;
-      const upTime = interpolateTime(upCurve, testCurrent);
-      const downTime = interpolateTime(downCurve, testCurrent);
-      const actualMargin = upTime - downTime;
-      const pass = actualMargin >= safeMargin;
+      const upstream = evaluateOperatingTime(upCurve, testCurrent, { boundary: 'lower', instantaneousCeilingA: upCeiling });
+      const downstream = evaluateOperatingTime(downCurve, testCurrent, { boundary: 'upper', instantaneousCeilingA: downCeiling });
+      const { margin: actualMargin, result } = assessPairAtCurrent(upstream, downstream, safeMargin);
 
       rows.push({
         'Upstream Device': upstreamEntry.id,
@@ -116,11 +183,11 @@ export function buildCTIRows(deviceEntries, coordResult, faultCurrentA, margin =
         'Input Fingerprint': studyContext.provenance?.inputFingerprint || '',
         'Intended Use': studyContext.provenance?.intendedUse || '',
         'Test Current (A)': testCurrent.toFixed(1),
-        'Upstream Time (s)': upTime.toFixed(4),
-        'Downstream Time (s)': downTime.toFixed(4),
-        'Margin (s)': actualMargin.toFixed(4),
+        'Upstream Time (s)': formatOperatingTime(upstream),
+        'Downstream Time (s)': formatOperatingTime(downstream),
+        'Margin (s)': actualMargin === null ? 'N/A' : actualMargin.toFixed(4),
         'Required CTI (s)': safeMargin.toFixed(2),
-        'Pass/Fail': pass ? 'PASS' : 'FAIL'
+        'Pass/Fail': result
       });
     }
   }

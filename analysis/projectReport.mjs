@@ -29,6 +29,7 @@ import {
 import { buildConduitCableMap, evaluateConduitFill, recordId as conduitRecordId } from './conduitFill.mjs';
 import { cablesAssignedToTray, evaluateTrayFillWithCompartments, summarizeTrayFillResult } from './trayFill.mjs';
 import { assessArcFlashResultPlausibility } from './arcFlashResultUnits.mjs';
+import { normalizeRouteResultState } from './routeResults.mjs';
 import { parseTradeSize } from './pullBoxSizing.mjs';
 
 
@@ -51,36 +52,117 @@ function buildSummarySection(cables, trays, conduits, ductbanks, projectName) {
   };
 }
 
-function buildCableSection(cables) {
-  const rows = cables.map(c => ({
-    id:             c.id || c.tag || c.cable_id || '—',
-    from:           c.from || c.from_tag || c.source || '—',
-    to:             c.to || c.to_tag || c.destination || '—',
-    size:           c.conductor_size || c.size || '—',
-    insulation:     c.insulation_type || c.insulation || c.insulation_material || '—',
-    voltage:        c.voltage_rating || c.cable_rating || c.operating_voltage || c.voltage || c.rated_voltage || '—',
-    lengthFt:       parseFloat(c.length || c.length_ft || 0),
-    raceway:        c.route_preference || c.raceway || (Array.isArray(c.raceway_ids) ? c.raceway_ids.join(', ') : c.raceway_ids) || '—',
-    routed:         Boolean(c.route_preference || c.raceway || (Array.isArray(c.raceway_ids) ? c.raceway_ids.length : c.raceway_ids)),
-  }));
+const LENGTH_MISMATCH_TOLERANCE_FT = 5;
+const LENGTH_MISMATCH_TOLERANCE_FRACTION = 0.1;
 
-  const routed   = rows.filter(r => r.routed).length;
-  const unrouted = rows.length - routed;
-  const totalFt  = rows.reduce((s, r) => s + r.lengthFt, 0);
+function positiveNumber(value) {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+/**
+ * Cable rows for the report. Identifiers are cable tags (the same identifiers
+ * Routing Summary and DRC use); rated insulation voltage and operating voltage
+ * are separate columns; "routed" means a saved route result exists, not merely
+ * a raceway assignment; and the routed length is shown beside the schedule
+ * length so differences are visible.
+ */
+function buildCableSection(cables, routeResults = null) {
+  const routeState = routeResults ? normalizeRouteResultState(routeResults, { cables }) : null;
+  const routedNames = new Set((routeState?.routedCableNames || []).map(name => String(name).trim().toLowerCase()));
+  const routeByCable = new Map((routeState?.batchResults || []).map(result => [
+    String(result.cable ?? result.cable_tag ?? result.tag ?? result.name ?? '').trim().toLowerCase(),
+    result,
+  ]));
+  const rows = cables.map(c => {
+    const tag = c.tag || c.name || c.cable_id || c.id || '—';
+    const key = String(tag).trim().toLowerCase();
+    const assignment = c.route_preference || c.raceway || (Array.isArray(c.raceway_ids) ? c.raceway_ids.join(', ') : c.raceway_ids) || '';
+    const lengthFt = positiveNumber(c.length) ?? positiveNumber(c.length_ft) ?? 0;
+    const route = routeByCable.get(key) || null;
+    const routed = routeState ? routedNames.has(key) : false;
+    const routedLengthFt = routed ? positiveNumber(route?.total_length ?? route?.totalLength ?? route?.length) : null;
+    const lengthMismatch = routedLengthFt !== null && lengthFt > 0
+      && Math.abs(routedLengthFt - lengthFt) > Math.max(LENGTH_MISMATCH_TOLERANCE_FT, LENGTH_MISMATCH_TOLERANCE_FRACTION * lengthFt);
+    return {
+      id:              tag,
+      from:            c.from || c.from_tag || c.source || '—',
+      to:              c.to || c.to_tag || c.destination || '—',
+      size:            c.conductor_size || c.size || '—',
+      insulation:      c.insulation_type || c.insulation || c.insulation_material || '—',
+      ratedVoltage:    c.voltage_rating || c.cable_rating || c.rated_voltage || '—',
+      operatingVoltage: positiveNumber(c.operating_voltage) ?? positiveNumber(c.voltage) ?? '—',
+      lengthFt,
+      routedLengthFt:  routedLengthFt ?? '—',
+      lengthMismatch,
+      raceway:         assignment || '—',
+      routeStatus:     routed ? 'Routed' : (routeState ? (assignment ? 'Assigned, not routed' : 'Not routed') : (assignment ? 'Assigned' : 'Unassigned')),
+      assigned:        Boolean(assignment),
+      routed,
+    };
+  });
+
+  const totalFt = rows.reduce((s, r) => s + r.lengthFt, 0);
+  const routed = routeState ? rows.filter(r => r.routed).length : null;
 
   return {
     title: 'Cable Schedule',
     rows,
     summary: {
       total: rows.length,
+      routeResultsAvailable: Boolean(routeState),
       routed,
-      unrouted,
+      unrouted: routed === null ? null : rows.length - routed,
+      assigned: rows.filter(r => r.assigned).length,
+      lengthMismatches: rows.filter(r => r.lengthMismatch).length,
       totalLengthFt: +totalFt.toFixed(1),
       missingInsulation: rows.filter(row => row.insulation === '—').length,
-      missingVoltage: rows.filter(row => row.voltage === '—').length,
-      issueReady: rows.every(row => row.insulation !== '—' && row.voltage !== '—')
+      missingVoltage: rows.filter(row => row.ratedVoltage === '—').length,
+      missingOperatingVoltage: rows.filter(row => row.operatingVoltage === '—').length,
+      issueReady: rows.every(row => row.insulation !== '—' && row.ratedVoltage !== '—'),
     },
   };
+}
+
+/** Shared Cable Schedule markup for both report renderers. */
+function cableSectionHTML(cables, { esc, fmt }) {
+  const summary = cables.summary;
+  const readiness = summary.issueReady
+    ? '<p class="report-readiness-note report-readiness-note--ready">Issue-ready fields complete (insulation type and rated voltage).</p>'
+    : `<p class="report-readiness-note report-readiness-note--warning">Not issue-ready: ${fmt(summary.missingInsulation)} cable(s) need insulation type and ${fmt(summary.missingVoltage)} cable(s) need rated voltage.</p>`;
+  const routing = summary.routeResultsAvailable
+    ? `${fmt(summary.routed)} routed &nbsp;·&nbsp; ${fmt(summary.unrouted)} not routed`
+    : `${fmt(summary.assigned)} assigned to a raceway &nbsp;·&nbsp; no saved route results`;
+  const mismatch = summary.lengthMismatches
+    ? ` &nbsp;·&nbsp; ${fmt(summary.lengthMismatches)} length mismatch(es) between schedule and route (more than ${LENGTH_MISMATCH_TOLERANCE_FT} ft and ${LENGTH_MISMATCH_TOLERANCE_FRACTION * 100}%)`
+    : '';
+  return `${readiness}
+  <p class="report-note">${routing} &nbsp;·&nbsp; ${fmt(summary.totalLengthFt)} ft total (schedule lengths)${mismatch}</p>
+  <div class="report-scroll"><table class="report-table">
+    <thead><tr><th>Cable</th><th>From</th><th>To</th><th>Size</th><th>Insulation</th><th>Rated (V)</th><th>Operating (V)</th><th>Schedule length (ft)</th><th>Routed length (ft)</th><th>Raceway</th><th>Route status</th></tr></thead>
+    <tbody>${cables.rows.map(r => `<tr>
+      <td>${esc(r.id)}</td><td>${esc(r.from)}</td><td>${esc(r.to)}</td>
+      <td>${esc(r.size)}</td><td>${esc(r.insulation)}</td><td>${fmt(r.ratedVoltage)}</td><td>${fmt(r.operatingVoltage)}</td>
+      <td>${fmt(r.lengthFt)}</td><td>${fmt(r.routedLengthFt)}${r.lengthMismatch ? ' ⚠' : ''}</td><td>${esc(r.raceway)}</td><td>${esc(r.routeStatus)}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+/**
+ * Number formatting for issued report text. `toLocaleString()` keeps at most
+ * three decimals, which turned 0.9496 pu into "0.95" (reading as inside a
+ * 0.95 pu band), small probabilities into "0", and 99.99991 % into "100".
+ * Up to six significant figures are kept, integers and large values keep
+ * grouping, and magnitudes below 1e-4 use exponent notation.
+ */
+export function formatReportNumber(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+  if (value === 0) return '0';
+  const magnitude = Math.abs(value);
+  if (magnitude < 1e-4) return value.toExponential(2);
+  if (Number.isInteger(value)) return value.toLocaleString();
+  if (magnitude >= 1000) return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  return value.toLocaleString(undefined, { maximumSignificantDigits: 6 });
 }
 
 const round2 = value => (Number.isFinite(value) ? +value.toFixed(2) : null);
@@ -329,11 +411,12 @@ export function generateProjectReport({
   studies = {},
   approvals = {},
   assessHeatTraceCase = null,
+  routeResults = null,
 } = {}) {
   return {
     generatedAt: new Date().toISOString(),
     summary:    buildSummarySection(cables, trays, conduits, ductbanks, projectName),
-    cables:     buildCableSection(cables),
+    cables:     buildCableSection(cables, routeResults),
     fill:       buildFillSection(trays, conduits, cables),
     clashes:    buildClashSection(trays),
     spools:     buildSpoolSection(trays, cables),
@@ -350,7 +433,7 @@ export function generateProjectReport({
  */
 export function renderReportHTML(report) {
   const esc = s => String(s ?? '—').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const fmt = n => typeof n === 'number' ? n.toLocaleString() : esc(n);
+  const fmt = n => typeof n === 'number' ? formatReportNumber(n) : esc(n);
 
   const statusBadge = s => {
     const map = {
@@ -391,18 +474,7 @@ export function renderReportHTML(report) {
 
 <section class="report-section" id="rpt-cables">
   <h2>Cable Schedule</h2>
-  ${cables.summary.issueReady ? '<p class="report-readiness-note report-readiness-note--ready">Issue-ready fields complete.</p>' : `<p class="report-readiness-note report-readiness-note--warning">Not issue-ready: ${fmt(cables.summary.missingInsulation)} cable(s) need insulation type and ${fmt(cables.summary.missingVoltage)} cable(s) need voltage rating.</p>`}
-  <p class="report-note">${fmt(cables.summary.routed)} routed &nbsp;·&nbsp; ${fmt(cables.summary.unrouted)} unrouted &nbsp;·&nbsp; ${fmt(cables.summary.totalLengthFt)} ft total</p>
-  <div class="report-scroll">
-  <table class="report-table">
-    <thead><tr><th>ID</th><th>From</th><th>To</th><th>Size</th><th>Insulation</th><th>Voltage</th><th>Length (ft)</th><th>Raceway</th></tr></thead>
-    <tbody>${cables.rows.map(r => `<tr>
-      <td>${esc(r.id)}</td><td>${esc(r.from)}</td><td>${esc(r.to)}</td>
-      <td>${esc(r.size)}</td><td>${esc(r.insulation)}</td><td>${esc(r.voltage)}</td>
-      <td>${fmt(r.lengthFt)}</td><td>${esc(r.raceway)}</td>
-    </tr>`).join('')}</tbody>
-  </table>
-  </div>
+  ${cableSectionHTML(cables, { esc, fmt })}
 </section>
 
 <section class="report-section" id="rpt-fill">
@@ -1045,7 +1117,7 @@ export function buildAdvancedStudySections(studies = {}, approvals = {}, options
         { key: 'maxVm', label: 'Max V (pu)' }, { key: 'risk', label: 'Envelope Status' },
       ],
       rows: (qd?.busEnvelope || []).map(row => ({
-        bus: row.label || row.id || 'â€”',
+        bus: row.label || row.id || '—',
         minVm: row.minVm,
         maxVm: row.maxVm,
         risk: [row.minRisk, row.maxRisk].includes('fail') ? 'fail'
@@ -1070,7 +1142,7 @@ export function buildAdvancedStudySections(studies = {}, approvals = {}, options
         { key: 'pUnder', label: 'P(V < 0.95)' }, { key: 'pOver', label: 'P(V > 1.05)' },
       ],
       rows: (probabilistic?.busStats || []).map(row => ({
-        bus: row.label || row.id || 'â€”',
+        bus: row.label || row.id || '—',
         mean: row.mean,
         p05: row.p05,
         min: row.min,
@@ -1096,8 +1168,8 @@ export function buildAdvancedStudySections(studies = {}, approvals = {}, options
         { key: 'status', label: 'Status' }, { key: 'transient', label: 'Transient Screen' },
       ],
       rows: (contingency?.contingencies || []).map(row => ({
-        branch: row.branchName || row.branchId || 'â€”',
-        type: row.branchType || 'â€”',
+        branch: row.branchName || row.branchId || '—',
+        type: row.branchType || '—',
         converged: row.converged ? 'Yes' : 'No',
         violations: (row.violations || []).length,
         status: row.critical ? 'critical' : 'pass',
@@ -1118,7 +1190,7 @@ export function buildAdvancedStudySections(studies = {}, approvals = {}, options
         { key: 'marginPct', label: 'Margin (%)' }, { key: 'reactiveMargin', label: 'Reactive Margin (MVAR)' },
       ],
       rows: voltage ? [{
-        targetBus: voltage.summary?.targetBusId || 'â€”',
+        targetBus: voltage.summary?.targetBusId || '—',
         operatingLoadMw: voltage.summary?.operatingLoadMW,
         maxLoadMw: voltage.summary?.maxLoadMW,
         marginMw: voltage.summary?.loadabilityMarginMW,
@@ -1193,7 +1265,7 @@ export function buildAdvancedStudySections(studies = {}, approvals = {}, options
         { key: 'cost', label: 'Cost ($/h)' }, { key: 'limit', label: 'Limit Status' },
       ],
       rows: (opf?.dispatch || []).map(row => ({
-        unit: row.name || row.id || 'â€”',
+        unit: row.name || row.id || '—',
         output: row.output,
         loading: row.loadingPct,
         incrementalCost: row.incrementalCost,
@@ -1307,7 +1379,7 @@ export function renderPackageHTML(pkg, baseReport = {}) {
   if (!pkg || !pkg.sections) return '';
 
   const esc = s => String(s ?? '—').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const fmt = n => typeof n === 'number' ? n.toLocaleString() : esc(n);
+  const fmt = n => typeof n === 'number' ? formatReportNumber(n) : esc(n);
 
   const statusBadge = s => {
     const map = {
@@ -1477,16 +1549,7 @@ export function renderPackageHTML(pkg, baseReport = {}) {
     html += `
 <section class="report-section" id="rpt-cables">
   <h2>Cable Schedule</h2>
-  ${cables.summary.issueReady ? '<p class="report-readiness-note report-readiness-note--ready">Issue-ready fields complete.</p>' : `<p class="report-readiness-note report-readiness-note--warning">Not issue-ready: ${fmt(cables.summary.missingInsulation)} cable(s) need insulation type and ${fmt(cables.summary.missingVoltage)} cable(s) need voltage rating.</p>`}
-  <p class="report-note">${fmt(cables.summary.routed)} routed &nbsp;·&nbsp; ${fmt(cables.summary.unrouted)} unrouted &nbsp;·&nbsp; ${fmt(cables.summary.totalLengthFt)} ft total</p>
-  <div class="report-scroll"><table class="report-table">
-    <thead><tr><th>ID</th><th>From</th><th>To</th><th>Size</th><th>Insulation</th><th>Voltage</th><th>Length (ft)</th><th>Raceway</th></tr></thead>
-    <tbody>${cables.rows.map(r => `<tr>
-      <td>${esc(r.id)}</td><td>${esc(r.from)}</td><td>${esc(r.to)}</td>
-      <td>${esc(r.size)}</td><td>${esc(r.insulation)}</td><td>${esc(r.voltage)}</td>
-      <td>${fmt(r.lengthFt)}</td><td>${esc(r.raceway)}</td>
-    </tr>`).join('')}</tbody>
-  </table></div>
+  ${cableSectionHTML(cables, { esc, fmt })}
 </section>`;
   } else if (sections.cables) {
     html += unavailableSection('cables', sections.cables.title || 'Cable Schedule');
@@ -1716,6 +1779,8 @@ export function renderPackageHTML(pkg, baseReport = {}) {
   const advancedStudyKeys = [
     'quasiDynamic', 'probabilisticLoadFlow', 'contingency', 'voltageStability',
     'frequencyScan', 'transientStability', 'optimalPowerFlow', 'reliability',
+    // analysis/reportSupplementalSections.mjs builds these in the same shape.
+    'sustainability', 'tccSettings', 'hazAreaClass', 'insulationCoord', 'lighting',
   ];
   for (const key of advancedStudyKeys) {
     const s = sections[key];
@@ -1730,8 +1795,8 @@ export function renderPackageHTML(pkg, baseReport = {}) {
   ${s.empty ? emptySection(s.title || key) : `
   <p class="report-readiness-note ${readinessClass}">
     ${esc(s.readiness?.validityLabel || 'Validity not recorded')}
-    &nbsp;Â·&nbsp; Source: ${esc(s.readiness?.source || 'not recorded')}
-    ${s.readiness?.runAt ? ` &nbsp;Â·&nbsp; Run: ${esc(s.readiness.runAt)}` : ''}
+    &nbsp;·&nbsp; Source: ${esc(s.readiness?.source || 'not recorded')}
+    ${s.readiness?.runAt ? ` &nbsp;·&nbsp; Run: ${esc(s.readiness.runAt)}` : ''}
   </p>
   ${s.readiness?.convergence ? `<p class="report-note">${esc(s.readiness.convergence)}</p>` : ''}
   ${summaryEntries.length ? `<dl class="report-summary-list">${summaryEntries.map(([label, value]) =>
@@ -1742,7 +1807,7 @@ export function renderPackageHTML(pkg, baseReport = {}) {
     <thead><tr>${(s.headers || []).map(header => `<th>${esc(header.label)}</th>`).join('')}</tr></thead>
     <tbody>${s.rows.map(row => `<tr>${(s.headers || []).map(header => {
       const value = row[header.key];
-      return `<td>${typeof value === 'number' ? fmt(value) : esc(value ?? 'â€”')}</td>`;
+      return `<td>${typeof value === 'number' ? fmt(value) : esc(value ?? '—')}</td>`;
     }).join('')}</tr>`).join('')}</tbody>
   </table></div>` : '<p class="report-empty">No detailed rows were produced.</p>'}
   ${(s.cutSets || []).length ? `
