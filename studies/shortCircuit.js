@@ -5,6 +5,7 @@ import { downloadPDF } from '../reports/reporting.mjs';
 import { barChartHtml, kpiStripHtml, shortCircuitBarRows, statusLegendHtml } from '../src/components/resultViz.mjs';
 import { loadReferencedProtectiveDevices } from '../src/protectiveDevices/calculationCatalog.mjs';
 import { studyExportMetadata } from '../analysis/studyExportMetadata.mjs';
+import { isStudyResultCurrent } from '../analysis/studyResultContext.mjs';
 import { buildShortCircuitExportTable, shortCircuitInputQuality as inputQuality } from './shortCircuitExportTable.mjs';
 
 function projectComponents() {
@@ -355,7 +356,7 @@ function initializeShortCircuitPage() {
     let latestStale = false;
     if (reviewableResults(latestResults)) {
       const assessment = getStudyAssessments().shortCircuit;
-      latestStale = assessment?.freshness !== 'current' || assessment?.eligible !== true;
+      latestStale = !isStudyResultCurrent(assessment);
       renderResults(latestResults, scope?.value || 'project', { stale: latestStale });
       if (exportButton) exportButton.disabled = false;
       const timestamp = resultTimestamp(latestResults);
