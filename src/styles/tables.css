@@ -630,7 +630,7 @@ body.dark-mode .table-row-focusable:focus-within::after {
 
 .loadlist-chip.active,
 .loadlist-chip:hover {
-    background: var(--primary-color);
+    background: var(--button-bg, var(--primary-color));
     color: #fff;
 }
 

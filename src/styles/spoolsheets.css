@@ -75,7 +75,7 @@
 }
 
 .spoolsheets-page .spool-parameter-row label strong {
-  color: var(--primary-color, #2563eb);
+  color: var(--color-heading-accent, var(--primary-color));
   font-size: .82rem;
   white-space: nowrap;
 }
@@ -152,7 +152,7 @@
 .spoolsheets-page .spool-view-preset.is-active {
   border-color: var(--primary-color, #2563eb);
   background: color-mix(in srgb, var(--primary-color, #2563eb) 12%, var(--card-bg, #ffffff));
-  color: var(--primary-color, #2563eb);
+  color: var(--color-heading-accent, var(--primary-color));
 }
 
 .spoolsheets-page .spool-view-preset:disabled {
@@ -237,7 +237,7 @@
 .spoolsheets-page .spool-view-btn[aria-pressed="true"] {
   border-color: var(--primary-color, #2563eb);
   background: color-mix(in srgb, var(--primary-color, #2563eb) 12%, var(--card-bg, #ffffff));
-  color: var(--primary-color, #2563eb);
+  color: var(--color-heading-accent, var(--primary-color));
 }
 
 .spoolsheets-page .spool-view-btn:disabled {

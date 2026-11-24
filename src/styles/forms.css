@@ -853,7 +853,7 @@ details {
 details > summary {
     cursor: pointer;
     font-weight: bold;
-    color: var(--primary-color);
+    color: var(--color-heading-accent, var(--primary-color));
 }
 
 .tray-form {

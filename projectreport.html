@@ -208,6 +208,8 @@
     /* Light-theme headings use --primary-color (pinned above); body.dark-mode
        also recolours h4, which paper keeps as ink. */
     .report-preview h4 { color: inherit; }
+    /* The preview is always a light page, so headings use the dark-on-light teal. */
+    .report-preview { --color-heading-accent: #0e7490; }
     .report-preview .report-section { min-width: 0; }
     .report-preview .report-scroll { max-width: 100%; overflow: visible; }
     .report-preview .report-table { width: 100%; max-width: 100%; table-layout: fixed; font-size: clamp(.62rem, 1.1vw, .78rem); }

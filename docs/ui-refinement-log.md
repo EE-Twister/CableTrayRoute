@@ -1,5 +1,13 @@
 # UI Refinement Log
 
+
+## 2026-11-24 (dark-mode contrast on the remaining pages)
+
+- Teal *text* (`color: var(--primary-color)`, 33 rules) now uses `--color-heading-accent`, which is a lighter teal in dark mode; fills and borders keep `--primary-color`. The report preview overrides the token to a darker teal because it is always a light page.
+- Hard-coded colours on the One-Line command labels and right-rail tabs, the step navigation, the TCC readiness labels, the Optimal Route sidebar heading and raceway filter, and the raceway/gallery chips now use theme tokens.
+- Unstyled links use `--color-primary` through a zero-specificity `:where()` rule, replacing Firefox's default `#8c8cff`.
+- `playwright-tests/a11y.spec.ts` no longer excludes any page in the dark pass.
+
 ## 2026-11-23
 
 - Fixed dark mode drawing light panels under light text (review finding U1):

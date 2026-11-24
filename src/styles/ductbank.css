@@ -200,7 +200,7 @@ body.dark-mode .filter-btn:focus-visible {
 }
 
 .filter-btn.filtered {
-    color: var(--primary-color);
+    color: var(--color-heading-accent, var(--primary-color));
 }
 
 .header-sort {
@@ -255,7 +255,7 @@ body.dark-mode .filter-btn:focus-visible {
 }
 
 th.is-sorted .header-sort {
-    color: var(--primary-color);
+    color: var(--color-heading-accent, var(--primary-color));
 }
 
 .group-toggle {
@@ -273,7 +273,7 @@ th.is-sorted .header-sort {
 .group-toggle:hover,
 .group-toggle:focus {
     background: var(--secondary-color);
-    color: var(--primary-color);
+    color: var(--color-heading-accent, var(--primary-color));
 }
 
 .group-toggle:focus-visible {

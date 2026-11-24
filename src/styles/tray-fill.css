@@ -127,7 +127,7 @@ body.conduitfill-page .helpBtn {
     background: transparent;
     border: 1px solid transparent;
     border-radius: 4px;
-    color: var(--primary-color);
+    color: var(--color-heading-accent, var(--primary-color));
     cursor: pointer;
     font-size: 0.85rem;
     font-weight: 700;
@@ -169,7 +169,7 @@ body.cabletrayfill-page .warning {
     font-weight: bold;
 }
 body.cabletrayfill-page .recommend {
-    color: var(--primary-color);
+    color: var(--color-heading-accent, var(--primary-color));
     font-weight: bold;
 }
 body.cabletrayfill-page .nfpaWarn {

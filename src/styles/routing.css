@@ -177,7 +177,7 @@ body.dark-mode .large-facility-sample-btn {
 
 .optimal-route-sidebar header h2 {
   margin-bottom: var(--space-2, 0.5rem);
-  color: #0f172a;
+  color: var(--color-text, #0f172a);
 }
 
 .sidebar-note,
@@ -1167,7 +1167,7 @@ button.route-review-kpi:focus-visible {
 .route-plot-selection-card > span:first-child {
   display: block;
   margin-bottom: 0.2rem;
-  color: var(--primary-color, #2563eb);
+  color: var(--color-heading-accent, var(--primary-color));
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.09em;
@@ -1253,7 +1253,7 @@ button.route-review-kpi:focus-visible {
 
 .route-raceway-filter select {
   max-width: 13rem;
-  color: #1d4ed8;
+  color: #1e3a8a;
 }
 
 .route-raceway-filter-summary {
@@ -1287,7 +1287,7 @@ button.route-review-kpi:focus-visible {
 .route-view-presets button[aria-pressed="true"] {
   border-color: var(--color-border, #dbe3ec);
   background: var(--color-surface-strong, #ffffff);
-  color: var(--primary-color, #2563eb);
+  color: var(--color-heading-accent, var(--primary-color));
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
 }
 

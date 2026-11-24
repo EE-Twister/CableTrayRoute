@@ -94,7 +94,7 @@
 
 .panel-info-section h2 {
     margin: 0 0 0.65rem;
-    color: var(--primary-color);
+    color: var(--color-heading-accent, var(--primary-color));
     font-size: 0.78rem;
     font-weight: 700;
     letter-spacing: 0.055em;
@@ -1709,7 +1709,7 @@ body.dark-mode .tcc-tool-controls {
 .device-filter-btn.active {
     border-color: var(--primary-color, #0d6efd);
     background: rgba(13, 110, 253, 0.14);
-    color: var(--primary-color, #0d6efd);
+    color: var(--color-heading-accent, var(--primary-color));
 }
 
 .device-filter-btn:disabled {
@@ -1860,7 +1860,7 @@ body.dark-mode .tcc-callout-scope-label select {
 .tcc-view-option-clear {
     background: none;
     border: none;
-    color: var(--primary-color, #0d6efd);
+    color: var(--color-heading-accent, var(--primary-color));
     cursor: pointer;
     font-size: 0.85rem;
     padding: 0;
@@ -2178,7 +2178,7 @@ body.dark-mode .tcc-crosshair-text {
 
 .tcc-equipment-metrics-heading h2 {
     margin: 0;
-    color: var(--primary-color, #0d6efd);
+    color: var(--color-heading-accent, var(--primary-color));
     font-size: 1rem;
     line-height: 1.2;
 }

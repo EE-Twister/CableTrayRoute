@@ -29,24 +29,6 @@ const PAGES = [
 
 const COLOR_SCHEMES = ['light', 'dark'] as const;
 
-// Dark-mode contrast is still failing on these pages: older stylesheets use
-// the teal --primary-color both as a button fill (needs a darker value) and as
-// link/heading text (needs a lighter one), and several page-specific rules
-// hard-code colours. They stay in the dark pass as fixme so the gap is tracked
-// and the pass is enforced on every other page; remove a page from this set as
-// its styles move to role-specific tokens. See docs/application-review-2026-11-23.md (U1).
-const DARK_KNOWN_FAILURES = new Set([
-  'cableschedule.html',
-  'optimalRoute.html',
-  'racewayschedule.html',
-  'loadFlow.html',
-  'oneline.html',
-  'tcc.html',
-  'panelschedule.html',
-  'help.html',
-  'projectreport.html',
-  'samplegallery.html',
-]);
 
 // Pages that do not load the shared theme runtime, so body never receives the
 // dark-mode class; the dark pass still covers them through the media query.
@@ -81,7 +63,6 @@ for (const colorScheme of COLOR_SCHEMES) {
   for (const page of PAGES) {
     const title = colorScheme === 'light' ? `WCAG 2.1 AA: ${page}` : `WCAG 2.1 AA (dark): ${page}`;
     test(title, async ({ page: pw }) => {
-      test.fixme(colorScheme === 'dark' && DARK_KNOWN_FAILURES.has(page), 'Known dark-mode contrast failures; see DARK_KNOWN_FAILURES');
       await pw.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
       await pw.addInitScript(() => {
         localStorage.clear();

@@ -647,7 +647,7 @@
 
         &:hover {
             background: color-mix(in srgb, var(--primary-color) 8%, transparent);
-            color: var(--primary-color);
+            color: var(--color-heading-accent, var(--primary-color));
         }
 
         &.active,
@@ -655,7 +655,7 @@
             font-weight: 600;
             background: color-mix(in srgb, var(--primary-color) 14%, transparent);
             border-left-color: var(--primary-color);
-            color: var(--primary-color);
+            color: var(--color-heading-accent, var(--primary-color));
             padding-left: calc(0.5rem - 1px);
         }
 
@@ -1007,7 +1007,7 @@
     gap: 1rem;
 
     & a {
-        color: #1e40af;
+        color: var(--color-primary, #1e40af);
         text-decoration: none;
         padding: var(--space-2) var(--space-3);
         border: 1px solid var(--color-border);
@@ -1030,7 +1030,7 @@
 .step-nav-prev,
 .step-nav-link,
 .step-nav-next {
-    color: #1e40af;
+    color: var(--color-primary, #1e40af);
 }
 
 .step-nav[hidden] {

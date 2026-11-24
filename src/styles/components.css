@@ -3,7 +3,7 @@
     display: inline-block;
     font-size: 0.8em;
     margin-top: 0.25rem;
-    color: var(--primary-color);
+    color: var(--color-heading-accent, var(--primary-color));
     text-decoration: underline;
     word-break: break-word;
     background: none;

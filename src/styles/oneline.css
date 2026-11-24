@@ -970,7 +970,7 @@ body.compact-mode .palette-section .section-buttons {
 }
 
 .command-label {
-  color: #344054;
+  color: var(--color-text-muted, #344054);
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1364,7 +1364,7 @@ body.compact-mode .palette-section .section-buttons {
 .pan-controls .icon-button:hover,
 .pan-controls .icon-button:focus {
   background-color: var(--secondary-color);
-  color: var(--primary-color);
+  color: var(--color-heading-accent, var(--primary-color));
 }
 
 #zoom-display {
@@ -1544,7 +1544,7 @@ body.oneline-page.engineering-print-mode .oneline-canvas-scroll #diagram {
 }
 
 .status-mode {
-  color: var(--primary-color);
+  color: var(--color-heading-accent, var(--primary-color));
   font-weight: 600;
 }
 
@@ -1625,7 +1625,7 @@ body.oneline-page .palette-scroll {
 .right-rail-tab {
   border: 1px solid var(--ol-border-color);
   background: var(--secondary-color);
-  color: #111827;
+  color: var(--color-text, #111827);
   border-radius: var(--ol-radius);
   padding: 0.35rem 0.45rem;
   cursor: pointer;
@@ -1670,7 +1670,7 @@ body.oneline-page .palette-scroll {
 
 .readiness-header strong {
   font-size: 1.25rem;
-  color: var(--primary-color);
+  color: var(--color-heading-accent, var(--primary-color));
 }
 
 .readiness-list {
@@ -1786,7 +1786,7 @@ body.oneline-page .palette-scroll {
 .right-rail-fix-btn {
   font-size: 0.8rem !important;
   font-weight: 600;
-  color: var(--primary-color) !important;
+  color: var(--color-heading-accent, var(--primary-color)) !important;
 }
 
 .right-rail-link-grid {
@@ -2579,7 +2579,7 @@ body.oneline-page.engineering-print-mode {
 
 .prop-field-badge-calculated {
   background: rgba(0, 123, 255, 0.12);
-  color: var(--primary-color);
+  color: var(--color-heading-accent, var(--primary-color));
   border-color: rgba(0, 123, 255, 0.35);
 }
 
@@ -2707,7 +2707,7 @@ body.oneline-page.engineering-print-mode {
 
 .harmonic-profile-chart-modal-header h3 {
   margin: 0;
-  color: var(--primary-color);
+  color: var(--color-heading-accent, var(--primary-color));
 }
 
 .harmonic-profile-chart-close {
