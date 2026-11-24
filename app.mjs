@@ -49,6 +49,10 @@ import { appendHtmlChunks } from './src/components/incrementalDom.js';
 import { bindRouteDetailActions, buildRouteDetailMarkup } from './src/routing/routeDetailView.mjs';
 import { createRouteBreakdown } from './src/routing/routeBreakdown.mjs';
 import { downloadRouteWorkbook } from './src/routing/routeExportDownload.mjs';
+import {
+    CABLE_TEMPLATE_HEADERS, ROUTE_SUMMARY_COLUMNS, TRAY_TEMPLATE_HEADERS, buildCableOptionsCsv, buildRouteDataCsv,
+    buildTrayListCsv, labelRouteRows, mapImportedTrayRow, normalizeImportRow
+} from './src/routing/routingFileModel.mjs';
 import { renderSharedRouteMetrics } from './src/routing/sharedRoutesView.mjs';
 import { mergeCanonicalCableRoutes, persistCanonicalCableEdit, removeCanonicalCable } from './src/routing/canonicalCableRouteMerge.mjs';
 import { createPullOptionElements, getPullAnalysisInputs, readPullCheckOptions, restorePullCheckOptions } from './src/routing/pullOptionsController.mjs';
@@ -419,26 +423,13 @@ async function initializeApp() {
     if(elements.exportCablesBtn) elements.exportCablesBtn.addEventListener('click',markSaved);
     ['export-csv-btn','export-routes-btn','download-bom-btn','export-tray-fills-btn'].forEach(id=>{const b=document.getElementById(id);if(b)b.addEventListener('click',markSaved);});
 
-    const trayTemplateHeaders=[
-        'tray_id','start_x','start_y','start_z','end_x','end_y','end_z',
-        ['inside_width','width'],
-        ['tray_depth','height'],
-        'tray_type','current_fill','num_slots','slot_groups','allowed_cable_group','shape'
-    ];
+    const trayTemplateHeaders=TRAY_TEMPLATE_HEADERS;
     const trayImportRequiredHeaders=[
         'tray_id','start_x','start_y','start_z','end_x','end_y','end_z',
         ['inside_width','width'],
         ['tray_depth','height']
     ];
-    const cableTemplateHeaders=[
-        'tag',
-        ['from_tag','start_tag'],
-        ['to_tag','end_tag'],
-        'cable_type','conductors','conductor_size',
-        ['cable_od','diameter'],
-        ['weight','weight_lb_ft'],
-        'allowed_cable_group','start_x','start_y','start_z','end_x','end_y','end_z'
-    ];
+    const cableTemplateHeaders=CABLE_TEMPLATE_HEADERS;
     const cableImportRequiredHeaders=[
         'tag',
         ['from_tag','start_tag'],
@@ -531,7 +522,7 @@ async function initializeApp() {
                 }else{
                     rows=Papa.parse(e.target.result,{header:true,skipEmptyLines:true}).data;
                 }
-                rows=rows.map(r=>{const o={};Object.keys(r).forEach(k=>{o[k.trim().toLowerCase()]=r[k];});return o;});
+                rows=rows.map(normalizeImportRow);
                 cb(rows);
             }catch(err){
                 console.error('Import failed',err);
@@ -1721,18 +1712,7 @@ const openUtilizationReview = row => {
         }
     };
     const exportManualTraysCSV = () => {
-        const headers = trayTemplateHeaders.map(h=>Array.isArray(h)?h[0]:h);
-        const rows = state.manualTrays;
-        let csv = headers.join(',') + '\n';
-        if (rows.length > 0) {
-            rows.forEach(r => {
-                const row = [
-                    r.tray_id,r.start_x,r.start_y,r.start_z,r.end_x,r.end_y,r.end_z,
-                    r.width,r.height,r.tray_type||'',r.current_fill,r.allowed_cable_group,r.shape
-                ];
-                csv += row.join(',') + '\n';
-            });
-        }
+        const csv = buildTrayListCsv(state.manualTrays);
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -1748,23 +1728,7 @@ const openUtilizationReview = row => {
         const file = elements.importTraysFile.files[0];
         if(!file)return;
         handleImport(file,trayImportRequiredHeaders,rows=>{
-            const newTrays=rows.map(t=>({
-                tray_id:t.tray_id,
-                start_x:parseFloat(t.start_x)||0,
-                start_y:parseFloat(t.start_y)||0,
-                start_z:parseFloat(t.start_z)||0,
-                end_x:parseFloat(t.end_x)||0,
-                end_y:parseFloat(t.end_y)||0,
-                end_z:parseFloat(t.end_z)||0,
-                width:parseFloat((t.inside_width??t.width))||0,
-                height:parseFloat((t.tray_depth??t.height))||0,
-                tray_type:t.tray_type||'',
-                current_fill:parseFloat(t.current_fill)||0,
-                allowed_cable_group:t.allowed_cable_group||'',
-                shape:t.shape||'STR',
-                raceway_type:'tray'
-            }));
-            state.manualTrays=newTrays;
+            state.manualTrays=rows.map(mapImportedTrayRow);
             rebuildTrayData();
             renderManualTrayTable();
             updateTrayDisplay();
@@ -1778,27 +1742,7 @@ const openUtilizationReview = row => {
     };
 
     const exportCableOptionsCSV = () => {
-        const headers = cableTemplateHeaders.map(h=>Array.isArray(h)?h[0]:h);
-        const rows = state.cableList;
-        let csv = headers.join(',') + '\n';
-        if (rows.length > 0) {
-            rows.forEach(c => {
-                const row = [
-                    c.name || '',
-                    c.start_tag || '',
-                    c.end_tag || '',
-                    c.cable_type || '',
-                    c.conductors !== undefined ? c.conductors : '',
-                    c.conductor_size || '',
-                    c.diameter !== undefined ? c.diameter : '',
-                    c.weight !== undefined ? c.weight : '',
-                    c.allowed_cable_group || '',
-                    c.start[0], c.start[1], c.start[2],
-                    c.end[0], c.end[1], c.end[2]
-                ];
-                csv += row.join(',') + '\n';
-            });
-        }
+        const csv = buildCableOptionsCsv(state.cableList);
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -2408,12 +2352,7 @@ const renderBatchResults = async (results) => {
         const segmentRows = buildSegmentRows(state.latestRouteData);
         const summaryRows = buildSummaryRows(state.latestRouteData);
 
-        const headers = ['cable_tag','segment_order','element_type','element_id','length','cumulative_length','start_x','start_y','start_z','end_x','end_y','end_z','reason_codes'];
-        let csv = headers.join(',') + '\n';
-        segmentRows.forEach(r => {
-            csv += headers.map(h => r[h] !== undefined ? r[h] : '').join(',') + '\n';
-        });
-        const csvBlob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const csvBlob = new Blob([buildRouteDataCsv(segmentRows)], { type: 'text/csv;charset=utf-8;' });
         const csvUrl = URL.createObjectURL(csvBlob);
         const csvLink = document.createElement('a');
         csvLink.href = csvUrl;
@@ -2454,9 +2393,9 @@ const renderBatchResults = async (results) => {
         }));
 
         const wb = XLSX.utils.book_new();
-        const ws1 = XLSX.utils.json_to_sheet(segmentRows);
+        const ws1 = XLSX.utils.json_to_sheet(labelRouteRows(segmentRows));
         XLSX.utils.book_append_sheet(wb, ws1, 'Segments');
-        const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+        const wsSummary = XLSX.utils.json_to_sheet(labelRouteRows(summaryRows, ROUTE_SUMMARY_COLUMNS));
         XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
         const ws2 = XLSX.utils.json_to_sheet(trayList);
         XLSX.utils.book_append_sheet(wb, ws2, 'Tray Cable Map');
@@ -2476,7 +2415,7 @@ const renderBatchResults = async (results) => {
             fetchDataFile('data/conductor_properties.json', {}),
             fetchDataFile('data/material_costs.json', {})
         ]);
-        const { raceways, cables } = buildBOM(state.latestRouteData, state.trayData, state.cableList, conductorProps, materialCosts);
+        const { raceways, racewayUsage, cables } = buildBOM(state.latestRouteData, state.trayData, state.cableList, conductorProps, materialCosts);
 
         // Build per-tray cable weight map from route results for support span calculation
         const trayWeights = {};
@@ -2497,6 +2436,8 @@ const renderBatchResults = async (results) => {
         if (raceways.length) {
             const wsR = XLSX.utils.json_to_sheet(raceways);
             XLSX.utils.book_append_sheet(wb, wsR, 'Raceways');
+            // Per-raceway traceability only: no cost, and routed_cable_ft is not a purchase quantity.
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(racewayUsage), 'Raceway Usage');
         }
         if (cables.length) {
             const wsC = XLSX.utils.json_to_sheet(cables);

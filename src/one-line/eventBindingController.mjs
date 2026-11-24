@@ -363,7 +363,7 @@ export async function initializeOneLineEvents(context, state) {
   if (defaultsBtn) defaultsBtn.addEventListener('click', editManufacturerDefaults);
 
   const exportReportsBtn = document.getElementById('export-reports-btn');
-  if (exportReportsBtn) exportReportsBtn.addEventListener('click', () => { if (preliminaryMotorNotice({ oneLine: { sheets: state.sheets } })) showToast('Report export blocked: generated motor protection is unresolved. Use Design Synthesis preliminary exports for review.'); else exportAllReports(); });
+  if (exportReportsBtn) exportReportsBtn.addEventListener('click', () => { if (preliminaryMotorNotice({ oneLine: { sheets: state.sheets } })) showToast('Report export blocked: generated motor protection is unresolved. Use Design Synthesis preliminary exports for review.'); else Promise.resolve().then(() => exportAllReports()).catch(error => { console.error('[oneline] export all reports failed', error); openModal({ title: 'Export All Reports Failed', message: `No reports were downloaded. ${error?.message || String(error)}`, primaryText: 'Close', secondaryText: null }); }); });
 
   scheduleNoncriticalWork(() => { buildPalette(); loadTemplates(); renderTemplates(); setupLibraryTools(); });
   const customComponentStorageSuffix = `:${customComponentStorageKey}`;

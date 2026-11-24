@@ -31,6 +31,14 @@ If any assigned cable cannot be placed, the tray is reported as **incomplete** w
 
 The Tray Fill page's **Packing Density** gauge and per-zone stackable/non-stackable percentages are geometric layout screens. They are not the NEC 392.22 allowance; the Article 392 result on the same page is the code check.
 
+### Tray Fill Excel export
+
+**Export Excel** on the Tray Fill page writes three sheets. **Cables** and **Compartments** hold the inputs and remain the template that **Import Excel** reads. **Fill Analysis** reports, for each compartment, the selected Article 392 result that **Draw Tray** shows: arrangement, NEC 2023 clause and Table 392.22(A)(1) column, used and allowable cable area or large-cable diameter sum, utilization of the selected allowance, status (selected-rule pass, selected-rule exceedance, or evidence incomplete), and which compartment governs. The overall status and governing compartment follow the compartmented-tray rule above: any exceedance fails the tray, the fullest compartment governs, and incomplete evidence or a cable assigned to a compartment that does not exist makes the result incomplete. Incomplete compartments show a blank utilization, never 0 %.
+
+The sheet also lists each compartment's geometric packing density (total cable cross-sectional area ÷ compartment width × depth, the gauge's formula), labelled as not an NEC limit. The on-screen stackable/non-stackable split depends on the drawn layout and is not repeated in the export.
+
+The analysis is evaluated when you export, from the cables and compartments in the same workbook, so it always matches the inputs in the file. If you edited the table after the last **Draw Tray**, click **Draw Tray** again to bring the on-screen result up to date.
+
 Conduit checks use the recognized wiring method and trade-size internal area plus the NEC Chapter 9 count-based 53%, 31%, or 40% screen. Installation-specific conditions, exact conductor/cable construction, nipples, and adopted-code requirements still require qualified review.
 
 Primary source used for the selected tray rules: [NFPA 70 2023 code-development record containing 392.22 text and Table 392.22(A)(1)](https://docinfofiles.nfpa.org/files/AboutTheCodes/70/70_A2022_NEC_P08_FD_PIReport_rev_1008.pdf).

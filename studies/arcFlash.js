@@ -267,7 +267,7 @@ function initializeArcFlashPage() {
     });
     exportButton?.addEventListener('click', () => {
       if (!latestResults) return;
-      const exportSummary = generateArcFlashReport(latestResults, { assessment: getStudyAssessments().arcFlash });
+      const exportSummary = generateArcFlashReport(latestResults, { assessment: getStudyAssessments().arcFlash, scope: scope?.value || 'project' });
       if (status) {
         status.textContent = exportSummary?.omittedLabelCount
           ? `Draft report exported; ${exportSummary.omittedLabelCount} incomplete label draft(s) were withheld.`

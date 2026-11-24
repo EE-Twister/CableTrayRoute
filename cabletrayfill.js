@@ -5,6 +5,7 @@ import { createFillGauge } from './src/components/fillGauge.js';
 import { start as startTour } from './tour.js';
 import { getCableAssignedRacewayIds, summarizeCableWorkflow } from './analysis/scheduleWorkflow.mjs';
 import { evaluateTrayFill, summarizeTrayFillResult } from './analysis/trayFill.mjs';
+import { buildTrayFillAnalysisRows, TRAY_FILL_ANALYSIS_SHEET } from './src/tray-fill/fillAnalysisSheet.mjs';
 
 const TRAYFILL_TOUR_STEPS = [
   { selector: '#trayParameters',       message: 'Select the tray you want to analyze: choose width, depth, and tray type. These parameters are used to calculate a selected NEC-informed fill percentage.' },
@@ -1620,6 +1621,8 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           return;
         }
         const data=[['Tag','Cable Type','Conductors','Conductor Size','Cable Rating (V)','Operating Voltage (V)','OD','Weight','Compartment','Circuit Group']];
+        // Same cable shape the Draw Tray handler passes to evaluateTrayFill.
+        const fillCables=[];
         rows.forEach(row=>{
           const tag=row.children[0].querySelector('input').value.trim();
           const cableType=row.children[1].querySelector('select').value;
@@ -1632,14 +1635,38 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           const zone=row.children[8].querySelector('input').value.trim();
           const group=row.children[9].querySelector('input').value.trim();
           data.push([tag,cableType,count,size,rating,voltage,od,weight,zone,group]);
+          const selSize=row.children[6].querySelector('select');
+          fillCables.push({
+            tag,
+            cableType,
+            count:parseInt(count),
+            size,
+            rating:parseFloat(rating),
+            voltage:parseFloat(voltage),
+            cable_size:selSize?selSize.value:'',
+            OD:parseFloat(od),
+            weight:parseFloat(weight),
+            zone:parseInt(zone)||1,
+            parallelCount:Math.max(1,parseInt(row.dataset.parallelCount)||1),
+          });
         });
         const wb=XLSX.utils.book_new();
         const ws=XLSX.utils.aoa_to_sheet(data);
+        // Cables stays first and Compartments keeps its name so the file re-imports.
         XLSX.utils.book_append_sheet(wb,ws,'Cables');
         // Compartments sheet
         const compData=[['Compartment ID','Width (in)','Depth (in)','Label']];
         compartments.forEach(c=>compData.push([c.id,c.width,c.depth,c.label||'']));
         XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(compData),'Compartments');
+        const analysisRows=buildTrayFillAnalysisRows({
+          trayName:document.getElementById('trayName').value.trim(),
+          trayType:document.getElementById('trayType').value,
+          trayWidth:parseFloat(document.getElementById('trayWidth').value),
+          trayDepth:parseFloat(document.getElementById('trayDepth').value),
+          compartments,
+          cables:fillCables,
+        });
+        XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(analysisRows),TRAY_FILL_ANALYSIS_SHEET);
         XLSX.writeFile(wb,'CableList.xlsx');
       }
 

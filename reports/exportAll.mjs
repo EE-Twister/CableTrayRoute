@@ -99,38 +99,103 @@ export async function setReportTemplate(tpl) {
   }
 }
 
+const isPlainObject = value => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+const isPrivateKey = key => String(key).startsWith('_');
+
+/**
+ * Headers are the union of every row's keys in first-seen order, so a column
+ * carried only by later rows (per-bus notes, required inputs) is not dropped.
+ */
+function unionHeaders(rows = [], extra = []) {
+  const headers = new Set();
+  rows.forEach(row => {
+    if (isPlainObject(row)) Object.keys(row).forEach(key => headers.add(key));
+  });
+  extra.forEach(key => headers.add(key));
+  return [...headers];
+}
+
+function scheduleSection(title, rows) {
+  if (!Array.isArray(rows) || !rows.length) return null;
+  return { title, headers: unionHeaders(rows), rows };
+}
+
+// Study results saved as an object keep their table rows in named fields.
+// The first field keeps the `<study> Analysis` name; later fields get their
+// own CSV. Studies not listed here fall back to `results`/`rows` arrays or to
+// a map keyed by id.
+const STUDY_ROW_SOURCES = Object.freeze({
+  voltageDropStudy: [{ key: 'results' }],
+  loadFlow: [{ key: 'buses' }, { key: 'lines', title: 'Branch Flows' }],
+  motorStart: [{ key: 'results' }],
+  reliability: [{ key: 'componentStats' }],
+});
+const GENERIC_ROW_KEYS = ['results', 'rows'];
+
+// Row identity survives withholding so a withheld row still names its cable,
+// bus or branch.
+const STUDY_ROW_IDENTITY_KEYS = ['tag', 'name', 'ref', 'displayLabel', 'fromLabel', 'toLabel', 'componentId', 'equipmentTag'];
+
+function withoutPrivateKeys(record) {
+  return Object.fromEntries(Object.entries(record).filter(([key]) => !isPrivateKey(key)));
+}
+
+function keyedStudyRow(id, entry) {
+  if (isPlainObject(entry)) return { id, ...withoutPrivateKeys(entry) };
+  if (Array.isArray(entry) && entry.every(item => item === null || typeof item !== 'object')) {
+    return { id, value: entry.join('; ') };
+  }
+  return { id, value: entry };
+}
+
+function studyCollectionRows(collection) {
+  if (Array.isArray(collection)) {
+    return collection
+      .filter(entry => entry != null)
+      .map(entry => (isPlainObject(entry) ? withoutPrivateKeys(entry) : { value: entry }));
+  }
+  if (isPlainObject(collection)) {
+    return Object.entries(collection)
+      .filter(([id]) => !isPrivateKey(id))
+      .map(([id, entry]) => keyedStudyRow(id, entry));
+  }
+  return [];
+}
+
+/** Expand one saved study result into one or more `{ title, rows }` tables. */
+function buildStudyTables(studyKey, result) {
+  if (Array.isArray(result)) return [{ title: '', rows: studyCollectionRows(result) }];
+  if (!isPlainObject(result)) return [];
+  const sources = (STUDY_ROW_SOURCES[studyKey] || []).filter(source => result[source.key] != null);
+  if (sources.length) {
+    return sources.map(source => ({ title: source.title || '', rows: studyCollectionRows(result[source.key]) }));
+  }
+  const genericKey = GENERIC_ROW_KEYS.find(key => Array.isArray(result[key]));
+  if (genericKey) return [{ title: '', rows: studyCollectionRows(result[genericKey]) }];
+  return [{ title: '', rows: studyCollectionRows(result) }];
+}
+
 function buildSections(data = {}) {
-  const sections = [];
-  if (Array.isArray(data.equipment) && data.equipment.length) {
-    const headers = Object.keys(data.equipment[0]);
-    sections.push({ title: 'Equipment Schedule', headers, rows: data.equipment });
-  }
-  if (Array.isArray(data.panels) && data.panels.length) {
-    const headers = Object.keys(data.panels[0]);
-    sections.push({ title: 'Panel Schedule', headers, rows: data.panels });
-  }
-  if (Array.isArray(data.cables) && data.cables.length) {
-    const headers = Object.keys(data.cables[0]);
-    sections.push({ title: 'Cable Schedule', headers, rows: data.cables });
-  }
-  if (data.analyses) {
-    Object.entries(data.analyses).forEach(([name, rows]) => {
-      let arr = rows;
-      if (!Array.isArray(rows) && rows && typeof rows === 'object') {
-        arr = Object.entries(rows).map(([id, val]) => {
-          if (typeof val === 'object' && !Array.isArray(val)) return { id, ...val };
-          return { id, value: Array.isArray(val) ? val.join('; ') : val };
-        });
-      }
-      if (Array.isArray(arr) && arr.length) {
+  const sections = [
+    scheduleSection('Equipment Schedule', data.equipment),
+    scheduleSection('Panel Schedule', data.panels),
+    scheduleSection('Cable Schedule', data.cables),
+  ].filter(Boolean);
+  if (isPlainObject(data.analyses)) {
+    Object.entries(data.analyses)
+      .filter(([name]) => !isPrivateKey(name))
+      .forEach(([name, result]) => {
         const assessment = data.studyAssessments?.[name];
-        const reportRows = assessment
-          ? decorateStudyRows(arr, assessment)
-          : arr;
-        const headers = [...new Set([...Object.keys(reportRows[0]), ...(assessment ? studyMetadataColumns() : [])])];
-        sections.push({ title: `${name} Analysis`, headers, rows: reportRows });
-      }
-    });
+        buildStudyTables(name, result).forEach(table => {
+          if (!table.rows.length) return;
+          const reportRows = assessment
+            ? decorateStudyRows(table.rows, assessment, { preserve: STUDY_ROW_IDENTITY_KEYS })
+            : table.rows;
+          const headers = unionHeaders(reportRows, assessment ? studyMetadataColumns() : []);
+          const title = table.title ? `${name} ${table.title} Analysis` : `${name} Analysis`;
+          sections.push({ title, headers, rows: reportRows });
+        });
+      });
   }
   if (data.studyAssessments && Object.keys(data.studyAssessments).length) {
     const rows = Object.values(data.studyAssessments).map(assessment => ({
@@ -153,14 +218,12 @@ function buildSections(data = {}) {
     }));
     sections.push({
       title: 'Study Result Lifecycle Index',
-      headers: Object.keys(rows[0] || {}),
+      headers: unionHeaders(rows),
       rows,
     });
   }
-  if (Array.isArray(data.tcc) && data.tcc.length) {
-    const headers = Object.keys(data.tcc[0]);
-    sections.push({ title: 'TCC Plots', headers, rows: data.tcc });
-  }
+  const tccSection = scheduleSection('TCC Plots', data.tcc);
+  if (tccSection) sections.push(tccSection);
   return sections;
 }
 
@@ -184,78 +247,127 @@ function sanitizeZipFileName(name, fallback = 'report') {
   return stripped || fallback;
 }
 
-function crc32(buf) {
+function crc32(bytes) {
   let crc = -1;
-  for (let i = 0; i < buf.length; i++) {
-    crc = (crc >>> 8) ^ crcTable[(crc ^ buf[i]) & 0xff];
+  for (let i = 0; i < bytes.length; i++) {
+    crc = (crc >>> 8) ^ crcTable[(crc ^ bytes[i]) & 0xff];
   }
   return (crc ^ -1) >>> 0;
+}
+
+const textEncoder = new TextEncoder();
+
+// Entry data arrives as text (CSV/SVG) or as jsPDF's ArrayBuffer; store bytes.
+function toZipBytes(data) {
+  if (data instanceof Uint8Array) return data;
+  if (data instanceof ArrayBuffer) return new Uint8Array(data);
+  if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  return textEncoder.encode(data == null ? '' : String(data));
+}
+
+// MS-DOS date/time fields; ZIP cannot represent dates before 1980.
+function toDosDateTime(value) {
+  const date = value instanceof Date && !Number.isNaN(value.getTime()) ? value : new Date();
+  const year = Math.min(Math.max(date.getFullYear(), 1980), 2107);
+  return {
+    time: (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2),
+    date: ((year - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate(),
+  };
+}
+
+const LOCAL_HEADER_SIZE = 30;
+const CENTRAL_HEADER_SIZE = 46;
+const END_OF_CENTRAL_DIRECTORY_SIZE = 22;
+
+/**
+ * Write a stored (uncompressed) ZIP archive with typed arrays only, so the
+ * same code runs in browsers and Node without the Node `Buffer` global.
+ */
+function buildZipBytes(entries, modified) {
+  if (entries.length > 0xffff) throw new Error('Too many files for a ZIP archive.');
+  const stamp = toDosDateTime(modified);
+  const records = entries.map(entry => {
+    const name = textEncoder.encode(entry.name);
+    const content = toZipBytes(entry.data);
+    return { name, content, crc: crc32(content), offset: 0 };
+  });
+  const localSize = records.reduce((sum, record) => sum + LOCAL_HEADER_SIZE + record.name.length + record.content.length, 0);
+  const centralSize = records.reduce((sum, record) => sum + CENTRAL_HEADER_SIZE + record.name.length, 0);
+  if (localSize + centralSize > 0xffffffff) throw new Error('Report bundle is too large for a ZIP archive.');
+  const out = new Uint8Array(localSize + centralSize + END_OF_CENTRAL_DIRECTORY_SIZE);
+  const view = new DataView(out.buffer);
+  let offset = 0;
+  records.forEach(record => {
+    record.offset = offset;
+    view.setUint32(offset, 0x04034b50, true);
+    view.setUint16(offset + 4, 20, true);
+    view.setUint16(offset + 6, 0, true);
+    view.setUint16(offset + 8, 0, true);
+    view.setUint16(offset + 10, stamp.time, true);
+    view.setUint16(offset + 12, stamp.date, true);
+    view.setUint32(offset + 14, record.crc, true);
+    view.setUint32(offset + 18, record.content.length, true);
+    view.setUint32(offset + 22, record.content.length, true);
+    view.setUint16(offset + 26, record.name.length, true);
+    view.setUint16(offset + 28, 0, true);
+    out.set(record.name, offset + LOCAL_HEADER_SIZE);
+    out.set(record.content, offset + LOCAL_HEADER_SIZE + record.name.length);
+    offset += LOCAL_HEADER_SIZE + record.name.length + record.content.length;
+  });
+  const centralStart = offset;
+  records.forEach(record => {
+    view.setUint32(offset, 0x02014b50, true);
+    view.setUint16(offset + 4, 20, true);
+    view.setUint16(offset + 6, 20, true);
+    view.setUint16(offset + 8, 0, true);
+    view.setUint16(offset + 10, 0, true);
+    view.setUint16(offset + 12, stamp.time, true);
+    view.setUint16(offset + 14, stamp.date, true);
+    view.setUint32(offset + 16, record.crc, true);
+    view.setUint32(offset + 20, record.content.length, true);
+    view.setUint32(offset + 24, record.content.length, true);
+    view.setUint16(offset + 28, record.name.length, true);
+    view.setUint16(offset + 30, 0, true);
+    view.setUint16(offset + 32, 0, true);
+    view.setUint16(offset + 34, 0, true);
+    view.setUint16(offset + 36, 0, true);
+    view.setUint32(offset + 38, 0, true);
+    view.setUint32(offset + 42, record.offset, true);
+    out.set(record.name, offset + CENTRAL_HEADER_SIZE);
+    offset += CENTRAL_HEADER_SIZE + record.name.length;
+  });
+  view.setUint32(offset, 0x06054b50, true);
+  view.setUint16(offset + 4, 0, true);
+  view.setUint16(offset + 6, 0, true);
+  view.setUint16(offset + 8, records.length, true);
+  view.setUint16(offset + 10, records.length, true);
+  view.setUint32(offset + 12, offset - centralStart, true);
+  view.setUint32(offset + 16, centralStart, true);
+  view.setUint16(offset + 20, 0, true);
+  return out;
 }
 
 class SimpleZip {
   constructor() { this.entries = []; }
   file(name, data) {
-    if (typeof data === 'string') data = new TextEncoder().encode(data);
     const safeName = sanitizeZipFileName(name);
-    this.entries.push({ name: safeName, data });
+    const used = new Set(this.entries.map(entry => entry.name));
+    let uniqueName = safeName;
+    const dot = safeName.lastIndexOf('.');
+    const stem = dot > 0 ? safeName.slice(0, dot) : safeName;
+    const ext = dot > 0 ? safeName.slice(dot) : '';
+    for (let counter = 2; used.has(uniqueName); counter += 1) uniqueName = `${stem}_${counter}${ext}`;
+    this.entries.push({ name: uniqueName, data: toZipBytes(data) });
   }
-  async generateAsync({ type = 'nodebuffer' } = {}) {
-    const fileRecords = [];
-    const central = [];
-    let offset = 0;
-    this.entries.forEach(entry => {
-      const nameBuf = Buffer.from(entry.name);
-      const content = Buffer.from(entry.data);
-      const crc = crc32(content);
-      const header = Buffer.alloc(30);
-      header.writeUInt32LE(0x04034b50, 0);
-      header.writeUInt16LE(20, 4);
-      header.writeUInt16LE(0, 6);
-      header.writeUInt16LE(0, 8);
-      header.writeUInt16LE(0, 10);
-      header.writeUInt16LE(0, 12);
-      header.writeUInt32LE(crc, 14);
-      header.writeUInt32LE(content.length, 18);
-      header.writeUInt32LE(content.length, 22);
-      header.writeUInt16LE(nameBuf.length, 26);
-      header.writeUInt16LE(0, 28);
-      fileRecords.push(header, nameBuf, content);
-
-      const centralHdr = Buffer.alloc(46);
-      centralHdr.writeUInt32LE(0x02014b50, 0);
-      centralHdr.writeUInt16LE(20, 4);
-      centralHdr.writeUInt16LE(20, 6);
-      centralHdr.writeUInt16LE(0, 8);
-      centralHdr.writeUInt16LE(0, 10);
-      centralHdr.writeUInt16LE(0, 12);
-      centralHdr.writeUInt16LE(0, 14);
-      centralHdr.writeUInt32LE(crc, 16);
-      centralHdr.writeUInt32LE(content.length, 20);
-      centralHdr.writeUInt32LE(content.length, 24);
-      centralHdr.writeUInt16LE(nameBuf.length, 28);
-      centralHdr.writeUInt16LE(0, 30);
-      centralHdr.writeUInt16LE(0, 32);
-      centralHdr.writeUInt16LE(0, 34);
-      centralHdr.writeUInt16LE(0, 36);
-      centralHdr.writeUInt32LE(0, 38);
-      centralHdr.writeUInt32LE(offset, 42);
-      central.push(centralHdr, nameBuf);
-      offset += header.length + nameBuf.length + content.length;
-    });
-    const centralBuf = Buffer.concat(central);
-    const eocdr = Buffer.alloc(22);
-    eocdr.writeUInt32LE(0x06054b50, 0);
-    eocdr.writeUInt16LE(0, 4);
-    eocdr.writeUInt16LE(0, 6);
-    eocdr.writeUInt16LE(this.entries.length, 8);
-    eocdr.writeUInt16LE(this.entries.length, 10);
-    eocdr.writeUInt32LE(centralBuf.length, 12);
-    eocdr.writeUInt32LE(offset, 16);
-    eocdr.writeUInt16LE(0, 20);
-    const out = Buffer.concat([...fileRecords, centralBuf, eocdr]);
-    if (type === 'blob') return new Blob([out]);
-    if (type === 'arraybuffer') return out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
-    return out;
+  /**
+   * @param {{type?: 'uint8array'|'arraybuffer'|'blob', date?: Date}} [options]
+   */
+  async generateAsync({ type = 'uint8array', date } = {}) {
+    const bytes = buildZipBytes(this.entries, date);
+    if (type === 'uint8array') return bytes;
+    if (type === 'arraybuffer') return bytes.buffer;
+    if (type === 'blob') return new Blob([bytes], { type: 'application/zip' });
+    throw new Error(`Unsupported ZIP output type: ${type}`);
   }
   get files() {
     const map = {};

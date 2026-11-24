@@ -676,7 +676,7 @@ test('sample project satisfies contract handoffs from equipment through delivera
   const routeCsv = await readDownloadText(routeCsvDownload);
   const routeCsvLines = routeCsv.trim().split(/\r?\n/);
   expect(routeCsvLines[0]).toContain('cable_tag');
-  expect(routeCsvLines[0]).toContain('length');
+  expect(routeCsvLines[0]).toContain('Length (ft)');
   const routeCsvHeaders = routeCsvLines[0].split(',');
   const routeCsvRows = routeCsvLines.slice(1).map(line => line.split(','));
   const routeCsvRecords = routeCsvRows.map(row => Object.fromEntries(routeCsvHeaders.map((header, index) => [header, row[index] ?? ''])));
@@ -684,7 +684,7 @@ test('sample project satisfies contract handoffs from equipment through delivera
   for (const tag of cables.cableTags) {
     expect(routeCsvRecords.some(row => row.cable_tag === tag), `CSV should contain ${tag}`).toBe(true);
   }
-  expect(routeCsvRecords.every(row => Number.isFinite(Number(row.length)) && Number(row.length) > 0)).toBe(true);
+  expect(routeCsvRecords.every(row => Number.isFinite(Number(row['Length (ft)'])) && Number(row['Length (ft)']) > 0)).toBe(true);
   const expectedElement = segment => {
     if (segment.type === 'field') return { type: 'field', id: 'Field Route' };
     if (segment.conduit_id) return { type: 'conduit', id: `${segment.ductbankTag ? `${segment.ductbankTag}:` : ''}${segment.conduit_id}` };
@@ -695,8 +695,8 @@ test('sample project satisfies contract handoffs from equipment through delivera
     for (const [index, segment] of route.route_segments.entries()) {
       const csvRow = routeCsvRecords.find(row => row.cable_tag === route.cable && Number(row.segment_order) === index + 1);
       expect(csvRow, `CSV should contain ${route.cable} segment ${index + 1}`).toBeTruthy();
-      expect(Number(csvRow.length)).toBeCloseTo(Number(segment.length), 2);
-      expect(Number(csvRow.cumulative_length)).toBeCloseTo(
+      expect(Number(csvRow['Length (ft)'])).toBeCloseTo(Number(segment.length), 2);
+      expect(Number(csvRow['Cumulative Length (ft)'])).toBeCloseTo(
         route.route_segments.slice(0, index + 1).reduce((sum, item) => sum + Number(item.length), 0),
         2
       );
@@ -716,7 +716,7 @@ test('sample project satisfies contract handoffs from equipment through delivera
   for (const csvRow of routeCsvRecords) {
     const workbookRow = workbookSegmentRows.find(row => row.cable_tag === csvRow.cable_tag && Number(row.segment_order) === Number(csvRow.segment_order));
     expect(workbookRow, `workbook should contain ${csvRow.cable_tag} segment ${csvRow.segment_order}`).toBeTruthy();
-    expect(Number(workbookRow.length)).toBeCloseTo(Number(csvRow.length), 2);
+    expect(Number(workbookRow['Length (ft)'])).toBeCloseTo(Number(csvRow['Length (ft)']), 2);
     expect(workbookRow.element_id).toBe(csvRow.element_id);
   }
   const summaryRows = XLSX.utils.sheet_to_json(routeWorkbook.Sheets.Summary);
@@ -724,7 +724,7 @@ test('sample project satisfies contract handoffs from equipment through delivera
   for (const row of summaryRows) {
     const saved = generatedRows.find(candidate => candidate.cable === row.cable_tag);
     expect(saved, `workbook should contain ${row.cable_tag}`).toBeTruthy();
-    expect(Number(row.total_length)).toBeCloseTo(Number(saved.total_length), 2);
+    expect(Number(row['Total Length (ft)'])).toBeCloseTo(Number(saved.total_length), 2);
     expect(Number(row.segments_count)).toBe(Number(saved.segments_count));
   }
 

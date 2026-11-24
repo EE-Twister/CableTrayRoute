@@ -32,7 +32,24 @@ Still open from R8–R11:
 - Auto-Coordinate's `checkCoordination` still treats an upstream device below pickup as unevaluated, while the CTI report passes it.
 - The TCC report section carries pair data only; device settings are not included.
 
-E1–E8 and U1–U5 remain open.
+E1–E8 were then corrected:
+
+- **E1:** Export All builds its zip without Node's `Buffer`, so it downloads in the browser. Failures show a dialog. Array results become rows, `_` keys are skipped, and headers are the union across rows.
+- **E2:** table XLSX export and import keep 0.
+- **E3:** the tray CSV writes all 15 columns, and every Optimal Route CSV uses `csvCell` quoting with formula guards. Import strips the guard again.
+- **E4:** the Cost Estimate workbook is built from the run-time snapshot, and export is refused, with the changed inputs named, until the estimate is rerun. Money and quantity cells are numbers.
+- **E5:** route BOM raceway quantities count each raceway once; per-cable usage is a separate sheet without cost.
+- **E6:** the Short Circuit PDF keeps per-bus validity, warnings and required inputs, and reports success only after the PDF is generated.
+- **E7:** labels print exact kV, never "N ft 12 in", and literal `$`. Approach boundaries follow NFPA 70E-2024 Table 130.4(E)(a); the earlier values were wrong above 750 V.
+- **E8:**
+  - Route exports label lengths "(ft)".
+  - The Panel Schedule XLSX keeps "—", leaves kW out of the kVA column, and sanitizes sheet names.
+  - The arc-flash CSV/PDF has units in its headers, a UTF-8 BOM, and follows the page scope.
+  - Tray Fill's Excel export adds a Fill Analysis sheet.
+
+Still open from E1–E8: the panel's Phase Load (VA) column still falls back to kW.
+
+U1–U5 remain open.
 
 **Scope:** what a user sees, what the issued report says, and what the export files contain.
 

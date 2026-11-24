@@ -12,7 +12,28 @@ integration with other design tools.
 - Arc‑flash warning labels as individual SVG files.
 - TCC plot metadata when available.
 
-Use `exportAllReports()` from the one‑line editor to download `reports.zip`.
+Use **Export All Reports** in the one‑line editor (`exportAllReports()`) to download `reports.zip`.
+The archive is written in the browser with typed arrays (uncompressed, standard ZIP), so it
+needs no server or Node runtime. If the bundle cannot be built, the editor shows an
+"Export All Reports Failed" dialog with the reason and nothing is downloaded.
+
+Study result CSVs (`<study>_analysis.csv`) contain one row per result record:
+
+- Results saved as arrays are exported row for row. Saved objects export their record list:
+  Voltage Drop `results`, Motor Starting `results` (one row per motor, not the saved
+  `runAt`/`criteria`/`cases` keys), Reliability `componentStats`, and Load Flow `buses`, with
+  Load Flow branch flows (`lines`) in a separate `loadflow_branch_flows_analysis.csv`. Other
+  studies use their `results` or `rows` array when present.
+- Results keyed by bus or equipment id (Short Circuit, Arc Flash, Harmonics) give one row per id.
+- Internal metadata keys that start with `_` (for example `_meta` or `_runMetadata`) are never
+  exported as rows or columns.
+- Column headers are the union of all rows' fields, in first-seen order, so a field that only
+  some rows carry (such as `requiredInputs` or `notes`) is kept. Nested values are written as
+  JSON text.
+- Each row carries the study lifecycle columns (`resultEligibility`, `freshness`,
+  `resultStatus`, …). Rows of a stale, unevaluated or otherwise ineligible study are withheld:
+  their values print as "—" (verdicts as "not evaluated"), the row identity (id, tag, from/to) is
+  kept, and the saved values appear only under `historicalValues`.
 
 ## One‑Line Diagram Exchange
 

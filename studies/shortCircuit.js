@@ -5,6 +5,7 @@ import { downloadPDF } from '../reports/reporting.mjs';
 import { barChartHtml, kpiStripHtml, shortCircuitBarRows, statusLegendHtml } from '../src/components/resultViz.mjs';
 import { loadReferencedProtectiveDevices } from '../src/protectiveDevices/calculationCatalog.mjs';
 import { studyExportMetadata } from '../analysis/studyExportMetadata.mjs';
+import { buildShortCircuitExportTable, shortCircuitInputQuality as inputQuality } from './shortCircuitExportTable.mjs';
 
 function projectComponents() {
   const sheets = getOneLine()?.sheets;
@@ -120,12 +121,6 @@ export function buildShortCircuitComparison(results = {}) {
   };
 }
 
-function inputQuality(result = {}) {
-  const warnings = Array.isArray(result.warnings) ? result.warnings : [];
-  const required = Array.isArray(result.requiredInputs) ? result.requiredInputs : [];
-  return required.length ? `${required.length} required input(s)` : warnings.length ? `${warnings.length} assumption(s)` : 'Complete';
-}
-
 export function formatKA(value) {
   const number = finiteNullableNumber(value);
   return Number.isFinite(number) ? number.toFixed(2) : 'Unevaluated';
@@ -172,13 +167,17 @@ export async function runShortCircuitStudy(opts = {}) {
   return results;
 }
 
-export function exportShortCircuitReport(results = {}) {
+/**
+ * Export the saved short-circuit study as a PDF. Resolves true only after the
+ * PDF was generated and handed to the browser, false otherwise.
+ */
+export async function exportShortCircuitReport(results = {}) {
   const lifecycle = studyExportMetadata(results, { assessment: getStudyAssessments().shortCircuit });
   const entries = resultEntries(results);
   const summary = summaryResult(results);
   if (!entries.length && !summary) return false;
   if (!entries.length) {
-    downloadPDF('Short Circuit Saved Result', ['status', 'availableFaultKa', 'updatedAt', 'freshness', 'eligibility', 'calculationVersion', 'calculatedAt', 'provenance'], [{
+    return downloadPDF('Short Circuit Saved Result', ['status', 'availableFaultKa', 'updatedAt', 'freshness', 'eligibility', 'calculationVersion', 'calculatedAt', 'provenance'], [{
       status: summary.status,
       availableFaultKa: summary.availableFaultKa,
       updatedAt: summary.updatedAt || '',
@@ -188,28 +187,9 @@ export function exportShortCircuitReport(results = {}) {
       calculatedAt: lifecycle.calculatedAt,
       provenance: lifecycle.provenance,
     }], 'shortcircuit.pdf');
-    return true;
   }
-  const isIEC = entries.some(([, result]) => result.method === 'IEC');
-  const headers = isIEC
-    ? ['bus', 'prefaultKV', 'threePhaseKA', 'lineToGroundKA', 'lineToLineKA', 'ip', 'Ib', 'Ith', 'kappa', 'inputQuality']
-    : ['bus', 'threePhaseKA', 'lineToGroundKA', 'lineToLineKA', 'doubleLineGroundKA', 'inputQuality'];
-  headers.push('validity', 'freshness', 'eligibility', 'calculationVersion', 'calculatedAt', 'assumptions', 'warnings', 'provenance');
-  const rows = entries.map(([bus, result]) => ({
-    bus: result.equipmentTag || bus,
-    ...result,
-    inputQuality: inputQuality(result),
-    validity: lifecycle.resultValidity,
-    freshness: lifecycle.freshness,
-    eligibility: lifecycle.resultEligibility,
-    calculationVersion: lifecycle.calculationVersion,
-    calculatedAt: lifecycle.calculatedAt,
-    assumptions: lifecycle.assumptions,
-    warnings: lifecycle.warnings,
-    provenance: lifecycle.provenance,
-  }));
-  downloadPDF(isIEC ? 'IEC 60909 Short-Circuit Report' : 'Short Circuit Report', headers, rows, 'shortcircuit.pdf');
-  return true;
+  const { title, headers, rows } = buildShortCircuitExportTable(entries, lifecycle);
+  return downloadPDF(title, headers, rows, 'shortcircuit.pdf');
 }
 
 function renderShortCircuitChart(entries, assumedCount) {
@@ -389,8 +369,10 @@ function initializeShortCircuitPage() {
     scope?.addEventListener('change', () => {
       if (latestResults) renderResults(latestResults, scope.value);
     });
-    exportButton?.addEventListener('click', () => {
-      if (latestResults && exportShortCircuitReport(latestResults) && status) status.textContent = 'Short-circuit report exported.';
+    exportButton?.addEventListener('click', async () => {
+      if (!latestResults) return;
+      const exported = await exportShortCircuitReport(latestResults);
+      if (status) status.textContent = exported ? 'Short-circuit report exported.' : 'Short-circuit report could not be exported.';
     });
 }
 

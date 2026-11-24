@@ -123,19 +123,26 @@ function resolveVoltage(comp) {
   return null;
 }
 
-function computeApproachDistances(voltage) {
+export function computeApproachDistances(voltage) {
   if (!Number.isFinite(voltage) || voltage <= 50) {
     return { limited: null, restricted: null };
   }
+  // NFPA 70E-2024 Table 130.4(E)(a), AC systems: limited approach boundary for
+  // an exposed fixed circuit part and restricted approach boundary (which
+  // includes the inadvertent-movement adder), from the printed ft/in values
+  // converted to mm. "Avoid contact" (50-150 V) has no distance. The
+  // restricted boundary assumes an elevation not exceeding 900 m (3000 ft).
+  // Rows are matched by upper voltage limit so fractional volts fall in a row.
   const table = [
-    { min: 50, max: 150, limited: 1067, restricted: null },
-    { min: 151, max: 750, limited: 1067, restricted: 305 },
-    { min: 751, max: 15000, limited: 1524, restricted: 432 },
-    { min: 15001, max: 36000, limited: 1829, restricted: 660 },
-    { min: 36001, max: 46000, limited: 2438, restricted: 787 },
-    { min: 46001, max: 72500, limited: 3048, restricted: 914 }
+    { max: 150, limited: 1067, restricted: null },    // 3 ft 6 in; avoid contact
+    { max: 750, limited: 1067, restricted: 305 },     // 3 ft 6 in; 1 ft 0 in
+    { max: 5000, limited: 1067, restricted: 635 },    // 3 ft 6 in; 2 ft 1 in
+    { max: 15000, limited: 1524, restricted: 660 },   // 5 ft 0 in; 2 ft 2 in
+    { max: 36000, limited: 1829, restricted: 787 },   // 6 ft 0 in; 2 ft 7 in
+    { max: 46000, limited: 2438, restricted: 864 },   // 8 ft 0 in; 2 ft 10 in
+    { max: 72500, limited: 2438, restricted: 1016 },  // 8 ft 0 in; 3 ft 4 in
   ];
-  const row = table.find(entry => voltage >= entry.min && voltage <= entry.max);
+  const row = table.find(entry => voltage <= entry.max);
   if (!row) return { limited: null, restricted: null };
   return { limited: row.limited, restricted: row.restricted };
 }

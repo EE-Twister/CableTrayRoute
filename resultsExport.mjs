@@ -80,16 +80,44 @@ export function buildSummaryRows(results = []) {
 
 export { buildTrayHardwareBOM } from './analysis/trayHardware.mjs';
 
-export function buildBOM(results = [], trayData = [], cableList = [], conductorProps = {}, materialCosts = {}) {
+const positiveNumber = (...values) => {
+    for (const value of values) {
+        const number = Number(value);
+        if (Number.isFinite(number) && number > 0) return number;
+    }
+    return 0;
+};
+
+// Scheduled length of a raceway record: an explicit length, else its start/end geometry.
+// Mirrors recordLength() in analysis/routeCostAssurance.mjs so the BOM and the Cost Estimate agree.
+const scheduledRacewayLength = (record = {}) => {
+    const coordinates = ['start_x', 'start_y', 'start_z', 'end_x', 'end_y', 'end_z']
+        .map(key => (record[key] === '' || record[key] == null ? Number.NaN : Number(record[key])));
+    const geometry = coordinates.every(Number.isFinite)
+        ? Math.hypot(coordinates[3] - coordinates[0], coordinates[4] - coordinates[1], coordinates[5] - coordinates[2])
+        : 0;
+    return positiveNumber(record.length_ft, record.lengthFt, record.length, geometry);
+};
+
+/**
+ * Collect the physical raceways used by the routes, keyed by raceway identity
+ * (tray id, or ductbank tag + conduit id) so a raceway shared by several cables
+ * is counted once.
+ */
+function collectRacewayUsage(results, trayData) {
     const trayLookup = new Map();
     const conduitLookup = new Map();
     trayData.forEach(t => {
         if (t.tray_id) trayLookup.set(String(t.tray_id), t);
-        if (t.conduit_id) conduitLookup.set(String(t.conduit_id), t);
+        if (t.conduit_id) {
+            conduitLookup.set(String(t.conduit_id), t);
+            conduitLookup.set(`${t.ductbankTag || ''}|${t.conduit_id}`, t);
+        }
     });
 
-    const racewayMap = new Map();
-    results.forEach(res => {
+    const usage = new Map();
+    results.forEach((res, resultIndex) => {
+        const cableTag = String(res?.cable ?? res?.cable_tag ?? res?.name ?? `route ${resultIndex + 1}`);
         const segments = Array.isArray(res.breakdown) && res.breakdown.length
             ? res.breakdown
             : (Array.isArray(res.route_segments) ? res.route_segments : []);
@@ -104,24 +132,49 @@ export function buildBOM(results = [], trayData = [], cableList = [], conductorP
                 return;
             }
             const len = parseFloat(seg.length) || 0;
+            let entry;
             // A conduit-bearing segment can also carry its parent tray/ductbank id.
             // Prefer the conduit material whenever both ids are present.
             if (conduitId) {
-                const conduit = conduitLookup.get(String(conduitId)) || {};
-                const type = conduit.type || 'conduit';
-                const r = racewayMap.get(type) || { type, total_length: 0 };
-                r.total_length += len;
-                racewayMap.set(type, r);
+                const ductbankTag = String(seg.ductbankTag ?? seg.ductbank_tag ?? seg.ductbank_id ?? '');
+                const conduit = conduitLookup.get(`${ductbankTag}|${conduitId}`) || conduitLookup.get(String(conduitId));
+                const ownerTag = conduit ? (conduit.ductbankTag || '') : ductbankTag;
+                const id = String(conduit?.conduit_id ?? conduitId);
+                entry = { key: `conduit|${ownerTag}|${id}`, kind: 'conduit', id: ownerTag ? `${ownerTag}:${id}` : id, type: conduit?.type || 'conduit', record: conduit };
             } else if (trayId) {
-                const tray = trayLookup.get(String(trayId)) || {};
-                const type = tray.tray_type || tray.type || 'tray';
-                const r = racewayMap.get(type) || { type, total_length: 0 };
-                r.total_length += len;
-                racewayMap.set(type, r);
+                const tray = trayLookup.get(String(trayId));
+                entry = { key: `tray|${trayId}`, kind: 'tray', id: String(trayId), type: tray?.tray_type || tray?.type || 'tray', record: tray };
+            } else {
+                return;
             }
+            if (!usage.has(entry.key)) usage.set(entry.key, { ...entry, perCable: new Map() });
+            const row = usage.get(entry.key);
+            row.perCable.set(cableTag, (row.perCable.get(cableTag) || 0) + len);
         });
     });
+    return Array.from(usage.values()).map(row => {
+        const scheduled = scheduledRacewayLength(row.record || {});
+        const routedLengths = Array.from(row.perCable.values());
+        return {
+            ...row,
+            length: scheduled || Math.max(0, ...routedLengths),
+            basis: scheduled ? 'scheduled length' : 'longest routed length (no scheduled geometry)',
+            routedCableFt: routedLengths.reduce((sum, value) => sum + value, 0)
+        };
+    });
+}
 
+export function buildBOM(results = [], trayData = [], cableList = [], conductorProps = {}, materialCosts = {}) {
+    const usedRaceways = collectRacewayUsage(results, trayData);
+    const racewayMap = new Map();
+    usedRaceways.forEach(raceway => {
+        const r = racewayMap.get(raceway.type) || { type: raceway.type, raceway_count: 0, total_length: 0 };
+        r.raceway_count += 1;
+        r.total_length += raceway.length;
+        racewayMap.set(raceway.type, r);
+    });
+
+    // Procurement quantities: each physical raceway once, at its scheduled length.
     const raceways = Array.from(racewayMap.values()).map(r => {
         const info = (materialCosts.raceways || {})[r.type] || {};
         const weightPerFt = info.weight_per_ft || 0;
@@ -129,11 +182,24 @@ export function buildBOM(results = [], trayData = [], cableList = [], conductorP
         const weight = weightPerFt * r.total_length;
         return {
             type: r.type,
+            raceway_count: r.raceway_count,
             total_length: r.total_length,
             weight,
             cost: costPerFt != null ? costPerFt * r.total_length : ''
         };
     });
+
+    // Traceability view: which raceways make up each total and how much cable runs through them.
+    // routed_cable_ft is cable length, not raceway to purchase, so this view carries no cost.
+    const racewayUsage = usedRaceways.map(raceway => ({
+        raceway_id: raceway.id,
+        kind: raceway.kind,
+        type: raceway.type,
+        physical_length_ft: raceway.length,
+        length_basis: raceway.basis,
+        cable_count: raceway.perCable.size,
+        routed_cable_ft: raceway.routedCableFt
+    }));
 
     const cableLookup = new Map();
     cableList.forEach(c => {
@@ -180,6 +246,6 @@ export function buildBOM(results = [], trayData = [], cableList = [], conductorP
         cost: c.cost ? c.cost : ''
     }));
 
-    return { raceways, cables };
+    return { raceways, racewayUsage, cables };
 }
 

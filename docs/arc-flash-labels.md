@@ -132,6 +132,30 @@ Available placeholder tokens:
 
 ---
 
+## Approach Boundaries and Report Formatting
+
+Limited and restricted approach boundaries come from NFPA 70E-2024 Table 130.4(E)(a) for AC systems. Values were transcribed from a published copy of the 2024 table; confirm them against the edition your site has adopted.
+
+| Nominal voltage (phase to phase) | Limited approach (exposed fixed part) | Restricted approach |
+| --- | --- | --- |
+| 50–150 V | 3 ft 6 in (1067 mm) | Avoid contact |
+| 151–750 V | 3 ft 6 in (1067 mm) | 1 ft 0 in (305 mm) |
+| 751 V–5 kV | 3 ft 6 in (1067 mm) | 2 ft 1 in (635 mm) |
+| 5.1–15 kV | 5 ft 0 in (1524 mm) | 2 ft 2 in (660 mm) |
+| 15.1–36 kV | 6 ft 0 in (1829 mm) | 2 ft 7 in (787 mm) |
+| 36.1–46 kV | 8 ft 0 in (2438 mm) | 2 ft 10 in (864 mm) |
+| 46.1–72.5 kV | 8 ft 0 in (2438 mm) | 3 ft 4 in (1016 mm) |
+
+The restricted approach boundary includes the inadvertent-movement adder and assumes an elevation not exceeding 900 m (3000 ft). Above 72.5 kV, no approach distance is assigned.
+
+Label and report formatting:
+
+- **Voltages** print as exact kilovolts: 12,470 V is "12.47 kV", not a rounded "12.5 kV".
+- **Distances** round the total to 0.1 in before splitting into feet and inches, so a value just under a whole foot prints "3 ft", never "2 ft 12 in".
+- **Template values** that contain `$` (for example `PNL-$$1`) are inserted literally.
+- **CSV and PDF reports** put units in the column headers (`incidentEnergy (cal/cm²)`, `boundary (mm)`, `clearingTime (s)`, and so on). The CSV is written with a UTF-8 byte-order mark so Excel shows "cal/cm²" correctly.
+- **Scope:** when the page's scope selector names one location, the report and label drafts cover only that location.
+
 ## Implementation Notes
 
 - **Module:** `reports/arcFlashReport.mjs` — `buildLabelSheetHtml()`, `openLabelPrintWindow()`

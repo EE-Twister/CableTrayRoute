@@ -32,36 +32,45 @@ function round(value, decimals = 0) {
 function formatVoltage(voltage) {
   if (!Number.isFinite(voltage) || voltage <= 0) return 'Not Specified';
   if (voltage >= 1000) {
-    const kv = voltage / 1000;
-    return `${round(kv, kv >= 10 ? 1 : 2)} kV`;
+    // Exact system voltage: 12,470 V is "12.47 kV", not a rounded "12.5 kV".
+    return `${round(voltage / 1000, 3)} kV`;
   }
   return `${round(voltage, 0)} V`;
 }
 
+/**
+ * Split a distance into whole feet and inches after rounding the total to
+ * 0.1 in, so a value just under a whole foot reads "3 ft", never "2 ft 12 in".
+ */
+function feetAndInches(mm) {
+  const inchesTotal = round(mm / MM_PER_INCH, 1);
+  const feet = Math.floor(inchesTotal / 12);
+  const inches = round(inchesTotal - feet * 12, 1);
+  return { inchesTotal, feet, inches };
+}
+
+function formatInches(inches) {
+  return inches.toFixed(inches % 1 ? 1 : 0);
+}
+
 function formatDistanceVerbose(mm) {
   if (!Number.isFinite(mm) || mm <= 0) return 'Not Applicable';
-  const inchesTotal = mm / MM_PER_INCH;
-  const feet = Math.floor(inchesTotal / 12);
-  const inches = inchesTotal - feet * 12;
+  const { inchesTotal, feet, inches } = feetAndInches(mm);
   if (feet > 0) {
-    const inchesRounded = round(inches, 1);
-    const inchesText = inchesRounded === 0 ? '' : ` ${inchesRounded.toFixed(inchesRounded % 1 ? 1 : 0)} in`;
+    const inchesText = inches === 0 ? '' : ` ${formatInches(inches)} in`;
     return `${feet} ft${inchesText} (${round(mm, 0)} mm)`;
   }
-  const inchesRounded = round(inchesTotal, 1);
-  return `${inchesRounded.toFixed(inchesRounded % 1 ? 1 : 0)} in (${round(mm, 0)} mm)`;
+  return `${formatInches(inchesTotal)} in (${round(mm, 0)} mm)`;
 }
 
 function formatDistanceShort(mm) {
   if (!Number.isFinite(mm) || mm <= 0) return 'N/A';
-  const inchesTotal = mm / MM_PER_INCH;
-  const feet = Math.floor(inchesTotal / 12);
-  const inches = round(inchesTotal - feet * 12, 1);
+  const { inchesTotal, feet, inches } = feetAndInches(mm);
   if (feet > 0) {
     if (!inches) return `${feet} ft`;
-    return `${feet} ft ${inches.toFixed(inches % 1 ? 1 : 0)} in`;
+    return `${feet} ft ${formatInches(inches)} in`;
   }
-  return `${inches.toFixed(inches % 1 ? 1 : 0)} in`;
+  return `${formatInches(inchesTotal)} in`;
 }
 
 function formatApproach(mm) {
@@ -200,9 +209,32 @@ export function openLabelPrintWindow(results = {}, projectName = '') {
  * Generate CSV and PDF reports from arc flash analysis results.
  * @param {Object<string, {incidentEnergy:number, minimumArcRatingCalCm2:number, boundary:number, clearingTime:number}>} results
  */
+// Units for exported columns whose values are not self-describing. Engine
+// values are mm for distances, cal/cm² for energy, s for time, V for voltage.
+const EXPORT_COLUMN_UNITS = {
+  nominalVoltage: 'V',
+  incidentEnergy: 'cal/cm²',
+  boundary: 'mm',
+  clearingTime: 's',
+  workingDistance: 'mm',
+  limitedApproach: 'mm',
+  restrictedApproach: 'mm',
+};
+
+/** Rename unit-bearing columns, e.g. "boundary" -> "boundary (mm)". */
+export function withUnitHeaders(headers = [], rows = []) {
+  const label = header => (EXPORT_COLUMN_UNITS[header] ? `${header} (${EXPORT_COLUMN_UNITS[header]})` : header);
+  return {
+    headers: headers.map(label),
+    rows: rows.map(row => Object.fromEntries(headers.map(header => [label(header), row[header]]))),
+  };
+}
+
 export function generateArcFlashReport(results = {}, options = {}) {
   const lifecycle = studyExportMetadata(results, { assessment: options.assessment });
-  const entries = safeEntries(results);
+  // Honour the page's scope selector: a single location exports only that location.
+  const scope = options.scope && options.scope !== 'project' ? options.scope : null;
+  const entries = safeEntries(results).filter(([id]) => !scope || id === scope);
   const labelEntries = entries.filter(([, info]) => isArcFlashLabelEligible(info));
   const headers = [
     'bus',
@@ -297,8 +329,9 @@ export function generateArcFlashReport(results = {}, options = {}) {
     };
   });
   if (!rows.length) return { reportCount: 0, labelCount: 0, omittedLabelCount: 0 };
-  downloadCSV(headers, rows, 'arcflash.csv');
-  downloadPDF('Arc Flash Report', headers, rows, 'arcflash.pdf');
+  const table = withUnitHeaders(headers, rows);
+  downloadCSV(table.headers, table.rows, 'arcflash.csv', { bom: true });
+  downloadPDF('Arc Flash Report', table.headers, table.rows, 'arcflash.pdf');
   // export individual labels
   labelEntries.forEach(([id, info]) => {
     const svg = generateArcFlashLabel(buildArcFlashLabelData(id, info));

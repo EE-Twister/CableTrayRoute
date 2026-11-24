@@ -15,20 +15,67 @@ function getLoadLabel(load) {
   return tag || desc || '';
 }
 
-function getDemandValue(load) {
-  if (!load) return null;
-  const candidates = [
-    load.demandKva,
-    load.kva,
-    load.demandKw,
-    load.kw,
-    load.demand
-  ];
-  for (const candidate of candidates) {
-    const parsed = Number.parseFloat(candidate);
-    if (Number.isFinite(parsed)) return parsed;
+const SHEET_NAME_MAX_LENGTH = 31;
+const INVALID_SHEET_NAME_CHARS = /[:\\/?*[\]]/g;
+
+function roundTo(value, digits) {
+  return Number(value.toFixed(digits));
+}
+
+function firstNonZeroNumber(values) {
+  let zeroFound = false;
+  for (const value of values) {
+    const parsed = Number.parseFloat(value);
+    if (!Number.isFinite(parsed)) continue;
+    if (parsed === 0) {
+      zeroFound = true;
+      continue;
+    }
+    return parsed;
   }
-  return null;
+  return zeroFound ? 0 : null;
+}
+
+/**
+ * Demand kVA for the "Demand (kVA)" column. Mirrors the panel totals, which
+ * use demand kVA and then connected kVA; kW is never relabelled as kVA.
+ * @param {object} load
+ * @returns {number|null}
+ */
+export function getDemandKva(load) {
+  if (!load) return null;
+  return firstNonZeroNumber([load.demandKva, load.kva]);
+}
+
+function getRecordedKw(load) {
+  if (!load) return null;
+  return firstNonZeroNumber([load.demandKw, load.kw]);
+}
+
+/**
+ * Turn any panel identifier into a valid, unique Excel sheet name: no
+ * : \ / ? * [ ], no leading or trailing apostrophe, not "History", and at
+ * most 31 characters. Duplicates (case-insensitive, as Excel compares them)
+ * receive a numeric suffix.
+ * @param {string} name
+ * @param {string[]} [existingNames]
+ * @returns {string}
+ */
+export function toExcelSheetName(name, existingNames = []) {
+  const clean = value => value.replace(/^[\s']+|[\s']+$/g, '');
+  let base = clean(String(name ?? '').replace(/\p{Cc}/gu, '').replace(INVALID_SHEET_NAME_CHARS, '-'));
+  base = clean(base.slice(0, SHEET_NAME_MAX_LENGTH)) || 'Sheet';
+  const taken = new Set(['history', ...existingNames.map(existing => String(existing).toLowerCase())]);
+  if (!taken.has(base.toLowerCase())) return base;
+  for (let suffix = 2; ; suffix += 1) {
+    const marker = `-${suffix}`;
+    const candidate = `${clean(base.slice(0, SHEET_NAME_MAX_LENGTH - marker.length)) || 'Sheet'}${marker}`;
+    if (!taken.has(candidate.toLowerCase())) return candidate;
+  }
+}
+
+function toDownloadFileName(name) {
+  return String(name ?? '').replace(/[\p{Cc}<>:"/\\|?*]+/gu, '_').trim() || 'panel';
 }
 
 /**
@@ -91,6 +138,7 @@ export function exportPanelSchedule(panelId) {
   }
 
   const rows = [];
+  const kwOnlyNotes = [];
   for (let circuit = 1; circuit <= circuitCount; circuit++) {
     const info = assignments.get(circuit);
     const phase = getPhaseLabel(panel, circuit) || '';
@@ -104,8 +152,12 @@ export function exportPanelSchedule(panelId) {
         const effectivePoles = Math.max(spanLength, derivedPoles);
         poles = effectivePoles ? String(effectivePoles) : '';
         description = getLoadLabel(load);
-        const demandCandidate = getDemandValue(load);
-        demandVal = demandCandidate != null ? demandCandidate.toFixed(2) : '';
+        const demandKva = getDemandKva(load);
+        demandVal = demandKva != null ? roundTo(demandKva, 2) : '';
+        const recordedKw = demandKva == null ? getRecordedKw(load) : null;
+        if (recordedKw != null) {
+          kwOnlyNotes.push(`Circuit ${circuit}${description ? ` (${description})` : ''}: the load records ${recordedKw.toFixed(2)} kW but no kVA, so Demand (kVA) is blank; no power factor conversion is assumed. Panel kVA totals likewise do not convert kW.`);
+        }
       } else {
         const startRef = parsePositiveInt(load.breaker) || startCircuit || (circuit - position);
         const label = getLoadLabel(load);
@@ -117,7 +169,7 @@ export function exportPanelSchedule(panelId) {
     const detail = panel.breakerDetails?.[String(start)] || {};
     const customLabel = typeof detail.customLoad === 'string' ? detail.customLoad.trim() : '';
     if (customLabel) {
-      description = circuit === start ? customLabel : `Tied to Circuit ${start} � ${customLabel}`;
+      description = circuit === start ? customLabel : `Tied to Circuit ${start} — ${customLabel}`;
     }
     if (block && circuit === start) poles = String(block.size);
     const customPower = getDetailPhaseLoad(detail, getPhaseLoadKey(phase, block));
@@ -165,13 +217,23 @@ export function exportPanelSchedule(panelId) {
   const totals = calculatePanelTotalsFromData(panel, loads);
 
   data.push([]);
-  data.push(['Connected Load (kVA)', totals.connectedKva.toFixed(2), '', '', '', '', 'Demand Load (kVA)', totals.demandKva.toFixed(2)]);
-  data.push(['Connected Load (kW)', totals.connectedKw.toFixed(2), '', '', '', '', 'Demand Load (kW)', totals.demandKw.toFixed(2)]);
+  data.push(['Connected Load (kVA)', roundTo(totals.connectedKva, 2), '', '', '', '', 'Demand Load (kVA)', roundTo(totals.demandKva, 2)]);
+  data.push(['Connected Load (kW)', roundTo(totals.connectedKw, 2), '', '', '', '', 'Demand Load (kW)', roundTo(totals.demandKw, 2)]);
+  if (kwOnlyNotes.length) {
+    data.push([]);
+    data.push(['Notes']);
+    kwOnlyNotes.forEach(note => data.push([note]));
+  }
 
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, panelId);
-  XLSX.writeFile(wb, `${panelId}_panel_schedule.xlsx`);
+  try {
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, toExcelSheetName(panelId));
+    XLSX.writeFile(wb, `${toDownloadFileName(panelId)}_panel_schedule.xlsx`);
+  } catch (error) {
+    console.error('Panel schedule export failed', error);
+    showAlertModal('Export Error', `The panel schedule could not be exported: ${error?.message || error}`);
+  }
 }
 
 if (typeof window !== 'undefined') {

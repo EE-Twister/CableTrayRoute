@@ -217,8 +217,22 @@ Each browser profile and device maintains its own pricing book. For team use, ex
 
 ## XLSX Export
 
-When exporting the estimate to XLSX, the **Summary** sheet includes the pricing
-basis and applied material/labor factors. A dedicated **Estimate Basis** sheet
+**Export XLSX** writes the estimate exactly as it was when **Generate Estimate**
+last ran: the workbook is built from a snapshot taken at that moment (line
+items, contingency, estimate basis, pricing source, and assurance evidence),
+never from the current page inputs. If contingency, any estimate-basis field,
+a manual labor or fitting rate, or the pricing book has changed since the run,
+export is refused with a **Rerun Estimate to Export** message naming the changed
+inputs, because the file would no longer match the inputs on the page. Click
+**Generate Estimate** and export again.
+
+Money and quantity cells are numbers, so Excel can sum and format them. The
+**Summary** amounts are whole dollars, matching the on-screen summary; the
+**Line Items** sheet keeps cents, quantities to 0.001, and unit prices to cents,
+so its totals can differ from the Summary by rounding.
+
+The **Summary** sheet also records when the estimate ran, the pricing
+basis, and the applied material/labor factors. A dedicated **Estimate Basis** sheet
 records dates, region, wages, index values, series IDs, calculated factors, and
 public source URLs. The **Line Items** sheet also carries manufacturer, catalog
 number, and approval status fields when schedule rows include governed catalog
@@ -241,7 +255,7 @@ This section summarizes the behavior expected by integration checks and user wor
 ### Expected outputs
 
 - The UI renders category subtotals, subtotal before contingency, contingency amount, and grand total.
-- Displayed currency is rounded for readability in UI tables, while internal/exported values retain full calculation precision where applicable.
+- Displayed currency is rounded for readability in UI tables. The exported Summary sheet uses the same whole-dollar amounts as the screen; the Line Items sheet keeps cents.
 - Empty project data yields guidance text instead of broken or blank result tables.
 
 ### Compliance interpretation
@@ -251,11 +265,12 @@ This section summarizes the behavior expected by integration checks and user wor
 ### Export behavior
 
 - **Export XLSX** is intentionally blocked until an estimate is generated.
-- The exported workbook is expected to align with on-screen totals for the same run and include pricing basis metadata for traceability.
+- **Export XLSX** is also blocked when any estimate input changed after the last run; rerun the estimate first.
+- The exported workbook is built from the run-time snapshot, so it matches on-screen totals for the same run and includes pricing basis metadata for traceability.
 
 ### Troubleshooting (common validation failures)
 
 - **No data message shown after Generate Estimate**: load/import project schedule data and rerun.
 - **Unexpected contingency result**: verify contingency is numeric and in range; malformed values can trigger fallback handling.
-- **Export blocked with warning**: run **Generate Estimate** first in the current state, then retry **Export XLSX**.
+- **Export blocked with warning**: run **Generate Estimate** first in the current state, then retry **Export XLSX**. A **Rerun Estimate to Export** message lists the inputs that changed since the estimate on screen was generated.
 - **Imported CSV appears partially applied**: check warning dialog for skipped rows (invalid category/key/price) and correct the CSV.

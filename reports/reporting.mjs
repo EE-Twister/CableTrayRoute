@@ -122,9 +122,11 @@ export async function toPDF(title = 'Report', headers = [], rows = []) {
 /**
  * Convenience helper to export data as CSV file in browser.
  */
-export function downloadCSV(headers, rows, filename = 'report.csv') {
+export function downloadCSV(headers, rows, filename = 'report.csv', { bom = false } = {}) {
   const csv = toCSV(headers, rows);
-  const blob = new Blob([csv], { type: 'text/csv' });
+  // Opt-in UTF-8 byte-order mark so Excel reads units such as "cal/cm²"
+  // correctly; off by default for CSVs other tools may parse.
+  const blob = new Blob(bom ? ['﻿', csv] : [csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = filename;
@@ -134,6 +136,8 @@ export function downloadCSV(headers, rows, filename = 'report.csv') {
 
 /**
  * Convenience helper to export data as PDF file in browser.
+ * Resolves true once the PDF was handed to the browser, false if generation
+ * failed, so callers do not report an export that never happened.
  */
 export async function downloadPDF(title, headers, rows, filename = 'report.pdf') {
   try {
@@ -144,8 +148,10 @@ export async function downloadPDF(title, headers, rows, filename = 'report.pdf')
     a.download = filename;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 0);
+    return true;
   } catch (err) {
     console.error('Failed to download PDF', err);
+    return false;
   }
 }
 
@@ -184,7 +190,9 @@ export function buildMotorStartRows(result = {}) {
       status: entry.status
     }));
   }
-  return Object.entries(result).map(([id, entry]) => ({
+  return Object.entries(result || {})
+    .filter(([id, entry]) => !id.startsWith('_') && entry && typeof entry === 'object')
+    .map(([id, entry]) => ({
     id,
     inrushKA: entry.inrushKA,
     voltageSagPct: entry.voltageSagPct,

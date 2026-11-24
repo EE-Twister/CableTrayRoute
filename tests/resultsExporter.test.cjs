@@ -22,6 +22,9 @@ function it(name, fn) {
   const { buildSegmentRows, buildSummaryRows, buildBOM } = await import(
     "../resultsExport.mjs"
   );
+  const { buildRouteQuantityLedger } = await import(
+    "../analysis/routeCostAssurance.mjs"
+  );
   const conductorProps = JSON.parse(
     fs.readFileSync(
       path.join(__dirname, "..", "data", "conductor_properties.json"),
@@ -230,6 +233,79 @@ function it(name, fn) {
         },
       ], [{ tray_id: "TRAY-1", tray_type: "Ladder (50 % fill)" }]);
       assert.deepStrictEqual(raceways, []);
+    });
+
+    const sharedTray = {
+      tray_id: "TR-100", tray_type: "Ladder (50 % fill)",
+      start_x: 0, start_y: 0, start_z: 10, end_x: 100, end_y: 0, end_z: 10,
+    };
+    const fiveCablesInOneTray = ["C1", "C2", "C3", "C4", "C5"].map(cable => ({
+      cable,
+      status: "Routed",
+      total_length: 100,
+      route_segments: [{ type: "tray", tray_id: "TR-100", length: 100, start: [0, 0, 10], end: [100, 0, 10] }],
+    }));
+
+    it("counts a raceway shared by five cables once (E5)", () => {
+      const { raceways, racewayUsage } = buildBOM(fiveCablesInOneTray, [sharedTray], [], conductorProps, materialCosts);
+      assert.deepStrictEqual(raceways, [{
+        type: "Ladder (50 % fill)", raceway_count: 1, total_length: 100, weight: 100, cost: 500,
+      }]);
+      assert.deepStrictEqual(racewayUsage, [{
+        raceway_id: "TR-100",
+        kind: "tray",
+        type: "Ladder (50 % fill)",
+        physical_length_ft: 100,
+        length_basis: "scheduled length",
+        cable_count: 5,
+        routed_cable_ft: 500,
+      }]);
+      assert.ok(!Object.keys(racewayUsage[0]).some(key => /cost/i.test(key)));
+    });
+
+    it("matches the Cost Estimate route quantity ledger for unique tray length", () => {
+      const ledger = buildRouteQuantityLedger({
+        routeResults: fiveCablesInOneTray,
+        cables: ["C1", "C2", "C3", "C4", "C5"].map(tag => ({ tag })),
+        trays: [sharedTray],
+      });
+      const { raceways } = buildBOM(fiveCablesInOneTray, [sharedTray]);
+      assert.strictEqual(raceways[0].total_length, ledger.summary.uniqueTrayFt);
+    });
+
+    it("uses the longest per-cable length when a raceway has no scheduled geometry", () => {
+      const { raceways, racewayUsage } = buildBOM([
+        {
+          cable: "SPLIT",
+          route_segments: [
+            { type: "tray", tray_id: "TR-NOGEOM", length: 40 },
+            { type: "tray", tray_id: "TR-NOGEOM", length: 60 },
+          ],
+        },
+        { cable: "SHORT", route_segments: [{ type: "tray", tray_id: "TR-NOGEOM", length: 30 }] },
+      ], [{ tray_id: "TR-NOGEOM", tray_type: "Ladder (50 % fill)" }], [], conductorProps, materialCosts);
+      assert.strictEqual(raceways[0].total_length, 100);
+      assert.strictEqual(raceways[0].raceway_count, 1);
+      assert.strictEqual(racewayUsage[0].routed_cable_ft, 130);
+      assert.match(racewayUsage[0].length_basis, /longest routed/);
+    });
+
+    it("keeps same-numbered conduits in different ductbanks apart", () => {
+      const trayData = [
+        { tray_id: "DB-A-1", ductbankTag: "DB-A", conduit_id: "1", type: "PVC Sch 40", start_x: 0, start_y: 0, start_z: -8, end_x: 50, end_y: 0, end_z: -8 },
+        { tray_id: "DB-B-1", ductbankTag: "DB-B", conduit_id: "1", type: "PVC Sch 40", start_x: 0, start_y: 20, start_z: -8, end_x: 30, end_y: 20, end_z: -8 },
+      ];
+      const results = [
+        { cable: "A1", route_segments: [{ type: "conduit", ductbankTag: "DB-A", conduit_id: "1", length: 50 }] },
+        { cable: "A2", route_segments: [{ type: "conduit", ductbankTag: "DB-A", conduit_id: "1", length: 50 }] },
+        { cable: "B1", route_segments: [{ type: "conduit", ductbankTag: "DB-B", conduit_id: "1", length: 30 }] },
+      ];
+      const { raceways, racewayUsage } = buildBOM(results, trayData, [], conductorProps, materialCosts);
+      assert.deepStrictEqual(raceways, [{ type: "PVC Sch 40", raceway_count: 2, total_length: 80, weight: 40, cost: 160 }]);
+      assert.deepStrictEqual(racewayUsage.map(row => [row.raceway_id, row.physical_length_ft, row.cable_count]), [
+        ["DB-A:1", 50, 2],
+        ["DB-B:1", 30, 1],
+      ]);
     });
   });
 })();

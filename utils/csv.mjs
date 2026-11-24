@@ -22,3 +22,15 @@ export function csvCell(value) {
   }
   return cell;
 }
+
+/**
+ * Undo the apostrophe `csvCell` adds in front of formula-like text, so a file the
+ * app exported imports back to the original value. Other values pass through.
+ *
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+export function stripCsvFormulaGuard(value) {
+  if (typeof value !== 'string') return value;
+  return /^'[\s]*[=+\-@\t\r]/.test(value) && !PLAIN_NUMBER.test(value.slice(1)) ? value.slice(1) : value;
+}
