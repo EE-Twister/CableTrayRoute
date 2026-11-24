@@ -9,7 +9,7 @@ Reviewed commit `e4da1f678fa65d50e966876f1cbb84870c304193`. The working tree con
 - **R3, R4:** Load Flow and Motor Starting read the saved engine shapes.
 - **R5:** a shared compartment-aware evaluator, `evaluateTrayFillWithCompartments`, now feeds the Raceway Schedule, the report, the submittal, raceway assurance, and DRC-01. Raceways that cannot be evaluated show as **incomplete**, not 0 % "ok". The Raceway Schedule KPI now counts ductbank conduits.
 - **R6:** report heat-trace branches are re-assessed for freshness before totalling.
-- **R7:** withheld report rows lose their verdict, reliability cut sets are withheld with their study, and voltage-drop rows are gated on their own result. Arc Flash chart bars and headline cards show readiness instead of "Pass" when a result is not current and label-ready. The Short Circuit and Load Flow page charts were not changed and still need the same treatment, so R7 is partly done.
+- **R7:** withheld report rows lose their verdict, reliability cut sets are withheld with their study, and voltage-drop rows are gated on their own result. Arc Flash chart bars and headline cards show readiness instead of "Pass" when a result is not current and label-ready. The Short Circuit and Load Flow page charts now follow the same rule: a stale result, or a Short Circuit location with missing required inputs, shows a "Stale" or "Incomplete" badge and a reason instead of Pass/Review/Fail, and the headline cards drop their verdict colour.
 
 R8–R11 were then corrected:
 

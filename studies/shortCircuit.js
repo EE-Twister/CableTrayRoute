@@ -192,7 +192,17 @@ export async function exportShortCircuitReport(results = {}) {
   return downloadPDF(title, headers, rows, 'shortcircuit.pdf');
 }
 
-function renderShortCircuitChart(entries, assumedCount) {
+// A bar only carries a pass/review/fail verdict when its result is current and
+// its inputs are complete; otherwise it shows why not.
+function shortCircuitChartReadiness(result, { stale = false } = {}) {
+  if (stale) return { ready: false, badge: 'Stale', reason: 'Saved result is not current; rerun before relying on it' };
+  if (result?.calculationStatus === 'incomplete' || (Array.isArray(result?.requiredInputs) && result.requiredInputs.length)) {
+    return { ready: false, badge: 'Incomplete', reason: 'Required inputs are missing for this location' };
+  }
+  return { ready: true };
+}
+
+function renderShortCircuitChart(entries, assumedCount, { stale = false } = {}) {
   const chart = document.getElementById('shortcircuit-chart');
   if (!chart) return;
   const ratings = {};
@@ -200,27 +210,30 @@ function renderShortCircuitChart(entries, assumedCount) {
     const rating = Number(component?.props?.interruptRatingKA);
     if (component?.id && Number.isFinite(rating) && rating > 0) ratings[component.id] = rating;
   });
-  const rows = shortCircuitBarRows(entries, ratings);
+  const rows = shortCircuitBarRows(entries, ratings, { readiness: (id, result) => shortCircuitChartReadiness(result, { stale }) });
   if (!rows.length) {
     chart.innerHTML = '';
     return;
   }
   const highest = rows.reduce((best, row) => (row.value > best.value ? row : best), rows[0]);
-  const overRated = rows.filter(row => row.limit && row.value > row.limit).length;
-  const rated = rows.filter(row => row.limit).length;
+  const verdictRows = rows.filter(row => !row.notReady);
+  const notReadyCount = rows.length - verdictRows.length;
+  const overRated = verdictRows.filter(row => row.limit && row.value > row.limit).length;
+  const rated = verdictRows.filter(row => row.limit).length;
   chart.innerHTML = `${kpiStripHtml([
-    { label: 'Highest 3-phase fault', value: `${highest.value.toFixed(1)} kA`, hint: highest.label, status: highest.status },
+    { label: 'Highest 3-phase fault', value: `${highest.value.toFixed(1)} kA`, hint: highest.label, status: highest.notReady ? 'info' : highest.status },
     { label: 'Locations calculated', value: String(rows.length), status: 'info' },
     { label: 'Need input review', value: String(assumedCount), status: assumedCount ? 'warn' : 'pass' },
+    ...(notReadyCount ? [{ label: 'Not evaluated', value: String(notReadyCount), status: 'info', hint: stale ? 'Result is stale' : 'Required inputs missing' }] : []),
     ...(rated ? [{ label: 'Over entered rating', value: String(overRated), status: overRated ? 'fail' : 'pass', hint: `${rated} of ${rows.length} have a rating` }] : [])
   ])}
   <h3 class="study-chart__title">3-phase fault current by location</h3>
   ${barChartHtml(rows, { unit: 'kA', ariaLabel: '3-phase fault current by location' })}
-  ${rated ? statusLegendHtml() : ''}
+  ${rated || notReadyCount ? statusLegendHtml(notReadyCount ? ['pass', 'warn', 'fail', 'na'] : undefined) : ''}
   <p class="field-hint">Bars are colored by magnitude (under 22 kA, 22–65 kA, 65 kA and above); a tick marks the interrupting rating entered on the One-Line, where there is one. Without a rating, high values are not failures: they set the equipment rating you need. Each note shows the smallest standard interrupting rating that covers the fault current.</p>`;
 }
 
-function renderResults(results, scope = 'project') {
+function renderResults(results, scope = 'project', { stale = false } = {}) {
   const entries = resultEntries(results, scope);
   const savedSummary = summaryResult(results);
   const table = document.getElementById('shortcircuit-results-table');
@@ -282,7 +295,7 @@ function renderResults(results, scope = 'project') {
         </tr>`).join('')
       : '<tr><td colspan="4">The previous run contains a summary only. Run the study again to begin bus-by-bus comparisons.</td></tr>';
   }
-  renderShortCircuitChart(entries, assumedCount);
+  renderShortCircuitChart(entries, assumedCount, { stale });
   table.hidden = entries.length === 0;
   details.hidden = entries.length === 0;
   if (!entries.length) {
@@ -339,8 +352,11 @@ function initializeShortCircuitPage() {
     const componentCount = projectComponents().length;
     const projectName = String(getProjectState()?.name || 'Untitled').trim() || 'Untitled';
     if (projectContext) projectContext.textContent = `Project: ${projectName}. ${componentCount} One-Line component(s) available.`;
+    let latestStale = false;
     if (reviewableResults(latestResults)) {
-      renderResults(latestResults, scope?.value || 'project');
+      const assessment = getStudyAssessments().shortCircuit;
+      latestStale = assessment?.freshness !== 'current' || assessment?.eligible !== true;
+      renderResults(latestResults, scope?.value || 'project', { stale: latestStale });
       if (exportButton) exportButton.disabled = false;
       const timestamp = resultTimestamp(latestResults);
       const freshness = getShortCircuitFreshness(latestResults, getProjectInputFingerprint());
@@ -355,6 +371,7 @@ function initializeShortCircuitPage() {
       if (form) form.setAttribute('aria-busy', 'true');
       try {
         latestResults = await runShortCircuitStudy({ method: form.method.value });
+        latestStale = false;
         renderResults(latestResults, scope?.value || 'project');
         if (exportButton) exportButton.disabled = !reviewableResults(latestResults);
         if (status) status.textContent = 'Study complete and saved to the active project. Results now match the current project inputs.';
@@ -367,7 +384,7 @@ function initializeShortCircuitPage() {
       }
     });
     scope?.addEventListener('change', () => {
-      if (latestResults) renderResults(latestResults, scope.value);
+      if (latestResults) renderResults(latestResults, scope.value, { stale: latestStale });
     });
     exportButton?.addEventListener('click', async () => {
       if (!latestResults) return;

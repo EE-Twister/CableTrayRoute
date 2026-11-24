@@ -37,6 +37,22 @@ assert.strictEqual(notReady[0].status, 'na');
 assert.match(notReady[0].note, /stale/);
 assert.strictEqual(notReady[1].status, 'pass');
 
+// Short-circuit and load-flow bars follow the same rule: no verdict when stale or incomplete.
+const scNotReady = shortCircuitBarRows(
+  [['a', { equipmentTag: 'MSB', threePhaseKA: 70 }], ['b', { equipmentTag: 'PNL', threePhaseKA: 10 }]],
+  { a: 65 },
+  { readiness: id => (id === 'a' ? { ready: false, badge: 'Stale', reason: 'Saved result is not current' } : { ready: true }) }
+);
+assert.strictEqual(scNotReady[0].status, 'na');
+assert.strictEqual(scNotReady[0].badgeLabel, 'Stale');
+assert.strictEqual(scNotReady[0].notReady, true);
+assert.match(scNotReady[0].note, /not current/);
+assert.strictEqual(scNotReady[1].status, 'pass');
+const lfBuses = [{ id: 'B1', Vm: 0.9 }, { id: 'B2', Vm: 1.0 }];
+assert.strictEqual(loadFlowVoltageRows(lfBuses)[0].status, 'fail');
+const lfStale = loadFlowVoltageRows(lfBuses, bus => bus.id, { stale: true });
+assert.ok(lfStale.every(row => row.status === 'na' && row.badgeLabel === 'Stale'));
+
 const vd = voltageDropBarRows([
   { tag: 'C1', evaluated: true, dropPct: 2, limitPct: 3, status: 'pass' },
   { tag: 'C2', evaluated: false },

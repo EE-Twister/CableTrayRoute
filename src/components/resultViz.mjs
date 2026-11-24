@@ -110,13 +110,33 @@ export function statusLegendHtml(keys = ['pass', 'warn', 'fail']) {
   return `<p class="viz-legend" aria-label="Status legend">${keys.map(key => statusBadgeHtml(key)).join(' ')}</p>`;
 }
 
-/** Short-circuit rows -> bar chart rows (value coloured by required AIC step). */
-export function shortCircuitBarRows(entries, ratings = {}) {
+/**
+ * Short-circuit rows -> bar chart rows (value coloured by required AIC step).
+ *
+ * `readiness(id, result)` may return `{ ready: false, badge, reason }` for a
+ * location whose saved result is stale or whose required inputs are missing.
+ * Such rows keep their bar for context but carry a "Not evaluated" badge and
+ * the reason instead of a pass/review/fail verdict.
+ */
+export function shortCircuitBarRows(entries, ratings = {}, { readiness = null } = {}) {
   return (entries || []).map(([id, result]) => {
     const ka = finite(result?.threePhaseKA);
     if (ka === null) return null;
     const aic = nextStandardAicKa(ka);
     const rating = finite(ratings?.[id]);
+    const state = typeof readiness === 'function' ? readiness(id, result) : null;
+    if (state && state.ready === false) {
+      return {
+        id,
+        label: result.equipmentTag || id,
+        value: ka,
+        ...(rating !== null && rating > 0 ? { limit: rating } : {}),
+        status: 'na',
+        badgeLabel: state.badge || 'Not evaluated',
+        note: [state.reason || 'Not ready', aic ? `Needs ≥ ${aic} kA interrupting rating if this value holds` : ''].filter(Boolean).join(' · '),
+        notReady: true,
+      };
+    }
     if (rating !== null && rating > 0) {
       const over = ka > rating;
       return {
@@ -192,7 +212,7 @@ export function voltageDropBarRows(results) {
 }
 
 /** Load-flow bus results -> per-unit voltage rows (ANSI C84.1 style 0.95-1.05 band). */
-export function loadFlowVoltageRows(buses, labelFor = bus => bus.displayLabel || bus.id) {
+export function loadFlowVoltageRows(buses, labelFor = bus => bus.displayLabel || bus.id, { stale = false } = {}) {
   return (buses || []).map(bus => {
     const vm = finite(bus?.Vm);
     if (vm === null) return null;
@@ -201,7 +221,8 @@ export function loadFlowVoltageRows(buses, labelFor = bus => bus.displayLabel ||
       label: labelFor(bus),
       value: vm,
       limit: vm < 1 ? 0.95 : 1.05,
-      status: off > 0.05 ? 'fail' : off > 0.03 ? 'warn' : 'pass',
+      status: stale ? 'na' : off > 0.05 ? 'fail' : off > 0.03 ? 'warn' : 'pass',
+      ...(stale ? { badgeLabel: 'Stale', note: 'Saved result is not current; rerun before relying on it', notReady: true } : {}),
       valueLabel: `${vm.toFixed(3)} pu`,
     };
   }).filter(Boolean);

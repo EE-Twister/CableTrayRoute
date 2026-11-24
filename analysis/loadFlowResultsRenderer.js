@@ -343,7 +343,7 @@ function resolveBusLabel(id, fallback, map) {
   return id;
 }
 
-export function renderLoadFlowResultsHtml(res) {
+export function renderLoadFlowResultsHtml(res, { stale = false } = {}) {
   const buses = Array.isArray(res?.buses)
     ? res.buses
     : Array.isArray(res)
@@ -384,9 +384,10 @@ export function renderLoadFlowResultsHtml(res) {
   html += buildBranchConnectionsSection(res?.summary, busLabelMap);
 
   if (buses.length) {
-    const voltageRows = loadFlowVoltageRows(buses, bus => resolveBusLabel(bus.id, bus.displayLabel, busLabelMap));
+    const voltageRows = loadFlowVoltageRows(buses, bus => resolveBusLabel(bus.id, bus.displayLabel, busLabelMap), { stale });
     if (voltageRows.length) {
       html += '<h3>Voltage Profile</h3>';
+      if (stale) html += '<p class="field-hint"><strong>Saved result is not current.</strong> Bars show no verdict until the study is rerun against the current project.</p>';
       html += barChartHtml(voltageRows, { unit: 'pu', min: 0.9, max: 1.1, sort: 'asc', ariaLabel: 'Bus voltage in per-unit' });
       html += statusLegendHtml();
       html += '<p class="field-hint">Bars span 0.90–1.10 pu. The tick marks the nearest 0.95 / 1.05 pu limit; buses beyond 3% off nominal are flagged for review.</p>';
