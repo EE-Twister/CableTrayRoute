@@ -414,13 +414,171 @@ export function cablesAssignedToTray(tray = {}, cables = []) {
   });
 }
 
+/** Number of physical compartments (barrier-separated slots) in a tray record. */
+export function traySlotCount(tray = {}) {
+  const parsed = Number.parseInt(String(tray.num_slots ?? tray.numSlots ?? ''), 10);
+  return Number.isInteger(parsed) && parsed > 1 ? parsed : 1;
+}
+
+/** Slot index -> label map from a tray's `slot_groups` (object, JSON text, or Map). */
+export function traySlotGroups(tray = {}, numSlots = traySlotCount(tray)) {
+  let raw = tray.slot_groups ?? tray.slotGroups ?? null;
+  if (typeof raw === 'string') {
+    try { raw = JSON.parse(raw); } catch { raw = null; }
+  }
+  const entries = raw instanceof Map
+    ? [...raw.entries()]
+    : (raw && typeof raw === 'object' && !Array.isArray(raw) ? Object.entries(raw) : []);
+  const labels = new Map();
+  entries.forEach(([slotKey, group]) => {
+    const index = Number.parseInt(String(slotKey), 10);
+    const label = text(group);
+    if (Number.isInteger(index) && index >= 0 && index < numSlots && label && !labels.has(index)) labels.set(index, label);
+  });
+  return labels;
+}
+
+function parseSlotIndex(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = Number.parseInt(String(value), 10);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
 /**
- * Evaluate every tray against its assigned cables with the NEC 392.22(A) method.
+ * Zero-based compartment for a cable in a multi-compartment tray, or null when
+ * it cannot be resolved. Resolution order: an explicit slot index; the cable's
+ * group matched against the tray's slot_groups labels; then the cable zone,
+ * which the Tray Fill page uses as the one-based compartment number.
+ */
+export function resolveCableCompartment(cable = {}, numSlots = 1, slotGroups = new Map()) {
+  if (numSlots <= 1) return 0;
+  const inRange = index => (Number.isInteger(index) && index >= 0 && index < numSlots ? index : null);
+  const explicit = inRange(parseSlotIndex(cable.slot_index ?? cable.slotIndex ?? cable.tray_slot));
+  if (explicit !== null) return explicit;
+  const group = text(cable.allowed_cable_group ?? cable.cable_group);
+  if (group) {
+    for (const [index, label] of slotGroups) {
+      if (label === group) return index;
+    }
+  }
+  const zone = parseSlotIndex(cable.zone ?? cable.cable_zone);
+  return zone === null ? null : inRange(zone - 1);
+}
+
+/**
+ * Evaluate a tray with NEC 392.22(A), splitting barrier-separated compartments
+ * (`num_slots` > 1) into equal-width sections and reporting the governing
+ * compartment. Single-compartment trays return evaluateTrayFill() unchanged.
+ * Cables that cannot be placed in a compartment make the result incomplete —
+ * a whole-tray average is never substituted.
+ */
+export function evaluateTrayFillWithCompartments(tray = {}, cables = []) {
+  const numSlots = traySlotCount(tray);
+  if (numSlots <= 1) return evaluateTrayFill(tray, cables);
+
+  const rows = Array.isArray(cables) ? cables.filter(cable => cable && typeof cable === 'object') : [];
+  const slotGroups = traySlotGroups(tray, numSlots);
+  const fullWidthIn = trayInsideWidthIn(tray);
+  const compartmentWidthIn = fullWidthIn ? fullWidthIn / numSlots : null;
+  const byCompartment = Array.from({ length: numSlots }, () => []);
+  const unresolved = [];
+  rows.forEach(cable => {
+    const index = resolveCableCompartment(cable, numSlots, slotGroups);
+    if (index === null) unresolved.push(cableId(cable));
+    else byCompartment[index].push(cable);
+  });
+
+  const compartments = byCompartment
+    .map((compartmentCables, index) => {
+      if (!compartmentCables.length) return null;
+      const label = slotGroups.get(index) || `Compartment ${index + 1}`;
+      const result = evaluateTrayFill({
+        ...tray,
+        tray_id: `${trayId(tray)} (${label})`,
+        inside_width: compartmentWidthIn,
+        width: compartmentWidthIn,
+        num_slots: 1,
+      }, compartmentCables);
+      return { index, label, widthIn: compartmentWidthIn, cableCount: compartmentCables.length, result };
+    })
+    .filter(Boolean);
+
+  const failing = compartments.filter(entry => entry.result.status === 'fail');
+  const incomplete = compartments.filter(entry => entry.result.evaluable !== true);
+  const evaluated = compartments.filter(entry => entry.result.evaluable === true);
+  const byUtilization = (a, b) => (b.result.utilizationPercent ?? -1) - (a.result.utilizationPercent ?? -1);
+  const governing = (failing.length ? failing : evaluated).slice().sort(byUtilization)[0] || compartments[0] || null;
+  const shared = {
+    trayId: trayId(tray),
+    widthIn: fullWidthIn,
+    compartmented: true,
+    compartmentCount: numSlots,
+    compartments,
+    unresolvedCables: unresolved,
+    governingCompartment: governing ? governing.label : null,
+  };
+
+  if (!rows.length || unresolved.length || (!failing.length && incomplete.length)) {
+    const issues = [];
+    if (!rows.length) {
+      issues.push(makeIssue('TRAY-FILL-MISSING-INPUT', 'warning', 'Article 392 fill cannot be evaluated: assigned cables.'));
+    }
+    if (unresolved.length) {
+      issues.push(makeIssue(
+        'TRAY-FILL-UNASSIGNED-COMPARTMENT',
+        'warning',
+        `Compartmented tray fill is incomplete: ${unresolved.length} cable(s) are not assigned to one of the ${numSlots} compartments (${unresolved.join(', ')}). Set the cable zone, slot index, or a cable group matching the tray's slot groups.`
+      ));
+    }
+    incomplete.forEach(entry => {
+      (entry.result.issues || []).forEach(issue => issues.push({ ...issue, message: `${entry.label}: ${issue.message}` }));
+    });
+    // Same base fields evaluateTrayFill() returns, so consumers never see a thinner shape.
+    const base = {
+      trayId: trayId(tray),
+      basis: NEC_2023_TRAY_FILL_BASIS,
+      construction: normalizeTrayConstruction(tray.tray_type ?? tray.trayType ?? tray.construction ?? tray.type),
+      depthIn: trayUsableDepthIn(tray),
+      cableCount: rows.reduce((sum, cable) => sum + physicalCableCount(cable), 0),
+      arrangement: 'unresolved',
+      clause: NEC_2023_TRAY_FILL_BASIS.article,
+      tableColumn: null,
+      used: {},
+      allowable: {},
+    };
+    const missingInputs = [
+      ...(!rows.length ? ['assigned cables'] : []),
+      ...unresolved.map(id => `${id}: compartment assignment`),
+      ...incomplete.flatMap(entry => (entry.result.missingInputs || []).map(input => `${entry.label}: ${input}`)),
+    ];
+    return {
+      ...base,
+      ...(governing ? governing.result : {}),
+      ...shared,
+      status: 'incomplete',
+      evaluable: false,
+      utilizationPercent: null,
+      marginPercent: null,
+      missingInputs: [...new Set(missingInputs)],
+      issues,
+    };
+  }
+
+  return {
+    ...governing.result,
+    ...shared,
+    issues: compartments.flatMap(entry => (entry.result.issues || []).map(issue => ({ ...issue, message: `${entry.label}: ${issue.message}` }))),
+  };
+}
+
+/**
+ * Evaluate every tray against its assigned cables with the NEC 392.22(A) method,
+ * per compartment for barrier-separated trays.
  * @returns {Array<{ tray: object, assigned: object[], result: object }>}
  */
 export function evaluateProjectTrayFill(trays = [], cables = []) {
   return (Array.isArray(trays) ? trays : []).map(tray => {
     const assigned = cablesAssignedToTray(tray, cables);
-    return { tray, assigned, result: evaluateTrayFill(tray, assigned) };
+    return { tray, assigned, result: evaluateTrayFillWithCompartments(tray, assigned) };
   });
 }

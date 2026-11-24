@@ -257,8 +257,9 @@ function createPointTable(doc, title, points, { editable, onChange, onRemove, em
       timeCell.appendChild(timeInput);
       row.append(currentCell, timeCell);
       if (comparisonCurve) {
+        // null: the point is below the stored curve's minimum current, so there is no stored time to compare.
         const storedTime = interpolateTime(normalizeReviewCurve(comparisonCurve), Number(point.current));
-        const relativeError = Number(point.time) > 0 ? (storedTime - Number(point.time)) / Number(point.time) : null;
+        const relativeError = Number.isFinite(storedTime) && Number(point.time) > 0 ? (storedTime - Number(point.time)) / Number(point.time) : null;
         row.append(
           createElement(doc, 'td', '', Number.isFinite(storedTime) ? storedTime.toPrecision(4) : '—'),
           createElement(doc, 'td', '', Number.isFinite(relativeError) ? `${relativeError >= 0 ? '+' : ''}${(relativeError * 100).toFixed(2)}%` : '—')
@@ -286,8 +287,9 @@ function createPointTable(doc, title, points, { editable, onChange, onRemove, em
 
 function spotChecksFor(sourceCurve, libraryCurve, sourceId, profileId = null) {
   return sourceCurve.map(point => {
+    // null below the library curve's minimum current: the stored curve does not cover this source point.
     const actualTime = interpolateTime(libraryCurve, point.current);
-    const relativeError = actualTime > 0 ? (actualTime - point.time) / point.time : null;
+    const relativeError = Number.isFinite(actualTime) && actualTime > 0 ? (actualTime - point.time) / point.time : null;
     return {
       profileId,
       current: point.current,

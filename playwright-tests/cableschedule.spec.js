@@ -115,6 +115,7 @@ test.describe('cableschedule buttons', () => {
     await page.evaluate(() => { document.querySelector('#cableScheduleTable tbody').innerHTML = ''; });
     await expect(page.locator('#cableScheduleTable tbody tr')).toHaveCount(0);
 
+    await openToolbarMenu(page, 'More');
     await page.click('#load-schedule-btn');
     await expect(page.locator('#cableScheduleTable tbody tr')).toHaveCount(1);
     await expect(page.locator('#cableScheduleTable tbody tr:first-child input[name="tag"]')).toHaveValue('C1');
@@ -150,6 +151,7 @@ test.describe('cableschedule buttons', () => {
   });
 
   test('load sample cables populates table', async ({ page }) => {
+    await openToolbarMenu(page, 'More');
     await page.click('#load-sample-cables-btn');
     await expect(page.locator('#cableScheduleTable tbody tr')).toHaveCount(3);
     await expect(page.locator('#cableScheduleTable tbody input[name="tag"]').first()).toHaveValue('CBL-001');
@@ -176,6 +178,8 @@ test.describe('cableschedule buttons', () => {
 
   test('quick add creates multiple routing-ready cables with generated tags', async ({ page }) => {
     await seedRaceway(page, 'R1');
+    // Quick Add is the secondary option of the split Add Cable button.
+    await openToolbarMenu(page, 'Add options');
     await page.click('#quick-add-cables-btn');
     await expect(page.locator('.quick-add-table tbody tr')).toHaveCount(5);
 
@@ -201,6 +205,7 @@ test.describe('cableschedule buttons', () => {
   });
 
   test('tag settings control the next Add Cable tag', async ({ page }) => {
+    await openToolbarMenu(page, 'More');
     await page.click('#open-tag-settings-btn');
     await page.fill('#tag-prefix-input', 'PX-');
     await page.fill('#tag-next-input', '7');
@@ -349,6 +354,7 @@ test.describe('cableschedule buttons', () => {
     await addCable(page, { tag: 'B2', raceway: 'R2' });
     await page.check('#cableScheduleTable-select-all');
 
+    await openToolbarMenu(page, 'More');
     await page.click('#open-batch-edit-btn');
     await page.check('#batch-set-cable-type');
     await page.selectOption('#batch-cable-type-input', 'Data');

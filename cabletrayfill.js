@@ -5,6 +5,8 @@ import { createFillGauge } from './src/components/fillGauge.js';
 import { start as startTour } from './tour.js';
 import { getCableAssignedRacewayIds, summarizeCableWorkflow } from './analysis/scheduleWorkflow.mjs';
 import { evaluateTrayFill, summarizeTrayFillResult } from './analysis/trayFill.mjs';
+import { buildTrayFillAnalysisRows, TRAY_FILL_ANALYSIS_SHEET } from './src/tray-fill/fillAnalysisSheet.mjs';
+import { BLANK_TRAY_PARAM, findTrayById, selectInitialTray, trayIdentity } from './src/tray-fill/initialTraySelection.mjs';
 
 const TRAYFILL_TOUR_STEPS = [
   { selector: '#trayParameters',       message: 'Select the tray you want to analyze: choose width, depth, and tray type. These parameters are used to calculate a selected NEC-informed fill percentage.' },
@@ -42,10 +44,6 @@ function readStoredList(reader) {
   }
 }
 
-function trayIdentity(tray) {
-  return String(tray?.tray_id || tray?.tag || tray?.id || '').trim();
-}
-
 function normalizeTrayForFill(tray = {}) {
   const width = parseFloat(tray.width ?? tray.inside_width ?? tray.insideWidth);
   const height = parseFloat(tray.height ?? tray.tray_depth ?? tray.load_depth ?? tray.depth);
@@ -75,18 +73,27 @@ function renderTrayFillHandoff(context = {}) {
   const assignedToTray = trayId
     ? projectCablesForTray(trayId, cables).length
     : 0;
+  const loadedCount = selectedCables.length || assignedToTray;
+  const missingTrayId = trayId ? '' : String(context.missingTrayId || '').trim();
   const title = trayId
     ? `Reviewing ${trayId}`
-    : (trays.length ? 'Choose a project tray to load its assigned cables' : 'Add raceways before tray fill review');
+    : missingTrayId
+      ? `Tray ${missingTrayId} is not in the Raceway Schedule`
+      : (trays.length ? 'Reviewing a blank tray' : 'Add raceways before tray fill review');
+  const resultNote = !loadedCount
+    ? 'No project cables are assigned to this tray yet.'
+    : context.drawn
+      ? 'Its Article 392 result is drawn below.'
+      : 'Complete type, conductors, size, OD, and weight for each cable, then Draw Tray for the Article 392 result.';
   const detail = trayId
-    ? `${selectedCables.length || assignedToTray} cable(s) are loaded for this tray. ${schedule.routingReady} cable schedule row(s) are routing-ready.`
+    ? `${loadedCount} cable(s) are loaded for this tray. ${resultNote} ${schedule.routingReady} cable schedule row(s) are routing-ready.`
     : (trays.length
-        ? `${trays.length} tray record(s) are available. Selecting one loads its dimensions, compartments, and cable assignments.`
+        ? `${trays.length} tray record(s) are available. Selecting one loads its dimensions, compartments, and cable assignments; New blank tray keeps manual entry.`
         : 'Tray Fill still works standalone, but the project workflow starts with tray geometry in the Raceway Schedule.');
-  const trayOptions = trays.map(tray => {
+  const trayOptions = trays.filter(tray => trayIdentity(tray)).map(tray => {
     const id = trayIdentity(tray);
-    const selected = id && id.toLowerCase() === trayId.toLowerCase() ? ' selected' : '';
-    return `<option value="${escapeHtml(id)}"${selected}>${escapeHtml(id || 'Unnamed tray')}</option>`;
+    const selected = id.toLowerCase() === trayId.toLowerCase() ? ' selected' : '';
+    return `<option value="${escapeHtml(id)}"${selected}>${escapeHtml(id)}</option>`;
   }).join('');
   el.innerHTML = `
     <div>
@@ -94,7 +101,7 @@ function renderTrayFillHandoff(context = {}) {
       <p>${escapeHtml(detail)}</p>
     </div>
     <span>
-      ${trays.length ? `<label class="tray-fill-project-picker">Project tray<select id="tray-fill-project-selector"><option value="">Choose tray...</option>${trayOptions}</select></label>` : ''}
+      ${trays.length ? `<label class="tray-fill-project-picker">Project tray<select id="tray-fill-project-selector"><option value="">New blank tray</option>${trayOptions}</select></label>` : ''}
       <a class="btn" href="racewayschedule.html">Raceway Schedule</a>
       <a class="btn" href="cableschedule.html">Cable Schedule</a>
       <a class="btn" href="optimalRoute.html">Routing</a>
@@ -116,7 +123,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       initCompactMode();
       initHelpModal('help-btn','helpOverlay','helpClose');
       initNavToggle();
-      const trayGauge = createFillGauge('fill-gauge-container', { label: 'Current fill', width: 160, strokeWidth: 16 });
+      const trayGauge = createFillGauge('fill-gauge-container', { label: 'Packing density', width: 160, strokeWidth: 16 });
       const dirty = createDirtyTracker();
       const markSaved = () => { dirty.markClean(); };
       const markUnsaved = () => { dirty.markDirty(); };
@@ -1620,6 +1627,8 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           return;
         }
         const data=[['Tag','Cable Type','Conductors','Conductor Size','Cable Rating (V)','Operating Voltage (V)','OD','Weight','Compartment','Circuit Group']];
+        // Same cable shape the Draw Tray handler passes to evaluateTrayFill.
+        const fillCables=[];
         rows.forEach(row=>{
           const tag=row.children[0].querySelector('input').value.trim();
           const cableType=row.children[1].querySelector('select').value;
@@ -1632,14 +1641,38 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           const zone=row.children[8].querySelector('input').value.trim();
           const group=row.children[9].querySelector('input').value.trim();
           data.push([tag,cableType,count,size,rating,voltage,od,weight,zone,group]);
+          const selSize=row.children[6].querySelector('select');
+          fillCables.push({
+            tag,
+            cableType,
+            count:parseInt(count),
+            size,
+            rating:parseFloat(rating),
+            voltage:parseFloat(voltage),
+            cable_size:selSize?selSize.value:'',
+            OD:parseFloat(od),
+            weight:parseFloat(weight),
+            zone:parseInt(zone)||1,
+            parallelCount:Math.max(1,parseInt(row.dataset.parallelCount)||1),
+          });
         });
         const wb=XLSX.utils.book_new();
         const ws=XLSX.utils.aoa_to_sheet(data);
+        // Cables stays first and Compartments keeps its name so the file re-imports.
         XLSX.utils.book_append_sheet(wb,ws,'Cables');
         // Compartments sheet
         const compData=[['Compartment ID','Width (in)','Depth (in)','Label']];
         compartments.forEach(c=>compData.push([c.id,c.width,c.depth,c.label||'']));
         XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(compData),'Compartments');
+        const analysisRows=buildTrayFillAnalysisRows({
+          trayName:document.getElementById('trayName').value.trim(),
+          trayType:document.getElementById('trayType').value,
+          trayWidth:parseFloat(document.getElementById('trayWidth').value),
+          trayDepth:parseFloat(document.getElementById('trayDepth').value),
+          compartments,
+          cables:fillCables,
+        });
+        XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(analysisRows),TRAY_FILL_ANALYSIS_SHEET);
         XLSX.writeFile(wb,'CableList.xlsx');
       }
 
@@ -2017,14 +2050,45 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         select.value = stringValue;
       };
 
+      // Keep the URL on the tray being reviewed so a reload reopens it.
+      const setTrayUrl = (trayId, { blank = false } = {}) => {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('tray');
+        url.searchParams.delete(BLANK_TRAY_PARAM);
+        if (trayId) url.searchParams.set('tray', trayId);
+        if (blank) url.searchParams.set(BLANK_TRAY_PARAM, '1');
+        return url;
+      };
+
+      // Choosing another tray replaces the tray inputs and cable rows, so ask
+      // first when the user has unsaved manual entries.
+      const confirmReplaceTray = label => (dirty.isDirty() ? openModal({
+        title: 'Replace tray inputs?',
+        description: `Your unsaved tray and cable entries will be replaced by ${label}.`,
+        primaryText: 'Replace',
+        secondaryText: 'Cancel'
+      }) : Promise.resolve(true));
+
       const updateTrayHandoff = () => {
         renderTrayFillHandoff(trayHandoffContext);
         const selector = document.getElementById('tray-fill-project-selector');
         if (!selector) return;
-        selector.addEventListener('change', () => {
-          const tray = readStoredList(getTrays).find(item => trayIdentity(item).toLowerCase() === selector.value.toLowerCase());
-          if (!tray) return;
-          applyTrayFillContext({ tray, cables: projectCablesForTray(selector.value) });
+        const currentTrayId = trayIdentity(trayHandoffContext.tray);
+        selector.addEventListener('change', async () => {
+          const tray = findTrayById(readStoredList(getTrays), selector.value);
+          if (!(await confirmReplaceTray(tray ? trayIdentity(tray) : 'a new blank tray'))) {
+            selector.value = currentTrayId;
+            return;
+          }
+          if (!tray) {
+            // A blank tray is the page's initial state; reload into it.
+            markSaved();
+            window.location.assign(setTrayUrl('', { blank: true }).toString());
+            return;
+          }
+          applyTrayFillContext({ tray, cables: projectCablesForTray(trayIdentity(tray)) });
+          markSaved();
+          window.history.replaceState(window.history.state, '', setTrayUrl(trayIdentity(tray)).toString());
         });
       };
 
@@ -2072,31 +2136,48 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           circuitGroup: c.circuitGroup || c.circuit_group || ''
         }));
         renderCableRows();
+        // Draw only when every row passes the Draw Tray validation, so opening
+        // a tray never raises a validation dialog.
         const canDrawImmediately = cables.length > 0 && cables.every(cable => (
-          cable.cableType
-          && cable.count
-          && cable.size
+          String(cable.tag || '').trim()
+          && cable.cableType
+          && Number(cable.count) >= 1
+          && String(cable.size || '').trim()
           && Number.parseFloat(cable.od) > 0
           && Number.parseFloat(cable.weight) > 0
         ));
         if (canDrawImmediately) document.getElementById('drawBtn').click();
+        trayHandoffContext.drawn = canDrawImmediately;
         updateTrayHandoff();
       };
 
+      // Open on a tray instead of a blank 12 in tray: a stored handoff first,
+      // then ?blank=1 or ?tray=, then the first project tray (see
+      // src/tray-fill/initialTraySelection.mjs). Runs once, at page load.
       updateTrayHandoff();
-      const stored = getItem('trayFillData');
-      const requestedTrayId = new URLSearchParams(window.location.search).get('tray');
-      if (stored?.tray) {
+      const projectTrays = readStoredList(getTrays);
+      const projectCables = readStoredList(getCables);
+      const initialTray = selectInitialTray({
+        stored: getItem('trayFillData'),
+        search: window.location.search,
+        trays: projectTrays,
+        cablesForTray: trayId => projectCablesForTray(trayId, projectCables)
+      });
+      if (initialTray.source === 'handoff') {
         try {
-          applyTrayFillContext(stored);
+          applyTrayFillContext(initialTray.context);
         } catch (e) {
           console.error('Failed to load trayFillData', e);
         }
         removeItem('trayFillData');
-      } else if (requestedTrayId) {
-        const requestedTray = readStoredList(getTrays)
-          .find(tray => trayIdentity(tray).toLowerCase() === requestedTrayId.toLowerCase());
-        if (requestedTray) applyTrayFillContext({ tray: requestedTray, cables: projectCablesForTray(requestedTrayId) });
+        // The handoff is one-shot; point the URL at the tray so a reload reopens it.
+        const handoffTray = findTrayById(projectTrays, trayIdentity(initialTray.context.tray));
+        if (handoffTray) window.history.replaceState(window.history.state, '', setTrayUrl(trayIdentity(handoffTray)).toString());
+      } else if (initialTray.tray) {
+        applyTrayFillContext({ tray: initialTray.tray, cables: projectCablesForTray(trayIdentity(initialTray.tray)) });
+      } else if (initialTray.source === 'missing') {
+        trayHandoffContext = { missingTrayId: initialTray.requestedTrayId };
+        updateTrayHandoff();
       }
 
       // Attach help popups for table headers

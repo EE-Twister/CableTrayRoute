@@ -12,6 +12,8 @@ import {
   applyEstimateBasis,
   parsePricingCSV,
   exportPricingCSV,
+  buildCostEstimateWorkbookSheets,
+  listChangedEstimateInputs,
 } from './analysis/costEstimate.mjs';
 import {
   getCables,
@@ -47,6 +49,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let lastEstimateBasis = buildEstimateBasis();
   let lastRouteCostAssurance = null;
   let lastDuctbankAssemblies = [];
+  // Frozen copy of the last displayed estimate; XLSX export reads only this.
+  let lastEstimateSnapshot = null;
 
   // Restore persisted custom pricing from project settings.
   try {
@@ -275,9 +279,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  /** Every page input that feeds an estimate, for run-time vs export-time comparison. */
+  function readEstimateInputs() {
+    return {
+      basis: readEstimateBasis(),
+      contingencyPct: getContingencyPct(),
+      overrides: {
+        laborCableRate: numVal('labor-cable-rate', null),
+        laborTrayRate: numVal('labor-tray-rate', null),
+        laborConduitRate: numVal('labor-conduit-rate', null),
+        fittingPrice: numVal('fitting-price', null),
+      },
+      pricing: customPrices ? { prices: customPrices, meta: customPricingMeta } : null,
+    };
+  }
+
   function updateEscalationPreview() {
+    // Preview only: the run-time basis in lastEstimateBasis changes only when an estimate runs.
     const basis = buildEstimateBasis(readEstimateBasis());
-    lastEstimateBasis = basis;
     const el = document.getElementById('escalation-preview');
     if (el) {
       el.innerHTML = `<strong>Applied factors:</strong> materials ×${basis.materialFactor.toFixed(3)};
@@ -352,6 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
     lastLineItems = [...cableItems, ...trayItems, ...conduitItems, ...supportItems, ...ductbankEstimate.lineItems];
 
     if (!lastLineItems.length) {
+      lastEstimateSnapshot = null;
       document.getElementById('results').innerHTML =
         '<p class="field-hint">No project data found. Add cables and raceways to the schedules first.</p>';
       return;
@@ -413,6 +433,19 @@ document.addEventListener('DOMContentLoaded', () => {
         routeCostBlockers: lastRouteCostAssurance.blockingIssues.length,
       },
     }));
+
+    lastEstimateSnapshot = structuredClone({
+      generatedAt,
+      inputs: readEstimateInputs(),
+      basis: lastEstimateBasis,
+      contingencyPct,
+      pricingSource: customPrices && customPricingMeta.source
+        ? `Custom pricing: ${customPricingMeta.source}${customPricingMeta.date ? ' (' + customPricingMeta.date + ')' : ''}`
+        : 'Built-in 2024 conceptual pricing allowances',
+      lineItems: lastLineItems,
+      routeCostAssurance: lastRouteCostAssurance,
+      ductbankAssemblies: lastDuctbankAssemblies,
+    });
 
     renderResults(summary, lastLineItems, contingencyPct, contingencyAmt, totalWithContingency, lastEstimateBasis);
   }
@@ -577,7 +610,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── XLSX export ──────────────────────────────────────────────────────────
 
   function exportXlsx() {
-    if (!lastLineItems.length) {
+    if (!lastEstimateSnapshot) {
       showAlertModal('No Data', 'Run the estimate first before exporting.');
       return;
     }
@@ -586,111 +619,24 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const summary = summarizeCosts(lastLineItems);
-    const contingencyPct = getContingencyPct();
-    const contingencyAmt = summary.grandTotal * contingencyPct;
-    const totalWithContingency = summary.grandTotal + contingencyAmt;
+    // The workbook is built only from the run-time snapshot. If any input that
+    // feeds the estimate has changed since, the snapshot no longer matches the
+    // page, so require a rerun rather than exporting a stale or mixed estimate.
+    const changedInputs = listChangedEstimateInputs(lastEstimateSnapshot.inputs, readEstimateInputs());
+    if (changedInputs.length) {
+      showAlertModal(
+        'Rerun Estimate to Export',
+        `These inputs changed after the estimate was run: ${changedInputs.join(', ')}. ` +
+        'Click Generate Estimate so the displayed estimate reflects them, then export again.'
+      );
+      return;
+    }
 
     const wb = { SheetNames: [], Sheets: {} };
-
-    function addSheet(name, data) {
-      const ws = XLSX.utils.aoa_to_sheet(data);
+    buildCostEstimateWorkbookSheets(lastEstimateSnapshot).forEach(({ name, rows }) => {
       wb.SheetNames.push(name);
-      wb.Sheets[name] = ws;
-    }
-
-    const srcNote = customPrices && customPricingMeta.source
-      ? `Custom pricing: ${customPricingMeta.source}${customPricingMeta.date ? ' (' + customPricingMeta.date + ')' : ''}`
-      : 'Built-in 2024 conceptual pricing allowances';
-
-    const summaryData = [
-      ['CableTrayRoute — Cost Estimate'],
-      [`Pricing basis: ${srcNote}`],
-      [`Estimate class: ${lastEstimateBasis.estimateClass}`],
-      [`Pricing period: ${lastEstimateBasis.baseDate || 'not recorded'} to ${lastEstimateBasis.estimateDate || 'not recorded'}`],
-      [`Material factor: ${lastEstimateBasis.materialFactor.toFixed(6)}`],
-      [`Combined labor factor: ${lastEstimateBasis.combinedLaborFactor.toFixed(6)}`],
-      [],
-      ['Category', 'Material ($)', 'Labor ($)', 'Total ($)'],
-      ...Object.entries(summary.categories).map(([cat, s]) => [cat, s.materialCost.toFixed(0), s.laborCost.toFixed(0), s.totalCost.toFixed(0)]),
-      [],
-      ['Subtotal', summary.grandMaterial.toFixed(0), summary.grandLabor.toFixed(0), summary.grandTotal.toFixed(0)],
-      [`Contingency (${(contingencyPct * 100).toFixed(0)}%)`, '', '', contingencyAmt.toFixed(0)],
-      ['Grand Total', '', '', totalWithContingency.toFixed(0)],
-    ];
-    addSheet('Summary', summaryData);
-
-    addSheet('Estimate Basis', [
-      ['Field', 'Value', 'Source / note'],
-      ['Estimate classification', lastEstimateBasis.estimateClass, ''],
-      ['Currency', lastEstimateBasis.currency, ''],
-      ['Pricing base date', lastEstimateBasis.baseDate, ''],
-      ['Estimate date', lastEstimateBasis.estimateDate, ''],
-      ['Material series ID', lastEstimateBasis.materialSeriesId, lastEstimateBasis.materialSeriesName],
-      ['Material base index', lastEstimateBasis.materialBaseIndex, ''],
-      ['Material current index', lastEstimateBasis.materialCurrentIndex, ''],
-      ['Material escalation factor', lastEstimateBasis.materialFactor, lastEstimateBasis.materialSourceUrl],
-      ['Labor region', lastEstimateBasis.laborRegion, ''],
-      ['National electrician wage ($/hr)', lastEstimateBasis.nationalElectricianHourlyWage, lastEstimateBasis.wageSource],
-      ['Local electrician wage ($/hr)', lastEstimateBasis.localElectricianHourlyWage, 'Comparable local OEWS value supplied by estimator'],
-      ['Regional labor factor', lastEstimateBasis.regionalLaborFactor, lastEstimateBasis.wageSourceUrl],
-      ['Labor series ID', lastEstimateBasis.laborSeriesId, lastEstimateBasis.laborSeriesName],
-      ['Labor base index', lastEstimateBasis.laborBaseIndex, ''],
-      ['Labor current index', lastEstimateBasis.laborCurrentIndex, ''],
-      ['Labor escalation factor', lastEstimateBasis.laborEscalationFactor, lastEstimateBasis.laborSourceUrl],
-      ['Combined labor factor', lastEstimateBasis.combinedLaborFactor, 'Regional factor × labor escalation factor'],
-    ]);
-
-    const detailData = [
-      ['Category', 'ID', 'Description', 'Manufacturer', 'Catalog No.', 'Approval', 'Quantity', 'Unit', 'Price Key', 'Unit Price ($)', 'Labor Basis', 'Labor Hours', 'Material ($)', 'Labor ($)', 'Total ($)'],
-      ...lastLineItems.map(i => [
-        i.category, i.id, i.description,
-        i.manufacturer || '',
-        i.catalogNumber || '',
-        i.approvedPart ? 'Approved' : 'Unreviewed',
-        (i.quantity || 0).toFixed(3), i.unit,
-        i.priceKey || '',
-        (i.unitPrice || 0).toFixed(2),
-        i.laborHoursKey || (i.productivityEaPerHr ? `${i.productivityEaPerHr} EA/hr` : i.productivityFtPerHr ? `${i.productivityFtPerHr} ft/hr` : ''),
-        (i.laborHrs || 0).toFixed(3),
-        (i.materialCost || 0).toFixed(0),
-        (i.laborCost || 0).toFixed(0),
-        (i.totalCost || 0).toFixed(0),
-      ]),
-    ];
-    addSheet('Line Items', detailData);
-
-    if (lastRouteCostAssurance) {
-      const assurance = lastRouteCostAssurance;
-      addSheet('Route Quantity', [
-        ['Route Quantity Ledger', `Signature: ${assurance.quantityLedger.signature}`],
-        ['Category', 'ID', 'Quantity', 'Unit', 'Basis'],
-        ...assurance.quantityLedger.rows.map(row => [row.category, row.id, row.quantity, row.unit, row.basis]),
-      ]);
-      addSheet('Cost Assurance', [
-        ['Classification', assurance.classification],
-        ['Status', assurance.status],
-        ['Cost signature', assurance.signature],
-        ['Quantity signature', assurance.quantityLedger.signature],
-        ['Input fingerprint', assurance.inputFingerprint],
-        [],
-        ['Code', 'Severity', 'Blocking', 'Message'],
-        ...[...assurance.issues, ...assurance.warnings].map(item => [item.code, item.severity, item.blocking ? 'Yes' : 'No', item.message]),
-      ]);
-      if (lastDuctbankAssemblies.length) {
-        addSheet('Ductbank Assemblies', [
-          ['Ductbank', 'BOM ready', 'Route quantity (ft)', 'Category', 'Item', 'Specification', 'Quantity', 'Unit', 'Quantity basis', 'Blocking reason'],
-          ...lastDuctbankAssemblies.flatMap(assembly => {
-            const reasons = (assembly.blockingReasons || []).join(' ');
-            const rows = assembly.bom?.rows || [];
-            return rows.length
-              ? rows.map(row => [assembly.ductbankId, assembly.ready ? 'Yes' : 'No', assembly.routeQuantityFt, row.category, row.item, row.specification, row.quantity, row.unit, row.basis, reasons])
-              : [[assembly.ductbankId, assembly.ready ? 'Yes' : 'No', assembly.routeQuantityFt, '', '', '', '', '', '', reasons]];
-          }),
-        ]);
-      }
-    }
-
+      wb.Sheets[name] = XLSX.utils.aoa_to_sheet(rows);
+    });
     XLSX.writeFile(wb, 'cost_estimate.xlsx');
   }
 });

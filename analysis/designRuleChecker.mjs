@@ -7,7 +7,7 @@
  * Rules implemented:
  *   DRC-01  NEC 392.22(A)  — Selected multiconductor tray-fill arrangement
  *   DRC-02  NEC 392.6(H)   — Voltage-class segregation (mixed cable groups)
- *   DRC-03  NEC 310.15     — Cable exceeds rated ampacity (with tray derating)
+ *   DRC-03  NEC 392.80(A)(1)(a); Table 310.15(C)(1) — Cable in tray exceeds adjusted ampacity
  *   DRC-04  NEC 250.122    — Power cables have no EGC, or selected EGC is undersized
  *   DRC-05  (advisory)     — Cables with no assigned route (unrouted cables)
  *   DRC-06  TIA-568.0-D §4.5 — Structured cabling (Data/Fiber) shares tray with Power cables
@@ -25,6 +25,7 @@ import {
   recordId,
 } from './conduitFill.mjs';
 import {
+  bundlingFactor,
   inferTerminalTempRating,
   nextStandardOcpd,
   normalizeConductorMaterial,
@@ -32,7 +33,7 @@ import {
   smallConductorMaxOcpd,
   tableAmpacity,
 } from './autoSize.mjs';
-import { evaluateTrayFill, summarizeTrayFillResult } from './trayFill.mjs';
+import { evaluateTrayFill, evaluateTrayFillWithCompartments, summarizeTrayFillResult, traySlotCount } from './trayFill.mjs';
 
 // ---------------------------------------------------------------------------
 // Severity constants
@@ -50,19 +51,18 @@ export const DRC_SEVERITY = {
 const DEFAULT_TRAY_CAPACITY_SCREENING_LIMIT = 0.40;
 
 // ---------------------------------------------------------------------------
-// NEC 310.15(B)(3)(a) — Tray derating factors for power cables
-//   When installed in a cable tray the "bundling" derating factor applies to
-//   the number of current-carrying conductors in the tray section.  We use
-//   a simplified stepped table (Table 310.15(C)(1) equivalent).
+// NEC 392.80(A)(1)(a) — Multiconductor cables in cable tray
+//   The Table 310.15(C)(1) adjustment factors apply only to multiconductor
+//   cables with more than three current-carrying conductors, and the
+//   adjustment is limited to the number of current-carrying conductors in the
+//   cable, not the number of conductors in the tray. The factor table itself
+//   (4–6 → 0.80 … 41+ → 0.35) is shared with autoSize.mjs via bundlingFactor().
 // ---------------------------------------------------------------------------
-const TRAY_DERATING_FACTORS = [
-  { maxConductors:  3, factor: 1.00 },
-  { maxConductors:  6, factor: 0.80 },
-  { maxConductors:  9, factor: 0.70 },
-  { maxConductors: 20, factor: 0.50 },
-  { maxConductors: 30, factor: 0.45 },
-  { maxConductors: Infinity, factor: 0.40 },
-];
+const AMPACITY_REFERENCE = 'NEC 392.80(A)(1)(a); Table 310.15(C)(1)';
+
+// Load-current fields read in priority order. `est_load` is the Cable Schedule
+// "Est Load (A)" column; `load_amps` is written by workflow automation.
+const DESIGN_CURRENT_FIELDS = ['design_current', 'load_amps', 'est_load'];
 
 // ---------------------------------------------------------------------------
 // NEC Table 310.16 baseline ampacity (formerly 310.15(B)(16)) — 75 °C copper, used as default
@@ -213,12 +213,6 @@ export function traySlotFillPercent(tray, slotIndex, slotFillSqIn) {
   return (slotFillSqIn / slotArea) * 100;
 }
 
-/**
- * Return the derating factor for a given number of current-carrying conductors.
- * @param {number} conductorCount
- * @returns {number}
- */
-
 function parseSlotGroupAssignments(rawSlotGroups, slotGroupsMap, numSlots) {
   const assignments = new Map();
   const addAssignment = (slotKey, groupValue) => {
@@ -263,11 +257,43 @@ function cableSlotIndex(cable) {
   return Number.isInteger(parsed) ? parsed : null;
 }
 
-function derateFactor(conductorCount) {
-  for (const entry of TRAY_DERATING_FACTORS) {
-    if (conductorCount <= entry.maxConductors) return entry.factor;
+/**
+ * Number of current-carrying conductors in one multiconductor cable. The
+ * schedule records the equipment grounding conductor separately
+ * (`ground_size`), so the `conductors` count is treated as the CCC count.
+ * Parallel sets are separate cables and do not multiply this count.
+ * @param {object} cable
+ * @returns {number}
+ */
+function cableCurrentCarryingConductors(cable) {
+  const count = Number.parseInt(cable.conductors, 10);
+  return Number.isFinite(count) && count > 0 ? count : 3;
+}
+
+/**
+ * NEC 392.80(A)(1)(a) adjustment factor for a multiconductor cable in tray:
+ * 1.0 for three or fewer current-carrying conductors, otherwise the Table
+ * 310.15(C)(1) factor for the cable's own CCC count.
+ * @param {number} cccCount
+ * @returns {number}
+ */
+function cableTrayAdjustmentFactor(cccCount) {
+  return cccCount > 3 ? bundlingFactor(cccCount) : 1.0;
+}
+
+/**
+ * First finite, positive load current from design_current, load_amps, est_load.
+ * @param {object} cable
+ * @returns {number|null}
+ */
+function cableDesignCurrent(cable) {
+  for (const field of DESIGN_CURRENT_FIELDS) {
+    const value = cable[field];
+    if (value === null || value === undefined || value === '') continue;
+    const amps = typeof value === 'number' ? value : Number.parseFloat(String(value).trim());
+    if (Number.isFinite(amps) && amps > 0) return amps;
   }
-  return TRAY_DERATING_FACTORS[TRAY_DERATING_FACTORS.length - 1].factor;
+  return null;
 }
 
 /**
@@ -470,44 +496,24 @@ function checkTrayFill(trays, trayCableMap, options = {}) {
     const trayId = String(tray.tray_id ?? tray.id ?? tray.tag ?? '').trim();
     const assignedCables = trayCableMap.get(trayId) ?? [];
     if (assignedCables.length > 0) {
-      const numSlots = Math.max(1, parseInt(tray.num_slots) || 1);
-      if (numSlots > 1) {
-        const assignments = parseSlotGroupAssignments(tray.slot_groups, tray.slotGroups, numSlots);
-        const slotCables = Array.from({ length: numSlots }, () => []);
-        let unresolved = false;
-        assignedCables.forEach(cable => {
-          let slotIndex = cableSlotIndex(cable);
-          if (slotIndex === null && assignments) {
-            const group = String(cable.allowed_cable_group ?? cable.cable_group ?? '').trim();
-            if (group && assignments.has(group)) slotIndex = assignments.get(group);
-          }
-          if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= numSlots) {
-            unresolved = true;
-          } else {
-            slotCables[slotIndex].push(cable);
-          }
-        });
-        if (unresolved) {
+      if (traySlotCount(tray) > 1) {
+        // Shared with the Raceway Schedule, project report, and submittal so every
+        // surface resolves compartments (slot index, slot-group label, zone) the same way.
+        const compartmented = evaluateTrayFillWithCompartments(tray, assignedCables);
+        if (compartmented.unresolvedCables?.length) {
           findings.push({
             ruleId: 'DRC-01',
             severity: DRC_SEVERITY.WARNING,
             location: trayId,
             message: 'Compartmented tray fill is incomplete because one or more assigned cables do not resolve to a physical compartment.',
-            detail: 'No whole-tray average is substituted for the missing compartment assignment.',
+            detail: `No whole-tray average is substituted for the missing compartment assignment. Unassigned: ${compartmented.unresolvedCables.join(', ')}.`,
             reference: 'NFPA 70 (NEC) 2023 392.22(A)',
-            remediation: 'Assign every cable to a tray slot/compartment and rerun the check.',
+            remediation: 'Set each cable\'s zone (compartment number), slot index, or a cable group matching the tray\'s slot groups, then rerun the check.',
           });
           continue;
         }
-        const fullWidth = parseFloat(tray.inside_width ?? tray.width) || 0;
-        for (let index = 0; index < numSlots; index += 1) {
-          if (!slotCables[index].length) continue;
-          const slotTray = { ...tray, inside_width: fullWidth / numSlots, num_slots: 1 };
-          const result = evaluateTrayFill(slotTray, slotCables[index]);
-          const slotLabel = assignments
-            ? [...assignments.entries()].find(([, slot]) => slot === index)?.[0] || `slot ${index + 1}`
-            : `slot ${index + 1}`;
-          const finding = article392Finding(tray, result, `${trayId} (${slotLabel})`);
+        for (const compartment of compartmented.compartments || []) {
+          const finding = article392Finding(tray, compartment.result, `${trayId} (${compartment.label})`);
           if (finding) findings.push(finding);
         }
         continue;
@@ -610,9 +616,13 @@ function checkSegregation(trays, trayCableMap) {
 }
 
 /**
- * DRC-03 — Cable ampacity with tray bundling derating.
- * For each power cable, computes derated ampacity and compares against
- * the cable's rated ampacity (or baseline NEC table value).
+ * DRC-03 — Ampacity of multiconductor power cables installed in cable tray.
+ * Per NEC 392.80(A)(1)(a), the Table 310.15(C)(1) adjustment applies only to
+ * cables with more than three current-carrying conductors and is based on the
+ * conductors in the cable itself, not the total in the tray. The adjusted
+ * ampacity (rated or baseline Table 310.16 value × parallel sets × factor) is
+ * compared against the cable's design current (design_current, load_amps, or
+ * the schedule's est_load).
  *
  * @param {object[]}                cables        Cable schedule rows.
  * @param {Map<string, object[]>}   trayCableMap  Map of tray_id → cable objects.
@@ -646,51 +656,57 @@ function checkAmpacity(cables, trayCableMap) {
 
     if (ratedAmpacity === null) continue;
 
-    // Parallel sets multiply the effective ampacity (NEC 310.10(H))
+    // Parallel sets multiply the effective ampacity (NEC 310.10(H)). Each
+    // parallel cable is its own cable, so the per-cable CCC count is unchanged.
     const parallelCount = Math.max(1, parseInt(cable.parallel_count) || 1);
     const aggregateAmpacity = ratedAmpacity * parallelCount;
 
+    const cccCount = cableCurrentCarryingConductors(cable);
+    const factor = cableTrayAdjustmentFactor(cccCount);
+    const adjustedAmpacity = aggregateAmpacity * factor;
+    const designCurrent = cableDesignCurrent(cable);
+    const parallelLabel = parallelCount > 1 ? ` (${parallelCount} × ${ratedAmpacity} A)` : '';
+    const adjusted = factor < 1.0;
+
     const trayIds = cableTrayMap.get(name) ?? [];
     for (const trayId of trayIds) {
-      const cohabitants = trayCableMap.get(trayId) ?? [];
-      // Count current-carrying conductors (power cables × conductors × parallel sets)
-      const conductorCount = cohabitants.reduce((sum, c) => {
-        if (!isPowerCable(c)) return sum;
-        const conductors = parseInt(c.conductors, 10) || 3;
-        const parallelSets = Math.max(1, parseInt(c.parallel_count) || 1);
-        return sum + conductors * parallelSets;
-      }, 0);
-
-      const factor = derateFactor(conductorCount);
-      const deratedAmpacity = aggregateAmpacity * factor;
-      const designCurrent = parseFloat(cable.design_current ?? cable.load_amps) || null;
-      const parallelLabel = parallelCount > 1 ? ` (${parallelCount} × ${ratedAmpacity} A)` : '';
-
-      if (designCurrent !== null && designCurrent > deratedAmpacity) {
+      if (designCurrent !== null && designCurrent > adjustedAmpacity) {
         findings.push({
           ruleId: 'DRC-03',
           severity: DRC_SEVERITY.ERROR,
           location: `${name} @ ${trayId}`,
           message:
-            `Cable "${name}" design current ${designCurrent} A exceeds derated ampacity ` +
-            `${deratedAmpacity.toFixed(1)} A (${aggregateAmpacity} A aggregate${parallelLabel} × ${factor} derating).`,
-          detail:
-            `${conductorCount} current-carrying conductors in tray "${trayId}" ` +
-            `(NEC 310.15 derating factor ${factor}).`,
-          reference: 'NEC 310.15',
-          remediation: `Upgrade the conductor to the next larger standard size, increase the number of parallel sets (NEC 310.10(H)), split into a separate tray to reduce bundling derating, or reduce the design load current for "${name}".`,
+            `Cable "${name}" design current ${designCurrent} A exceeds ${adjusted ? 'adjusted ' : ''}ampacity ` +
+            `${adjustedAmpacity.toFixed(1)} A (${aggregateAmpacity} A aggregate${parallelLabel}` +
+            `${adjusted ? ` × ${factor} adjustment` : ''}).`,
+          detail: adjusted
+            ? `${cccCount} current-carrying conductors in cable → Table 310.15(C)(1) factor ${factor} ` +
+              `(NEC 392.80(A)(1)(a)); cable routed in tray "${trayId}".`
+            : `${cccCount} current-carrying conductors in cable; NEC 392.80(A)(1)(a) applies no ` +
+              `Table 310.15(C)(1) adjustment to cables with three or fewer. Cable routed in tray "${trayId}".`,
+          reference: AMPACITY_REFERENCE,
+          remediation:
+            `Upgrade the conductor to the next larger standard size, increase the number of parallel sets (NEC 310.10(H)), ` +
+            `${adjusted ? 'use cables with fewer current-carrying conductors each, ' : ''}` +
+            `or reduce the design load current for "${name}".`,
         });
-      } else if (factor < 1.0) {
-        // Advisory: derating applied even if not over limit
+      } else if (adjusted) {
+        // Advisory: adjustment applied even though the design current is within limits
         findings.push({
           ruleId: 'DRC-03',
           severity: DRC_SEVERITY.INFO,
           location: `${name} @ ${trayId}`,
           message:
-            `Tray bundling derating applied: ${aggregateAmpacity} A aggregate${parallelLabel} → ${deratedAmpacity.toFixed(1)} A ` +
-            `(factor ${factor}, ${conductorCount} current-carrying conductors).`,
-          reference: 'NEC 310.15',
-          remediation: 'No action required if the derated ampacity remains above the design current. Consider segregating conductors into separate tray sections to reduce derating.',
+            `Ampacity adjustment applied: ${cccCount} current-carrying conductors in cable → factor ${factor} ` +
+            `(NEC 392.80(A)(1)(a); Table 310.15(C)(1)). ` +
+            `${aggregateAmpacity} A aggregate${parallelLabel} → ${adjustedAmpacity.toFixed(1)} A.`,
+          detail:
+            'The Conductors field is counted as current-carrying; a neutral that carries only the unbalanced ' +
+            'current (NEC 310.15(E)) need not be counted, and equipment grounding conductors are recorded separately.',
+          reference: AMPACITY_REFERENCE,
+          remediation:
+            'No action required if the adjusted ampacity remains above the design current. Cables with three or ' +
+            'fewer current-carrying conductors are not subject to this adjustment.',
         });
       }
     }

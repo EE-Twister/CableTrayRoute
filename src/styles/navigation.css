@@ -16,12 +16,14 @@
         flex: 1;
     }
 
+    /* Shrinkable so the project chip, not the page, absorbs a narrow header. */
     & .nav-actions {
         display: flex;
         align-items: center;
         gap: var(--space-3);
         margin-left: auto;
-        flex-shrink: 0;
+        flex-shrink: 1;
+        min-width: 0;
     }
 
     & .nav-actions .settings-btn {
@@ -645,7 +647,7 @@
 
         &:hover {
             background: color-mix(in srgb, var(--primary-color) 8%, transparent);
-            color: var(--primary-color);
+            color: var(--color-heading-accent, var(--primary-color));
         }
 
         &.active,
@@ -653,7 +655,7 @@
             font-weight: 600;
             background: color-mix(in srgb, var(--primary-color) 14%, transparent);
             border-left-color: var(--primary-color);
-            color: var(--primary-color);
+            color: var(--color-heading-accent, var(--primary-color));
             padding-left: calc(0.5rem - 1px);
         }
 
@@ -691,15 +693,21 @@
     flex-shrink: 0;
 }
 
+/* The brand link keeps its "CableTrayRoute home" label; the wordmark gives
+   way to the logo alone on phones and where the full desktop nav is tight. */
 .nav-brand-name {
-    @media (max-width: 480px) {
+    @media (max-width: 480px), (min-width: 961px) and (max-width: 1120px) {
         display: none;
     }
 }
 
+/* The project chip absorbs the header's slack: it shrinks and ellipsizes the
+   project name instead of pushing the header wider than the viewport. The
+   full name and status stay in the trigger's title and aria-label. */
 .project-actions-control {
     position: relative;
-    flex-shrink: 0;
+    flex-shrink: 1;
+    min-width: 0;
 }
 
 .project-actions-trigger {
@@ -707,7 +715,8 @@
     align-items: center;
     gap: 0.4rem;
     min-height: 2.1rem;
-    max-width: min(30vw, 20rem);
+    min-width: 0;
+    max-width: min(100%, 30vw, 24rem);
     padding: 0.25rem 0.55rem;
     border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
     border-radius: 0.45rem;
@@ -744,7 +753,8 @@
 
 .project-display-chip {
     display: inline-block;
-    min-width: 0;
+    flex: 0 1 auto;
+    min-width: 2.5rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -753,8 +763,14 @@
     line-height: 1.2;
 }
 
+/* Capped so a long cloud label ("Cloud synced · <date>") cannot crowd out the
+   project name; the full text is in the chip's title and the aria-label. */
 .project-sync-status {
     flex-shrink: 0;
+    max-width: 7rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     padding: 0.13rem 0.35rem;
     border-radius: 999px;
     background: color-mix(in srgb, var(--color-border) 42%, transparent);
@@ -764,7 +780,8 @@
     line-height: 1.1;
 }
 
-.project-sync-status[hidden] {
+.project-sync-status[hidden],
+.project-display-chip[hidden] {
     display: none;
 }
 
@@ -860,25 +877,17 @@
     }
 
     /* Keep the project name visible at laptop widths; drop the decorative
-       icon and caret instead so the trigger stays compact. */
+       icon and caret instead so the trigger stays compact. The name still
+       ellipsizes when the header is narrow (see .project-actions-control). */
     .project-actions-trigger {
-        min-width: 18rem;
         min-height: 2.75rem;
-        max-width: 22rem;
+        max-width: min(100%, 22rem);
         justify-content: flex-start;
         padding: 0.25rem 0.45rem;
     }
 
     .project-actions-trigger .project-display-chip {
-        flex: 1 1 12rem;
-        min-width: 10rem;
         text-align: left;
-    }
-
-    .project-actions-trigger .project-sync-status {
-        max-width: 7rem;
-        overflow: hidden;
-        text-overflow: ellipsis;
     }
 
     .project-actions-trigger::after,
@@ -998,7 +1007,7 @@
     gap: 1rem;
 
     & a {
-        color: #1e40af;
+        color: var(--color-primary, #1e40af);
         text-decoration: none;
         padding: var(--space-2) var(--space-3);
         border: 1px solid var(--color-border);
@@ -1021,7 +1030,7 @@
 .step-nav-prev,
 .step-nav-link,
 .step-nav-next {
-    color: #1e40af;
+    color: var(--color-primary, #1e40af);
 }
 
 .step-nav[hidden] {
@@ -1111,6 +1120,8 @@ body.dark-mode .workflow-step-nav {
 }
 
 body.dark-mode .nav-dropdown-trigger.active,
+body.dark-mode .top-nav a.active,
+body.dark-mode .top-nav a[aria-current="page"],
 body.dark-mode .workflow-step-nav-label {
     color: #bfdbfe;
 }

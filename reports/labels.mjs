@@ -49,7 +49,8 @@ export function generateArcFlashLabel(data = {}) {
   let svg = template;
   Object.entries(data).forEach(([k, v]) => {
     const re = new RegExp(`{{${k}}}`, 'g');
-    svg = svg.replace(re, escapeXml(v));
+    // A replacer function keeps "$" in values (e.g. PNL-$$1) literal.
+    svg = svg.replace(re, () => escapeXml(v));
   });
   return svg;
 }

@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 
 import {
   evaluateTrayFill,
+  evaluateTrayFillWithCompartments,
   isFourOOrLarger,
+  resolveCableCompartment,
   table39222AllowableArea,
 } from '../analysis/trayFill.mjs';
 
@@ -125,3 +127,80 @@ assert.equal(isFourOOrLarger('3-#4 CU'), false);
     assert.match(unlistedWidth.issues[0].message, /interpolation is not performed/i);
   });
 });
+
+describe('Compartment-aware tray fill (barrier-separated trays)', () => {
+  const tray = {
+    tray_id: 'TR-2C', tray_type: 'Ladder', inside_width: 24, tray_depth: 6, num_slots: 2,
+    slot_groups: { 0: 'Zone 1 - Power', 1: 'Zone 2 - Control' },
+  };
+
+  it('returns the single-tray result unchanged when there is one compartment', () => {
+    const single = { tray_id: 'TR-1', tray_type: 'Ladder', inside_width: 12, tray_depth: 6 };
+    assert.deepEqual(evaluateTrayFillWithCompartments(single, [cable()]), evaluateTrayFill(single, [cable()]));
+  });
+
+  it('resolves compartments by slot index, then slot-group label, then one-based zone', () => {
+    const groups = new Map([[0, 'Zone 1 - Power'], [1, 'Zone 2 - Control']]);
+    assert.equal(resolveCableCompartment({ slot_index: 1, zone: 1 }, 2, groups), 1);
+    assert.equal(resolveCableCompartment({ allowed_cable_group: 'Zone 2 - Control' }, 2, groups), 1);
+    assert.equal(resolveCableCompartment({ zone: 1 }, 2, groups), 0);
+    assert.equal(resolveCableCompartment({ zone: 3 }, 2, groups), null, 'out-of-range zone is unresolved');
+    assert.equal(resolveCableCompartment({}, 2, groups), null);
+  });
+
+  it('is governed by the fullest compartment, not the whole-tray average', () => {
+    // 10 in2 in a 12 in compartment (14 in2 allowance) is 71 %; over the
+    // whole 24 in tray (28 in2) it would read as only 36 %.
+    const cables = [
+      cable({ tag: 'P1', cable_area: 10, zone: 1 }),
+      cable({ tag: 'C1', cable_area: 1, zone: 2 }),
+    ];
+    const result = evaluateTrayFillWithCompartments(tray, cables);
+    assert.equal(result.status, 'pass');
+    assert.equal(result.compartmented, true);
+    assert.equal(result.governingCompartment, 'Zone 1 - Power');
+    assert.ok(Math.abs(result.utilizationPercent - (10 / 14) * 100) < 0.01, `${result.utilizationPercent}`);
+    assert.equal(result.compartments.length, 2);
+    assert.ok(evaluateTrayFill(tray, cables).utilizationPercent < 40, 'whole-tray figure understates it');
+  });
+
+  it('fails when any compartment exceeds its allowance', () => {
+    const result = evaluateTrayFillWithCompartments(tray, [
+      cable({ tag: 'P1', cable_area: 15, zone: 1 }),
+      cable({ tag: 'C1', cable_area: 1, zone: 2 }),
+    ]);
+    assert.equal(result.status, 'fail');
+    assert.equal(result.governingCompartment, 'Zone 1 - Power');
+  });
+
+  it('is incomplete, not a pass, when a cable has no compartment', () => {
+    const result = evaluateTrayFillWithCompartments(tray, [
+      cable({ tag: 'P1', cable_area: 1, zone: 1 }),
+      cable({ tag: 'LOOSE', cable_area: 1 }),
+    ]);
+    assert.equal(result.status, 'incomplete');
+    assert.equal(result.evaluable, false);
+    assert.equal(result.utilizationPercent, null);
+    assert.deepEqual(result.unresolvedCables, ['LOOSE']);
+    assert.match(result.issues[0].message, /not assigned to one of the 2 compartments/);
+  });
+
+  it('keeps the full result shape for an empty or wholly unassigned compartmented tray', () => {
+    const empty = evaluateTrayFillWithCompartments(tray, []);
+    const loose = evaluateTrayFillWithCompartments(tray, [cable({ tag: 'A' }), cable({ tag: 'B' })]);
+    for (const result of [empty, loose]) {
+      assert.equal(result.status, 'incomplete');
+      assert.equal(result.evaluable, false);
+      assert.equal(typeof result.clause, 'string');
+      assert.equal(typeof result.arrangement, 'string');
+      assert.ok(Array.isArray(result.missingInputs) && result.missingInputs.length > 0);
+      assert.deepEqual(result.used, {});
+      assert.deepEqual(result.allowable, {});
+      assert.ok(result.basis);
+    }
+    assert.ok(empty.missingInputs.includes('assigned cables'));
+    assert.deepEqual(loose.unresolvedCables, ['A', 'B']);
+    assert.ok(loose.missingInputs.includes('A: compartment assignment'));
+  });
+});
+

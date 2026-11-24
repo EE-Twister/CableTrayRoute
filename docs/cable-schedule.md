@@ -5,12 +5,14 @@ The Cable Schedule page is optimized for fast entry first, with deeper routing a
 ## Basic Entry
 
 - Use **Add Cable** to open the focused cable entry form.
-- Use **Quick Add** to enter several cables at once with tag, termination, cable type, conductor size, length, and raceway fields.
-- Use **Tag Settings** to define the automatic cable numbering pattern used by Add Cable and Quick Add.
+- Use **Quick Add Several** to enter several cables at once with tag, termination, cable type, conductor size, length, and raceway fields. It is the option under the arrow beside **Add Cable**.
+- Use **Tag Settings** (under **More**) to define the automatic cable numbering pattern used by Add Cable and Quick Add.
+- The toolbar is one row beside the **Cable List** heading: **Add Cable** with its Quick Add option, **Save**, the **Import / Export**, **Templates** and **View** menus, **Route All**, and **More**. **More** holds the occasional actions: **Reload Saved**, **Load Sample Cables** (it replaces the schedule), **Tag Settings**, **Batch Edit**, **Change Log** and **Delete All Rows**. Edits are stored as you type; **Save** checks the required fields across the schedule and records the save in the change log. One toolbar menu is open at a time, and Escape or a click elsewhere closes it.
 - The default **Basic Entry** view shows identification, terminations, cable construction, electrical entry, and notes.
 - Cable construction now includes **EGC Size** and **EGC Material**, and electrical entry includes **OCPD Rating (A)** plus **Terminal Temp (C)** for selected NEC 110.14(C), 240.4, and 250.122 screening in the Design Rule Checker.
 - Advanced routing coordinates, manufacturer details, and calculated fields remain available through **View Preset**.
-- The workspace is laid out so the first cable rows sit above the fold on a typical laptop screen (about 1265 × 712): the summary strip is a single slim row, the next-action banner shows its actions as compact buttons, and the search field carries its own label.
+- The workspace is laid out so the first cable rows sit above the fold on a typical laptop screen (about 1265 × 712, with at least three editable rows in view) and the first row still clears the fold in a 1009 × 596 browser pane: the summary strip is a single slim row, the toolbar is a single row, the next-action banner shows its actions as compact buttons, and the search field carries its own label.
+- When a guided sample workflow is active, its guide (sample name, step progress, **Previous**, **Next**, **Checklist** and **Exit**) shares one band with the workflow step label instead of adding a second band. On narrower desktop widths the project status shows as a coloured dot; hover it for the text.
 - Each column group header has a small **–/+** toggle that collapses or expands that group. Screen readers announce it as, for example, "Collapse Terminations columns" together with its expanded state.
 
 ## Voltage Drop Inputs
@@ -49,7 +51,7 @@ The Cable Schedule page is optimized for fast entry first, with deeper routing a
 
 ## Batch Editing
 
-- Select rows with the row checkboxes and use **Batch Edit** to apply shared raceways, cable type, operating voltage, From Tag, or To Tag.
+- Select rows with the row checkboxes and use **More > Batch Edit** to apply shared raceways, cable type, operating voltage, From Tag, or To Tag.
 - Batch edits update the row Last Modified value and are recorded in the local change log.
 
 ## Import, Export, and Print
@@ -74,7 +76,23 @@ The Cable Schedule page is optimized for fast entry first, with deeper routing a
 
 ## Summary strip
 
-A strip at the top of the page shows cable count, total length, and how many rows are missing a length or voltage. It also shows the voltage-class mix. It refreshes as you edit the table. The Raceway Schedule page has a matching strip that counts trays, conduits and ductbanks.
+A strip at the top of the page shows four cards. It refreshes as you edit the table.
+
+- **Cables:** the row count, with the voltage-class mix taken from **Operating Voltage (V)**.
+- **Total length:** the sum of the row lengths.
+- **Schedule-ready:** how many rows have Tag, From/To, Conductor Size, and Length. This is the same check, and the same count, as the Cable Schedule step in the workflow header. Blank rows are not counted.
+- **Missing operating voltage:** rows with no positive **Operating Voltage (V)**. Routing does not need it, so it does not affect schedule-ready status. Sizing and voltage-drop checks do need it.
+
+The Raceway Schedule page has a matching strip that counts trays, conduits and ductbanks.
+
+## Operating voltage on import
+
+**Operating Voltage (V)** is the nominal system voltage of the circuit. **Cable Rating (V)** is the insulation rating, a separate value. Some projects and samples record the system voltage only in a `voltage` field. Loading or importing such a project fills a blank Operating Voltage from that field. This covers loading a sample from the gallery, importing a project file, **Load Project**, and server copies. The fill happens only when the value is a plain number such as `480`, `"480"`, `"480 V"`, or `"480V"`.
+
+- An Operating Voltage that is already entered is never replaced.
+- The original `voltage` field is kept.
+- Values such as `480/277` or `13.8 kV` are not converted. Enter those directly.
+- Reloading the browser page does not fill the column for a project that is already open. Load the sample again, use **Load Project**, or import the project file.
 
 ## Linking to raceways
 

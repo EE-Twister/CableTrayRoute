@@ -1,6 +1,8 @@
 import { repairMojibakeDeep } from './src/textEncoding.js';
 import { COMPACT_SYNTHESIS_KEYS, isCompactSynthesisKey, isDeviceEvidenceEnvelope, packProjectDeviceEvidence, unpackDeviceEvidence, unpackProjectDeviceEvidence } from './utils/designSynthesisDeviceEvidenceCodec.mjs';
 import { isProjectSettingKey, isProjectStorageKey, sanitizeProjectSettings } from './src/projectSettingKeys.js';
+import { normalizeStudyResultsArcFlashUnits } from './analysis/arcFlashResultUnits.mjs';
+import { normalizeCableOperatingVoltage } from './analysis/cableOperatingVoltage.mjs';
 import {
   PROJECT_SCHEMA_VERSION,
   assertValidStoredProject,
@@ -256,6 +258,12 @@ function migrateSettingsPayload(settings = {}) {
       next.studyResults.frequencyScan = next.studyResults.freqScan;
     }
     delete next.studyResults.freqScan;
+    // Saved arc-flash boundaries are millimetres; convert legacy inch/foot values.
+    next.studyResults = normalizeStudyResultsArcFlashUnits(next.studyResults);
+  }
+  const legacyStudies = next.studies;
+  if (legacyStudies && typeof legacyStudies === 'object' && !Array.isArray(legacyStudies)) {
+    next.studies = normalizeStudyResultsArcFlashUnits(legacyStudies);
   }
   return next;
 }
@@ -316,6 +324,10 @@ function migrateProject(old = {}) {
     if (nextVersion <= version) throw new Error(`Stored project migration ${version} did not advance the schema version.`);
     version = nextVersion;
   }
+  // Cable rows that record the system voltage only as `voltage` get the
+  // `operating_voltage` the Cable Schedule and its checks read.
+  const cables = normalizeCableOperatingVoltage(projectDocument.cables);
+  if (cables !== projectDocument.cables) projectDocument = { ...projectDocument, cables };
   if (projectDocument.settings && typeof projectDocument.settings === 'object' && !Array.isArray(projectDocument.settings)) {
     projectDocument = {
       ...projectDocument,

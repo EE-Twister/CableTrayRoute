@@ -7,11 +7,15 @@
   --color-overlay: rgba(0, 0, 0, 0.55);
 
   --font-family-base: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family-mono: ui-monospace, 'SFMono-Regular', 'Cascadia Code', Consolas, monospace;
+  --font-mono: var(--font-family-mono);
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
   --font-size-md: 1rem;
+  --font-size-base: var(--font-size-md);
   --font-size-lg: 1.125rem;
   --font-size-xl: 1.4rem;
+  --font-size-2xl: 2rem;
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -26,6 +30,7 @@
   --radius-md: 10px;
   --radius-lg: 16px;
   --radius-pill: 999px;
+  --radius: var(--radius-sm);
 
   --control-height: 2.5rem;
   --control-padding-block: var(--space-2);
@@ -40,6 +45,8 @@
   --elevation-md: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
   --elevation-lg: 0 20px 40px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.06);
   --elevation-nav: 0 1px 0 rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-sm: var(--elevation-sm);
+  --shadow-lg: var(--elevation-lg);
 
   --size-full: 100%;
   --size-modal-sm: 32rem;
@@ -67,7 +74,6 @@
   --error-bg: #f8d7da;
   --error-text: #721c24;
   --focus-ring-color: #0a58ca;
-  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--focus-ring-color) 28%, transparent);
   --theme-control-bg: #ffffff;
   --theme-control-text: #111827;
   --panel-phase-a: #f25c54;
@@ -79,7 +85,6 @@
 
   --ol-font: var(--font-family-base);
   --ol-spacing: var(--spacing-base);
-  --ol-card-bg: var(--secondary-color);
   --ol-border-color: #dcdcdc;
   --ol-shadow: var(--elevation-md);
   --ol-radius: var(--radius-md);
@@ -87,6 +92,7 @@
 
   /* Semantic color tokens */
   --color-success: #28a745;
+  --color-warning: #b45309;
   --color-error: #dc3545;
   --color-tooltip-bg: #333333;
   --color-tooltip-text: #ffffff;
@@ -95,7 +101,6 @@
   --color-debug-text: #00ff00;
   --color-progress-track: #e9ecef;
   --color-text-muted: #475569;
-  --text-muted: var(--color-text-muted);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -106,8 +111,9 @@
     --color-surface-strong: #1e293b;
     --color-text: #f1f5f9;
     --color-border: #334155;
-    --color-text-muted: #94a3b8;
+    --color-text-muted: #aab7c9;
     --color-success: #4ade80;
+    --color-warning: #fbbf24;
     --color-error: #f87171;
     --color-tooltip-bg: #475569;
     --color-tooltip-text: #f8fafc;
@@ -115,7 +121,7 @@
     --color-debug-bg: #000000;
     --color-debug-text: #4ade80;
     /* Backward-compatible aliases */
-    --primary-color: #17a2b8;
+    --primary-color: #17a2b8; --color-heading-accent: #3dd5e8;
     --secondary-color: #343a40;
     --border-color: #495057;
     --text-color: #f8f9fa;
@@ -149,8 +155,9 @@ body.dark-mode {
   --color-surface-strong: #1e293b;
   --color-text: #f1f5f9;
   --color-border: #334155;
-  --color-text-muted: #94a3b8;
+  --color-text-muted: #aab7c9;
   --color-success: #4ade80;
+  --color-warning: #fbbf24;
   --color-error: #f87171;
   --color-tooltip-bg: #475569;
   --color-tooltip-text: #f8fafc;
@@ -158,7 +165,7 @@ body.dark-mode {
   --color-debug-bg: #000000;
   --color-debug-text: #4ade80;
   /* Backward-compatible aliases */
-  --primary-color: #17a2b8;
+  --primary-color: #17a2b8; --color-heading-accent: #3dd5e8;
   --secondary-color: #343a40;
   --border-color: #495057;
   --text-color: #f8f9fa;
@@ -183,14 +190,19 @@ body.dark-mode {
   --row-divider-color: rgba(255, 255, 255, 0.18);
 }
 
-
-body.theme-light {
+/* High contrast starts from the light palette (its own block below wins) so an
+   OS dark preference cannot leak navy surfaces under its black text. */
+body.theme-light,
+body.theme-high-contrast {
   --color-primary: #2563eb;
   --color-surface: #f8fafc;
   --color-surface-strong: #ffffff;
   --color-text: #0f172a;
   --color-border: #e2e8f0;
   --color-text-muted: #475569;
+  --color-success: #28a745;
+  --color-warning: #b45309;
+  --color-error: #dc3545;
   --primary-color: #0b5ed7;
   --secondary-color: #f8f9fa;
   --border-color: #dee2e6;
@@ -211,6 +223,10 @@ body.theme-light {
 }
 
 body.theme-high-contrast {
+  --color-surface: #ffffff;
+  --color-text: #000000;
+  --color-text-muted: #1f1f1f;
+  --color-border: #000000;
   --primary-color: #000000;
   --secondary-color: #ffffff;
   --border-color: #000000;
@@ -220,4 +236,80 @@ body.theme-high-contrast {
   --button-hover-bg: #1f1f1f;
   --focus-ring-color: #ffbf47;
   --table-row-alt-bg: #f5f5f5;
+}
+
+/* Theme-following aliases: each legacy/component name maps once to a themed token.
+   Declared on body too because var() resolves where declared; a :root-only alias
+   would keep the OS-scheme colour after a body theme class changes the base tokens.
+   npm run lint:css fails on any undefined var(--x), so add new names here. */
+:root,
+body {
+  /* Text */
+  --text: var(--color-text);
+  --heading-color: var(--color-text);
+  --color-body: var(--color-text);
+  --lp-text: var(--color-text);
+  --text-muted: var(--color-text-muted);
+  --color-muted: var(--color-text-muted);
+  --muted-color: var(--color-text-muted);
+  --muted-text: var(--color-text-muted);
+  --muted-text-color: var(--color-text-muted);
+  /* Raised surfaces: cards, sticky bars, inputs */
+  --surface: var(--color-surface-strong);
+  --surface-1: var(--color-surface-strong);
+  --surface-color: var(--color-surface-strong);
+  --surface-elevated: var(--color-surface-strong);
+  --surface-raised: var(--color-surface-strong);
+  --bg-primary: var(--color-surface-strong);
+  /* Subtle surfaces: section headers, table headers, insets, hover */
+  --surface-2: var(--color-surface);
+  --surface-subtle: var(--color-surface);
+  --surface-muted: var(--color-surface);
+  --surface-hover: var(--color-surface);
+  --color-surface-2: var(--color-surface);
+  --color-surface-alt: var(--color-surface);
+  --color-surface-muted: var(--color-surface);
+  --bg-secondary: var(--color-surface);
+  --table-header-bg: var(--color-surface);
+  --lp-surface: var(--color-surface);
+  /* Page background */
+  --background: var(--secondary-color);
+  --bg-color: var(--secondary-color);
+  --ol-card-bg: var(--secondary-color);
+  /* Primary-tinted surfaces */
+  --color-info-bg: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-strong));
+  --info-bg: var(--color-info-bg);
+  --accent-subtle: var(--color-info-bg);
+  --color-primary-subtle: var(--color-info-bg);
+  --color-surface-raised: var(--color-info-bg);
+  /* Status surfaces */
+  --color-success-bg: var(--success-bg);
+  --color-warning-bg: var(--warning-bg);
+  --color-danger-bg: var(--error-bg);
+  --danger-bg: var(--error-bg);
+  /* Status foregrounds and accents */
+  --success-color: var(--success-text);
+  --warning-color: var(--color-warning);
+  --color-warning-text: var(--warning-text);
+  --danger-color: var(--color-error);
+  --color-danger: var(--color-error);
+  --danger-text: var(--error-text);
+  /* Primary accents; "strong" variants move toward the text colour */
+  --primary: var(--color-primary);
+  --accent: var(--color-primary);
+  --color-info: var(--color-primary);
+  --color-info-dark: color-mix(in srgb, var(--color-primary) 75%, var(--color-text));
+  --color-accent-strong: color-mix(in srgb, var(--color-primary) 75%, var(--color-text));
+  --color-primary-dark: var(--button-hover-bg);
+  --color-accent-hover: var(--button-hover-bg);
+  /* Borders */
+  --border: var(--border-color);
+  --border-subtle: var(--border-color);
+  --color-border-subtle: var(--border-color);
+  --lp-border: var(--border-color);
+  --color-border-strong: color-mix(in srgb, var(--border-color) 50%, var(--color-text-muted));
+  /* Focus */
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--focus-ring-color) 28%, transparent);
+  --focus-color: var(--focus-ring-color);
+  --color-focus: var(--focus-ring-color);
 }

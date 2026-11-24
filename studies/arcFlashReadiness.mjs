@@ -1,5 +1,19 @@
+import { assessArcFlashResultPlausibility } from '../analysis/arcFlashResultUnits.mjs';
+
 function finiteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isIncompleteArcFlashResult(result = {}) {
+  return !finiteNumber(result.incidentEnergy)
+    || ['incomplete', 'unevaluated', 'unsupported', 'invalid', 'missing-inputs'].includes(String(result.calculationStatus || '').toLowerCase())
+    || ['incomplete', 'unevaluated', 'invalid'].includes(String(result.validity || '').toLowerCase())
+    || (Array.isArray(result.requiredInputs) && result.requiredInputs.length > 0);
+}
+
+/** False when the saved boundary contradicts the incident energy (see analysis/arcFlashResultUnits.mjs). */
+export function isArcFlashResultPlausible(info = {}) {
+  return assessArcFlashResultPlausibility(info).plausible;
 }
 
 export function arcFlashResultEntries(results = {}, scope = 'project') {
@@ -32,31 +46,34 @@ export function isArcFlashLabelEligible(info = {}) {
     && Number(info.clearingTime) > 0
     && typeof info.upstreamDevice === 'string'
     && info.upstreamDevice.trim().length > 0
-    && info.upstreamDevice !== 'Not Specified';
+    && info.upstreamDevice !== 'Not Specified'
+    && isArcFlashResultPlausible(info);
 }
 
 export function summarizeArcFlashResults(results = {}, scope = 'project') {
   const entries = arcFlashResultEntries(results, scope);
   const total = entries.length;
   const labelEligible = entries.filter(([, result]) => isArcFlashLabelEligible(result)).length;
-  const incomplete = entries.filter(([, result]) => {
-    return !finiteNumber(result.incidentEnergy)
-      || ['incomplete', 'unevaluated', 'unsupported', 'invalid', 'missing-inputs'].includes(String(result.calculationStatus || '').toLowerCase())
-      || ['incomplete', 'unevaluated', 'invalid'].includes(String(result.validity || '').toLowerCase())
-      || (Array.isArray(result.requiredInputs) && result.requiredInputs.length > 0);
-  }).length;
+  const incomplete = entries.filter(([, result]) => isIncompleteArcFlashResult(result)).length;
   const outsideModelRange = entries.filter(([, result]) => result.calculationInputs?.withinModelRange === false).length;
+  const invalid = entries.filter(([, result]) => !isArcFlashResultPlausible(result)).length;
   const assumedClearingTime = entries.filter(([, result]) => {
     const source = String(result.calculationInputs?.clearingTimeSource || '');
     return source === 'default-screening-assumption' || source === 'unavailable';
   }).length;
-  const status = !total ? 'empty' : incomplete || outsideModelRange ? 'review' : 'ready';
+  const status = !total ? 'empty' : incomplete || outsideModelRange || invalid ? 'review' : 'ready';
 
   let title = 'Run the study to establish readiness';
   let summary = 'Label eligibility is determined only after both arcing-current cases and their clearing-time evidence are checked.';
   if (status === 'review') {
-    title = `${incomplete || outsideModelRange} location(s) need engineering follow-up`;
+    const followUp = entries.filter(([, result]) => isIncompleteArcFlashResult(result)
+      || result.calculationInputs?.withinModelRange === false
+      || !isArcFlashResultPlausible(result)).length;
+    title = `${followUp} location(s) need engineering follow-up`;
     summary = `${labelEligible} of ${total} location(s) are eligible for draft label generation. Incomplete results remain in the draft report with their required inputs and provenance.`;
+    if (invalid) {
+      summary += ` ${invalid} location(s) have an arc-flash boundary that is inconsistent with the incident energy and are marked invalid; check boundary units.`;
+    }
   } else if (status === 'ready') {
     title = `${total} location(s) calculated with complete inputs`;
     summary = `${labelEligible} location(s) are eligible for draft label generation. Engineer review is still required before field use.`;
@@ -70,17 +87,16 @@ export function summarizeArcFlashResults(results = {}, scope = 'project') {
     labelEligible,
     incomplete,
     outsideModelRange,
+    invalid,
     assumedClearingTime,
   };
 }
 
 export function arcFlashReadinessLabel(result = {}) {
+  if (!isArcFlashResultPlausible(result)) return 'Invalid result';
   if (isArcFlashLabelEligible(result)) return 'Label eligible';
   if (result.calculationInputs?.withinModelRange === false) return 'Outside model range';
-  if (!finiteNumber(result.incidentEnergy)
-      || ['incomplete', 'unevaluated', 'unsupported', 'invalid', 'missing-inputs'].includes(String(result.calculationStatus || '').toLowerCase())
-      || ['incomplete', 'unevaluated', 'invalid'].includes(String(result.validity || '').toLowerCase())
-      || result.requiredInputs?.length) return 'Inputs required';
+  if (isIncompleteArcFlashResult(result)) return 'Inputs required';
   return 'Review required';
 }
 

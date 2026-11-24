@@ -75,7 +75,9 @@ assert(diagnostics.health.spoolSheets > 0);
 assert.equal(diagnostics.blockers.filter(item => item.severity === 'critical').length, 1);
 assert.equal(diagnostics.blockers.filter(item => item.severity === 'warning').length, 1);
 assert.equal(diagnostics.designRules.errors, 2);
-assert.equal(diagnostics.designRules.warnings, 10);
+// The sample's compartmented trays resolve cables by zone, so DRC-01 evaluates
+// each compartment instead of warning that the assignment is unresolved.
+assert.equal(diagnostics.designRules.warnings, 8);
 assert.equal(diagnostics.cableDeliverables.ready, 14);
 assert.equal(diagnostics.readyForDeliverables, false);
 assert.equal(diagnostics.workflowSteps.length, 8);

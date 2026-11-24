@@ -423,7 +423,7 @@ body.theme-high-contrast td {
 
 h1, h2, h3 {
     font-family: var(--font-family-base);
-    color: var(--primary-color);
+    color: var(--color-heading-accent, var(--primary-color));
     margin-bottom: var(--spacing-base);
     letter-spacing: -0.015em;
     font-weight: 600;
@@ -522,6 +522,13 @@ button:focus-visible {
     outline: 2px solid var(--focus-ring-color, #0a58ca);
     outline-offset: 2px;
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--focus-ring-color, #0a58ca) 18%, transparent);
+}
+
+/* Unstyled links use the theme link colour instead of the browser default
+   (Firefox's #8c8cff gives only 4:1 on the dark page). :where() keeps this at
+   zero specificity so any component colour still wins. */
+a:where(:not([class])) {
+  color: var(--color-primary);
 }
 
 a:focus-visible {
@@ -765,5 +772,15 @@ hr {
 
 .shortcuts-table tbody tr:hover {
     background: color-mix(in srgb, var(--color-primary, #2563eb) 4%, transparent);
+}
+
+/* ---- Disclosure Headings ---- */
+
+/* "About This Tool" / "Method & Assumptions" summaries appear on most pages.
+   routing.css (pages layer) hard-codes #0f172a on them, which is dark-on-dark
+   in dark mode; an !important here, in an earlier layer, outranks that rule. */
+.method-panel > summary,
+.advanced-routing-settings > summary {
+    color: var(--color-text) !important;
 }
 

@@ -13,7 +13,7 @@
  */
 
 import { scaleCurve } from './tccUtils.js';
-import { evaluateTimeCurrentCurve } from './timeCurrentCurve.mjs';
+import { evaluateTimeCurrentCurve, normalizeTimeCurrentCurve } from './timeCurrentCurve.mjs';
 
 const MIN_TIME = 1e-4;
 const TIME_DIAL_MIN = 0.05;
@@ -40,18 +40,105 @@ function dialOverrideKey(device) {
 
 /**
  * Log-log linear interpolation of time from a curve at a given current.
- * Mirrors the private interpolateTimeAtCurrent() in tccUtils.js.
+ *
+ * Below the curve's minimum current (the pickup), the device does not operate,
+ * so no time is returned (null) rather than the first point's time. Above the
+ * curve's maximum current, the last point's time is held; no slope is
+ * extrapolated. This raw lookup suits comparing two curves point by point (for
+ * example, library review spot checks). Coordination margins must use
+ * evaluateOperatingTime(), which holds a time above the curve only for an
+ * instantaneous plateau.
  *
  * @param {Array<{current: number, time: number}>} curve - Sorted ascending by current
  * @param {number} current - Current value to interpolate at [A]
- * @returns {number} Interpolated time [s], never below MIN_TIME
+ * @returns {number|null} Interpolated time [s], never below MIN_TIME, or null
+ *   when the current is below the curve's minimum current (no trip). An empty
+ *   curve or a non-positive current still returns MIN_TIME.
  */
 export function interpolateTime(curve, current) {
   const evaluation = evaluateTimeCurrentCurve(curve, current, {
     boundary: 'lower',
     outOfRange: 'clamp',
   });
+  if (evaluation.status === 'clamped-below-domain') return null;
   return Math.max(evaluation.time ?? MIN_TIME, MIN_TIME);
+}
+
+/**
+ * Keep only the longest time at the curve's last current. scaleCurve() ends
+ * instantaneous characteristics with a vertical drop at the instantaneous-max
+ * current (to MIN_TIME on the nominal and minimum curves, to MIN_TIME × the
+ * upper tolerance on the maximum curve). The drop leads nowhere: it marks the
+ * end of the plotted curve and is not an operating time. Without this, a
+ * 'lower' lookup at exactly that current would report about 0.0001 s instead
+ * of the instantaneous clearing time.
+ *
+ * @param {Array<{current: number, time: number}>} curve
+ * @returns {Array<{current: number, time: number}>}
+ */
+function withoutEndOfCurveMarker(curve) {
+  const points = normalizeTimeCurrentCurve(curve);
+  if (points.length < 2) return points;
+  // normalizeTimeCurrentCurve sorts equal currents by descending time.
+  const lastCurrent = points.at(-1).current;
+  return points.slice(0, points.findIndex(point => point.current === lastCurrent) + 1);
+}
+
+function sameCurrent(a, b) {
+  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= Math.max(Math.abs(a), Math.abs(b)) * 1e-9;
+}
+
+/**
+ * Evaluate a device's operating time at a fault current for coordination
+ * reporting, without making up a time outside the curve's range.
+ *
+ * Status values:
+ *   - 'operates': `time` is the exact or log-log interpolated time for the
+ *     requested boundary within the curve's range. Above the range, it is the
+ *     instantaneous time held as described below.
+ *   - 'no-trip': the current is below the curve's minimum current (pickup).
+ *     The device does not operate, and `time` is null.
+ *   - 'above-domain': the current is above the curve's maximum current, and
+ *     `time` is null. The exception is a curve that ends on an instantaneous
+ *     plateau: the caller passes `instantaneousCeilingA` (the scaled device's
+ *     settings.instantaneousMax), and the curve's last current equals it.
+ *     scaleCurve() cuts the plateau at the instantaneous-max setting, the
+ *     interrupting rating, or a 10× pickup plotting fallback. The
+ *     instantaneous element still operates at every current above its pickup,
+ *     so the plateau time is held ('operates', `heldInstantaneous: true`).
+ *     Interrupting-rating duty is checked separately by checkDuty() in
+ *     tccUtils.js. Any other curve that ends while still sloping (fuses, IEC
+ *     inverse-time relays) gets no time: holding its last point would
+ *     overstate an upstream device's delay, and the slope is not extrapolated.
+ *   - 'no-curve': the curve has no usable points, or the current is invalid.
+ *     `time` is null.
+ *
+ * @param {Array<{current: number, time: number}>} curve
+ * @param {number} current - Fault current [A]
+ * @param {{ boundary?: 'lower'|'upper', instantaneousCeilingA?: number|null }} [options]
+ *   Use boundary 'lower' for an upstream minimum curve and 'upper' for a
+ *   downstream maximum (clearing) curve, as checkCoordination() does.
+ * @returns {{ time: number|null, status: 'operates'|'no-trip'|'above-domain'|'no-curve', domain: object, heldInstantaneous?: boolean }}
+ */
+export function evaluateOperatingTime(curve, current, { boundary = 'lower', instantaneousCeilingA = null } = {}) {
+  const points = withoutEndOfCurveMarker(curve);
+  const evaluation = evaluateTimeCurrentCurve(points, current, {
+    boundary,
+    outOfRange: 'reject',
+  });
+  const { domain } = evaluation;
+  if (evaluation.status === 'below-domain') return { time: null, status: 'no-trip', domain };
+  if (evaluation.status === 'above-domain') {
+    if (sameCurrent(Number(instantaneousCeilingA), domain.maximumCurrent)) {
+      const plateau = evaluateTimeCurrentCurve(points, domain.maximumCurrent, { boundary, outOfRange: 'reject' });
+      if (Number.isFinite(plateau.time)) {
+        return { time: Math.max(plateau.time, MIN_TIME), status: 'operates', domain, heldInstantaneous: true };
+      }
+    }
+    return { time: null, status: 'above-domain', domain };
+  }
+  if (!Number.isFinite(evaluation.time)) return { time: null, status: 'no-curve', domain };
+  return { time: Math.max(evaluation.time, MIN_TIME), status: 'operates', domain };
 }
 
 /**

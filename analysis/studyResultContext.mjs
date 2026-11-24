@@ -471,7 +471,9 @@ export function decorateStudyRows(rows = [], assessment = {}, options = {}) {
   const preserve = new Set([
     'id', 'label', 'bus', 'branch', 'targetBus', 'unit', 'studyKey', 'method', 'studySource',
     'inputSource', 'path', 'from', 'to', 'resultUnits', 'resultInputSources',
-    'validity', 'calculationStatus', 'status', 'resultValidity', 'freshness', 'resultEligibility', 'resultStatus',
+    // `status` is deliberately not preserved: it carries the row's verdict
+    // (pass/fail/stable/...), which must not survive when the values are withheld.
+    'validity', 'calculationStatus', 'resultValidity', 'freshness', 'resultEligibility', 'resultStatus',
     'calculationVersion', 'calculationVersionStatus', 'sourceFingerprint',
     'currentInputFingerprint', 'currentCalculationVersion', 'calculatedAt',
     'inputSources', 'source', 'inputSource', 'assumptions', 'modelLimits', 'limitations', 'units',
@@ -494,6 +496,7 @@ export function decorateStudyRows(rows = [], assessment = {}, options = {}) {
       if (!preserve.has(key) && historicalValues[key] === undefined) historicalValues[key] = value;
     });
     const withheld = Object.fromEntries(Object.keys(historicalValues).map(key => [key, '—']));
+    if (Object.prototype.hasOwnProperty.call(withheld, 'status')) withheld.status = 'not evaluated';
     return {
       ...decorated,
       ...withheld,

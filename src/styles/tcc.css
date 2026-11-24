@@ -93,7 +93,7 @@ body.dark-mode .is-selected-device .component-selection-role {
 }
 
 .tcc-readiness-metrics dt {
-    color: var(--text-muted, #64748b);
+    color: var(--color-text, #475569);
     font-size: 0.66rem;
     font-weight: 600;
     line-height: 1.2;

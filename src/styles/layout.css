@@ -26,7 +26,7 @@
 
     & header h2 {
         font-size: 1.4rem;
-        color: var(--primary-color);
+        color: var(--color-heading-accent, var(--primary-color));
         border-bottom: 2px solid var(--primary-color);
         padding-bottom: 0.5rem;
     }

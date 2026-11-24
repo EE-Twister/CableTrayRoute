@@ -51,6 +51,8 @@ calculation.
 
 After the arc flash study completes, label export is available only for results with no unresolved `requiredInputs` and with complete voltage, working-distance, clearing-time, boundary, and upstream-device data. A protective-device curve below `calculation_ready`, or an arcing current outside the recorded total-clearing curve domain, leaves a required input unresolved and withholds that location from label export. A 0.2 s fallback remains a screening assumption, not an issue-ready clearing time.
 
+Saved arc-flash results store `boundary` and `workingDistance` in millimetres. When a project, sample, or saved result records `boundaryUnit` as inches, feet, centimetres, or metres, or records `workingDistanceIn`, CableTrayRoute converts the values to millimetres when the project is migrated or imported. A result is marked **Invalid result** and withheld from label export when its incident energy exceeds 1.2 cal/cm² but its arc-flash boundary is more than 10% shorter than the working distance (455 mm when none is recorded), because the boundary is by definition farther away than any point that receives more than 1.2 cal/cm². The 10% allowance covers IEEE 1584-2018's separate interpolation of energy and boundary for 0.6–15 kV equipment, which can leave a correct boundary a few percent inside the working distance just above 1.2 cal/cm²; a boundary recorded in inches but read as millimetres is about 25 times too short. The same status applies to a boundary still tagged with a non-millimetre unit. The Arc Flash page shows these locations as invalid with the reason "check boundary units" instead of a boundary distance, one-line overlay badges show "AFB: invalid, check units", and the CSV report lists the reason in the location's notes.
+
 1. Click **Export Draft Report & Eligible Labels**
 2. The report includes every calculated location, including calculation status, unresolved inputs, clearing-time provenance, protective-device evidence status, source fingerprint, model assumptions, and model-range status
 3. Only calculation-complete locations produce label drafts; incomplete locations are withheld and remain identified in the report
@@ -129,6 +131,30 @@ Available placeholder tokens:
 | `{{studyDate}}` | Date of arc flash study (YYYY-MM-DD) |
 
 ---
+
+## Approach Boundaries and Report Formatting
+
+Limited and restricted approach boundaries come from NFPA 70E-2024 Table 130.4(E)(a) for AC systems. Values were transcribed from a published copy of the 2024 table; confirm them against the edition your site has adopted.
+
+| Nominal voltage (phase to phase) | Limited approach (exposed fixed part) | Restricted approach |
+| --- | --- | --- |
+| 50–150 V | 3 ft 6 in (1067 mm) | Avoid contact |
+| 151–750 V | 3 ft 6 in (1067 mm) | 1 ft 0 in (305 mm) |
+| 751 V–5 kV | 3 ft 6 in (1067 mm) | 2 ft 1 in (635 mm) |
+| 5.1–15 kV | 5 ft 0 in (1524 mm) | 2 ft 2 in (660 mm) |
+| 15.1–36 kV | 6 ft 0 in (1829 mm) | 2 ft 7 in (787 mm) |
+| 36.1–46 kV | 8 ft 0 in (2438 mm) | 2 ft 10 in (864 mm) |
+| 46.1–72.5 kV | 8 ft 0 in (2438 mm) | 3 ft 4 in (1016 mm) |
+
+The restricted approach boundary includes the inadvertent-movement adder and assumes an elevation not exceeding 900 m (3000 ft). Above 72.5 kV, no approach distance is assigned.
+
+Label and report formatting:
+
+- **Voltages** print as exact kilovolts: 12,470 V is "12.47 kV", not a rounded "12.5 kV".
+- **Distances** round the total to 0.1 in before splitting into feet and inches, so a value just under a whole foot prints "3 ft", never "2 ft 12 in".
+- **Template values** that contain `$` (for example `PNL-$$1`) are inserted literally.
+- **CSV and PDF reports** put units in the column headers (`incidentEnergy (cal/cm²)`, `boundary (mm)`, `clearingTime (s)`, and so on). The CSV is written with a UTF-8 byte-order mark so Excel shows "cal/cm²" correctly.
+- **Scope:** when the page's scope selector names one location, the report and label drafts cover only that location.
 
 ## Implementation Notes
 

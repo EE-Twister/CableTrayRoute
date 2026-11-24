@@ -4,7 +4,7 @@
  * Covers:
  *   DRC-01 — Tray fill limit (NEC 392.22(A))
  *   DRC-02 — Voltage segregation (NEC 392.6(H))
- *   DRC-03 — Ampacity derating (NEC 310.15)
+ *   DRC-03 — Cable-in-tray ampacity adjustment (NEC 392.80(A)(1)(a); Table 310.15(C)(1))
  *   DRC-04 — Grounding conductor (NEC 250.122)
  *   DRC-05 — Unrouted cables
  *   DRC-06 — Structured cabling EMI segregation (TIA-568.0-D §4.5)
@@ -229,34 +229,120 @@ describe('DRC-02 Voltage Segregation', () => {
 // ---------------------------------------------------------------------------
 // DRC-03 — Ampacity
 // ---------------------------------------------------------------------------
-describe('DRC-03 Ampacity Derating', () => {
-  it('raises ERROR when design current exceeds derated ampacity', () => {
-    // 7 conductors → 80 % derating factor
-    // Baseline #4 AWG 75°C Cu = 85 A; 85 × 0.80 = 68 A
-    // Design current = 80 A → over derated limit
-    const cables = [makeCable('C1', { conductor_size: '#4 AWG', design_current: 80 })];
-    const tray1Cables = Array.from({ length: 2 }, (_, i) =>
-      ({ name: `X${i}`, cable_type: 'Power', conductors: 3 })
+describe('DRC-03 Ampacity (NEC 392.80(A)(1)(a))', () => {
+  const AMPACITY_REFERENCE = 'NEC 392.80(A)(1)(a); Table 310.15(C)(1)';
+
+  function runAmpacity(cables, trayId = 'T1') {
+    const { findings } = runDRC({
+      trays: [makeTray(trayId, 5)],
+      cables,
+      trayCableMap: { [trayId]: cables },
+    }, { skipGrounding: true, skipOcpdProtection: true, skipParallelCheck: true });
+    return findings.filter(f => f.ruleId === 'DRC-03');
+  }
+
+  it('raises ERROR when design current exceeds the adjusted ampacity of a 4/C cable', () => {
+    // 4 CCCs in the cable → factor 0.80; baseline #4 AWG 75°C Cu = 85 A → 68 A
+    const drc03 = runAmpacity([makeCable('C1', { conductors: 4, conductor_size: '#4 AWG', design_current: 80 })]);
+    const errors = drc03.filter(f => f.severity === DRC_SEVERITY.ERROR);
+    assert.strictEqual(errors.length, 1, `Expected one DRC-03 ERROR, got ${JSON.stringify(drc03)}`);
+    assert.ok(errors[0].message.includes('68.0 A'), errors[0].message);
+    assert.strictEqual(errors[0].reference, AMPACITY_REFERENCE);
+    assert.ok(!/separate tray|bundling/i.test(errors[0].remediation), errors[0].remediation);
+  });
+
+  it('applies no adjustment to five 3/C power cables sharing one tray', () => {
+    // 15 conductors in the tray, but each cable has only 3 CCCs → factor 1.0.
+    // 80 A on #4 AWG (85 A) passes; the old tray-wide count (0.50 → 42.5 A) would have failed.
+    const cables = Array.from({ length: 5 }, (_, i) =>
+      makeCable(`P${i + 1}`, { conductors: 3, conductor_size: '#4 AWG', design_current: 80 })
     );
-    const trayCableMap = {
-      // 3 conductors from cable C1 + 6 from tray1Cables = 9 → 0.70 factor
-      // Actually let's put 4 power cables × 3 conductors = 12 conductors → 0.50
-      T1: [
-        { name: 'C1', cable_type: 'Power', conductors: 3 },
-        { name: 'C2', cable_type: 'Power', conductors: 3 },
-        { name: 'C3', cable_type: 'Power', conductors: 3 },
-        { name: 'C4', cable_type: 'Power', conductors: 3 },
-      ],
-    };
-    const allCables = [
-      makeCable('C1', { conductor_size: '#4 AWG', design_current: 80 }),
-      makeCable('C2'), makeCable('C3'), makeCable('C4'),
+    const drc03 = runAmpacity(cables);
+    assert.strictEqual(drc03.length, 0, `Expected no DRC-03 findings, got ${JSON.stringify(drc03.map(f => f.message))}`);
+  });
+
+  it('reports factor 0.80 INFO for a 4/C cable based on its own CCC count, not the tray total', () => {
+    const cables = [
+      makeCable('C4W', { conductors: 4, conductor_size: '#4 AWG' }),
+      makeCable('P1', { conductors: 3 }),
+      makeCable('P2', { conductors: 3 }),
+      makeCable('P3', { conductors: 3 }),
     ];
-    const trays = [makeTray('T1', 5)];
-    const { findings } = runDRC({ trays, cables: allCables, trayCableMap });
-    // 12 conductors → factor 0.50; 85 × 0.50 = 42.5 A; design = 80 A → ERROR
-    const drc03errors = findings.filter(f => f.ruleId === 'DRC-03' && f.severity === DRC_SEVERITY.ERROR);
-    assert.ok(drc03errors.length > 0, 'Expected DRC-03 ERROR for ampacity exceedance');
+    const drc03 = runAmpacity(cables);
+    assert.strictEqual(drc03.length, 1, `Expected only the 4/C cable to be reported, got ${JSON.stringify(drc03.map(f => f.location))}`);
+    const [info] = drc03;
+    assert.strictEqual(info.severity, DRC_SEVERITY.INFO);
+    assert.strictEqual(info.location, 'C4W @ T1');
+    assert.ok(info.message.includes('4 current-carrying conductors in cable'), info.message);
+    assert.ok(info.message.includes('factor 0.8 ('), info.message);
+    assert.ok(info.message.includes('68.0 A'), info.message);
+    assert.ok(!/tray|13 current-carrying/i.test(info.message), `Message should not cite tray totals: ${info.message}`);
+    assert.strictEqual(info.reference, AMPACITY_REFERENCE);
+  });
+
+  it('uses the Table 310.15(C)(1) 0.35 factor for 41 or more CCCs in one cable', () => {
+    // 100 A rated × 0.35 = 35 A
+    const drc03 = runAmpacity([makeCable('MC45', { conductors: 45, ampacity: 100 })]);
+    assert.strictEqual(drc03.length, 1);
+    assert.ok(drc03[0].message.includes('factor 0.35 ('), drc03[0].message);
+    assert.ok(drc03[0].message.includes('35.0 A'), drc03[0].message);
+  });
+
+  it('uses the 0.40 factor for 31–40 CCCs in one cable', () => {
+    const drc03 = runAmpacity([makeCable('MC36', { conductors: 36, ampacity: 100 })]);
+    assert.strictEqual(drc03.length, 1);
+    assert.ok(drc03[0].message.includes('factor 0.4 ('), drc03[0].message);
+    assert.ok(drc03[0].message.includes('40.0 A'), drc03[0].message);
+  });
+
+  it('applies the per-cable factor to the aggregate ampacity of parallel 4/C cables', () => {
+    // 2 × 4/C 3/0 AWG (200 A each) → 400 A aggregate × 0.80 = 320 A.
+    // parallel_count does not raise the CCC count (8 CCCs would give 0.70).
+    const drc03 = runAmpacity([makeCable('PAR4', { conductors: 4, conductor_size: '3/0 AWG', parallel_count: 2 })]);
+    assert.strictEqual(drc03.length, 1, `Expected one DRC-03 INFO; findings: ${JSON.stringify(drc03)}`);
+    assert.strictEqual(drc03[0].severity, DRC_SEVERITY.INFO);
+    assert.ok(drc03[0].message.includes('factor 0.8 ('), drc03[0].message);
+    assert.ok(drc03[0].message.includes('2 × 200 A'), drc03[0].message);
+    assert.ok(drc03[0].message.includes('320.0 A'), drc03[0].message);
+  });
+
+  it('raises ERROR when the Cable Schedule est_load exceeds the adjusted ampacity', () => {
+    // est_load is the schedule's "Est Load (A)" column and is often stored as text.
+    const drc03 = runAmpacity([makeCable('C1', {
+      conductors: 4,
+      conductor_size: '#4 AWG',
+      design_current: '',
+      est_load: '75',
+    })]);
+    const errors = drc03.filter(f => f.severity === DRC_SEVERITY.ERROR);
+    assert.strictEqual(errors.length, 1, `Expected DRC-03 ERROR from est_load, got ${JSON.stringify(drc03)}`);
+    assert.ok(errors[0].message.includes('75 A'), errors[0].message);
+    assert.ok(errors[0].message.includes('68.0 A'), errors[0].message);
+  });
+
+  it('raises ERROR for an unadjusted 3/C cable whose est_load exceeds its ampacity', () => {
+    const drc03 = runAmpacity([makeCable('C1', { conductors: 3, conductor_size: '#4 AWG', est_load: 95 })]);
+    const errors = drc03.filter(f => f.severity === DRC_SEVERITY.ERROR);
+    assert.strictEqual(errors.length, 1);
+    assert.ok(errors[0].message.includes('85.0 A'), errors[0].message);
+    assert.ok(!errors[0].message.includes('adjustment'), errors[0].message);
+  });
+
+  it('still honors load_amps and design_current', () => {
+    const fromLoadAmps = runAmpacity([makeCable('LA', { conductors: 3, conductor_size: '#4 AWG', load_amps: 90 })]);
+    assert.strictEqual(fromLoadAmps.filter(f => f.severity === DRC_SEVERITY.ERROR).length, 1, 'Expected ERROR from load_amps');
+
+    const fromDesign = runAmpacity([makeCable('DC', { conductors: 3, conductor_size: '#4 AWG', design_current: 90 })]);
+    assert.strictEqual(fromDesign.filter(f => f.severity === DRC_SEVERITY.ERROR).length, 1, 'Expected ERROR from design_current');
+
+    // design_current takes priority over est_load when both are set.
+    const prioritized = runAmpacity([makeCable('PR', {
+      conductors: 3,
+      conductor_size: '#4 AWG',
+      design_current: 50,
+      est_load: 200,
+    })]);
+    assert.strictEqual(prioritized.length, 0, `design_current should take priority: ${JSON.stringify(prioritized)}`);
   });
 
   it('can be skipped via skipAmpacity option', () => {

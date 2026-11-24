@@ -350,7 +350,7 @@ export function renderCatalogQuality(container, products, options = {}) {
   counts.textContent = summary.total === 0
     ? 'No catalog rows in view.'
     : `${summary.total} row(s) · ${summary.approved} approved · `
-      + `${summary.byEvidenceStatus.source_verified || 0} source verified Â· `
+      + `${summary.byEvidenceStatus.source_verified || 0} source verified · `
       + `${summary.byConfidence.complete} complete, ${summary.byConfidence.review} review, `
       + `${summary.byConfidence.incomplete} incomplete · average evidence score ${summary.averageScore}%`;
   container.appendChild(counts);
@@ -416,7 +416,7 @@ const ADD_FORM_FIELDS = `
     <legend>Heat trace selection (heat_trace only)</legend>
     <label class="catalog-filter-label">Type
       <select class="catalog-filter-select" name="heat_trace_type">
-        <option value="">â€”</option>
+        <option value="">—</option>
         <option value="selfRegulating">Self-regulating</option>
         <option value="constantWattage">Constant wattage</option>
         <option value="mineralInsulated">Mineral insulated</option>
@@ -445,7 +445,7 @@ const ADD_FORM_FIELDS = `
     <legend>Protective-device curve (protective_device only)</legend>
     <label class="catalog-filter-label">Device type
       <select class="catalog-filter-select" name="protective_device_type">
-        <option value="">â€”</option>
+        <option value="">—</option>
         <option value="breaker">Breaker</option>
         <option value="fuse">Fuse</option>
         <option value="relay">Relay</option>

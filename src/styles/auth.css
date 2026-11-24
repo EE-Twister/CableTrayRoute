@@ -278,7 +278,7 @@ body.dark-mode .auth-note {
 }
 
 .auth-note a {
-    color: var(--primary-color);
+    color: var(--color-heading-accent, var(--primary-color));
     font-weight: 600;
     text-decoration: none;
 }

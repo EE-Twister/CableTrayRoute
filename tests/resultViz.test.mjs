@@ -28,6 +28,14 @@ assert.strictEqual(scRows[0].status, 'warn');
 assert.match(scRows[0].note, /50 kA/);
 
 assert.strictEqual(arcFlashBarRows([['x', { incidentEnergy: 12, boundary: 900 }]])[0].status, 'warn');
+// A stale or input-incomplete location never shows a pass/review/fail verdict.
+const notReady = arcFlashBarRows(
+  [['x', { incidentEnergy: 3.8, boundary: 1067 }], ['y', { incidentEnergy: 0.9, boundary: 350 }]],
+  { readiness: id => (id === 'x' ? { ready: false, reason: 'Saved result is stale' } : { ready: true }) }
+);
+assert.strictEqual(notReady[0].status, 'na');
+assert.match(notReady[0].note, /stale/);
+assert.strictEqual(notReady[1].status, 'pass');
 
 const vd = voltageDropBarRows([
   { tag: 'C1', evaluated: true, dropPct: 2, limitPct: 3, status: 'pass' },
@@ -45,6 +53,7 @@ assert.ok(statusBadgeHtml('bogus').includes('viz-badge--na'));
 console.log('resultViz tests passed');
 
 import { cableSummaryHtml, summarizeCables, racewaySummaryHtml } from '../src/components/scheduleSummary.mjs';
+import { getCableReadiness, getStepStatus } from '../src/workflowStatus.js';
 const sum = summarizeCables([
   { length: '100', operating_voltage: '480' },
   { length: '', operating_voltage: '13800' },
@@ -52,11 +61,45 @@ const sum = summarizeCables([
 ]);
 assert.strictEqual(sum.count, 3);
 assert.strictEqual(sum.totalLength, 150);
-assert.strictEqual(sum.missing, 2);
+assert.strictEqual(sum.missingVoltage, 1);
 assert.strictEqual(sum.voltageMix['Medium voltage'], 1);
+assert.strictEqual(sum.voltageMix.Unspecified, 1);
 assert.strictEqual(cableSummaryHtml([]), '');
 assert.ok(cableSummaryHtml([{ length: 1, operating_voltage: 480 }]).includes('viz-kpi'));
 assert.strictEqual(racewaySummaryHtml({}), '');
+
+// The strip's schedule-ready count is the workflow step header's count, and
+// operating voltage is reported separately rather than as a routing blocker.
+const kpiText = html => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+const readyNoVoltage = Array.from({ length: 3 }, (_, i) => ({ tag: `C-${i}`, from: 'MCC-1', to: `M-${i}`, conductor_size: '#10 AWG', length: 100 }));
+const mixed = [...readyNoVoltage, { tag: 'C-9', from: 'MCC-1', conductor_size: '#10 AWG', length: 40, operating_voltage: 480 }, {}];
+{
+  const summary = summarizeCables(mixed);
+  const readiness = getCableReadiness(mixed);
+  assert.strictEqual(summary.scheduleReady, readiness.scheduleReady);
+  assert.strictEqual(summary.scheduleTotal, readiness.total);
+  assert.strictEqual(summary.scheduleReady, 3);
+  assert.strictEqual(summary.scheduleTotal, 4, 'blank rows are ignored, as in the step header');
+  assert.strictEqual(summary.missingVoltage, 4);
+  const text = kpiText(cableSummaryHtml(mixed));
+  assert.match(text, /3 of 4 Schedule-ready Needs tag, from\/to, conductor size, and length/);
+  assert.match(text, /4 Missing operating voltage Needed for sizing and voltage-drop checks/);
+  assert.doesNotMatch(text, /before routing|Missing length or voltage/);
+}
+{
+  const text = kpiText(cableSummaryHtml(readyNoVoltage));
+  assert.match(getStepStatus('cableSchedule', { cables: readyNoVoltage }).label, /^3 schedule-ready/);
+  assert.match(text, /3 of 3 Schedule-ready/);
+  assert.match(text, /3 Missing operating voltage/);
+  assert.ok(cableSummaryHtml(readyNoVoltage).includes('viz-kpi viz-kpi--pass'), 'complete rows show a pass readiness card');
+}
+{
+  const complete = readyNoVoltage.map(cable => ({ ...cable, operating_voltage: 480 }));
+  const html = cableSummaryHtml(complete);
+  assert.match(kpiText(html), /3 Cables Low voltage 3 300 ft Total length 3 of 3 Schedule-ready 0 Missing operating voltage$/);
+  assert.ok(!html.includes('viz-kpi--warn'));
+  assert.strictEqual(summarizeCables([{ operating_voltage: 0 }]).missingVoltage, 1, 'zero is not a usable operating voltage');
+}
 console.log('scheduleSummary tests passed');
 
 import { loadFlowVoltageRows } from '../src/components/resultViz.mjs';

@@ -135,6 +135,24 @@ class ContextMenu {
   }
 }
 
+
+/**
+ * Spreadsheet cell for a table value. Zero and false are real values and must
+ * survive export (a tray starting at x = 0 is not a blank coordinate); arrays
+ * such as raceway_ids are written as a comma-separated list.
+ */
+export function tableExportCell(value) {
+  if (value === null || value === undefined) return '';
+  if (Array.isArray(value)) return value.join(', ');
+  if (typeof value === 'object') return JSON.stringify(value);
+  return value;
+}
+
+/** Table value for an imported spreadsheet cell; keeps 0 instead of blanking it. */
+export function tableImportCell(value) {
+  return value === null || value === undefined ? '' : value;
+}
+
 class TableManager {
   constructor(opts) {
     this.table = document.getElementById(opts.tableId);
@@ -2034,7 +2052,7 @@ class TableManager {
   exportXlsx() {
     const data = [this.columns.map(c=>c.label)];
     this.getData().forEach(row => {
-      data.push(this.columns.map(c => row[c.key] || ''));
+      data.push(this.columns.map(c => tableExportCell(row[c.key])));
     });
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(data);
@@ -2053,7 +2071,7 @@ class TableManager {
       this.rowRecords.clear();
       json.forEach(obj => {
         const row = {};
-        this.columns.forEach(col => row[col.key] = obj[col.label] || '');
+        this.columns.forEach(col => row[col.key] = tableImportCell(obj[col.label]));
         this.addRow(row);
       });
       this.applyFilters();

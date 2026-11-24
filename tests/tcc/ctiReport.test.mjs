@@ -4,7 +4,11 @@
  */
 
 import assert from 'assert';
+import { readFile } from 'fs/promises';
+import { scaleCurve } from '../../analysis/tccUtils.js';
 import { buildCTIRows, CTI_HEADERS } from '../../reports/coordinationReport.mjs';
+
+const library = JSON.parse(await readFile(new URL('../../data/protectiveDevices.json', import.meta.url), 'utf8'));
 
 function describe(name, fn) { console.log(name); fn(); }
 function it(name, fn) {
@@ -196,6 +200,84 @@ describe('buildCTIRows — FAIL rows when upstream is too fast', () => {
     assert.strictEqual(rows.length, 5);
     rows.forEach(row => {
       assert.strictEqual(row['Pass/Fail'], 'FAIL', `expected FAIL, got ${row['Pass/Fail']}`);
+    });
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+describe('buildCTIRows — devices below pickup do not trip', () => {
+  // Upstream curve starts at 1200 A, so it does not operate for a 1000 A fault.
+  const highPickupUpstream = makeCurve(1200, 20000, 30, 0.5);
+  const noTripResult = {
+    allCoordinated: false,
+    results: [
+      { id: 'CB-LOAD', scaledResult: makeScaledResult(downCurve), timeDial: 1, found: true, violations: [] },
+      { id: 'CB-SOURCE', scaledResult: makeScaledResult(highPickupUpstream), timeDial: 1, found: true, violations: [] }
+    ]
+  };
+  const rows = buildCTIRows(deviceEntries2, noTripResult, 1000, margin);
+  const byCurrent = Object.fromEntries(rows.map(row => [row['Test Current (A)'], row]));
+
+  it('prints "No trip" for the upstream device below its minimum curve current', () => {
+    assert.strictEqual(rows.length, 5);
+    rows.forEach(row => {
+      assert.strictEqual(row['Upstream Time (s)'], 'No trip', `expected No trip at ${row['Test Current (A)']} A`);
+      assert.notStrictEqual(row['Upstream Time (s)'], '30.0000');
+    });
+  });
+
+  it('reports PASS without a fictitious margin when only the upstream device does not operate', () => {
+    const row = byCurrent['1000.0'];
+    // Downstream 100 A/2 s → 10 kA/0.1 s; 1000 A is the log midpoint: sqrt(2 × 0.1) s.
+    assert.strictEqual(row['Downstream Time (s)'], Math.sqrt(0.2).toFixed(4));
+    assert.strictEqual(row['Margin (s)'], 'N/A');
+    assert.strictEqual(row['Pass/Fail'], 'PASS (upstream does not operate)');
+    assert.strictEqual(byCurrent['100.0']['Pass/Fail'], 'PASS (upstream does not operate)');
+  });
+
+  it('reports NOT EVALUATED when the downstream device does not operate', () => {
+    const row = byCurrent['50.0'];
+    assert.strictEqual(row['Downstream Time (s)'], 'No trip');
+    assert.strictEqual(row['Margin (s)'], 'N/A');
+    assert.strictEqual(row['Pass/Fail'], 'NOT EVALUATED (downstream does not operate)');
+  });
+
+  it('reports NOT EVALUATED above a curve maximum current instead of holding the last time', () => {
+    const shortDownstream = makeCurve(100, 5000, 2, 0.2);
+    const aboveResult = {
+      allCoordinated: false,
+      results: [
+        { id: 'CB-LOAD', scaledResult: makeScaledResult(shortDownstream), timeDial: 1, found: true, violations: [] },
+        { id: 'CB-SOURCE', scaledResult: makeScaledResult(upCurve), timeDial: 1, found: true, violations: [] }
+      ]
+    };
+    const aboveRows = buildCTIRows(deviceEntries2, aboveResult, 8000, margin);
+    const top = aboveRows.find(row => row['Test Current (A)'] === '8000.0');
+    assert.strictEqual(top['Downstream Time (s)'], 'Above curve range');
+    assert.strictEqual(top['Margin (s)'], 'N/A');
+    assert.strictEqual(top['Pass/Fail'], 'NOT EVALUATED (outside curve data)');
+    const inRange = aboveRows.find(row => row['Test Current (A)'] === '2000.0');
+    assert.match(inRange['Pass/Fail'], /^(PASS|FAIL)$/);
+  });
+
+  it('keeps an instantaneous element operating above its plotted ceiling', () => {
+    const breaker = scaleCurve(library.find(d => d.id === 'abb_tmax_160'), { pickup: 100 });
+    const relay = scaleCurve(library.find(d => d.id === 'ge_multilin_750'), { pickup: 600 });
+    const instRows = buildCTIRows(deviceEntries2, {
+      allCoordinated: false,
+      results: [
+        { id: 'CB-LOAD', scaledResult: breaker, timeDial: 1, found: true, violations: [] },
+        { id: 'CB-SOURCE', scaledResult: relay, timeDial: 1, found: true, violations: [] }
+      ]
+    }, 10000, margin);
+    const top = instRows.find(row => row['Test Current (A)'] === '10000.0');
+    // The relay curve is plotted only to 10 x its 600 A instantaneous pickup.
+    assert.strictEqual(top['Upstream Time (s)'], '0.0075');
+    assert.strictEqual(top['Downstream Time (s)'], '0.0125');
+    assert.strictEqual(top['Pass/Fail'], 'FAIL');
+    instRows.forEach(row => {
+      assert.notStrictEqual(row['Upstream Time (s)'], '0.0001');
+      assert.notStrictEqual(row['Downstream Time (s)'], '0.0001');
     });
   });
 });

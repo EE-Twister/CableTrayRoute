@@ -342,7 +342,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Planning
-- Source files: `ampacity.mjs`, `analysis/arcFlash.mjs`, `analysis/ctMetadata.mjs`, `analysis/designSynthesisMotorReadiness.mjs`, `analysis/harmonicNetwork.mjs`, `analysis/harmonics.js`, `analysis/ibrModeling.mjs`, `analysis/idealCableTieContraction.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/ieee1584.mjs`, `analysis/liveTagAdapter.mjs`, `analysis/loadFlow.js`, `analysis/loadFlowModel.js`, `analysis/loadFlowResultsRenderer.js`, `analysis/motorStart.js`, `analysis/motorStartCalc.mjs`, `analysis/motorStartProjectInputs.mjs`, `analysis/protectiveDeviceLibrary.mjs`, `analysis/ptVtMetadata.mjs`, `analysis/reliability.js`, `analysis/resultContract.mjs`, `analysis/scheduleReconcile.mjs`, `analysis/shortCircuit.mjs`, `analysis/studyExportMetadata.mjs`, `analysis/studyLifecycle.mjs`, `analysis/studyResultContext.mjs`, `analysis/studyResultReadiness.mjs`, `analysis/tccUtils.js`, `analysis/timeCurrentCurve.mjs`, `analysis/transformerTapOptimization.mjs`, `codes/iecTables.js`, `codes/necTables.js`, `componentLibrary.json`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `exporters/dxf.js`, `exporters/pdf.js`, `exporters/simpleDxf.js`, `oneline.js`, `reports/arcFlashReport.mjs`, `reports/exportAll.mjs`, `reports/labels.mjs`, `reports/reporting.mjs`, `sizing.js`, `src/components/projectInputBinding.js`, `src/components/resultViz.mjs`, `src/crossProbe.js`, `src/design-synthesis/deviceEvidence.mjs`, `src/design-synthesis/preliminaryProjectNotice.mjs`, `src/harmonicNetwork.lazy.js`, `src/lifecycle/pageBootstrap.js`, `src/necTable9.mjs`, `src/one-line/builtInComponentCatalog.mjs`, `src/one-line/componentAttributes.mjs`, `src/one-line/componentElectricalSchema.mjs`, `src/one-line/componentGeometry.mjs`, `src/one-line/componentNodeRenderController.mjs`, `src/one-line/componentPropertyModel.mjs`, `src/one-line/connectionLabelLayout.mjs`, `src/one-line/connectionProtection.mjs`, `src/one-line/connectionRenderController.mjs`, `src/one-line/connectionRouting.mjs`, `src/one-line/datablockLayout.mjs`, `src/one-line/deferredStartup.js`, `src/one-line/diagramFileController.mjs`, `src/one-line/diagramModel.mjs`, `src/one-line/eventBindingController.mjs`, `src/one-line/harmonicProfiles.mjs`, `src/one-line/historyController.mjs`, `src/one-line/liveTelemetryViewController.mjs`, `src/one-line/paletteController.mjs`, `src/one-line/propertyClipboardModel.mjs`, `src/one-line/propertyDetailView.mjs`, `src/one-line/propertyEditorController.mjs`, `src/one-line/propertyEditorModel.mjs`, `src/one-line/propertySectionModel.mjs`, `src/one-line/protectionZonePanel.mjs`, `src/one-line/protectionZones.mjs`, `src/one-line/protectiveDeviceCompatibility.mjs`, `src/one-line/renderPerformance.js`, `src/one-line/scheduleCollectionCache.js`, `src/one-line/sheetLinks.mjs`, `src/one-line/sheetPersistenceController.mjs`, `src/one-line/studyExecutionController.mjs`, `src/one-line/studyInputModel.mjs`, `src/one-line/studyPanelController.mjs`, `src/one-line/transformerTapReviewGuard.mjs`, `src/one-line/validation.js`, `src/one-line/virtualNodePropertyView.mjs`, `src/one-line/voltageModel.mjs`, `src/performance/performanceMetrics.js`, `src/projectManagerEntry.js`, `src/protectiveDevices/calculationCatalog.mjs`, `src/protectiveDevices/catalogLoader.mjs`, `src/voltageDrop.js`, `src/workers/createWorkerClient.js`, `src/workers/oneLineNormalization.mjs`, `src/workers/onelineClient.js`, `studies/arcFlashReadiness.mjs`, `utils/cableImpedance.js`, `utils/cablePhases.js`, `utils/componentLabels.js`, `utils/csv.mjs`, `utils/designSynthesisDeviceEvidenceCodec.mjs`, `utils/evidenceBinaryCodec.mjs`, `utils/transformerImpedance.js`, `utils/transformerProperties.js`, `utils/voltage.js`, `validation/rules.js`
+- Source files: `ampacity.mjs`, `analysis/arcFlash.mjs`, `analysis/arcFlashResultUnits.mjs`, `analysis/ctMetadata.mjs`, `analysis/designSynthesisMotorReadiness.mjs`, `analysis/harmonicNetwork.mjs`, `analysis/harmonics.js`, `analysis/ibrModeling.mjs`, `analysis/idealCableTieContraction.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/ieee1584.mjs`, `analysis/liveTagAdapter.mjs`, `analysis/loadFlow.js`, `analysis/loadFlowModel.js`, `analysis/loadFlowResultsRenderer.js`, `analysis/motorStart.js`, `analysis/motorStartCalc.mjs`, `analysis/motorStartProjectInputs.mjs`, `analysis/protectiveDeviceLibrary.mjs`, `analysis/ptVtMetadata.mjs`, `analysis/reliability.js`, `analysis/resultContract.mjs`, `analysis/scheduleReconcile.mjs`, `analysis/shortCircuit.mjs`, `analysis/studyExportMetadata.mjs`, `analysis/studyLifecycle.mjs`, `analysis/studyResultContext.mjs`, `analysis/studyResultReadiness.mjs`, `analysis/tccUtils.js`, `analysis/timeCurrentCurve.mjs`, `analysis/transformerTapOptimization.mjs`, `codes/iecTables.js`, `codes/necTables.js`, `componentLibrary.json`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `exporters/dxf.js`, `exporters/pdf.js`, `exporters/simpleDxf.js`, `oneline.js`, `reports/arcFlashReport.mjs`, `reports/exportAll.mjs`, `reports/labels.mjs`, `reports/reporting.mjs`, `sizing.js`, `src/components/projectInputBinding.js`, `src/components/resultViz.mjs`, `src/crossProbe.js`, `src/design-synthesis/deviceEvidence.mjs`, `src/design-synthesis/preliminaryProjectNotice.mjs`, `src/harmonicNetwork.lazy.js`, `src/lifecycle/pageBootstrap.js`, `src/necTable9.mjs`, `src/one-line/builtInComponentCatalog.mjs`, `src/one-line/componentAttributes.mjs`, `src/one-line/componentElectricalSchema.mjs`, `src/one-line/componentGeometry.mjs`, `src/one-line/componentNodeRenderController.mjs`, `src/one-line/componentPropertyModel.mjs`, `src/one-line/connectionLabelLayout.mjs`, `src/one-line/connectionProtection.mjs`, `src/one-line/connectionRenderController.mjs`, `src/one-line/connectionRouting.mjs`, `src/one-line/datablockLayout.mjs`, `src/one-line/deferredStartup.js`, `src/one-line/diagramFileController.mjs`, `src/one-line/diagramModel.mjs`, `src/one-line/eventBindingController.mjs`, `src/one-line/harmonicProfiles.mjs`, `src/one-line/historyController.mjs`, `src/one-line/liveTelemetryViewController.mjs`, `src/one-line/paletteController.mjs`, `src/one-line/propertyClipboardModel.mjs`, `src/one-line/propertyDetailView.mjs`, `src/one-line/propertyEditorController.mjs`, `src/one-line/propertyEditorModel.mjs`, `src/one-line/propertySectionModel.mjs`, `src/one-line/protectionZonePanel.mjs`, `src/one-line/protectionZones.mjs`, `src/one-line/protectiveDeviceCompatibility.mjs`, `src/one-line/renderPerformance.js`, `src/one-line/scheduleCollectionCache.js`, `src/one-line/sheetLinks.mjs`, `src/one-line/sheetPersistenceController.mjs`, `src/one-line/studyExecutionController.mjs`, `src/one-line/studyInputModel.mjs`, `src/one-line/studyPanelController.mjs`, `src/one-line/transformerTapReviewGuard.mjs`, `src/one-line/validation.js`, `src/one-line/virtualNodePropertyView.mjs`, `src/one-line/voltageModel.mjs`, `src/performance/performanceMetrics.js`, `src/projectManagerEntry.js`, `src/protectiveDevices/calculationCatalog.mjs`, `src/protectiveDevices/catalogLoader.mjs`, `src/voltageDrop.js`, `src/workers/createWorkerClient.js`, `src/workers/oneLineNormalization.mjs`, `src/workers/onelineClient.js`, `studies/arcFlashReadiness.mjs`, `utils/cableImpedance.js`, `utils/cablePhases.js`, `utils/componentLabels.js`, `utils/csv.mjs`, `utils/designSynthesisDeviceEvidenceCodec.mjs`, `utils/evidenceBinaryCodec.mjs`, `utils/transformerImpedance.js`, `utils/transformerProperties.js`, `utils/voltage.js`, `validation/rules.js`
 
 **Undocumented Reads**
 - None
@@ -360,65 +360,65 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - None
 
 **Direct Browser Storage**
-- oneline.js:2038 sessionStorage.setItem(<dynamic>) - session-handoff: Temporary custom component editor prefill; not durable project state.
+- oneline.js:2039 sessionStorage.setItem(<dynamic>) - session-handoff: Temporary custom component editor prefill; not durable project state.
 
 **Detected Reads**
 - `cableSchedule`
   - analysis/shortCircuit.mjs:1296 getCables()
-  - oneline.js:10839 getCables()
-  - oneline.js:12287 getCables()
-  - oneline.js:12462 getCables()
-  - oneline.js:3346 getCables()
+  - oneline.js:10840 getCables()
+  - oneline.js:12288 getCables()
+  - oneline.js:12463 getCables()
+  - oneline.js:3347 getCables()
   - ... 6 more
 - `equipment`
   - analysis/motorStart.js:54 getEquipment()
-  - oneline.js:12287 getEquipment()
-  - oneline.js:12459 getEquipment()
-  - oneline.js:7940 getEquipment()
-  - reports/exportAll.mjs:330 getEquipment()
+  - oneline.js:12288 getEquipment()
+  - oneline.js:12460 getEquipment()
+  - oneline.js:7941 getEquipment()
+  - reports/exportAll.mjs:442 getEquipment()
   - ... 2 more
 - `loadList`
   - analysis/motorStart.js:55 getLoads()
-  - oneline.js:12287 getLoads()
-  - oneline.js:12461 getLoads()
-  - oneline.js:7941 getLoads()
+  - oneline.js:12288 getLoads()
+  - oneline.js:12462 getLoads()
+  - oneline.js:7942 getLoads()
   - src/design-synthesis/preliminaryProjectNotice.mjs:11 getLoads()
   - ... 1 more
 - `oneLineDiagram`
-  - analysis/arcFlash.mjs:460 getOneLine()
+  - analysis/arcFlash.mjs:467 getOneLine()
   - analysis/harmonicNetwork.mjs:264 getOneLine()
   - analysis/harmonics.js:226 getOneLine()
   - analysis/harmonics.js:300 getOneLine()
   - analysis/harmonics.js:532 getOneLine()
   - ... 20 more
 - `panelSchedule`
-  - oneline.js:12287 getPanels()
-  - oneline.js:12460 getPanels()
-  - reports/exportAll.mjs:331 getPanels()
+  - oneline.js:12288 getPanels()
+  - oneline.js:12461 getPanels()
+  - reports/exportAll.mjs:443 getPanels()
   - src/one-line/propertyDetailView.mjs:597 getPanels()
 - `settings.activeSampleWorkflow`
   - src/one-line/eventBindingController.mjs:2143 getItem(activeSampleWorkflow)
 - `settings.designSynthesisDeviceEvidence`
-  - oneline.js:5058 getItem(designSynthesisDeviceEvidence)
+  - oneline.js:5059 getItem(designSynthesisDeviceEvidence)
 - `settings.designSynthesisReviewDraft`
   - src/design-synthesis/preliminaryProjectNotice.mjs:8 getItem(designSynthesisReviewDraft)
 - `settings.diagramDatablockConfig`
   - src/one-line/eventBindingController.mjs:2131 getItem(diagramDatablockConfig)
 - `settings.diagramScale`
-  - oneline.js:2221 getItem(diagramScale)
+  - oneline.js:2222 getItem(diagramScale)
 - `settings.diagramTitleBlock`
   - src/one-line/eventBindingController.mjs:2078 getItem(diagramTitleBlock)
 - `settings.labelCounters`
-  - oneline.js:4525 getItem(labelCounters)
+  - oneline.js:4526 getItem(labelCounters)
   - src/one-line/eventBindingController.mjs:329 getItem(labelCounters)
 - `settings.labelPrefixes`
-  - oneline.js:4524 getItem(labelPrefixes)
+  - oneline.js:4525 getItem(labelPrefixes)
 - `settings.liveTelemetryConfig`
-  - oneline.js:2303 getItem(liveTelemetryConfig)
+  - oneline.js:2304 getItem(liveTelemetryConfig)
 - `settings.manufacturerDefaults`
-  - oneline.js:1944 getItem(manufacturerDefaults)
+  - oneline.js:1945 getItem(manufacturerDefaults)
 - `settings.onelineTemplates`
-  - oneline.js:5503 migrateLegacyItem(..., onelineTemplates)
+  - oneline.js:5504 migrateLegacyItem(..., onelineTemplates)
 - `settings.studyProvenance`
   - analysis/harmonics.js:531 captureStudyRunContext()
   - analysis/harmonics.js:536 captureStudyRunContext()
@@ -427,20 +427,20 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - analysis/motorStart.js:285 getStudyAssessments()
   - ... 19 more
 - `settings.studySettings`
-  - oneline.js:2266 getItem(studySettings)
+  - oneline.js:2267 getItem(studySettings)
 - `settings.tccSettings`
-  - analysis/arcFlash.mjs:364 getItem(tccSettings)
+  - analysis/arcFlash.mjs:371 getItem(tccSettings)
   - analysis/shortCircuit.mjs:824 getItem(tccSettings)
-  - oneline.js:4113 getItem(tccSettings)
+  - oneline.js:4114 getItem(tccSettings)
 - `studyResults`
   - analysis/motorStart.js:285 getStudyAssessments()
   - analysis/motorStart.js:56 getStudies()
-  - oneline.js:12016 getStudyAssessments()
-  - oneline.js:12017 getStudies()
-  - oneline.js:2520 getStudies()
+  - oneline.js:12017 getStudyAssessments()
+  - oneline.js:12018 getStudies()
+  - oneline.js:2521 getStudies()
   - ... 16 more
 - `studyResults.arcFlash`
-  - reports/exportAll.mjs:335 getStudies().arcFlash
+  - reports/exportAll.mjs:447 getStudies().arcFlash
 - `studyResults.duty`
   - validation/rules.js:703 studies.duty
   - validation/rules.js:703 studies?.duty
@@ -453,49 +453,49 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - validation/rules.js:715 studies?.reliability
   - validation/rules.js:728 studies?.reliability
 - `studyResults.transformerTapOptimization`
-  - oneline.js:2558 getStudies().transformerTapOptimization
+  - oneline.js:2559 getStudies().transformerTapOptimization
 
 **Detected Writes**
 - `cableSchedule`
-  - oneline.js:12478 setCables()
-  - oneline.js:3247 setCables()
-  - oneline.js:3356 setCables()
+  - oneline.js:12479 setCables()
+  - oneline.js:3248 setCables()
+  - oneline.js:3357 setCables()
 - `conduitSchedule`
-  - oneline.js:7849 addRaceway()
-  - oneline.js:8436 addRaceway()
+  - oneline.js:7850 addRaceway()
+  - oneline.js:8437 addRaceway()
 - `equipment`
-  - oneline.js:12475 setEquipment()
-  - oneline.js:3249 setEquipment()
+  - oneline.js:12476 setEquipment()
+  - oneline.js:3250 setEquipment()
 - `loadList`
-  - oneline.js:12477 setLoads()
-  - oneline.js:3243 setLoads()
+  - oneline.js:12478 setLoads()
+  - oneline.js:3244 setLoads()
 - `oneLineDiagram`
-  - oneline.js:4327 setOneLine()
+  - oneline.js:4328 setOneLine()
 - `panelSchedule`
-  - oneline.js:12476 setPanels()
-  - oneline.js:3245 setPanels()
+  - oneline.js:12477 setPanels()
+  - oneline.js:3246 setPanels()
 - `settings.activeSampleWorkflow`
   - src/one-line/eventBindingController.mjs:2150 setItem(activeSampleWorkflow)
 - `settings.diagramDatablockConfig`
-  - oneline.js:9992 setItem(diagramDatablockConfig)
+  - oneline.js:9993 setItem(diagramDatablockConfig)
 - `settings.diagramScale`
-  - oneline.js:10063 setItem(diagramScale)
-  - oneline.js:12625 setItem(diagramScale)
+  - oneline.js:10064 setItem(diagramScale)
+  - oneline.js:12626 setItem(diagramScale)
 - `settings.diagramTitleBlock`
   - src/one-line/eventBindingController.mjs:2113 setItem(diagramTitleBlock)
 - `settings.labelCounters`
-  - oneline.js:4534 setItem(labelCounters)
+  - oneline.js:4535 setItem(labelCounters)
 - `settings.labelPrefixes`
-  - oneline.js:4654 setItem(labelPrefixes)
+  - oneline.js:4655 setItem(labelPrefixes)
 - `settings.liveTelemetryConfig`
-  - oneline.js:2463 setItem(liveTelemetryConfig)
+  - oneline.js:2464 setItem(liveTelemetryConfig)
 - `settings.manufacturerDefaults`
-  - oneline.js:4723 setItem(manufacturerDefaults)
+  - oneline.js:4724 setItem(manufacturerDefaults)
 - `settings.oneLineScheduleReconcilePending`
-  - oneline.js:12295 setItem(oneLineScheduleReconcilePending)
+  - oneline.js:12296 setItem(oneLineScheduleReconcilePending)
 - `settings.onelineTemplates`
-  - oneline.js:5503 migrateLegacyItem(..., onelineTemplates)
-  - oneline.js:5511 setItem(onelineTemplates)
+  - oneline.js:5504 migrateLegacyItem(..., onelineTemplates)
+  - oneline.js:5512 setItem(onelineTemplates)
 - `settings.scenarios`
   - src/one-line/diagramFileController.mjs:151 switchScenario()
 - `settings.studyProvenance`
@@ -503,21 +503,21 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - analysis/harmonics.js:547 saveStudyResult()
   - analysis/harmonics.js:579 saveStudyResult()
   - analysis/motorStart.js:271 saveStudyResult()
-  - oneline.js:4367 saveStudyResult()
+  - oneline.js:4368 saveStudyResult()
 - `settings.studySettings`
-  - oneline.js:2578 setItem(studySettings)
+  - oneline.js:2579 setItem(studySettings)
 - `studyResults`
   - analysis/harmonics.js:546 saveStudyResult()
   - analysis/harmonics.js:547 saveStudyResult()
   - analysis/harmonics.js:579 saveStudyResult()
   - analysis/motorStart.js:271 saveStudyResult()
-  - oneline.js:4338 setStudies()
+  - oneline.js:4339 setStudies()
   - ... 1 more
 - `studyResults.duty`
   - validation/rules.js:703 studies.duty
 - `traySchedule`
-  - oneline.js:7849 addRaceway()
-  - oneline.js:8436 addRaceway()
+  - oneline.js:7850 addRaceway()
+  - oneline.js:8437 addRaceway()
 
 ### Demand Schedule (`demandschedule.html`)
 
@@ -561,7 +561,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Cable
-- Source files: `ampacity.mjs`, `analysis/cableLibrary.mjs`, `analysis/conduitFill.mjs`, `analysis/designSynthesisMotorReadiness.mjs`, `analysis/resultContract.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/studyResultReadiness.mjs`, `analysis/trayFill.mjs`, `cableschedule.js`, `codes/iecTables.js`, `codes/necTables.js`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `sizing.js`, `src/cable-schedule/io.js`, `src/cable-schedule/optionModel.js`, `src/cable-schedule/printReport.js`, `src/cable-schedule/scheduleConfig.js`, `src/cable-schedule/sizingHighlight.js`, `src/cable-schedule/tagModel.js`, `src/cable-schedule/templateModel.js`, `src/cableschedule.js`, `src/components/cableScheduleLinksBoot.js`, `src/components/crossHighlight.mjs`, `src/components/crossHighlightMount.js`, `src/components/importedOption.js`, `src/components/projectDeletionReview.js`, `src/components/resultViz.mjs`, `src/components/scheduleSummary.mjs`, `src/components/scheduleSummaryMount.js`, `src/crossProbe.js`, `src/design-synthesis/preliminaryProjectNotice.mjs`, `src/lifecycle/pageBootstrap.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/projectManagerEntry.js`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/cablePhases.js`
+- Source files: `ampacity.mjs`, `analysis/cableLibrary.mjs`, `analysis/conduitFill.mjs`, `analysis/designSynthesisMotorReadiness.mjs`, `analysis/resultContract.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/studyResultReadiness.mjs`, `analysis/trayFill.mjs`, `cableschedule.js`, `codes/iecTables.js`, `codes/necTables.js`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `sizing.js`, `src/cable-schedule/io.js`, `src/cable-schedule/optionModel.js`, `src/cable-schedule/printReport.js`, `src/cable-schedule/scheduleConfig.js`, `src/cable-schedule/sizingHighlight.js`, `src/cable-schedule/tagModel.js`, `src/cable-schedule/templateModel.js`, `src/cable-schedule/toolbarMenus.js`, `src/cableschedule.js`, `src/components/cableScheduleLinksBoot.js`, `src/components/crossHighlight.mjs`, `src/components/crossHighlightMount.js`, `src/components/importedOption.js`, `src/components/projectDeletionReview.js`, `src/components/resultViz.mjs`, `src/components/scheduleSummary.mjs`, `src/components/scheduleSummaryMount.js`, `src/crossProbe.js`, `src/design-synthesis/preliminaryProjectNotice.mjs`, `src/lifecycle/pageBootstrap.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/projectManagerEntry.js`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/cablePhases.js`
 
 **Undocumented Reads**
 - None
@@ -583,21 +583,21 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - cableschedule.js:1874 getCables()
+  - cableschedule.js:1875 getCables()
   - src/components/scheduleSummaryMount.js:16 getCables()
   - src/components/scheduleSummaryMount.js:21 getCables()
   - src/design-synthesis/preliminaryProjectNotice.mjs:12 getCables()
 - `conduitSchedule`
-  - cableschedule.js:108 getConduits()
+  - cableschedule.js:109 getConduits()
   - src/components/scheduleSummaryMount.js:19 getConduits()
 - `ductbankSchedule`
-  - cableschedule.js:109 getDuctbanks()
+  - cableschedule.js:110 getDuctbanks()
   - src/components/scheduleSummaryMount.js:20 getDuctbanks()
 - `equipment`
-  - cableschedule.js:127 getEquipment()
+  - cableschedule.js:128 getEquipment()
   - src/design-synthesis/preliminaryProjectNotice.mjs:10 getEquipment()
 - `loadList`
-  - cableschedule.js:130 getLoads()
+  - cableschedule.js:131 getLoads()
   - src/design-synthesis/preliminaryProjectNotice.mjs:11 getLoads()
 - `oneLineDiagram`
   - src/crossProbe.js:139 getOneLine()
@@ -605,47 +605,47 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - src/crossProbe.js:201 getOneLine()
   - src/design-synthesis/preliminaryProjectNotice.mjs:13 getOneLine()
 - `panelSchedule`
-  - cableschedule.js:118 getPanels()
-  - cableschedule.js:133 getPanels()
+  - cableschedule.js:119 getPanels()
+  - cableschedule.js:134 getPanels()
 - `settings.cableChangeLog`
-  - cableschedule.js:424 getCableChangeLog()
-  - cableschedule.js:425 getItem(settings.cableChangeLog)
+  - cableschedule.js:425 getCableChangeLog()
+  - cableschedule.js:426 getItem(settings.cableChangeLog)
 - `settings.cableTagSettings`
-  - cableschedule.js:388 getCableTagSettings()
-  - cableschedule.js:389 getItem(settings.cableTagSettings)
+  - cableschedule.js:389 getCableTagSettings()
+  - cableschedule.js:390 getItem(settings.cableTagSettings)
 - `settings.cableTemplates`
-  - cableschedule.js:1169 getCableTemplates()
-  - cableschedule.js:1450 getCableTemplates()
-  - cableschedule.js:381 getCableTemplates()
+  - cableschedule.js:1170 getCableTemplates()
+  - cableschedule.js:1451 getCableTemplates()
+  - cableschedule.js:382 getCableTemplates()
 - `settings.designSynthesisReviewDraft`
   - src/design-synthesis/preliminaryProjectNotice.mjs:8 getItem(designSynthesisReviewDraft)
 - `settings.latestRouteResults`
   - src/components/crossHighlightMount.js:38 getItem(latestRouteResults)
   - src/components/scheduleSummaryMount.js:22 getItem(latestRouteResults)
 - `settings.trayHardwareCatalogCustomProducts`
-  - cableschedule.js:1205 getTrayHardwareCatalogCustomProducts()
+  - cableschedule.js:1206 getTrayHardwareCatalogCustomProducts()
 - `traySchedule`
-  - cableschedule.js:107 getTrays()
+  - cableschedule.js:108 getTrays()
   - src/components/scheduleSummaryMount.js:18 getTrays()
 
 **Detected Writes**
 - `cableSchedule`
-  - cableschedule.js:2212 setCables()
-  - cableschedule.js:2224 setCables()
-  - cableschedule.js:2238 setCables()
-  - cableschedule.js:2261 setCables()
+  - cableschedule.js:2213 setCables()
+  - cableschedule.js:2225 setCables()
+  - cableschedule.js:2239 setCables()
+  - cableschedule.js:2262 setCables()
 - `settings.cableChangeLog`
-  - cableschedule.js:431 setCableChangeLog()
-  - cableschedule.js:433 setItem(settings.cableChangeLog)
+  - cableschedule.js:432 setCableChangeLog()
+  - cableschedule.js:434 setItem(settings.cableChangeLog)
 - `settings.cableTagSettings`
-  - cableschedule.js:395 setCableTagSettings()
-  - cableschedule.js:397 setItem(settings.cableTagSettings)
+  - cableschedule.js:396 setCableTagSettings()
+  - cableschedule.js:398 setItem(settings.cableTagSettings)
 - `settings.cableTemplates`
-  - cableschedule.js:1179 setCableTemplates()
-  - cableschedule.js:1198 setCableTemplates()
-  - cableschedule.js:1232 setCableTemplates()
-  - cableschedule.js:1407 setCableTemplates()
-  - cableschedule.js:1733 setCableTemplates()
+  - cableschedule.js:1180 setCableTemplates()
+  - cableschedule.js:1199 setCableTemplates()
+  - cableschedule.js:1233 setCableTemplates()
+  - cableschedule.js:1408 setCableTemplates()
+  - cableschedule.js:1734 setCableTemplates()
   - ... 5 more
 
 ### Panel Schedule (`panelschedule.html`)
@@ -682,7 +682,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - src/panelSchedule.js:2362 getEquipment()
   - src/panelSchedule.js:2420 getEquipment()
 - `loadList`
-  - exportPanelSchedule.js:47 getLoads()
+  - exportPanelSchedule.js:94 getLoads()
   - src/design-synthesis/preliminaryProjectNotice.mjs:11 getLoads()
   - src/panelSchedule.js:1979 getLoads()
   - src/panelSchedule.js:2040 getLoads()
@@ -691,7 +691,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `oneLineDiagram`
   - src/design-synthesis/preliminaryProjectNotice.mjs:13 getOneLine()
 - `panelSchedule`
-  - exportPanelSchedule.js:45 getPanels()
+  - exportPanelSchedule.js:92 getPanels()
   - src/panelSchedule.js:1677 getPanels()
   - src/panelSchedule.js:2538 getPanels()
   - src/panelSchedule.js:2614 getPanels()
@@ -867,7 +867,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Raceway
-- Source files: `analysis/conduitFill.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/trayFill.mjs`, `cabletrayfill.js`, `src/cabletrayfill.js`, `src/components/fillGauge.js`, `src/projectManagerEntry.js`, `tableUtils.mjs`, `tour.js`
+- Source files: `analysis/conduitFill.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/trayFill.mjs`, `cabletrayfill.js`, `src/cabletrayfill.js`, `src/components/fillGauge.js`, `src/projectManagerEntry.js`, `src/tray-fill/fillAnalysisSheet.mjs`, `src/tray-fill/initialTraySelection.mjs`, `tableUtils.mjs`, `tour.js`
 
 **Undocumented Reads**
 - None
@@ -890,11 +890,11 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `settings.trayFillData`
-  - cabletrayfill.js:2087 getItem(trayFillData)
+  - cabletrayfill.js:2161 getItem(trayFillData)
 
 **Detected Writes**
 - `settings.trayFillData`
-  - cabletrayfill.js:2095 removeItem(trayFillData)
+  - cabletrayfill.js:2172 removeItem(trayFillData)
 
 ### Conduit Fill (`conduitfill.html`)
 
@@ -1425,7 +1425,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Optimization
-- Source files: `ampacity.mjs`, `analysis/cablePullGroups.mjs`, `analysis/cablePullPlan.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designSynthesisMotorReadiness.mjs`, `analysis/ductbankConduitAssignment.mjs`, `analysis/largeFacilityRoutingSample.mjs`, `analysis/pullCards.mjs`, `analysis/pullConstructability.mjs`, `analysis/racewayAssurance.mjs`, `analysis/racewayReviewTarget.mjs`, `analysis/reportPackage.mjs`, `analysis/resultContract.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `analysis/routeScreeningSummary.mjs`, `analysis/routeStorageCompaction.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/studyResultReadiness.mjs`, `analysis/trayFill.mjs`, `app.mjs`, `bimExport.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `e2e-helpers.js`, `exporters/simpleDxf.js`, `optimalRoute.js`, `resultsExport.mjs`, `src/components/incrementalDom.js`, `src/ductbankProjectAdapter.mjs`, `src/exporters/gltf2.mjs`, `src/fetchUtils.mjs`, `src/htmlSafety.mjs`, `src/necTable9.mjs`, `src/optimalRoute.js`, `src/performance/performanceMetrics.js`, `src/projectManagerEntry.js`, `src/pullCalc.js`, `src/routing/cableRoutingSystem.mjs`, `src/routing/canonicalCableRouteMerge.mjs`, `src/routing/manualEntryView.mjs`, `src/routing/plotlyRouteScene.mjs`, `src/routing/projectHash.mjs`, `src/routing/pullAccessView.mjs`, `src/routing/pullEvidenceView.mjs`, `src/routing/pullOptionsController.mjs`, `src/routing/pullReviewView.mjs`, `src/routing/racewayGeometry.mjs`, `src/routing/racewaySizingModel.mjs`, `src/routing/routeBreakdown.mjs`, `src/routing/routeDetailView.mjs`, `src/routing/routeExportDownload.mjs`, `src/routing/routeGraphTheme.mjs`, `src/routing/routeReviewModel.mjs`, `src/routing/routeReviewView.mjs`, `src/routing/routeVisualizationModel.mjs`, `src/routing/routingProjectAdapter.mjs`, `src/routing/routingReadinessModel.mjs`, `src/routing/routingSamples.mjs`, `src/routing/routingState.mjs`, `src/routing/sharedRoutesView.mjs`, `src/routing/trayNecAdvisory.mjs`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/cablePhases.js`, `utils/safeEvents.mjs`
+- Source files: `ampacity.mjs`, `analysis/cablePullGroups.mjs`, `analysis/cablePullPlan.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designSynthesisMotorReadiness.mjs`, `analysis/ductbankConduitAssignment.mjs`, `analysis/largeFacilityRoutingSample.mjs`, `analysis/pullCards.mjs`, `analysis/pullConstructability.mjs`, `analysis/racewayAssurance.mjs`, `analysis/racewayReviewTarget.mjs`, `analysis/reportPackage.mjs`, `analysis/resultContract.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `analysis/routeScreeningSummary.mjs`, `analysis/routeStorageCompaction.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/studyResultReadiness.mjs`, `analysis/trayFill.mjs`, `app.mjs`, `bimExport.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `e2e-helpers.js`, `exporters/simpleDxf.js`, `optimalRoute.js`, `resultsExport.mjs`, `src/components/incrementalDom.js`, `src/ductbankProjectAdapter.mjs`, `src/exporters/gltf2.mjs`, `src/fetchUtils.mjs`, `src/htmlSafety.mjs`, `src/necTable9.mjs`, `src/optimalRoute.js`, `src/performance/performanceMetrics.js`, `src/projectManagerEntry.js`, `src/pullCalc.js`, `src/routing/cableRoutingSystem.mjs`, `src/routing/canonicalCableRouteMerge.mjs`, `src/routing/manualEntryView.mjs`, `src/routing/plotlyRouteScene.mjs`, `src/routing/projectHash.mjs`, `src/routing/pullAccessView.mjs`, `src/routing/pullEvidenceView.mjs`, `src/routing/pullOptionsController.mjs`, `src/routing/pullReviewView.mjs`, `src/routing/racewayGeometry.mjs`, `src/routing/racewaySizingModel.mjs`, `src/routing/routeBreakdown.mjs`, `src/routing/routeDetailView.mjs`, `src/routing/routeExportDownload.mjs`, `src/routing/routeGraphTheme.mjs`, `src/routing/routeReviewModel.mjs`, `src/routing/routeReviewView.mjs`, `src/routing/routeVisualizationModel.mjs`, `src/routing/routingFileModel.mjs`, `src/routing/routingProjectAdapter.mjs`, `src/routing/routingReadinessModel.mjs`, `src/routing/routingSamples.mjs`, `src/routing/routingState.mjs`, `src/routing/sharedRoutesView.mjs`, `src/routing/trayNecAdvisory.mjs`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/cablePhases.js`, `utils/csv.mjs`, `utils/safeEvents.mjs`
 
 **Undocumented Reads**
 - None
@@ -1447,41 +1447,41 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - app.mjs:2183 getCables()
-  - app.mjs:2861 getCables()
-  - app.mjs:2992 getCables()
-  - app.mjs:899 getCables()
+  - app.mjs:2127 getCables()
+  - app.mjs:2802 getCables()
+  - app.mjs:2933 getCables()
+  - app.mjs:890 getCables()
   - src/routing/canonicalCableRouteMerge.mjs:58 getCables()
 - `conduitSchedule`
-  - app.mjs:903 getConduits()
+  - app.mjs:894 getConduits()
 - `ductbankSchedule`
-  - app.mjs:902 getDuctbanks()
+  - app.mjs:893 getDuctbanks()
 - `settings.ctrSession`
-  - app.mjs:463 getItem(ctrSession)
-  - app.mjs:812 getItem(ctrSession)
+  - app.mjs:454 getItem(ctrSession)
+  - app.mjs:803 getItem(ctrSession)
 - `settings.latestRouteResults`
-  - app.mjs:1073 getItem(latestRouteResults)
+  - app.mjs:1064 getItem(latestRouteResults)
 - `traySchedule`
-  - app.mjs:898 getTrays()
+  - app.mjs:889 getTrays()
 
 **Detected Writes**
 - `cableSchedule`
-  - app.mjs:2183 setCables()
-  - app.mjs:2992 setCables()
+  - app.mjs:2127 setCables()
+  - app.mjs:2933 setCables()
   - src/routing/canonicalCableRouteMerge.mjs:58 setCables()
 - `settings.conduitFillData`
-  - app.mjs:1420 setItem(conduitFillData)
-  - app.mjs:1454 setItem(conduitFillData)
+  - app.mjs:1411 setItem(conduitFillData)
+  - app.mjs:1445 setItem(conduitFillData)
 - `settings.ctrSession`
-  - app.mjs:472 setItem(ctrSession)
-  - app.mjs:801 setItem(ctrSession)
+  - app.mjs:463 setItem(ctrSession)
+  - app.mjs:792 setItem(ctrSession)
 - `settings.ductbankRouteData`
-  - app.mjs:1438 setItem(ductbankRouteData)
+  - app.mjs:1429 setItem(ductbankRouteData)
 - `settings.latestRouteResults`
-  - app.mjs:254 setItem(latestRouteResults)
+  - app.mjs:258 setItem(latestRouteResults)
 - `settings.trayFillData`
-  - app.mjs:1395 setItem(trayFillData)
-  - app.mjs:2599 setItem(trayFillData)
+  - app.mjs:1386 setItem(trayFillData)
+  - app.mjs:2540 setItem(trayFillData)
 
 ### Pull Cards (`pullcards.html`)
 
@@ -1614,37 +1614,37 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - costestimate.js:305 getCables()
+  - costestimate.js:324 getCables()
 - `conduitSchedule`
-  - costestimate.js:307 getConduits()
+  - costestimate.js:326 getConduits()
 - `ductbankSchedule`
-  - costestimate.js:308 getDuctbanks()
+  - costestimate.js:327 getDuctbanks()
 - `settings.costEstimateBasis`
-  - costestimate.js:61 migrateLegacyItem(..., costEstimateBasis)
+  - costestimate.js:65 migrateLegacyItem(..., costEstimateBasis)
 - `settings.customPricing`
-  - costestimate.js:53 migrateLegacyItem(..., customPricing)
+  - costestimate.js:57 migrateLegacyItem(..., customPricing)
 - `settings.latestRouteResults`
-  - costestimate.js:310 getItem(latestRouteResults)
+  - costestimate.js:329 getItem(latestRouteResults)
 - `studyResults`
-  - costestimate.js:309 getStudies()
+  - costestimate.js:328 getStudies()
 - `studyResults.routeResults`
-  - costestimate.js:313 studies.routeResults
+  - costestimate.js:332 studies.routeResults
 - `traySchedule`
-  - costestimate.js:306 getTrays()
+  - costestimate.js:325 getTrays()
 
 **Detected Writes**
 - `settings.costEstimateArtifact`
-  - costestimate.js:397 setItem(costEstimateArtifact)
+  - costestimate.js:417 setItem(costEstimateArtifact)
 - `settings.costEstimateBasis`
-  - costestimate.js:208 setItem(costEstimateBasis)
-  - costestimate.js:291 setItem(costEstimateBasis)
-  - costestimate.js:61 migrateLegacyItem(..., costEstimateBasis)
+  - costestimate.js:212 setItem(costEstimateBasis)
+  - costestimate.js:310 setItem(costEstimateBasis)
+  - costestimate.js:65 migrateLegacyItem(..., costEstimateBasis)
 - `settings.customPricing`
-  - costestimate.js:103 removeItem(customPricing)
-  - costestimate.js:141 setItem(customPricing)
-  - costestimate.js:53 migrateLegacyItem(..., customPricing)
+  - costestimate.js:107 removeItem(customPricing)
+  - costestimate.js:145 setItem(customPricing)
+  - costestimate.js:57 migrateLegacyItem(..., customPricing)
 - `settings.deliverableArtifacts`
-  - costestimate.js:398 upsertDeliverableArtifact()
+  - costestimate.js:418 upsertDeliverableArtifact()
 
 ### Submittal Package (`submittal.html`)
 
@@ -1722,7 +1722,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Deliverables
-- Source files: `analysis/autoSize.mjs`, `analysis/clashDetect.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableArtifacts.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designRuleChecker.mjs`, `analysis/designSynthesisMotorReadiness.mjs`, `analysis/ductbankConduitAssignment.mjs`, `analysis/equipmentWorkflow.mjs`, `analysis/fieldObservations.mjs`, `analysis/heatTraceReport.mjs`, `analysis/heatTraceSizing.mjs`, `analysis/loadWorkflow.mjs`, `analysis/projectReport.mjs`, `analysis/projectWorkflowCore.mjs`, `analysis/pullBoxSizing.mjs`, `analysis/pullCards.mjs`, `analysis/pullConstructability.mjs`, `analysis/racewayAssurance.mjs`, `analysis/reportPackage.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/studyLifecycle.mjs`, `analysis/studyResultContext.mjs`, `analysis/trayFill.mjs`, `src/components/projectInputBinding.js`, `src/projectManagerEntry.js`, `src/projectreport.js`, `src/pullCalc.js`, `utils/componentLabels.js`, `validation/rules.js`
+- Source files: `analysis/arcFlashResultUnits.mjs`, `analysis/autoSize.mjs`, `analysis/clashDetect.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableArtifacts.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designRuleChecker.mjs`, `analysis/designSynthesisMotorReadiness.mjs`, `analysis/ductbankConduitAssignment.mjs`, `analysis/equipmentWorkflow.mjs`, `analysis/fieldObservations.mjs`, `analysis/heatTraceReport.mjs`, `analysis/heatTraceSizing.mjs`, `analysis/lighting.mjs`, `analysis/loadWorkflow.mjs`, `analysis/projectReport.mjs`, `analysis/projectWorkflowCore.mjs`, `analysis/pullBoxSizing.mjs`, `analysis/pullCards.mjs`, `analysis/pullConstructability.mjs`, `analysis/racewayAssurance.mjs`, `analysis/reportPackage.mjs`, `analysis/reportSupplementalSections.mjs`, `analysis/routeCostAssurance.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/studyLifecycle.mjs`, `analysis/studyResultContext.mjs`, `analysis/trayFill.mjs`, `src/components/heatTraceLifecycle.mjs`, `src/components/projectInputBinding.js`, `src/projectManagerEntry.js`, `src/projectreport.js`, `src/pullCalc.js`, `utils/componentLabels.js`, `validation/rules.js`
 
 **Undocumented Reads**
 - None
@@ -1744,133 +1744,144 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - src/projectreport.js:287 getCables()
-  - src/projectreport.js:291 getCables()
+  - src/projectreport.js:292 getCables()
+  - src/projectreport.js:296 getCables()
 - `conduitSchedule`
-  - src/projectreport.js:293 getConduits()
+  - src/projectreport.js:298 getConduits()
 - `ductbankSchedule`
-  - src/projectreport.js:310 getDuctbanks()
+  - src/projectreport.js:315 getDuctbanks()
 - `equipment`
-  - src/projectreport.js:1002 getEquipment()
-  - src/projectreport.js:311 getEquipment()
+  - src/projectreport.js:1085 getEquipment()
+  - src/projectreport.js:316 getEquipment()
 - `loadList`
-  - src/projectreport.js:1003 getLoads()
-  - src/projectreport.js:312 getLoads()
+  - src/projectreport.js:1086 getLoads()
+  - src/projectreport.js:317 getLoads()
 - `oneLineDiagram`
-  - src/projectreport.js:1004 getOneLine()
-  - src/projectreport.js:313 getOneLine()
+  - src/projectreport.js:1087 getOneLine()
+  - src/projectreport.js:318 getOneLine()
 - `settings.costEstimateArtifact`
-  - src/projectreport.js:326 getItem(costEstimateArtifact)
+  - src/projectreport.js:331 getItem(costEstimateArtifact)
 - `settings.deliverableArtifacts`
-  - src/projectreport.js:330 getDeliverableArtifacts()
+  - src/projectreport.js:335 getDeliverableArtifacts()
 - `settings.designBasis`
-  - src/projectreport.js:1009 getDesignBasis()
-  - src/projectreport.js:318 getDesignBasis()
+  - src/projectreport.js:1092 getDesignBasis()
+  - src/projectreport.js:323 getDesignBasis()
 - `settings.designGateApprovals`
-  - src/projectreport.js:1010 getDesignGateApprovals()
-  - src/projectreport.js:319 getDesignGateApprovals()
+  - src/projectreport.js:1093 getDesignGateApprovals()
+  - src/projectreport.js:324 getDesignGateApprovals()
 - `settings.designSynthesisReviewDraft`
-  - src/projectreport.js:1011 getItem(designSynthesisReviewDraft)
-  - src/projectreport.js:320 getItem(designSynthesisReviewDraft)
+  - src/projectreport.js:1094 getItem(designSynthesisReviewDraft)
+  - src/projectreport.js:325 getItem(designSynthesisReviewDraft)
 - `settings.fieldExecutionRecords`
-  - src/projectreport.js:327 getFieldExecutionRecords()
+  - src/projectreport.js:332 getFieldExecutionRecords()
 - `settings.latestRouteResults`
-  - src/projectreport.js:1042 getItem(latestRouteResults)
-  - src/projectreport.js:1071 getItem(latestRouteResults)
-  - src/projectreport.js:1085 getItem(latestRouteResults)
-  - src/projectreport.js:287 getItem(latestRouteResults)
-  - src/projectreport.js:322 getItem(latestRouteResults)
+  - src/projectreport.js:1125 getItem(latestRouteResults)
+  - src/projectreport.js:1154 getItem(latestRouteResults)
+  - src/projectreport.js:1168 getItem(latestRouteResults)
+  - src/projectreport.js:292 getItem(latestRouteResults)
+  - src/projectreport.js:327 getItem(latestRouteResults)
 - `settings.lifecyclePackages`
-  - src/projectreport.js:1044 getLifecyclePackages()
-  - src/projectreport.js:1082 getLifecyclePackages()
-  - src/projectreport.js:1242 getLifecyclePackages()
-  - src/projectreport.js:1256 getLifecyclePackages()
-  - src/projectreport.js:966 getLifecyclePackages()
+  - src/projectreport.js:1049 getLifecyclePackages()
+  - src/projectreport.js:1127 getLifecyclePackages()
+  - src/projectreport.js:1165 getLifecyclePackages()
+  - src/projectreport.js:1325 getLifecyclePackages()
+  - src/projectreport.js:1339 getLifecyclePackages()
 - `settings.oneLineScheduleReconcilePending`
-  - src/projectreport.js:1088 getItem(oneLineScheduleReconcilePending)
+  - src/projectreport.js:1171 getItem(oneLineScheduleReconcilePending)
 - `settings.procurementRegister`
-  - src/projectreport.js:325 getProcurementRegister()
+  - src/projectreport.js:330 getProcurementRegister()
 - `settings.projectMeta`
-  - src/projectreport.js:156 getProjectMeta()
-  - src/projectreport.js:177 getProjectMeta()
-  - src/projectreport.js:206 getProjectMeta()
+  - src/projectreport.js:161 getProjectMeta()
+  - src/projectreport.js:182 getProjectMeta()
+  - src/projectreport.js:211 getProjectMeta()
 - `settings.pullPlanArtifact`
-  - src/projectreport.js:324 getItem(pullPlanArtifact)
+  - src/projectreport.js:329 getItem(pullPlanArtifact)
 - `settings.reportSnapshots`
-  - src/projectreport.js:1043 getReportSnapshots()
-  - src/projectreport.js:1081 getReportSnapshots()
-  - src/projectreport.js:874 getReportSnapshots()
-  - src/projectreport.js:909 getReportSnapshots()
+  - src/projectreport.js:1126 getReportSnapshots()
+  - src/projectreport.js:1164 getReportSnapshots()
+  - src/projectreport.js:957 getReportSnapshots()
+  - src/projectreport.js:992 getReportSnapshots()
 - `settings.studyApprovals`
-  - src/projectreport.js:317 getStudyApprovals()
+  - src/projectreport.js:322 getStudyApprovals()
 - `settings.studyProvenance`
   - analysis/studyLifecycle.mjs:182 captureStudyRunContext()
   - analysis/studyLifecycle.mjs:379 captureStudyRunContext()
-  - src/projectreport.js:315 getStudyProvenance()
-  - src/projectreport.js:316 getStudyAssessments()
+  - src/projectreport.js:320 getStudyProvenance()
+  - src/projectreport.js:321 getStudyAssessments()
+  - src/projectreport.js:693 captureStudyRunContext()
 - `settings.tccSettings`
-  - src/projectreport.js:1012 getItem(tccSettings)
-  - src/projectreport.js:321 getItem(tccSettings)
+  - src/projectreport.js:1095 getItem(tccSettings)
+  - src/projectreport.js:326 getItem(tccSettings)
 - `studyResults`
-  - src/projectreport.js:314 getStudies()
-  - src/projectreport.js:316 getStudyAssessments()
+  - src/projectreport.js:319 getStudies()
+  - src/projectreport.js:321 getStudyAssessments()
 - `studyResults.arcFlash`
-  - analysis/projectReport.mjs:482 studies.arcFlash
+  - analysis/projectReport.mjs:580 studies.arcFlash
 - `studyResults.bessHazard`
-  - analysis/projectReport.mjs:1192 studies.bessHazard
+  - analysis/projectReport.mjs:1331 studies.bessHazard
 - `studyResults.contingency`
-  - analysis/projectReport.mjs:961 studies.contingency
+  - analysis/projectReport.mjs:1100 studies.contingency
 - `studyResults.cyberCompliance`
-  - analysis/projectReport.mjs:966 studies.cyberCompliance
+  - analysis/projectReport.mjs:1105 studies.cyberCompliance
 - `studyResults.duty`
   - validation/rules.js:703 studies.duty
   - validation/rules.js:703 studies?.duty
   - validation/rules.js:707 studies?.duty
 - `studyResults.frequencyScan`
-  - analysis/projectReport.mjs:963 studies.frequencyScan
+  - analysis/projectReport.mjs:1102 studies.frequencyScan
 - `studyResults.harmonics`
-  - analysis/projectReport.mjs:715 studies.harmonics
+  - analysis/projectReport.mjs:838 studies.harmonics
+- `studyResults.hazAreaClassification`
+  - analysis/reportSupplementalSections.mjs:302 studies?.hazAreaClassification
 - `studyResults.heatTraceSizing`
-  - analysis/projectReport.mjs:232 studies.heatTraceSizing
+  - analysis/projectReport.mjs:355 studies.heatTraceSizing
 - `studyResults.heatTraceSizingCircuits`
-  - analysis/projectReport.mjs:233 studies.heatTraceSizingCircuits
+  - analysis/projectReport.mjs:356 studies.heatTraceSizingCircuits
 - `studyResults.iec60909`
-  - analysis/projectReport.mjs:562 studies.iec60909
+  - analysis/projectReport.mjs:675 studies.iec60909
+- `studyResults.insulationCoordination`
+  - analysis/reportSupplementalSections.mjs:418 studies?.insulationCoordination
+- `studyResults.lighting`
+  - analysis/reportSupplementalSections.mjs:549 studies?.lighting
 - `studyResults.loadFlow`
-  - analysis/projectReport.mjs:673 studies.loadFlow
+  - analysis/projectReport.mjs:786 studies.loadFlow
 - `studyResults.motorStart`
-  - analysis/projectReport.mjs:752 studies.motorStart
+  - analysis/projectReport.mjs:875 studies.motorStart
 - `studyResults.optimalPowerFlow`
-  - analysis/projectReport.mjs:965 studies.optimalPowerFlow
+  - analysis/projectReport.mjs:1104 studies.optimalPowerFlow
 - `studyResults.probabilisticLoadFlow`
-  - analysis/projectReport.mjs:960 studies.probabilisticLoadFlow
+  - analysis/projectReport.mjs:1099 studies.probabilisticLoadFlow
 - `studyResults.quasiDynamic`
-  - analysis/projectReport.mjs:959 studies.quasiDynamic
+  - analysis/projectReport.mjs:1098 studies.quasiDynamic
 - `studyResults.reliability`
-  - analysis/projectReport.mjs:856 studies.reliability
+  - analysis/projectReport.mjs:994 studies.reliability
   - validation/rules.js:712 studies?.reliability
   - validation/rules.js:713 studies.reliability
   - validation/rules.js:715 studies?.reliability
   - validation/rules.js:728 studies?.reliability
 - `studyResults.shortCircuit`
-  - analysis/projectReport.mjs:561 studies.shortCircuit
+  - analysis/projectReport.mjs:674 studies.shortCircuit
+- `studyResults.sustainabilityFootprint`
+  - analysis/reportSupplementalSections.mjs:144 studies?.sustainabilityFootprint
+- `studyResults.tcc`
+  - analysis/reportSupplementalSections.mjs:240 studies?.tcc
 - `studyResults.transientStability`
-  - analysis/projectReport.mjs:964 studies.transientStability
+  - analysis/projectReport.mjs:1103 studies.transientStability
 - `studyResults.voltageDropStudy`
-  - analysis/projectReport.mjs:784 studies.voltageDropStudy
+  - analysis/projectReport.mjs:914 studies.voltageDropStudy
 - `studyResults.voltageStability`
-  - analysis/projectReport.mjs:962 studies.voltageStability
+  - analysis/projectReport.mjs:1101 studies.voltageStability
 - `traySchedule`
-  - src/projectreport.js:292 getTrays()
+  - src/projectreport.js:297 getTrays()
 
 **Detected Writes**
 - `settings.deliverableArtifacts`
-  - src/projectreport.js:1343 upsertDeliverableArtifact()
+  - src/projectreport.js:1426 upsertDeliverableArtifact()
 - `settings.projectMeta`
-  - src/projectreport.js:208 setProjectMeta()
+  - src/projectreport.js:213 setProjectMeta()
 - `settings.reportSnapshots`
-  - src/projectreport.js:1342 setReportSnapshot()
-  - src/projectreport.js:902 deleteReportSnapshot()
+  - src/projectreport.js:1425 setReportSnapshot()
+  - src/projectreport.js:985 deleteReportSnapshot()
 - `studyResults.duty`
   - validation/rules.js:703 studies.duty
 
@@ -1965,7 +1976,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - analysis/shortCircuit.mjs:1296 getCables()
   - analysis/tcc.js:2997 getCables()
 - `oneLineDiagram`
-  - analysis/arcFlash.mjs:460 getOneLine()
+  - analysis/arcFlash.mjs:467 getOneLine()
   - analysis/shortCircuit.mjs:1290 getOneLine()
   - analysis/tcc.js:2108 getOneLine()
   - analysis/tcc.js:2220 getOneLine()
@@ -1975,7 +1986,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - analysis/tcc.js:2110 captureStudyRunContext()
   - analysis/tcc.js:3886 captureStudyRunContext()
 - `settings.tccSettings`
-  - analysis/arcFlash.mjs:364 getItem(tccSettings)
+  - analysis/arcFlash.mjs:371 getItem(tccSettings)
   - analysis/shortCircuit.mjs:824 getItem(tccSettings)
   - analysis/tcc.js:778 getItem(tccSettings)
 - `settings.trayHardwareCatalogCustomProducts`
@@ -2740,7 +2751,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Studies
 - Group: Protection
-- Source files: `analysis/ctMetadata.mjs`, `analysis/designBasis.mjs`, `analysis/designSynthesisMotorReadiness.mjs`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/ptVtMetadata.mjs`, `analysis/shortCircuit.mjs`, `analysis/studyExportMetadata.mjs`, `analysis/tccUtils.js`, `analysis/timeCurrentCurve.mjs`, `reports/reporting.mjs`, `src/components/resultViz.mjs`, `src/components/studyApproval.js`, `src/components/studyBasis.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/protectiveDevices/calculationCatalog.mjs`, `src/protectiveDevices/catalogLoader.mjs`, `src/shortCircuit.js`, `studies/shortCircuit.js`, `utils/cableImpedance.js`, `utils/csv.mjs`, `utils/transformerImpedance.js`, `utils/voltage.js`
+- Source files: `analysis/ctMetadata.mjs`, `analysis/designBasis.mjs`, `analysis/designSynthesisMotorReadiness.mjs`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/ptVtMetadata.mjs`, `analysis/shortCircuit.mjs`, `analysis/studyExportMetadata.mjs`, `analysis/tccUtils.js`, `analysis/timeCurrentCurve.mjs`, `reports/reporting.mjs`, `src/components/resultViz.mjs`, `src/components/studyApproval.js`, `src/components/studyBasis.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/protectiveDevices/calculationCatalog.mjs`, `src/protectiveDevices/catalogLoader.mjs`, `src/shortCircuit.js`, `studies/shortCircuit.js`, `studies/shortCircuitExportTable.mjs`, `utils/cableImpedance.js`, `utils/csv.mjs`, `utils/transformerImpedance.js`, `utils/voltage.js`
 
 **Undocumented Reads**
 - None
@@ -2763,36 +2774,36 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 **Detected Reads**
 - `cableSchedule`
   - analysis/shortCircuit.mjs:1296 getCables()
-  - studies/shortCircuit.js:15 getCables()
+  - studies/shortCircuit.js:16 getCables()
 - `oneLineDiagram`
   - analysis/shortCircuit.mjs:1290 getOneLine()
-  - studies/shortCircuit.js:10 getOneLine()
+  - studies/shortCircuit.js:11 getOneLine()
 - `settings.designBasis`
   - src/components/studyBasis.js:37 getDesignBasis()
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `settings.studyProvenance`
-  - studies/shortCircuit.js:152 captureStudyRunContext()
-  - studies/shortCircuit.js:176 getStudyAssessments()
+  - studies/shortCircuit.js:147 captureStudyRunContext()
+  - studies/shortCircuit.js:175 getStudyAssessments()
 - `settings.tccSettings`
   - analysis/shortCircuit.mjs:824 getItem(tccSettings)
 - `studyResults`
-  - studies/shortCircuit.js:160 getStudies()
-  - studies/shortCircuit.js:176 getStudyAssessments()
-  - studies/shortCircuit.js:356 getStudies()
+  - studies/shortCircuit.js:155 getStudies()
+  - studies/shortCircuit.js:175 getStudyAssessments()
+  - studies/shortCircuit.js:336 getStudies()
 - `studyResults.shortCircuit`
-  - studies/shortCircuit.js:161 studies.shortCircuit
-  - studies/shortCircuit.js:162 studies.shortCircuit
-  - studies/shortCircuit.js:356 getStudies().shortCircuit
+  - studies/shortCircuit.js:156 studies.shortCircuit
+  - studies/shortCircuit.js:157 studies.shortCircuit
+  - studies/shortCircuit.js:336 getStudies().shortCircuit
 
 **Detected Writes**
 - `settings.studyApprovals`
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `settings.studyProvenance`
-  - studies/shortCircuit.js:171 saveStudyResult()
+  - studies/shortCircuit.js:166 saveStudyResult()
 - `studyResults`
-  - studies/shortCircuit.js:171 saveStudyResult()
+  - studies/shortCircuit.js:166 saveStudyResult()
 
 ### IEC 60909 Short-Circuit (`iec60909.html`)
 
@@ -2851,7 +2862,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Studies
 - Group: Protection
-- Source files: `analysis/arcFlash.mjs`, `analysis/ctMetadata.mjs`, `analysis/designBasis.mjs`, `analysis/designSynthesisMotorReadiness.mjs`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/ieee1584.mjs`, `analysis/protectiveDeviceLibrary.mjs`, `analysis/ptVtMetadata.mjs`, `analysis/shortCircuit.mjs`, `analysis/studyExportMetadata.mjs`, `analysis/studyResultReadiness.mjs`, `analysis/tccUtils.js`, `analysis/timeCurrentCurve.mjs`, `reports/arcFlashReport.mjs`, `reports/labels.mjs`, `reports/reporting.mjs`, `src/arcFlash.js`, `src/components/resultViz.mjs`, `src/components/studyApproval.js`, `src/components/studyBasis.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/protectiveDevices/catalogLoader.mjs`, `studies/arcFlash.js`, `studies/arcFlashReadiness.mjs`, `utils/cableImpedance.js`, `utils/csv.mjs`, `utils/transformerImpedance.js`, `utils/voltage.js`
+- Source files: `analysis/arcFlash.mjs`, `analysis/arcFlashResultUnits.mjs`, `analysis/ctMetadata.mjs`, `analysis/designBasis.mjs`, `analysis/designSynthesisMotorReadiness.mjs`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/ieee1584.mjs`, `analysis/protectiveDeviceLibrary.mjs`, `analysis/ptVtMetadata.mjs`, `analysis/shortCircuit.mjs`, `analysis/studyExportMetadata.mjs`, `analysis/studyResultReadiness.mjs`, `analysis/tccUtils.js`, `analysis/timeCurrentCurve.mjs`, `reports/arcFlashReport.mjs`, `reports/labels.mjs`, `reports/reporting.mjs`, `src/arcFlash.js`, `src/components/resultViz.mjs`, `src/components/studyApproval.js`, `src/components/studyBasis.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/protectiveDevices/catalogLoader.mjs`, `studies/arcFlash.js`, `studies/arcFlashReadiness.mjs`, `utils/cableImpedance.js`, `utils/csv.mjs`, `utils/transformerImpedance.js`, `utils/voltage.js`
 
 **Undocumented Reads**
 - None
@@ -2875,35 +2886,35 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `cableSchedule`
   - analysis/shortCircuit.mjs:1296 getCables()
 - `oneLineDiagram`
-  - analysis/arcFlash.mjs:460 getOneLine()
+  - analysis/arcFlash.mjs:467 getOneLine()
   - analysis/shortCircuit.mjs:1290 getOneLine()
-  - studies/arcFlash.js:15 getOneLine()
+  - studies/arcFlash.js:16 getOneLine()
 - `settings.designBasis`
   - src/components/studyBasis.js:37 getDesignBasis()
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `settings.studyProvenance`
-  - studies/arcFlash.js:182 getStudyAssessments()
-  - studies/arcFlash.js:224 getStudyAssessments()
-  - studies/arcFlash.js:24 captureStudyRunContext()
+  - studies/arcFlash.js:226 getStudyAssessments()
+  - studies/arcFlash.js:25 captureStudyRunContext()
+  - studies/arcFlash.js:270 getStudyAssessments()
 - `settings.tccSettings`
-  - analysis/arcFlash.mjs:364 getItem(tccSettings)
+  - analysis/arcFlash.mjs:371 getItem(tccSettings)
   - analysis/shortCircuit.mjs:824 getItem(tccSettings)
 - `studyResults`
-  - studies/arcFlash.js:167 getStudies()
-  - studies/arcFlash.js:182 getStudyAssessments()
-  - studies/arcFlash.js:224 getStudyAssessments()
+  - studies/arcFlash.js:210 getStudies()
+  - studies/arcFlash.js:226 getStudyAssessments()
+  - studies/arcFlash.js:270 getStudyAssessments()
 - `studyResults.arcFlash`
-  - studies/arcFlash.js:167 getStudies().arcFlash
+  - studies/arcFlash.js:210 getStudies().arcFlash
 
 **Detected Writes**
 - `settings.studyApprovals`
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `settings.studyProvenance`
-  - studies/arcFlash.js:32 saveStudyResult()
+  - studies/arcFlash.js:33 saveStudyResult()
 - `studyResults`
-  - studies/arcFlash.js:32 saveStudyResult()
+  - studies/arcFlash.js:33 saveStudyResult()
 
 ### DC Short-Circuit & Arc Flash (`dcshortcircuit.html`)
 

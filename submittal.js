@@ -15,7 +15,7 @@ import { showAlertModal } from './src/components/modal.js';
 import { buildBomCatalogFields, buildCatalogTraceabilityReport, buildCatalogWarnings } from './analysis/manufacturerCatalog.mjs';
 import { buildArtifactRegisterRows, normalizeDeliverableArtifact } from './analysis/deliverableArtifacts.mjs';
 import { summarizeFieldExecution } from './analysis/fieldExecution.mjs';
-import { cablesAssignedToTray, evaluateTrayFill, summarizeTrayFillResult } from './analysis/trayFill.mjs';
+import { cablesAssignedToTray, evaluateTrayFillWithCompartments, summarizeTrayFillResult } from './analysis/trayFill.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -63,9 +63,9 @@ function persistProjectInfo() {
   setProjectMeta({
     ...current,
     projectName: info.projectName === '(Untitled Project)' ? '' : info.projectName,
-    projectNumber: info.projectNumber === 'â€”' ? '' : info.projectNumber,
-    client: info.client === 'â€”' ? '' : info.client,
-    engineer: info.engineer === 'â€”' ? '' : info.engineer,
+    projectNumber: info.projectNumber === '—' ? '' : info.projectNumber,
+    client: info.client === '—' ? '' : info.client,
+    engineer: info.engineer === '—' ? '' : info.engineer,
     revision: info.revision,
   });
 }
@@ -510,7 +510,7 @@ function buildTrayFillSection(trays, cables) {
   // 4/0 rules, real cable cross-sections), so the submittal cannot disagree with the study.
   const rows = trays.map(t => {
     const assigned = cablesAssignedToTray(t, cables);
-    const result = evaluateTrayFill(t, assigned);
+    const result = evaluateTrayFillWithCompartments(t, assigned);
     const evaluated = result.evaluable === true;
     const empty = assigned.length === 0;
     const statusClass = empty ? 'result-ok' : !evaluated ? 'result-warn' : result.status === 'pass' ? 'result-ok' : 'result-fail';

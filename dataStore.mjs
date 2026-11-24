@@ -28,6 +28,8 @@ import {
   prepareProjectSnapshotForSave
 } from './src/projectSnapshot.js';
 import { buildOneLineProjectView, hashProjectInputs, normalizeOneLineReferences, normalizeProjectEntities } from './analysis/projectIntegration.mjs';
+import { normalizeStudyResultsArcFlashUnits } from './analysis/arcFlashResultUnits.mjs';
+import { normalizeCableOperatingVoltage } from './analysis/cableOperatingVoltage.mjs';
 import { validateAndNormalizeCanonicalProject } from './src/canonicalProject.mjs';
 import {
   getProjectEntityDeletionImpact as buildProjectEntityDeletionImpact,
@@ -1814,7 +1816,7 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
       if (Array.isArray(equipment)) setEquipment(equipment); else setEquipment([]);
       if (Array.isArray(panels)) setPanels(panels); else setPanels([]);
       if (Array.isArray(loads)) setLoads(loads, { preserveShape: true });
-      if (Array.isArray(cables)) setCables(cables); else setCables([]);
+      if (Array.isArray(cables)) setCables(normalizeCableOperatingVoltage(cables)); else setCables([]);
       if (Array.isArray(cableTypicals)) setCableTypicals(cableTypicals); else setCableTypicals([]);
       if (Array.isArray(cableTemplates)) setCableTemplates(cableTemplates); else setCableTemplates([]);
       if (cableTagSettings && typeof cableTagSettings === 'object' && !Array.isArray(cableTagSettings)) setCableTagSettings(cableTagSettings); else setCableTagSettings({});
@@ -2156,7 +2158,9 @@ export function importProject(obj) {
     setConduits(data.conduits);
     clearConduitCache();
     setTrays(data.trays);
-    setCables(data.cables);
+    // Cables reach scenario storage through setCables, not migrateProject, so
+    // imports fill a blank operating_voltage from the row's `voltage` here.
+    setCables(normalizeCableOperatingVoltage(data.cables));
     setCableTypicals(Array.isArray(data.cableTypicals) ? data.cableTypicals : []);
     setPanels(Array.isArray(data.panels) ? data.panels : []);
     setEquipment(Array.isArray(data.equipment) ? data.equipment : []);
@@ -2171,7 +2175,10 @@ export function importProject(obj) {
     }
     const importedStudies = data.settings?.studyResults ?? data.settings?.[LEGACY_STUDIES_SETTING_KEY] ?? {};
     if (importedStudies && typeof importedStudies === 'object' && !Array.isArray(importedStudies)) {
-      setStudies(importedStudies);
+      // Study results reach scenario storage through setStudies, not
+      // migrateProject, so file, sample, saved-project, and server imports
+      // convert legacy arc-flash boundary units here before they are stored.
+      setStudies(normalizeStudyResultsArcFlashUnits(importedStudies));
     } else {
       setStudies({});
     }

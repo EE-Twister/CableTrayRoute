@@ -56,7 +56,11 @@
     --error-text: #721c24;
     --color-primary: #0d6efd;
     --color-surface: #f8f9fa;
+    --color-surface-strong: #ffffff;
+    --card-bg: #ffffff;
     --color-text: #212529;
+    --color-text-muted: #475569;
+    --color-warning: #b45309;
     --color-border: #dee2e6;
   }
 

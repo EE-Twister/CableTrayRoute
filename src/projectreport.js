@@ -16,7 +16,10 @@ import {
   getLifecyclePackages,
   getDeliverableArtifacts, getFieldExecutionRecords, getFieldObservationQueue, getFieldObservations, getProcurementRegister, upsertDeliverableArtifact,
   getDesignBasis, getDesignGateApprovals, getItem, getProjectInputFingerprint, getProjectMeta, setProjectMeta,
+  captureStudyRunContext,
 } from '../dataStore.mjs';
+import { assessHeatTraceCase } from './components/heatTraceLifecycle.mjs';
+import { fingerprintStudyValue } from '../analysis/studyLifecycle.mjs';
 import { getProjectState } from '../projectStorage.js';
 import { normalizeProjectMeta } from '../analysis/projectIntegration.mjs';
 import { buildArtifactRegisterRows, normalizeDeliverableArtifact } from '../analysis/deliverableArtifacts.mjs';
@@ -26,6 +29,8 @@ import { buildDeliverableReadinessDiagnostics } from '../analysis/deliverableWor
 import { normalizeRouteResultState } from '../analysis/routeResults.mjs';
 import { buildRacewayAssurance } from '../analysis/racewayAssurance.mjs';
 import { buildPullConstructabilityAssurance } from '../analysis/pullConstructability.mjs';
+import { assessSavedRouteCostArtifact } from '../analysis/routeCostAssurance.mjs';
+import { buildSupplementalStudySections } from '../analysis/reportSupplementalSections.mjs';
 import { buildWorkflowCoreDiagnostics } from '../analysis/projectWorkflowCore.mjs';
 import { runDRC } from '../analysis/designRuleChecker.mjs';
 import { generateProjectReport } from '../analysis/projectReport.mjs';
@@ -428,6 +433,9 @@ function constructionSectionData(projectData) {
   const assuranceByCable = new Map(assurance.resultChecks.map(check => [String(check.cable || '').trim().toLowerCase(), check]));
   const pullConstructability = buildPullConstructabilityAssurance({ routeResults: routeState.batchResults });
   const pullAssuranceByCable = new Map(pullConstructability.checks.map(check => [String(check.cable || '').trim().toLowerCase(), check]));
+  const costAssurance = projectData.costEstimate && typeof projectData.costEstimate === 'object'
+    ? assessSavedRouteCostArtifact(projectData.costEstimate, projectData.currentInputFingerprint || '')
+    : null;
   const routeRows = routeState.batchResults.map(row => {
     const cable = firstValue(row, ['cable', 'cable_tag', 'tag', 'name']);
     const check = assuranceByCable.get(String(cable || '').trim().toLowerCase());
@@ -494,6 +502,10 @@ function constructionSectionData(projectData) {
     routing: {
       key: 'routing',
       title: 'Routing Summary',
+      // Printed table: readable columns only. The workbook keeps every field,
+      // including route and pull-constructability signatures.
+      headers: ROUTING_PRINT_HEADERS,
+      exportHeaders: ROUTING_EXPORT_HEADERS,
       rows: routeRows,
       summary: {
         'Saved route records': routeRows.length,
@@ -529,12 +541,14 @@ function constructionSectionData(projectData) {
       title: 'Cost Estimate',
       rows: sectionRows(projectData.costEstimate),
       summary: {
+        // Freshness first, so stale totals are never read as current.
+        'Estimate freshness': costEstimateFreshness(projectData.costEstimate, projectData.currentInputFingerprint),
         ...(projectData.costEstimate?.summary || {}),
-        'Route cost assurance': projectData.costEstimate?.routeCostAssurance?.status || 'Not generated',
+        'Route cost assurance': costAssurance?.status || 'Not generated',
         'Assurance classification': projectData.costEstimate?.routeCostAssurance?.classification || 'Screening only',
         'Route cost signature': projectData.costEstimate?.routeCostAssurance?.signature || 'Not recorded',
         'Route quantity signature': projectData.costEstimate?.routeCostAssurance?.quantityLedger?.signature || 'Not recorded',
-        'Route cost blockers': projectData.costEstimate?.routeCostAssurance?.blockingIssues?.length || 0,
+        'Route cost blockers': costAssurance?.blockingIssues?.length || 0,
         'Estimate input fingerprint': projectData.costEstimate?.inputFingerprint || 'Not recorded',
       },
     },
@@ -560,6 +574,40 @@ function constructionSectionData(projectData) {
     },
   };
 }
+
+/** Compare a saved cost estimate's input fingerprint with the current project inputs. */
+function costEstimateFreshness(estimate, currentInputFingerprint) {
+  if (!estimate || typeof estimate !== 'object') return 'Not generated';
+  const saved = String(estimate.inputFingerprint || estimate.routeCostAssurance?.inputFingerprint || '').trim();
+  const current = String(currentInputFingerprint || '').trim();
+  if (!saved || !current) return 'Not recorded — regenerate the estimate to confirm it matches current inputs';
+  return saved === current
+    ? 'Current'
+    : 'Stale — totals reflect earlier cable/raceway inputs; regenerate before issue';
+}
+
+const ROUTING_PRINT_HEADERS = [
+  { key: 'cable', label: 'Cable' },
+  { key: 'status', label: 'Status' },
+  { key: 'totalLengthFt', label: 'Routed length (ft)' },
+  { key: 'segmentCount', label: 'Segments' },
+  { key: 'assurance', label: 'Raceway assurance' },
+  { key: 'internalConduits', label: 'Internal conduits' },
+  { key: 'fieldRouteExplanation', label: 'Route basis' },
+  { key: 'assuranceIssues', label: 'Assurance issues' },
+  { key: 'pullConstructability', label: 'Pull constructability' },
+  { key: 'pullPointAccess', label: 'Pull points' },
+  { key: 'pullConstructabilityIssues', label: 'Pull issues' },
+];
+
+const ROUTING_EXPORT_HEADERS = [
+  ...ROUTING_PRINT_HEADERS,
+  { key: 'routeSignature', label: 'Route signature' },
+  { key: 'conduitAssignmentBasis', label: 'Conduit assignment basis' },
+  { key: 'fieldRouteBasis', label: 'Route basis code' },
+  { key: 'pullConstructabilitySignature', label: 'Pull constructability signature' },
+  { key: 'pullPointAccessRecords', label: 'Pull point records' },
+];
 
 function availableSectionInputs(projectData) {
   return {
@@ -606,6 +654,7 @@ function assemblePackage(config, projectData) {
     drc:          buildDRCSection(Array.isArray(drcResults) ? drcResults : []),
     ...constructionSectionData(projectData),
     ...buildAdvancedStudySections(studies, approvals, studyOptions),
+    ...buildSupplementalStudySections(studies, approvals, studyOptions),
   };
 
   return buildReportPackage({
@@ -631,7 +680,33 @@ function buildBaseReport(projectData) {
     projectName,
     studies:     projectData.studies,
     approvals:   projectData.approvals,
+    routeResults: projectData.routeResults || null,
+    assessHeatTraceCase: activeLifecyclePkg ? assessSnapshotHeatTraceCase : assessLiveHeatTraceCase,
   });
+}
+
+/**
+ * Live project: the same freshness check the Heat Trace page applies before it
+ * totals branches, so stale branches are not counted in the issued schedule.
+ */
+function assessLiveHeatTraceCase(caseItem) {
+  return assessHeatTraceCase(caseItem, captureStudyRunContext('heatTraceSizing', {
+    inputs: caseItem?.inputs,
+    options: { unitSystem: caseItem?.unitSystem || 'imperial' },
+  }));
+}
+
+/**
+ * Lifecycle package: the snapshot is a frozen issue record, so each branch is
+ * checked against its own provenance (inputs unchanged since its result was
+ * calculated) rather than against the live project.
+ */
+function assessSnapshotHeatTraceCase(caseItem) {
+  const provenance = caseItem?._provenance;
+  const context = provenance
+    ? { ...provenance, inputFingerprint: fingerprintStudyValue(caseItem?.inputs ?? null) }
+    : null;
+  return assessHeatTraceCase(caseItem, context);
 }
 
 // ---------------------------------------------------------------------------
@@ -680,7 +755,7 @@ function exportXLSX(pkg, baseReport) {
   // Cable schedule
   if (sections.cables && baseReport.cables) {
     const rows = baseReport.cables.rows || [];
-    const headers = ['id', 'from', 'to', 'size', 'insulation', 'voltage', 'lengthFt', 'raceway'];
+    const headers = ['id', 'from', 'to', 'size', 'insulation', 'ratedVoltage', 'operatingVoltage', 'lengthFt', 'routedLengthFt', 'lengthMismatch', 'raceway', 'routeStatus'];
     const aoa = [headers, ...rows.map(r => headers.map(h => xlsxCell(r[h])))];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Cables');
   }
@@ -688,7 +763,7 @@ function exportXLSX(pkg, baseReport) {
   // Raceway fill
   if (sections.fill && baseReport.fill) {
     const { trays, conduits } = baseReport.fill;
-    const headers = ['id', 'type', 'areaIn2', 'fillIn2', 'usedPct', 'limitPct', 'status'];
+    const headers = ['id', 'type', 'areaIn2', 'fillIn2', 'usedPct', 'limitPct', 'status', 'basis', 'note'];
     const aoa = [headers, ...[...trays, ...conduits].map(r => headers.map(h => xlsxCell(r[h])))];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Fill');
   }
@@ -717,11 +792,11 @@ function exportXLSX(pkg, baseReport) {
 
   // Study sections
   const studySections = [
-    { key: 'arcFlash',     headers: ['id', 'incidentEnergy', 'ppeCategory', 'boundary', 'clearingTime', 'voltage'],    sheetName: 'ArcFlash' },
+    { key: 'arcFlash',     headers: ['id', 'incidentEnergy', 'ppeSelection', 'boundary', 'clearingTime', 'voltage'],   sheetName: 'ArcFlash' },
     { key: 'shortCircuit', headers: ['id', 'method', 'studySource', 'i3ph_kA', 'iSlg_kA', 'iLL_kA', 'iDLG_kA', 'iDLGPhaseB_kA', 'iDLGPhaseC_kA', 'iDLGEarth_kA', 'voltage', 'validity', 'calculationStatus', 'requiredInputs', 'warnings', 'provenance', 'modelLimits', 'studyOptions', 'inputFingerprint', 'currentInputFingerprint', 'freshness', 'calculatedAt'], sheetName: 'ShortCircuit' },
     { key: 'loadFlow',     headers: ['id', 'voltagePu', 'voltageKv', 'angleDeg', 'loadKW', 'loadKVAR'],               sheetName: 'LoadFlow-Buses', rowKey: 'busRows' },
     { key: 'harmonics',    headers: ['id', 'ithd', 'vthd', 'limit', 'warning', 'calculationStatus'],                   sheetName: 'Harmonics' },
-    { key: 'motorStart',   headers: ['id', 'inrushKA', 'voltageSagPct', 'accelTime', 'method'],                        sheetName: 'MotorStart' },
+    { key: 'motorStart',   headers: ['id', 'inrushKA', 'voltageSagPct', 'accelTime', 'method', 'status'],              sheetName: 'MotorStart' },
     { key: 'voltageDrop',  headers: ['id', 'from', 'to', 'inputSource', 'path', 'dropPct', 'limitPct', 'status', 'combinedDropPct', 'combinedLimitPct', 'combinedStatus', 'recommendation', 'resultValidity', 'resultUnits', 'resultInputSources', 'resultAssumptions', 'resultModelLimits', 'resultWarnings', 'inputFingerprint'], sheetName: 'VoltageDrop' },
     { key: 'reliability',  headers: ['id', 'kw', 'critical', 'availabilityPct', 'outageHours', 'interruptionsPerYear', 'eensKwh'], sheetName: 'Reliability' },
     { key: 'quasiDynamic', headers: ['bus', 'minVm', 'maxVm', 'risk'], sheetName: 'QuasiDynamic' },
@@ -731,6 +806,14 @@ function exportXLSX(pkg, baseReport) {
     { key: 'frequencyScan', headers: ['order', 'frequencyHz', 'impedance', 'type', 'risk'], sheetName: 'FrequencyScan' },
     { key: 'transientStability', headers: ['status', 'clearingTime', 'maxAngle', 'cct', 'cctCycles'], sheetName: 'TransientStability' },
     { key: 'optimalPowerFlow', headers: ['unit', 'output', 'loading', 'incrementalCost', 'cost', 'limit'], sheetName: 'OptimalPowerFlow' },
+    // Supplemental study sections export the columns their own headers declare.
+    ...[
+      { key: 'sustainability', sheetName: 'Sustainability' },
+      { key: 'tccSettings', sheetName: 'TCC' },
+      { key: 'hazAreaClass', sheetName: 'HazArea' },
+      { key: 'insulationCoord', sheetName: 'InsulationCoord' },
+      { key: 'lighting', sheetName: 'Lighting' },
+    ].map(entry => ({ ...entry, headers: (sections[entry.key]?.headers || []).map(header => header.key) })),
   ].map(section => ({
     ...section,
     headers: [...new Set([...section.headers, ...studyMetadataColumns()])],

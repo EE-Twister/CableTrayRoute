@@ -856,3 +856,172 @@ export function exportPricingCSV(prices = {}, meta = {}) {
 
   return rows.join('\n') + '\n';
 }
+
+// ---------------------------------------------------------------------------
+// Run-time snapshot and XLSX workbook
+// ---------------------------------------------------------------------------
+
+const ESTIMATE_INPUT_LABELS = Object.freeze({
+  contingencyPct: 'Contingency (%)',
+  estimateClass: 'Estimate classification',
+  baseDate: 'Pricing base date',
+  estimateDate: 'Estimate date',
+  laborRegion: 'Project labor region',
+  nationalElectricianHourlyWage: 'National electrician wage',
+  localElectricianHourlyWage: 'Local electrician wage',
+  materialBaseIndex: 'Base PPI index',
+  materialCurrentIndex: 'Current PPI index',
+  materialSeriesId: 'BLS PPI series ID',
+  materialSeriesName: 'PPI series description',
+  laborBaseIndex: 'Base ECI index',
+  laborCurrentIndex: 'Current ECI index',
+  laborSeriesId: 'BLS ECI series ID',
+  laborSeriesName: 'ECI series description',
+  laborCableRate: 'Cable pull labor rate',
+  laborTrayRate: 'Tray install labor rate',
+  laborConduitRate: 'Conduit install labor rate',
+  fittingPrice: 'Tray fitting unit price',
+  pricing: 'Pricing book',
+});
+
+function flattenEstimateInputs({ basis = {}, contingencyPct = null, overrides = {}, pricing = null } = {}) {
+  return { contingencyPct, ...basis, ...overrides, pricing };
+}
+
+/**
+ * Compare the page inputs captured when an estimate was run with the current
+ * inputs. Inputs are `{ basis, contingencyPct, overrides, pricing }` where
+ * `basis` holds the raw estimate-basis fields, `overrides` the manual labor and
+ * fitting fields, and `pricing` the imported pricing book (or null).
+ * @returns {string[]} labels of the inputs that changed, empty when unchanged
+ */
+export function listChangedEstimateInputs(runInputs = {}, currentInputs = {}) {
+  const before = flattenEstimateInputs(runInputs);
+  const after = flattenEstimateInputs(currentInputs);
+  return [...new Set([...Object.keys(before), ...Object.keys(after)])]
+    .filter(key => JSON.stringify(before[key] ?? null) !== JSON.stringify(after[key] ?? null))
+    .map(key => ESTIMATE_INPUT_LABELS[key] || key);
+}
+
+function roundNumber(value, digits) {
+  const number = Number(value);
+  return Number((Number.isFinite(number) ? number : 0).toFixed(digits));
+}
+
+function laborBasisText(item) {
+  if (item.laborHoursKey) return item.laborHoursKey;
+  if (item.productivityEaPerHr) return `${item.productivityEaPerHr} EA/hr`;
+  if (item.productivityFtPerHr) return `${item.productivityFtPerHr} ft/hr`;
+  return '';
+}
+
+/**
+ * Build the Cost Estimate workbook from the snapshot frozen when the estimate
+ * was run, never from live page inputs, so the file matches the displayed and
+ * saved estimate. Money and quantity cells are numbers: Summary amounts are
+ * whole dollars like the on-screen summary, Line Items keep cents.
+ * @param {{ generatedAt?: string, basis?: object, contingencyPct?: number,
+ *   pricingSource?: string, lineItems?: object[], routeCostAssurance?: object|null,
+ *   ductbankAssemblies?: object[] }} snapshot
+ * @returns {Array<{ name: string, rows: Array<Array<string|number>> }>}
+ */
+export function buildCostEstimateWorkbookSheets(snapshot = {}) {
+  const lineItems = Array.isArray(snapshot.lineItems) ? snapshot.lineItems : [];
+  const basis = snapshot.basis && snapshot.basis.materialFactor != null ? snapshot.basis : buildEstimateBasis(snapshot.basis || {});
+  const summary = summarizeCosts(lineItems);
+  const contingencyPct = Number.isFinite(Number(snapshot.contingencyPct)) ? Number(snapshot.contingencyPct) : 0;
+  const contingencyAmt = summary.grandTotal * contingencyPct;
+  const totalWithContingency = summary.grandTotal + contingencyAmt;
+  const dollars = value => roundNumber(value, 0);
+  const sheets = [];
+
+  sheets.push({ name: 'Summary', rows: [
+    ['CableTrayRoute — Cost Estimate'],
+    [`Estimate run: ${snapshot.generatedAt || 'not recorded'}`],
+    [`Pricing basis: ${snapshot.pricingSource || 'Built-in 2024 conceptual pricing allowances'}`],
+    [`Estimate class: ${basis.estimateClass}`],
+    [`Pricing period: ${basis.baseDate || 'not recorded'} to ${basis.estimateDate || 'not recorded'}`],
+    [`Material factor: ${basis.materialFactor.toFixed(6)}`],
+    [`Combined labor factor: ${basis.combinedLaborFactor.toFixed(6)}`],
+    [],
+    ['Category', 'Material ($)', 'Labor ($)', 'Total ($)'],
+    ...Object.entries(summary.categories).map(([cat, s]) => [cat, dollars(s.materialCost), dollars(s.laborCost), dollars(s.totalCost)]),
+    [],
+    ['Subtotal', dollars(summary.grandMaterial), dollars(summary.grandLabor), dollars(summary.grandTotal)],
+    [`Contingency (${(contingencyPct * 100).toFixed(0)}%)`, '', '', dollars(contingencyAmt)],
+    ['Grand Total', '', '', dollars(totalWithContingency)],
+  ] });
+
+  sheets.push({ name: 'Estimate Basis', rows: [
+    ['Field', 'Value', 'Source / note'],
+    ['Estimate classification', basis.estimateClass, ''],
+    ['Currency', basis.currency, ''],
+    ['Pricing base date', basis.baseDate, ''],
+    ['Estimate date', basis.estimateDate, ''],
+    ['Material series ID', basis.materialSeriesId, basis.materialSeriesName],
+    ['Material base index', basis.materialBaseIndex, ''],
+    ['Material current index', basis.materialCurrentIndex, ''],
+    ['Material escalation factor', basis.materialFactor, basis.materialSourceUrl],
+    ['Labor region', basis.laborRegion, ''],
+    ['National electrician wage ($/hr)', basis.nationalElectricianHourlyWage, basis.wageSource],
+    ['Local electrician wage ($/hr)', basis.localElectricianHourlyWage, 'Comparable local OEWS value supplied by estimator'],
+    ['Regional labor factor', basis.regionalLaborFactor, basis.wageSourceUrl],
+    ['Labor series ID', basis.laborSeriesId, basis.laborSeriesName],
+    ['Labor base index', basis.laborBaseIndex, ''],
+    ['Labor current index', basis.laborCurrentIndex, ''],
+    ['Labor escalation factor', basis.laborEscalationFactor, basis.laborSourceUrl],
+    ['Combined labor factor', basis.combinedLaborFactor, 'Regional factor × labor escalation factor'],
+  ] });
+
+  sheets.push({ name: 'Line Items', rows: [
+    ['Category', 'ID', 'Description', 'Manufacturer', 'Catalog No.', 'Approval', 'Quantity', 'Unit', 'Price Key', 'Unit Price ($)', 'Labor Basis', 'Labor Hours', 'Material ($)', 'Labor ($)', 'Total ($)'],
+    ...lineItems.map(item => [
+      item.category, item.id, item.description,
+      item.manufacturer || '',
+      item.catalogNumber || '',
+      item.approvedPart ? 'Approved' : 'Unreviewed',
+      roundNumber(item.quantity, 3), item.unit,
+      item.priceKey || '',
+      roundNumber(item.unitPrice, 2),
+      laborBasisText(item),
+      roundNumber(item.laborHrs, 3),
+      roundNumber(item.materialCost, 2),
+      roundNumber(item.laborCost, 2),
+      roundNumber(item.totalCost, 2),
+    ]),
+  ] });
+
+  const assurance = snapshot.routeCostAssurance;
+  if (assurance) {
+    sheets.push({ name: 'Route Quantity', rows: [
+      ['Route Quantity Ledger', `Signature: ${assurance.quantityLedger.signature}`],
+      ['Category', 'ID', 'Quantity', 'Unit', 'Basis'],
+      ...assurance.quantityLedger.rows.map(row => [row.category, row.id, row.quantity, row.unit, row.basis]),
+    ] });
+    sheets.push({ name: 'Cost Assurance', rows: [
+      ['Classification', assurance.classification],
+      ['Status', assurance.status],
+      ['Cost signature', assurance.signature],
+      ['Quantity signature', assurance.quantityLedger.signature],
+      ['Input fingerprint', assurance.inputFingerprint],
+      [],
+      ['Code', 'Severity', 'Blocking', 'Message'],
+      ...[...assurance.issues, ...assurance.warnings].map(item => [item.code, item.severity, item.blocking ? 'Yes' : 'No', item.message]),
+    ] });
+    const assemblies = Array.isArray(snapshot.ductbankAssemblies) ? snapshot.ductbankAssemblies : [];
+    if (assemblies.length) {
+      sheets.push({ name: 'Ductbank Assemblies', rows: [
+        ['Ductbank', 'BOM ready', 'Route quantity (ft)', 'Category', 'Item', 'Specification', 'Quantity', 'Unit', 'Quantity basis', 'Blocking reason'],
+        ...assemblies.flatMap(assembly => {
+          const reasons = (assembly.blockingReasons || []).join(' ');
+          const rows = assembly.bom?.rows || [];
+          return rows.length
+            ? rows.map(row => [assembly.ductbankId, assembly.ready ? 'Yes' : 'No', assembly.routeQuantityFt, row.category, row.item, row.specification, row.quantity, row.unit, row.basis, reasons])
+            : [[assembly.ductbankId, assembly.ready ? 'Yes' : 'No', assembly.routeQuantityFt, '', '', '', '', '', '', reasons]];
+        }),
+      ] });
+    }
+  }
+
+  return sheets;
+}

@@ -8,6 +8,7 @@ import { readFile } from 'fs/promises';
 import { scaleCurve } from '../../analysis/tccUtils.js';
 import {
   interpolateTime,
+  evaluateOperatingTime,
   checkCoordination,
   findCoordinatingTimeDial,
   greedyCoordinate,
@@ -109,12 +110,16 @@ describe('interpolateTime', () => {
     assert.strictEqual(interpolateTime(curve, NaN), 1e-4);
   });
 
-  it('returns first point time for current <= first current', () => {
+  it('returns first point time at exactly the first current', () => {
     assert.strictEqual(interpolateTime(curve, 100), 10);
-    assert.strictEqual(interpolateTime(curve, 50), 10);
   });
 
-  it('returns last point time for current > last current', () => {
+  it('returns null (no trip) below the curve minimum current instead of the first point time', () => {
+    assert.strictEqual(interpolateTime(curve, 50), null);
+    assert.strictEqual(interpolateTime(curve, 99), null);
+  });
+
+  it('holds the last point time for current > last current (no extrapolation)', () => {
     assert.strictEqual(interpolateTime(curve, 2000), 1);
     assert.strictEqual(interpolateTime(curve, 1000), 1);
   });
@@ -130,16 +135,97 @@ describe('interpolateTime', () => {
 
   it('handles single-point curve', () => {
     const single = [{ current: 500, time: 5 }];
-    assert.strictEqual(interpolateTime(single, 100), 5);
+    assert.strictEqual(interpolateTime(single, 100), null);
     assert.strictEqual(interpolateTime(single, 500), 5);
     assert.strictEqual(interpolateTime(single, 1000), 5);
   });
 
-  it('result is always finite and positive', () => {
-    for (const I of [1, 10, 100, 300, 1000, 5000]) {
+  it('result is finite and positive at and above the curve minimum current', () => {
+    for (const I of [100, 300, 1000, 5000]) {
       const t = interpolateTime(curve, I);
       assert(Number.isFinite(t) && t > 0, `Expected positive finite at I=${I}, got ${t}`);
     }
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+describe('evaluateOperatingTime', () => {
+  const curve = [
+    { current: 100, time: 10 },
+    { current: 1000, time: 1 }
+  ];
+
+  it('reports no-trip with a null time below the curve minimum current (pickup)', () => {
+    const result = evaluateOperatingTime(curve, 50);
+    assert.strictEqual(result.status, 'no-trip');
+    assert.strictEqual(result.time, null);
+  });
+
+  it('leaves in-range times unchanged', () => {
+    assert.deepStrictEqual(
+      [100, Math.sqrt(100 * 1000), 1000].map(I => evaluateOperatingTime(curve, I).time),
+      [100, Math.sqrt(100 * 1000), 1000].map(I => interpolateTime(curve, I))
+    );
+    const mid = evaluateOperatingTime(curve, Math.sqrt(100 * 1000));
+    assert.strictEqual(mid.status, 'operates');
+    assert(Math.abs(mid.time - Math.sqrt(10)) < 1e-9);
+  });
+
+  it('does not hold or extrapolate a time above the curve maximum current', () => {
+    const result = evaluateOperatingTime(curve, 2000);
+    assert.strictEqual(result.status, 'above-domain');
+    assert.strictEqual(result.time, null);
+  });
+
+  it('reports no-curve for an empty curve instead of MIN_TIME', () => {
+    assert.strictEqual(evaluateOperatingTime([], 500).status, 'no-curve');
+    assert.strictEqual(evaluateOperatingTime([], 500).time, null);
+  });
+
+  it('applies the requested boundary at a vertical (duplicate-current) segment', () => {
+    const vertical = [
+      { current: 100, time: 10 },
+      { current: 500, time: 2 },
+      { current: 500, time: 0.05 },
+      { current: 1000, time: 0.05 }
+    ];
+    assert.strictEqual(evaluateOperatingTime(vertical, 500, { boundary: 'lower' }).time, 0.05);
+    assert.strictEqual(evaluateOperatingTime(vertical, 500, { boundary: 'upper' }).time, 2);
+  });
+
+  it('ignores the scaleCurve end-of-curve drop at the instantaneous ceiling on min and max curves', () => {
+    const scaled = scaleCurve(abb, { pickup: 160 });
+    const ceiling = scaled.minCurve.at(-1).current;
+    for (const curve of [scaled.minCurve, scaled.maxCurve]) {
+      const atCeiling = evaluateOperatingTime(curve, ceiling, { boundary: 'lower' });
+      assert.strictEqual(atCeiling.status, 'operates');
+      assert(atCeiling.time > 1e-3, `Expected the instantaneous clearing time, got ${atCeiling.time}`);
+    }
+  });
+
+  it('holds the instantaneous plateau time above the ceiling only when told the instantaneous ceiling', () => {
+    const scaled = scaleCurve(ge, { pickup: 600 });
+    const ceiling = scaled.settings.instantaneousMax;
+    assert.strictEqual(scaled.minCurve.at(-1).current, ceiling);
+    const plateau = evaluateOperatingTime(scaled.minCurve, ceiling, { boundary: 'lower' }).time;
+    const held = evaluateOperatingTime(scaled.minCurve, 10000, { boundary: 'lower', instantaneousCeilingA: ceiling });
+    assert.strictEqual(held.status, 'operates');
+    assert.strictEqual(held.heldInstantaneous, true);
+    assert.strictEqual(held.time, plateau);
+    assert(held.time > 1e-3, `Expected the instantaneous time, got ${held.time}`);
+    assert.strictEqual(evaluateOperatingTime(scaled.minCurve, 10000, { boundary: 'lower' }).status, 'above-domain');
+  });
+
+  it('does not hold a sloping inverse-time tail above its range', () => {
+    const iec = rawDevices.find(d => d.id === 'iec_ni_relay');
+    const scaled = scaleCurve(iec, {});
+    const top = scaled.minCurve.at(-1).current;
+    const result = evaluateOperatingTime(scaled.minCurve, top * 2, {
+      boundary: 'lower',
+      instantaneousCeilingA: scaled.settings.instantaneousMax
+    });
+    assert.strictEqual(result.status, 'above-domain');
+    assert.strictEqual(result.time, null);
   });
 });
 

@@ -54,6 +54,7 @@ assert.deepEqual(
     labelEligible: summary.labelEligible,
     incomplete: summary.incomplete,
     outsideModelRange: summary.outsideModelRange,
+    invalid: summary.invalid,
     assumedClearingTime: summary.assumedClearingTime,
   },
   {
@@ -62,8 +63,23 @@ assert.deepEqual(
     labelEligible: 1,
     incomplete: 2,
     outsideModelRange: 1,
+    invalid: 0,
     assumedClearingTime: 1,
   },
 );
+
+// A boundary shorter than the working distance at > 1.2 cal/cm² (for example
+// 42 in stored as 42 mm) is invalid: never label eligible, never "normal".
+const inchBoundary = { ...complete, incidentEnergy: 3.8, boundary: 42, workingDistance: 457.2 };
+assert.equal(isArcFlashLabelEligible(inchBoundary), false);
+assert.equal(arcFlashReadinessLabel(inchBoundary), 'Invalid result');
+assert.equal(isArcFlashLabelEligible({ ...inchBoundary, boundary: 1066.8 }), true);
+const invalidSummary = summarizeArcFlashResults({ BUS1: complete, BUS4: inchBoundary });
+assert.equal(invalidSummary.status, 'review');
+assert.equal(invalidSummary.invalid, 1);
+assert.equal(invalidSummary.labelEligible, 1);
+assert.match(invalidSummary.title, /^1 location\(s\) need engineering follow-up$/);
+assert.match(invalidSummary.summary, /check boundary units/);
+assert.equal(summarizeArcFlashResults({ BUS1: complete }).invalid, 0);
 
 console.log('arc flash readiness model tests passed');

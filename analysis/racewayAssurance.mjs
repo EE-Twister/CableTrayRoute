@@ -8,7 +8,7 @@ import {
   routeResultSucceeded,
   routeResultTag,
 } from './routeResults.mjs';
-import { evaluateTrayFill, summarizeTrayFillResult } from './trayFill.mjs';
+import { evaluateTrayFillWithCompartments, summarizeTrayFillResult } from './trayFill.mjs';
 import {
   buildDuctbankConduitIndex,
   canonicalConduitIdentity,
@@ -355,7 +355,7 @@ function buildCapacityChecks(assignments, indexes) {
       : findRaceway(id, indexes);
     if (!resolved || resolved.kind === 'unresolved-conduit') continue;
     if (resolved.kind === 'tray') {
-      const result = evaluateTrayFill(resolved.record, cables);
+      const result = evaluateTrayFillWithCompartments(resolved.record, cables);
       checks.push({ racewayId: id, kind: 'tray', cableTags: cables.map(cableTag), result });
       if (result.status === 'fail') {
         issues.push(makeIssue('TRAY-FILL-EXCEEDED', 'error', summarizeTrayFillResult(result), { raceway: id, href: 'cabletrayfill.html' }));

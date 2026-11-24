@@ -483,12 +483,12 @@ body.modal-open {
     padding: 0.1rem 0.5rem;
     border-radius: 999px;
     border: 1px solid var(--primary-color);
-    color: var(--primary-color);
+    color: var(--color-heading-accent, var(--primary-color));
     background: var(--secondary-color);
 }
 
 .view-component-option.is-active .view-component-indicator {
-    color: var(--primary-color);
+    color: var(--color-heading-accent, var(--primary-color));
     background: var(--secondary-color);
 }
 
@@ -520,7 +520,7 @@ body.modal-open {
 
 .view-property-option.is-selected {
     background: var(--ol-hover-bg);
-    color: var(--primary-color);
+    color: var(--color-heading-accent, var(--primary-color));
 }
 
 .view-property-option input[type="checkbox"] {

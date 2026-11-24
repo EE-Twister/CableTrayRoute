@@ -138,7 +138,7 @@ export function createCableScheduleColumns({ getEquipmentOptions, getRacewayOpti
     { key: "panel_id", label: "Panel ID", type: "text", datalist: () => getPanelOptions(), group: "Terminations", tooltip: "Panel identifier from Panel Schedule" },
     { key: "circuit_number", label: "Circuit #", type: "number", group: "Terminations", tooltip: "Circuit number from Panel Schedule" },
     ...["start_x", "start_y", "start_z", "end_x", "end_y", "end_z"].map(key => ({ key, label: `${key.startsWith("start") ? "Start" : "End"} ${key.at(-1).toUpperCase()}`, type: "number", group: "Routing Details", tooltip: `${key.at(-1).toUpperCase()}-coordinate of cable ${key.startsWith("start") ? "start" : "end"}` })),
-    { key: "zone", label: "Cable Zone", type: "number", group: "Routing Details", tooltip: "Routing zone or area number" },
+    { key: "zone", label: "Cable Zone", type: "number", group: "Routing Details", tooltip: "Routing zone or area number; in a tray with barriers (slots), also the compartment number (1 = first) used for fill checks unless a slot index or matching cable group is set" },
     { key: "manual_path", label: "Manual Path", type: "text", datalist: () => getRacewayOptions(), group: "Routing Details", tooltip: "Tray IDs separated by > to override route" },
     { key: "circuit_group", label: "Circuit Group", type: "number", group: "Routing Details", tooltip: "Circuit grouping number" },
     { key: "allowed_cable_group", label: "Allowed Group", type: "text", group: "Routing Details", tooltip: "Permitted cable grouping identifier" },

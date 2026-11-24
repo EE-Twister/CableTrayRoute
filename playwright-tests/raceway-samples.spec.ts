@@ -30,6 +30,8 @@ test('raceway samples roundtrip and route', async ({ page }) => {
     };
   }, { racewayJson, cableJson });
   await page.goto(pageUrl('cableschedule.html?e2e=1'));
+  // Load Sample Cables lives in the Cable Schedule's "More" toolbar menu.
+  await page.locator('details.toolbar-menu').filter({ has: page.locator('summary:has-text("More")') }).locator('summary').click();
   await page.click('#load-sample-cables-btn');
   await page.waitForSelector('#cableScheduleTable tbody tr', { state: 'attached' });
   await expect.poll(() => page.evaluate(() => window.dataStore?.getCables?.().length || 0)).toBeGreaterThan(0);

@@ -1,6 +1,7 @@
 import { downloadCSV, downloadPDF } from './reporting.mjs';
 import { generateArcFlashLabel } from './labels.mjs';
 import { isArcFlashLabelEligible } from '../studies/arcFlashReadiness.mjs';
+import { assessArcFlashResultPlausibility } from '../analysis/arcFlashResultUnits.mjs';
 import { studyExportMetadata } from '../analysis/studyExportMetadata.mjs';
 
 export { isArcFlashLabelEligible as isArcFlashLabelReady } from '../studies/arcFlashReadiness.mjs';
@@ -31,36 +32,45 @@ function round(value, decimals = 0) {
 function formatVoltage(voltage) {
   if (!Number.isFinite(voltage) || voltage <= 0) return 'Not Specified';
   if (voltage >= 1000) {
-    const kv = voltage / 1000;
-    return `${round(kv, kv >= 10 ? 1 : 2)} kV`;
+    // Exact system voltage: 12,470 V is "12.47 kV", not a rounded "12.5 kV".
+    return `${round(voltage / 1000, 3)} kV`;
   }
   return `${round(voltage, 0)} V`;
 }
 
+/**
+ * Split a distance into whole feet and inches after rounding the total to
+ * 0.1 in, so a value just under a whole foot reads "3 ft", never "2 ft 12 in".
+ */
+function feetAndInches(mm) {
+  const inchesTotal = round(mm / MM_PER_INCH, 1);
+  const feet = Math.floor(inchesTotal / 12);
+  const inches = round(inchesTotal - feet * 12, 1);
+  return { inchesTotal, feet, inches };
+}
+
+function formatInches(inches) {
+  return inches.toFixed(inches % 1 ? 1 : 0);
+}
+
 function formatDistanceVerbose(mm) {
   if (!Number.isFinite(mm) || mm <= 0) return 'Not Applicable';
-  const inchesTotal = mm / MM_PER_INCH;
-  const feet = Math.floor(inchesTotal / 12);
-  const inches = inchesTotal - feet * 12;
+  const { inchesTotal, feet, inches } = feetAndInches(mm);
   if (feet > 0) {
-    const inchesRounded = round(inches, 1);
-    const inchesText = inchesRounded === 0 ? '' : ` ${inchesRounded.toFixed(inchesRounded % 1 ? 1 : 0)} in`;
+    const inchesText = inches === 0 ? '' : ` ${formatInches(inches)} in`;
     return `${feet} ft${inchesText} (${round(mm, 0)} mm)`;
   }
-  const inchesRounded = round(inchesTotal, 1);
-  return `${inchesRounded.toFixed(inchesRounded % 1 ? 1 : 0)} in (${round(mm, 0)} mm)`;
+  return `${formatInches(inchesTotal)} in (${round(mm, 0)} mm)`;
 }
 
 function formatDistanceShort(mm) {
   if (!Number.isFinite(mm) || mm <= 0) return 'N/A';
-  const inchesTotal = mm / MM_PER_INCH;
-  const feet = Math.floor(inchesTotal / 12);
-  const inches = round(inchesTotal - feet * 12, 1);
+  const { inchesTotal, feet, inches } = feetAndInches(mm);
   if (feet > 0) {
     if (!inches) return `${feet} ft`;
-    return `${feet} ft ${inches.toFixed(inches % 1 ? 1 : 0)} in`;
+    return `${feet} ft ${formatInches(inches)} in`;
   }
-  return `${inches.toFixed(inches % 1 ? 1 : 0)} in`;
+  return `${formatInches(inchesTotal)} in`;
 }
 
 function formatApproach(mm) {
@@ -199,9 +209,32 @@ export function openLabelPrintWindow(results = {}, projectName = '') {
  * Generate CSV and PDF reports from arc flash analysis results.
  * @param {Object<string, {incidentEnergy:number, minimumArcRatingCalCm2:number, boundary:number, clearingTime:number}>} results
  */
+// Units for exported columns whose values are not self-describing. Engine
+// values are mm for distances, cal/cm² for energy, s for time, V for voltage.
+const EXPORT_COLUMN_UNITS = {
+  nominalVoltage: 'V',
+  incidentEnergy: 'cal/cm²',
+  boundary: 'mm',
+  clearingTime: 's',
+  workingDistance: 'mm',
+  limitedApproach: 'mm',
+  restrictedApproach: 'mm',
+};
+
+/** Rename unit-bearing columns, e.g. "boundary" -> "boundary (mm)". */
+export function withUnitHeaders(headers = [], rows = []) {
+  const label = header => (EXPORT_COLUMN_UNITS[header] ? `${header} (${EXPORT_COLUMN_UNITS[header]})` : header);
+  return {
+    headers: headers.map(label),
+    rows: rows.map(row => Object.fromEntries(headers.map(header => [label(header), row[header]]))),
+  };
+}
+
 export function generateArcFlashReport(results = {}, options = {}) {
   const lifecycle = studyExportMetadata(results, { assessment: options.assessment });
-  const entries = safeEntries(results);
+  // Honour the page's scope selector: a single location exports only that location.
+  const scope = options.scope && options.scope !== 'project' ? options.scope : null;
+  const entries = safeEntries(results).filter(([id]) => !scope || id === scope);
   const labelEntries = entries.filter(([, info]) => isArcFlashLabelEligible(info));
   const headers = [
     'bus',
@@ -239,59 +272,66 @@ export function generateArcFlashReport(results = {}, options = {}) {
     'resultValidity', 'freshness', 'eligibility', 'calculationVersion', 'calculatedAt',
     'assumptions', 'warnings', 'provenance'
   ];
-  const rows = entries.map(([id, data]) => ({
-    bus: id,
-    equipmentTag: data.equipmentTag || id,
-    nominalVoltage: data.nominalVoltage ?? '',
-    incidentEnergy: data.incidentEnergy,
-    ppeSelectionMethod: data.ppeSelectionMethod || 'incident-energy',
-    minimumArcRatingCalCm2: data.minimumArcRatingCalCm2 ?? '',
-    boundary: data.boundary,
-    clearingTime: data.clearingTime,
-    workingDistance: data.workingDistance ?? '',
-    limitedApproach: data.limitedApproach ?? '',
-    restrictedApproach: data.restrictedApproach ?? '',
-    upstreamDevice: data.upstreamDevice || '',
-    studyDate: resolveStudyDate(data),
-    calculationStatus: data.calculationStatus || 'not-recorded',
-    labelEligibility: isArcFlashLabelEligible(data) ? 'eligible-draft' : 'withheld',
-    requiredInputs: Array.isArray(data.requiredInputs) ? data.requiredInputs.join(' | ') : '',
-    notes: Array.isArray(data.notes) ? data.notes.join(' | ') : '',
-    calculationModel: data.calculationInputs?.model || '',
-    boltedFaultCurrentKA: data.calculationInputs?.boltedFaultCurrentKA ?? '',
-    arcingCurrentKA: data.calculationInputs?.arcingCurrentKA ?? '',
-    clearingTimeSource: data.calculationInputs?.clearingTimeSource || '',
-    clearingCurveStatus: data.calculationInputs?.clearingCurveStatus || '',
-    clearingCurveDomainA: data.calculationInputs?.clearingCurveDomainA
-      ? JSON.stringify(data.calculationInputs.clearingCurveDomainA)
-      : '',
-    protectiveDeviceId: data.calculationInputs?.protectiveDeviceId || '',
-    protectiveDeviceLibraryStatus: data.calculationInputs?.protectiveDeviceLibraryStatus || '',
-    protectiveDeviceSourceFingerprint: data.calculationInputs?.protectiveDeviceSourceFingerprint || '',
-    governingScenario: data.calculationInputs?.governingScenario || '',
-    electrodeConfiguration: data.calculationInputs?.electrodeConfiguration || '',
-    gapMM: data.calculationInputs?.gapMM ?? '',
-    enclosureDimensionsMM: [
-      data.calculationInputs?.boxHeightMM,
-      data.calculationInputs?.boxWidthMM,
-      data.calculationInputs?.boxDepthMM,
-    ].every(Number.isFinite)
-      ? `${data.calculationInputs.boxHeightMM} x ${data.calculationInputs.boxWidthMM} x ${data.calculationInputs.boxDepthMM}`
-      : '',
-    withinModelRange: data.calculationInputs?.withinModelRange ?? '',
-    faultCurrentSource: data.calculationInputs?.faultCurrentSource || '',
-    resultValidity: lifecycle.resultValidity,
-    freshness: lifecycle.freshness,
-    eligibility: lifecycle.resultEligibility,
-    calculationVersion: lifecycle.calculationVersion,
-    calculatedAt: lifecycle.calculatedAt,
-    assumptions: lifecycle.assumptions,
-    warnings: lifecycle.warnings,
-    provenance: lifecycle.provenance,
-  }));
+  const rows = entries.map(([id, data]) => {
+    const plausibility = assessArcFlashResultPlausibility(data);
+    return {
+      bus: id,
+      equipmentTag: data.equipmentTag || id,
+      nominalVoltage: data.nominalVoltage ?? '',
+      incidentEnergy: data.incidentEnergy,
+      ppeSelectionMethod: data.ppeSelectionMethod || 'incident-energy',
+      minimumArcRatingCalCm2: data.minimumArcRatingCalCm2 ?? '',
+      boundary: data.boundary,
+      clearingTime: data.clearingTime,
+      workingDistance: data.workingDistance ?? '',
+      limitedApproach: data.limitedApproach ?? '',
+      restrictedApproach: data.restrictedApproach ?? '',
+      upstreamDevice: data.upstreamDevice || '',
+      studyDate: resolveStudyDate(data),
+      calculationStatus: data.calculationStatus || 'not-recorded',
+      labelEligibility: isArcFlashLabelEligible(data) ? 'eligible-draft' : 'withheld',
+      requiredInputs: Array.isArray(data.requiredInputs) ? data.requiredInputs.join(' | ') : '',
+      notes: [
+        ...(Array.isArray(data.notes) ? data.notes : []),
+        ...(plausibility.plausible ? [] : [plausibility.reason]),
+      ].join(' | '),
+      calculationModel: data.calculationInputs?.model || '',
+      boltedFaultCurrentKA: data.calculationInputs?.boltedFaultCurrentKA ?? '',
+      arcingCurrentKA: data.calculationInputs?.arcingCurrentKA ?? '',
+      clearingTimeSource: data.calculationInputs?.clearingTimeSource || '',
+      clearingCurveStatus: data.calculationInputs?.clearingCurveStatus || '',
+      clearingCurveDomainA: data.calculationInputs?.clearingCurveDomainA
+        ? JSON.stringify(data.calculationInputs.clearingCurveDomainA)
+        : '',
+      protectiveDeviceId: data.calculationInputs?.protectiveDeviceId || '',
+      protectiveDeviceLibraryStatus: data.calculationInputs?.protectiveDeviceLibraryStatus || '',
+      protectiveDeviceSourceFingerprint: data.calculationInputs?.protectiveDeviceSourceFingerprint || '',
+      governingScenario: data.calculationInputs?.governingScenario || '',
+      electrodeConfiguration: data.calculationInputs?.electrodeConfiguration || '',
+      gapMM: data.calculationInputs?.gapMM ?? '',
+      enclosureDimensionsMM: [
+        data.calculationInputs?.boxHeightMM,
+        data.calculationInputs?.boxWidthMM,
+        data.calculationInputs?.boxDepthMM,
+      ].every(Number.isFinite)
+        ? `${data.calculationInputs.boxHeightMM} x ${data.calculationInputs.boxWidthMM} x ${data.calculationInputs.boxDepthMM}`
+        : '',
+      withinModelRange: data.calculationInputs?.withinModelRange ?? '',
+      faultCurrentSource: data.calculationInputs?.faultCurrentSource || '',
+      resultValidity: lifecycle.resultValidity,
+      freshness: lifecycle.freshness,
+      eligibility: lifecycle.resultEligibility,
+      calculationVersion: lifecycle.calculationVersion,
+      calculatedAt: lifecycle.calculatedAt,
+      assumptions: lifecycle.assumptions,
+      warnings: lifecycle.warnings,
+      provenance: lifecycle.provenance,
+    };
+  });
   if (!rows.length) return { reportCount: 0, labelCount: 0, omittedLabelCount: 0 };
-  downloadCSV(headers, rows, 'arcflash.csv');
-  downloadPDF('Arc Flash Report', headers, rows, 'arcflash.pdf');
+  const table = withUnitHeaders(headers, rows);
+  downloadCSV(table.headers, table.rows, 'arcflash.csv', { bom: true });
+  downloadPDF('Arc Flash Report', table.headers, table.rows, 'arcflash.pdf');
   // export individual labels
   labelEntries.forEach(([id, info]) => {
     const svg = generateArcFlashLabel(buildArcFlashLabelData(id, info));

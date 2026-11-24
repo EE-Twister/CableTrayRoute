@@ -29,6 +29,7 @@ import {
 } from './src/cable-schedule/io.js';
 import { renderCablePrintReport as renderCablePrintReportTo } from './src/cable-schedule/printReport.js';
 import { applyCableSizingHighlight } from './src/cable-schedule/sizingHighlight.js';
+import { initToolbarMenus } from './src/cable-schedule/toolbarMenus.js';
 import { collectPanelOptions, collectRacewayOptions } from './src/cable-schedule/optionModel.js';
 import { ensureImportedOption } from './src/components/importedOption.js';
 import {
@@ -75,9 +76,9 @@ const CABLE_READINESS_COPY = getContractReadinessCopy('cableschedule.html');
 const CABLE_TOUR_STEPS = [
   { selector: '#add-row-btn',            message: 'Click "Add Cable" to create your first cable entry. Each cable needs a Tag, source/destination endpoints, conductor size, and voltage rating.' },
   { selector: '#cableScheduleTable',     message: 'Fill in the cable schedule. Every row is one cable. The "Route Preference" column lets you assign a cable to a specific tray or conduit ID.' },
-  { selector: '#load-sample-cables-btn', message: 'New here? Click "Load Sample Data" to populate 3 example cables so you can explore the workflow right away.' },
+  { selector: '#cable-more-menu > summary', message: 'New here? Open "More" and choose "Load Sample Cables" to populate 3 example cables so you can explore the workflow right away.' },
   { selector: '#auto-route-all-btn',     message: 'Once cables and raceways are defined, use "Route All" to send every cable to the Optimal Route tool automatically.' },
-  { selector: '#export-xlsx-btn',        message: 'Export to Excel at any time to share your cable schedule or back it up offline.' }
+  { selector: 'details:has(#export-xlsx-btn) > summary', message: 'Use "Import / Export" to export to Excel at any time to share your cable schedule or back it up offline.' }
 ];
 
 
@@ -3252,11 +3253,9 @@ async function initCableSchedule() {
     });
   }
 
-  // --- Tour ---
-  const tourBtn = document.getElementById('tour-btn');
-  if (tourBtn) {
-    tourBtn.addEventListener('click', () => startTour(CABLE_TOUR_STEPS, 'cableSchedule'));
-  }
+  // --- Tour and toolbar menus ---
+  document.getElementById('tour-btn')?.addEventListener('click', () => startTour(CABLE_TOUR_STEPS, 'cableSchedule'));
+  initToolbarMenus(document.querySelector('.cable-schedule-toolbar'));
 }
 
 bootstrapPage({

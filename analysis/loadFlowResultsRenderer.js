@@ -13,6 +13,77 @@ function formatNumber(value, digits, fallback = '') {
   return Number.isFinite(value) ? Number(value).toFixed(digits) : fallback;
 }
 
+/** Like formatNumber, but a value that rounds to zero prints as 0.00, never -0.00. */
+function formatNumberNoNegativeZero(value, digits, fallback = '') {
+  const text = formatNumber(value, digits, fallback);
+  return text !== fallback && Number(text) === 0 ? (0).toFixed(digits) : text;
+}
+
+/*
+ * Real-power loss tolerance.
+ *
+ * Passive branches cannot generate real power, so a negative system loss is
+ * either numerical noise or a modelling error. The noise has two sources:
+ *  1. Power-balance residual. Each bus injection is solved only to within the
+ *     solver's reported maxMismatchKW, so a total built from N buses can be off
+ *     by up to N × maxMismatchKW. The mismatch is measured in per-unit of the
+ *     base, so this term grows with the base MVA.
+ *  2. Ideal-tie round-off. Zero-impedance branches are solved as a 1e9 pu
+ *     admittance (LARGE_ADMITTANCE in loadFlow.js), which amplifies float64
+ *     round-off in the terminal voltages into a small spurious branch loss
+ *     that the bus mismatch does not bound. The bundled Project Workflow Core
+ *     sample has two ideal-tie fuses. Measured: -0.007 kW at 100 MVA (its
+ *     maxMismatchKW is only 0.003 kW), -0.004 kW at 1000 and 10000 MVA, and
+ *     -0.003 kW per phase in the A/B/C study. The 0.05 kW floor covers this
+ *     with margin and is five steps of the 0.01 kW display resolution.
+ * A negative loss within max(floor, N × maxMismatchKW) prints as 0.00. A more
+ * negative loss prints as computed and is flagged with a warning. Reactive
+ * "loss" can legitimately be negative (line charging and shunt capacitance), so
+ * it is never snapped or flagged; only -0.00 is normalized.
+ */
+export const LOSS_ROUNDOFF_FLOOR_KW = 0.05;
+
+export function realPowerLossToleranceKW({ maxMismatchKW, busCount } = {}) {
+  const mismatch = Number(maxMismatchKW);
+  const buses = Math.max(1, Math.floor(Number(busCount)) || 1);
+  const balanceResidual = Number.isFinite(mismatch) && mismatch > 0 ? mismatch * buses : 0;
+  return Math.max(LOSS_ROUNDOFF_FLOOR_KW, balanceResidual);
+}
+
+/**
+ * Classify and format a system real-power loss for display.
+ *
+ * @param {number} lossKW - Computed loss [kW]
+ * @param {{ maxMismatchKW?: number, busCount?: number }} [context] - Solver mismatch and bus count
+ * @returns {{ text: string, valueKW: number|null, status: 'ok'|'roundoff'|'negative'|'unavailable', toleranceKW: number }}
+ */
+export function formatRealPowerLoss(lossKW, context = {}) {
+  const toleranceKW = realPowerLossToleranceKW(context);
+  if (!Number.isFinite(lossKW)) {
+    return { text: '0.00', valueKW: null, status: 'unavailable', toleranceKW };
+  }
+  if (lossKW < 0 && -lossKW <= toleranceKW) {
+    return { text: '0.00', valueKW: 0, status: 'roundoff', toleranceKW };
+  }
+  return {
+    text: formatNumberNoNegativeZero(lossKW, 2, '0.00'),
+    valueKW: lossKW,
+    status: lossKW < 0 ? 'negative' : 'ok',
+    toleranceKW
+  };
+}
+
+function negativeLossWarning(label, loss) {
+  return `${label}: computed real-power loss is ${loss.text} kW, beyond the ${loss.toleranceKW.toFixed(2)} kW numerical tolerance. `
+    + 'Passive branches cannot generate real power; check branch resistance, transformer tap and shunt data.';
+}
+
+function countDistinctBuses(buses) {
+  if (!Array.isArray(buses) || !buses.length) return 0;
+  const ids = new Set(buses.map(bus => bus?.id).filter(id => id !== undefined && id !== null && id !== ''));
+  return ids.size || buses.length;
+}
+
 function formatVoltage(volts) {
   if (!Number.isFinite(volts)) return '';
   if (Math.abs(volts) >= 1000) return `${(volts / 1000).toFixed(3)} kV`;
@@ -64,20 +135,27 @@ function extractSummaryEntries(summary) {
   }));
 }
 
-function buildSummaryList(summary) {
+function buildSummaryList(summary, lossContext = {}) {
   const entries = extractSummaryEntries(summary);
   if (!entries.length) return '';
+  const lossWarnings = [];
   let html = '<ul class="study-summary">';
   entries.forEach(({ label, data }) => {
     const loadKw = formatNumber(data.totalLoadKW, 1, '0.0');
     const loadKvar = formatNumber(data.totalLoadKVAR, 1, '0.0');
     const genKw = formatNumber(data.totalGenKW, 1, '0.0');
     const genKvar = formatNumber(data.totalGenKVAR, 1, '0.0');
-    const lossKw = formatNumber(data.totalLossKW, 2, '0.00');
-    const lossKvar = formatNumber(data.totalLossKVAR, 2, '0.00');
-    html += `<li><strong>${escapeHtml(label)}</strong>: Load ${loadKw} kW / ${loadKvar} kvar, Generation ${genKw} kW / ${genKvar} kvar, Loss ${lossKw} kW / ${lossKvar} kvar</li>`;
+    const loss = formatRealPowerLoss(data.totalLossKW, lossContext);
+    const lossKvar = formatNumberNoNegativeZero(data.totalLossKVAR, 2, '0.00');
+    if (loss.status === 'negative') lossWarnings.push(negativeLossWarning(label, loss));
+    html += `<li><strong>${escapeHtml(label)}</strong>: Load ${loadKw} kW / ${loadKvar} kvar, Generation ${genKw} kW / ${genKvar} kvar, Loss ${loss.text} kW / ${lossKvar} kvar</li>`;
   });
   html += '</ul>';
+  if (lossWarnings.length) {
+    html += '<ul class="study-warning-list">';
+    lossWarnings.forEach(msg => { html += `<li>${escapeHtml(msg)}</li>`; });
+    html += '</ul>';
+  }
   return html;
 }
 
@@ -299,7 +377,10 @@ export function renderLoadFlowResultsHtml(res) {
 
   if (!converged) return html;
 
-  html += buildSummaryList(res?.summary);
+  // Saved results from older revisions may lack maxMismatchKW; the tolerance
+  // then falls back to the round-off floor.
+  const lossContext = { maxMismatchKW: res?.maxMismatchKW, busCount: countDistinctBuses(buses) };
+  html += buildSummaryList(res?.summary, lossContext);
   html += buildBranchConnectionsSection(res?.summary, busLabelMap);
 
   if (buses.length) {
@@ -354,10 +435,10 @@ export function renderLoadFlowResultsHtml(res) {
     html += '</tbody></table>';
     if (res?.losses) {
       if (Number.isFinite(res.losses?.P)) {
-        html += `<p>Total Losses: ${formatNumber(res.losses.P, 2, '0.00')} kW / ${formatNumber(res.losses.Q, 2, '0.00')} kvar</p>`;
+        html += `<p>Total Losses: ${formatRealPowerLoss(res.losses.P, lossContext).text} kW / ${formatNumberNoNegativeZero(res.losses.Q, 2, '0.00')} kvar</p>`;
       } else {
         const entries = Object.entries(res.losses)
-          .map(([ph, loss]) => `${escapeHtml(ph)}: ${formatNumber(loss?.P, 2, '0.00')} kW / ${formatNumber(loss?.Q, 2, '0.00')} kvar`)
+          .map(([ph, loss]) => `${escapeHtml(ph)}: ${formatRealPowerLoss(loss?.P, lossContext).text} kW / ${formatNumberNoNegativeZero(loss?.Q, 2, '0.00')} kvar`)
           .join(', ');
         html += `<p>Total Losses: ${entries}</p>`;
       }
