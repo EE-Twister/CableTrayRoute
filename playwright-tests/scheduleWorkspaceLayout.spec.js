@@ -88,7 +88,11 @@ async function expectSingleRowChrome(page) {
   expect(Math.abs(layout.stepLabel.center - layout.guide.center)).toBeLessThan(12);
   // One toolbar row beside the Cable List heading.
   expect(layout.toolbar.height, 'cable toolbar should be a single row').toBeLessThan(52);
-  expect(Math.abs(layout.heading.center - layout.toolbar.center)).toBeLessThan(16);
+  // The toolbar sits beside the heading, or, in a narrow pane with wider
+  // fonts (Linux CI), wraps directly beneath it as a single row.
+  const beside = Math.abs(layout.heading.center - layout.toolbar.center) < 16;
+  const directlyBelow = layout.toolbar.top >= layout.heading.bottom - 2 && layout.toolbar.top - layout.heading.bottom < 24;
+  expect(beside || directlyBelow, 'toolbar should be beside or directly under the Cable List heading').toBe(true);
   return layout;
 }
 
