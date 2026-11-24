@@ -14,7 +14,7 @@ import {
   getItem
 } from '../dataStore.mjs';
 import { filterRouteResultsForProject } from '../analysis/deliverableWorkflow.mjs';
-import { cableHasRoutingCoordinates } from '../analysis/scheduleWorkflow.mjs';
+import { cableHasRoutingCoordinates, cableHasRaceway, isCableScheduleReady as sharedIsCableScheduleReady } from '../analysis/scheduleWorkflow.mjs';
 import { normalizeDesignBasis } from '../analysis/designBasis.mjs';
 import {
   READINESS_VOCABULARY,
@@ -141,52 +141,14 @@ function fieldValue(record, names) {
   return '';
 }
 
-function cableTag(cable) {
-  return fieldValue(cable, ['tag', 'id', 'cable_id', 'cableId', 'ref']);
-}
-
-function cableFrom(cable) {
-  return fieldValue(cable, ['from', 'from_tag', 'fromTag', 'source', 'source_tag']);
-}
-
-function cableTo(cable) {
-  return fieldValue(cable, ['to', 'to_tag', 'toTag', 'destination', 'load', 'load_tag']);
-}
-
-function cableSize(cable) {
-  return fieldValue(cable, ['conductor_size', 'conductorSize', 'cable_size', 'wire_size', 'size']);
-}
-
-function cableLength(cable) {
-  return fieldValue(cable, ['length', 'length_ft', 'lengthFt', 'estimated_length', 'calculated_length']);
-}
-
+// Delegates to analysis/scheduleWorkflow.mjs so every surface counts the same
+// cables: a length must be a positive number, not just non-blank text.
 export function hasRacewayAssignment(cable) {
-  return hasValue(fieldValue(cable, [
-    'raceway',
-    'raceway_id',
-    'racewayId',
-    'raceway_ids',
-    'racewayIds',
-    'route_preference',
-    'manual_path',
-    'tray_id',
-    'trayId',
-    'conduit_id',
-    'conduitId',
-    'ductbank_id',
-    'ductbankId',
-    'route',
-    'path'
-  ]));
+  return cableHasRaceway(cable);
 }
 
 export function isCableScheduleReady(cable) {
-  return hasValue(cableTag(cable))
-    && hasValue(cableFrom(cable))
-    && hasValue(cableTo(cable))
-    && hasValue(cableSize(cable))
-    && hasValue(cableLength(cable));
+  return sharedIsCableScheduleReady(cable);
 }
 
 export function getCableReadiness(cables = getCables()) {

@@ -87,7 +87,9 @@ function cableRaceway(cable) {
   ]);
 }
 
-function cableIsScheduleReady(cable) {
+// Single definition of schedule-ready, shared by the Cable Schedule panel, the
+// workflow step header, the KPI strip, and the dashboards (see workflowStatus.js).
+export function isCableScheduleReady(cable) {
   const length = numericValue(cableLength(cable));
   return hasValue(cableTag(cable))
     && hasValue(cableFrom(cable))
@@ -97,7 +99,7 @@ function cableIsScheduleReady(cable) {
     && length > 0;
 }
 
-function cableHasRaceway(cable) {
+export function cableHasRaceway(cable) {
   return hasValue(cableRaceway(cable));
 }
 
@@ -226,7 +228,7 @@ export function summarizeCableWorkflow(cables = []) {
     const hasSize = hasValue(cableSize(row));
     const length = numericValue(cableLength(row));
     const hasLength = length !== null && length > 0;
-    const scheduleReady = hasTag && hasFromTo && hasSize && hasLength;
+    const scheduleReady = isCableScheduleReady(row);
     const routingReady = scheduleReady && cableHasRaceway(row);
     if (!hasTag) summary.missingTag += 1;
     if (!hasFromTo) summary.missingFromTo += 1;

@@ -24,6 +24,14 @@ export function getPhaseLabel(panel, breaker) {
   return sequence[(index - 1) % sequence.length] || "";
 }
 
+// The Phase Load column is apparent power (VA) on AC panels. A kW-only load is
+// converted with its power factor (unity when none is given, the same default
+// as the demand schedule) instead of being read as VA.
+function acApparentScale(load) {
+  const pf = parseFloat(load?.powerFactor ?? load?.power_factor ?? load?.pf);
+  return Number.isFinite(pf) && pf > 0 && pf <= 1 ? 1000 / pf : 1000;
+}
+
 export function getPhasePowerValue(load, system) {
   if (!load) return null;
   const candidates = system === "dc"
@@ -37,8 +45,8 @@ export function getPhasePowerValue(load, system) {
     : [
         { value: load.demandKva, scale: 1000 },
         { value: load.kva, scale: 1000 },
-        { value: load.demandKw, scale: 1000 },
-        { value: load.kw, scale: 1000 },
+        { value: load.demandKw, scale: acApparentScale(load) },
+        { value: load.kw, scale: acApparentScale(load) },
         { value: load.va, scale: 1 }
       ];
   let zeroFound = false;
