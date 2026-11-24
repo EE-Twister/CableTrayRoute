@@ -12,7 +12,8 @@
     "e2e": "npm run e2e:full",
     "server": "npm run build && node server.mjs",
     "server:fast": "node server.mjs",
-    "lint": "eslint . --max-warnings=0 --ignore-pattern \"dist/**\" --ignore-pattern \"node_modules/**\" && npm run lint:architecture && npm run lint:css",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint . --max-warnings=0 --ignore-pattern \"dist/**\" --ignore-pattern \"node_modules/**\" && npm run lint:architecture && npm run lint:css && npm run typecheck",
     "lint:architecture": "node scripts/checkArchitectureBoundaries.mjs && node scripts/checkModuleCycles.mjs",
     "lint:css": "node scripts/checkCssArchitecture.mjs",
     "test:critical": "node tests/ampacity.test.mjs && node tests/racewayRoute.test.cjs && node tests/analysis.test.cjs && node tests/serverSecurity.test.mjs && node tests/collaborationServer.test.mjs && node tests/projectDisplayScheduler.test.mjs && node tests/revitImporter.test.mjs && node tests/validation.test.mjs && node tests/validationManifest.test.mjs && node tests/studyBasis.test.mjs",
@@ -51,7 +52,8 @@
     "@rollup/plugin-terser": "^1.0.0",
     "ajv": "^6.15.0",
     "eslint": "^10.4.0",
-    "rollup": "^3.30.0"
+    "rollup": "^3.30.0",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",

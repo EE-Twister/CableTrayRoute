@@ -177,9 +177,10 @@ export function buildTrayCableMapFromRouteResults(source, cables = [], existingM
       map[racewayId] = Array.isArray(rows) ? rows.map(row => ({ ...row })) : [];
     });
   }
+  /** @type {Map<string, object>} */
   const cableByTag = new Map(
     (Array.isArray(cables) ? cables : [])
-      .map(cable => [text(cableRouteTag(cable)).toLowerCase(), cable])
+      .map(cable => /** @type {[string, object]} */ ([text(cableRouteTag(cable)).toLowerCase(), cable]))
       .filter(([tag]) => tag)
   );
 

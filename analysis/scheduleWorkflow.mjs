@@ -207,6 +207,10 @@ export function getCableEndpointOptions({ equipment = [], loads = [], panels = [
   return Array.from(values).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 }
 
+/**
+ * @param {import('../types/project').Cable[]} [cables]
+ * @returns {{ total: number, scheduleReady: number, routingReady: number, missingSchedule: number, missingTag: number, missingFromTo: number, missingSize: number, missingLength: number, missingRaceway: number, duplicateTags: number }}
+ */
 export function summarizeCableWorkflow(cables = []) {
   const rows = meaningfulRecords(cables);
   const summary = {
@@ -367,8 +371,10 @@ function racewayHasDimensions(row, type) {
   return true;
 }
 
+/** @param {{ ductbanks?: object[], trays?: object[], conduits?: object[], assignedIds?: Iterable<string> }} [input] */
 export function summarizeRacewayWorkflow({ ductbanks = [], trays = [], conduits = [], assignedIds = [] } = {}) {
-  const normalizedAssigned = new Set(Array.from(assignedIds || []).map(normalized).filter(Boolean));
+  const normalizedAssigned = new Set(Array.from(/** @type {Iterable<string>} */ (assignedIds || [])).map(normalized).filter(Boolean));
+  /** @type {Array<[string, object[]]>} */
   const groups = [
     ['ductbank', meaningfulRecords(ductbanks)],
     ['tray', meaningfulRecords(trays)],
