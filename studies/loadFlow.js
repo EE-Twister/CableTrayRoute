@@ -209,7 +209,8 @@ if (typeof document !== 'undefined') {
     }
     if (initialReadiness?.ready !== false && isUsableLoadFlowResult(saved)) {
       lastValidResult = saved;
-      output.innerHTML = renderLoadFlowResultsHtml(saved);
+      const assessment = getStudyAssessments().loadFlow;
+      output.innerHTML = renderLoadFlowResultsHtml(saved, { stale: assessment?.freshness !== 'current' || assessment?.eligible !== true });
       if (exportBtn) exportBtn.disabled = false;
     }
     form.addEventListener('submit', event => {

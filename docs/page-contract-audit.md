@@ -2570,13 +2570,14 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - src/components/studyLifecycle.js:406 getStudyProvenance()
   - src/components/studyLifecycle.js:63 getStudyAssessment()
   - studies/loadFlow.js:145 getStudyAssessments()
-  - ... 3 more
+  - ... 4 more
 - `studyResults`
   - src/components/studyLifecycle.js:301 getStudyAssessment()
   - src/components/studyLifecycle.js:63 getStudyAssessment()
   - studies/loadFlow.js:145 getStudyAssessments()
   - studies/loadFlow.js:162 getStudyAssessments()
   - studies/loadFlow.js:196 getStudies()
+  - ... 1 more
 - `studyResults.loadFlow`
   - studies/loadFlow.js:196 getStudies().loadFlow
 
@@ -2785,16 +2786,18 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.studyProvenance`
   - studies/shortCircuit.js:147 captureStudyRunContext()
   - studies/shortCircuit.js:175 getStudyAssessments()
+  - studies/shortCircuit.js:357 getStudyAssessments()
 - `settings.tccSettings`
   - analysis/shortCircuit.mjs:824 getItem(tccSettings)
 - `studyResults`
   - studies/shortCircuit.js:155 getStudies()
   - studies/shortCircuit.js:175 getStudyAssessments()
-  - studies/shortCircuit.js:336 getStudies()
+  - studies/shortCircuit.js:349 getStudies()
+  - studies/shortCircuit.js:357 getStudyAssessments()
 - `studyResults.shortCircuit`
   - studies/shortCircuit.js:156 studies.shortCircuit
   - studies/shortCircuit.js:157 studies.shortCircuit
-  - studies/shortCircuit.js:336 getStudies().shortCircuit
+  - studies/shortCircuit.js:349 getStudies().shortCircuit
 
 **Detected Writes**
 - `settings.studyApprovals`
