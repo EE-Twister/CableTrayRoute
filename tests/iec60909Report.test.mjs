@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { toIEC60909PDF } from '../reports/iec60909Report.mjs';
 
@@ -29,6 +30,8 @@ const results = {
 
 const pdf = await toIEC60909PDF(results);
 const outputPath = 'output/calculation-corrections-2026-09-17/iec60909-report.pdf';
+// output/ is gitignored, so a clean checkout (CI) has no evidence folder yet.
+await fs.mkdir(path.dirname(outputPath), { recursive: true });
 await fs.writeFile(outputPath, Buffer.from(pdf));
 const document = await getDocument({ data: new Uint8Array(pdf), disableWorker: true }).promise;
 let text = '';
