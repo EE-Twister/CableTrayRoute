@@ -28,6 +28,7 @@ import {
   prepareProjectSnapshotForSave
 } from './src/projectSnapshot.js';
 import { buildOneLineProjectView, hashProjectInputs, normalizeOneLineReferences, normalizeProjectEntities } from './analysis/projectIntegration.mjs';
+import { normalizeStudyResultsArcFlashUnits } from './analysis/arcFlashResultUnits.mjs';
 import { validateAndNormalizeCanonicalProject } from './src/canonicalProject.mjs';
 import {
   getProjectEntityDeletionImpact as buildProjectEntityDeletionImpact,
@@ -2171,7 +2172,10 @@ export function importProject(obj) {
     }
     const importedStudies = data.settings?.studyResults ?? data.settings?.[LEGACY_STUDIES_SETTING_KEY] ?? {};
     if (importedStudies && typeof importedStudies === 'object' && !Array.isArray(importedStudies)) {
-      setStudies(importedStudies);
+      // Study results reach scenario storage through setStudies, not
+      // migrateProject, so file, sample, saved-project, and server imports
+      // convert legacy arc-flash boundary units here before they are stored.
+      setStudies(normalizeStudyResultsArcFlashUnits(importedStudies));
     } else {
       setStudies({});
     }

@@ -28,6 +28,14 @@ assert.strictEqual(scRows[0].status, 'warn');
 assert.match(scRows[0].note, /50 kA/);
 
 assert.strictEqual(arcFlashBarRows([['x', { incidentEnergy: 12, boundary: 900 }]])[0].status, 'warn');
+// A stale or input-incomplete location never shows a pass/review/fail verdict.
+const notReady = arcFlashBarRows(
+  [['x', { incidentEnergy: 3.8, boundary: 1067 }], ['y', { incidentEnergy: 0.9, boundary: 350 }]],
+  { readiness: id => (id === 'x' ? { ready: false, reason: 'Saved result is stale' } : { ready: true }) }
+);
+assert.strictEqual(notReady[0].status, 'na');
+assert.match(notReady[0].note, /stale/);
+assert.strictEqual(notReady[1].status, 'pass');
 
 const vd = voltageDropBarRows([
   { tag: 'C1', evaluated: true, dropPct: 2, limitPct: 3, status: 'pass' },

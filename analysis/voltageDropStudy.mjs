@@ -327,6 +327,8 @@ export function addCombinedPathResults(results = []) {
       combinedDropPct,
       combinedLimitPct,
       combinedStatus: statusForDrop(combinedDropPct, combinedLimitPct, pathEvaluated),
+      // The cable's own drop contract; `resultContract` below describes the combined path.
+      individualResultContract: result.resultContract || null,
       resultContract: createCalculationResult({
         value: combinedDropPct,
         units: '%',

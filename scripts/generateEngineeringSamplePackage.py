@@ -58,6 +58,17 @@ def number(value, digits=1, default="-"):
         return default
 
 
+MM_PER_INCH = 25.4
+
+
+def inches_from_mm(value, digits=1, default="-"):
+    """Arc-flash boundary and working distance are stored in mm, matching the app engine."""
+    try:
+        return number(float(value) / MM_PER_INCH, digits, default)
+    except (TypeError, ValueError):
+        return default
+
+
 def load_project(path: Path) -> dict:
     with path.open("r", encoding="utf-8") as handle:
         project = json.load(handle)
@@ -826,8 +837,8 @@ class ArcFlashLabels(Flowable):
         c.setFont("Helvetica", 7.5)
         lines = [
             f"Nominal voltage: {text(row.get('nominalVoltage'))} V",
-            f"Arc flash boundary: {text(row.get('boundary'))} {text(row.get('boundaryUnit'), 'in')}",
-            f"Working distance: {text(row.get('workingDistanceIn'))} in",
+            f"Arc flash boundary: {inches_from_mm(row.get('boundary'))} in ({number(row.get('boundary'), 0)} mm)",
+            f"Working distance: {inches_from_mm(row.get('workingDistance'))} in ({number(row.get('workingDistance'), 0)} mm)",
             f"Minimum arc rating: {text(row.get('minimumArcRatingCalCm2'), '0')} cal/cm2",
             f"Label created: {text(self.created_date)}",
         ]
@@ -1238,8 +1249,8 @@ def build_pdf(project: dict, output_path: Path, visuals: dict):
         arc_results.append(row)
     arc_rows = [[
         row.get("equipmentTag"), row.get("nominalVoltage"), number(row.get("boltedFaultCurrentKA"), 2),
-        number(row.get("arcingCurrentKA"), 2), number(row.get("clearingTime"), 3), row.get("workingDistanceIn"),
-        number(row.get("incidentEnergy"), 1), f"{row.get('boundary')} {row.get('boundaryUnit')}",
+        number(row.get("arcingCurrentKA"), 2), number(row.get("clearingTime"), 3), inches_from_mm(row.get("workingDistance")),
+        number(row.get("incidentEnergy"), 1), f"{inches_from_mm(row.get('boundary'))} in",
         "Below 1.2" if float(row.get("incidentEnergy", 0)) <= 1.2 else f">= {row.get('minimumArcRatingCalCm2')} cal/cm2",
     ] for row in arc_results]
     story.append(data_table(

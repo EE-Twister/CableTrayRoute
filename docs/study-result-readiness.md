@@ -32,3 +32,13 @@ Only complete individual and assembled feeder-plus-branch path results are saved
 Voltage Stability, Optimal Power Flow, Frequency Scan, and Transient Stability can import available project data. The import banner identifies what was populated and which engineering inputs remain manual. Saved project-derived results are marked stale when their One-Line, cable, or upstream Short Circuit source changes.
 
 Advanced results appear as dedicated Project Report sections. Each section states whether it is a valid saved run or a legacy/unverified result, records the input source and run time, and carries solver warnings into the report.
+
+## Withheld results in the Project Report and on study pages
+
+When a saved study is stale, partially evaluated, or otherwise not eligible, the Project Report replaces its values with "—" and keeps them only as withheld historical values for audit. The row's verdict is withheld too: a row that said pass, fail, stable, or review reads **not evaluated**, so no pass/fail conclusion is shown beside values that are not current. Reliability cut sets are withheld with the rest of their study.
+
+On the Arc Flash page, a location that is not label-ready keeps its incident-energy bar for context but shows a **Not evaluated** badge with the reason instead of a PPE pass/review/fail badge.
+
+The Load Flow section reads the solver's saved bus voltages (pu and kV), angles, loads, and branch flows. Unbalanced runs list each phase separately. The Motor Starting section lists each motor from the Motor Starting page's saved results, with its status. In the Voltage Drop section, each cable's own drop is shown according to that cable's own result; the combined feeder-plus-branch path has its own status.
+
+The Heat Trace branch schedule in the report re-checks every saved branch against current inputs, as the Heat Trace page does. Stale branches are marked invalid and are excluded from the connected-load totals.

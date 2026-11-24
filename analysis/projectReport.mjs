@@ -27,47 +27,10 @@ import {
   decorateStudyRows,
 } from './studyResultContext.mjs';
 import { buildConduitCableMap, evaluateConduitFill, recordId as conduitRecordId } from './conduitFill.mjs';
-import { cablesAssignedToTray, evaluateTrayFill } from './trayFill.mjs';
+import { cablesAssignedToTray, evaluateTrayFillWithCompartments, summarizeTrayFillResult } from './trayFill.mjs';
+import { assessArcFlashResultPlausibility } from './arcFlashResultUnits.mjs';
 import { parseTradeSize } from './pullBoxSizing.mjs';
 
-// ---------------------------------------------------------------------------
-// Fill helpers
-// ---------------------------------------------------------------------------
-
-/** NEC §392.22 fill limit (%) by tray type. */
-const NEC_FILL_LIMIT_PCT = {
-  'Ladder (50 % fill)': 50,
-  'Solid Bottom (40 % fill)': 40,
-  'Ventilated (50 % fill)': 50,
-};
-
-function fillLimitPct(trayType = '') {
-  for (const [key, limit] of Object.entries(NEC_FILL_LIMIT_PCT)) {
-    if (trayType.toLowerCase().includes(key.split(' ')[0].toLowerCase())) return limit;
-  }
-  return 50; // default
-}
-
-/**
- * Compute total cable cross-section (in²) for cables assigned to a tray.
- */
-function cableFillIn2(cables, trayId) {
-  return cables
-    .filter(c => c.route_preference === trayId || c.raceway === trayId)
-    .reduce((sum, c) => {
-      const od = parseFloat(c.od) || 0;
-      return sum + Math.PI * (od / 2) ** 2;
-    }, 0);
-}
-
-/**
- * Compute tray cross-section available area (in²).
- */
-function trayAreaIn2(tray) {
-  const w = parseFloat(tray.inside_width) || 12;  // inches
-  const d = parseFloat(tray.tray_depth)   || 4;   // inches
-  return w * d;
-}
 
 // ---------------------------------------------------------------------------
 // Section builders
@@ -120,33 +83,56 @@ function buildCableSection(cables) {
   };
 }
 
+const round2 = value => (Number.isFinite(value) ? +value.toFixed(2) : null);
+
+/**
+ * Report row for one tray, from the same compartment-aware NEC 392.22(A)
+ * evaluation used by the Raceway Schedule. Values that cannot be evaluated are
+ * reported as incomplete with the reason — never as 0 % "ok".
+ */
+function buildTrayFillRow(tray, cables) {
+  const id = tray.tray_id || tray.id || '—';
+  const type = tray.tray_type || '—';
+  const widthIn = parseFloat(tray.inside_width ?? tray.width) || null;
+  const assigned = cablesAssignedToTray(tray, cables);
+  if (!assigned.length) {
+    return { id, type, widthIn, areaIn2: null, fillIn2: null, usedPct: 0, limitPct: 100, status: 'ok', basis: 'No cables assigned', note: '' };
+  }
+  const evaluation = evaluateTrayFillWithCompartments(tray, assigned);
+  const compartmentNote = evaluation.compartmented && evaluation.governingCompartment
+    ? ` · governing: ${evaluation.governingCompartment}`
+    : '';
+  if (evaluation.evaluable !== true) {
+    return {
+      id, type, widthIn, areaIn2: null, fillIn2: null, usedPct: null, limitPct: 100,
+      status: 'incomplete',
+      basis: evaluation.clause || '392.22',
+      note: summarizeTrayFillResult(evaluation),
+    };
+  }
+  const usedPct = evaluation.utilizationPercent;
+  const status = usedPct > 100 ? 'over' : usedPct > 90 ? 'near' : 'ok';
+  // 392.22(A)(1)(a)/(A)(3)(a) limit the sum of cable diameters, not an area.
+  const diameterBasis = evaluation.allowable?.smallCableAreaIn2 === undefined
+    && evaluation.allowable?.cableAreaIn2 === undefined
+    && Number.isFinite(evaluation.allowable?.largeCableDiameterIn);
+  const note = diameterBasis
+    ? `Sum of diameters ${round2(evaluation.used?.largeCableDiameterIn)} in of ${round2(evaluation.allowable?.largeCableDiameterIn)} in allowed`
+    : '';
+  return {
+    id, type, widthIn,
+    areaIn2: round2(evaluation.allowable?.smallCableAreaIn2 ?? evaluation.allowable?.cableAreaIn2),
+    fillIn2: round2(evaluation.used?.smallCableAreaIn2 ?? evaluation.used?.cableAreaIn2),
+    usedPct: +usedPct.toFixed(1),
+    limitPct: 100,
+    status,
+    basis: `${evaluation.clause}${compartmentNote}`,
+    note,
+  };
+}
+
 function buildFillSection(trays, conduits, cables) {
-  const trayRows = trays.map(tray => {
-    const id       = tray.tray_id || tray.id || '—';
-    const widthIn  = parseFloat(tray.inside_width) || 12;
-    const assigned = cablesAssignedToTray(tray, cables);
-    // Same NEC 392.22(A) evaluation as the Tray Fill page; fall back to the crude
-    // width x depth estimate only when the tray/cable data cannot be evaluated.
-    const evaluation = evaluateTrayFill(tray, assigned);
-    if (evaluation.evaluable === true) {
-      const allowableArea = evaluation.allowable?.smallCableAreaIn2 ?? evaluation.allowable?.baseTableAreaIn2 ?? null;
-      const usedArea = evaluation.used?.smallCableAreaIn2 ?? null;
-      const usedPct = evaluation.utilizationPercent;
-      const status = usedPct > 100 ? 'over' : usedPct > 90 ? 'near' : 'ok';
-      return {
-        id, type: tray.tray_type || '—', widthIn,
-        areaIn2: allowableArea != null ? +allowableArea.toFixed(2) : 0,
-        fillIn2: usedArea != null ? +usedArea.toFixed(2) : 0,
-        usedPct: +usedPct.toFixed(1), limitPct: 100, status, basis: evaluation.clause,
-      };
-    }
-    const areaIn2  = trayAreaIn2(tray);
-    const fillIn2  = cableFillIn2(cables, id);
-    const limitPct = fillLimitPct(tray.tray_type || '');
-    const usedPct  = areaIn2 > 0 ? (fillIn2 / areaIn2) * 100 : 0;
-    const status   = usedPct > limitPct ? 'over' : usedPct > limitPct * 0.9 ? 'near' : 'ok';
-    return { id, type: tray.tray_type || '—', widthIn, areaIn2: +areaIn2.toFixed(2), fillIn2: +fillIn2.toFixed(2), usedPct: +usedPct.toFixed(1), limitPct, status };
-  });
+  const trayRows = trays.map(tray => buildTrayFillRow(tray, cables));
 
   // Same NEC Chapter 9 area table and 53/31/40 % limits the Conduit Fill page uses,
   // so the report cannot disagree with the page it summarizes.
@@ -159,25 +145,56 @@ function buildFillSection(trays, conduits, cables) {
     const id       = c.conduit_id || c.id || '—';
     const evaluation = evaluateConduitFill(c, conduitCableMap.get(conduitRecordId(c)) || []);
     const parsedTrade = parseTradeSize(c.trade_size);
-    const trade    = Number.isFinite(parsedTrade) ? parsedTrade : 1;
-    // Unknown type/size: fall back to a nominal inside-diameter approximation.
-    const areaIn2  = evaluation.internalAreaIn2 ?? Math.PI * ((trade * 0.88) / 2) ** 2;
-    const fillIn2  = evaluation.cableAreaTotalIn2 || cableFillIn2(cables, id);
+    const trade    = Number.isFinite(parsedTrade) ? parsedTrade : null;
+    const type     = c.type || c.conduit_type || 'Conduit';
     const limitPct = (evaluation.fillLimit ?? 0.40) * 100;
+    const basis    = 'NEC Chapter 9, Table 1';
+    const areaIn2  = evaluation.internalAreaIn2;
+    // An unlisted type/size or a cable without a diameter leaves the fill unknown;
+    // report that instead of a percentage computed from partial data.
+    const missing = [];
+    if (!Number.isFinite(areaIn2) || areaIn2 <= 0) missing.push('listed conduit type and trade size');
+    if (evaluation.missingAreaCables?.length) missing.push(`cable diameter for ${evaluation.missingAreaCables.join(', ')}`);
+    if (missing.length && evaluation.cableCount > 0) {
+      return {
+        id, type, tradeSizeIn: trade, areaIn2: round2(areaIn2), fillIn2: null, usedPct: null, limitPct,
+        status: 'incomplete', basis, note: `Fill cannot be evaluated: missing ${missing.join('; ')}.`,
+      };
+    }
+    const fillIn2  = evaluation.cableAreaTotalIn2 || 0;
     const usedPct  = areaIn2 > 0 ? (fillIn2 / areaIn2) * 100 : 0;
     const status   = usedPct > limitPct ? 'over' : usedPct > limitPct * 0.9 ? 'near' : 'ok';
-    return { id, type: c.type || 'Conduit', tradeSizeIn: trade, areaIn2: +areaIn2.toFixed(2), fillIn2: +fillIn2.toFixed(2), usedPct: +usedPct.toFixed(1), limitPct, status };
+    return { id, type, tradeSizeIn: trade, areaIn2: round2(areaIn2), fillIn2: round2(fillIn2), usedPct: +usedPct.toFixed(1), limitPct, status, basis, note: evaluation.cableCount ? '' : 'No cables assigned' };
   });
 
   const overCount  = [...trayRows, ...conduitRows].filter(r => r.status === 'over').length;
   const nearCount  = [...trayRows, ...conduitRows].filter(r => r.status === 'near').length;
+  const incompleteCount = [...trayRows, ...conduitRows].filter(r => r.status === 'incomplete').length;
 
   return {
     title: 'Raceway Fill Analysis',
     trays: trayRows,
     conduits: conduitRows,
-    summary: { overCount, nearCount, totalRaceways: trayRows.length + conduitRows.length },
+    summary: { overCount, nearCount, incompleteCount, totalRaceways: trayRows.length + conduitRows.length },
   };
+}
+
+/** Shared Raceway Fill table for both report renderers. */
+function fillTableHTML(fill, { esc, fmt, statusBadge }) {
+  const row = r => `<tr>
+      <td>${esc(r.id)}</td><td>${esc(r.type)}</td>
+      <td>${fmt(r.areaIn2)}</td><td>${fmt(r.fillIn2)}</td>
+      <td>${fmt(r.usedPct)}</td><td>${fmt(r.limitPct)}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td>${esc(r.basis)}${r.note ? `<br><span class="report-note">${esc(r.note)}</span>` : ''}</td>
+    </tr>`;
+  return `<p class="report-note">${fmt(fill.summary.overCount)} over limit &nbsp;·&nbsp; ${fmt(fill.summary.nearCount)} near limit &nbsp;·&nbsp; ${fmt(fill.summary.incompleteCount ?? 0)} incomplete</p>
+  <div class="report-scroll"><table class="report-table">
+    <thead><tr><th>Raceway</th><th>Type</th><th>Allowable (in²)</th><th>Used (in²)</th><th>Used %</th><th>Limit %</th><th>Status</th><th>Basis</th></tr></thead>
+    <tbody>
+    ${[...fill.trays, ...fill.conduits].map(row).join('')}
+    </tbody>
+  </table></div>`;
 }
 
 function buildClashSection(trays) {
@@ -228,10 +245,36 @@ function buildValidationSection(cables, trays, conduits) {
   };
 }
 
-function buildHeatTraceSection(studies = {}, projectName = '', approval = null) {
+const HEAT_TRACE_CASE_NOT_ASSESSED = Object.freeze({
+  studyKey: 'heatTraceSizing',
+  validity: { state: 'unknown' },
+  freshness: 'unknown',
+  eligible: false,
+  reasons: ['freshness_not_assessed'],
+});
+
+/**
+ * Attach a lifecycle assessment to every saved branch so buildHeatTraceReport
+ * withholds stale or unassessed branches from the schedule totals. When the
+ * caller supplies an assessor (the browser report page does), every case is
+ * re-assessed against current inputs; a previously attached assessment is only
+ * trusted when no assessor is available.
+ */
+function assessHeatTraceCases(circuitCases, assessCase) {
+  return circuitCases.map(caseItem => {
+    if (!caseItem || typeof caseItem !== 'object') return caseItem;
+    if (assessCase) return { ...caseItem, _lifecycleAssessment: assessCase(caseItem) || HEAT_TRACE_CASE_NOT_ASSESSED };
+    if (caseItem._lifecycleAssessment) return caseItem;
+    return { ...caseItem, _lifecycleAssessment: HEAT_TRACE_CASE_NOT_ASSESSED };
+  });
+}
+
+function buildHeatTraceSection(studies = {}, projectName = '', approval = null, options = {}) {
   const activeResult = studies.heatTraceSizing || null;
-  const circuitCases = Array.isArray(studies.heatTraceSizingCircuits) ? studies.heatTraceSizingCircuits : [];
-  if (!activeResult && circuitCases.length === 0) return null;
+  const savedCases = Array.isArray(studies.heatTraceSizingCircuits) ? studies.heatTraceSizingCircuits : [];
+  if (!activeResult && savedCases.length === 0) return null;
+  const assessCase = typeof options.assessHeatTraceCase === 'function' ? options.assessHeatTraceCase : null;
+  const circuitCases = assessHeatTraceCases(savedCases, assessCase);
 
   const report = buildHeatTraceReport({
     activeResult,
@@ -285,6 +328,7 @@ export function generateProjectReport({
   projectName = '',
   studies = {},
   approvals = {},
+  assessHeatTraceCase = null,
 } = {}) {
   return {
     generatedAt: new Date().toISOString(),
@@ -293,7 +337,7 @@ export function generateProjectReport({
     fill:       buildFillSection(trays, conduits, cables),
     clashes:    buildClashSection(trays),
     spools:     buildSpoolSection(trays, cables),
-    heatTrace:  buildHeatTraceSection(studies, projectName, approvals.heatTraceSizing || null),
+    heatTrace:  buildHeatTraceSection(studies, projectName, approvals.heatTraceSizing || null, { assessHeatTraceCase }),
     validation: buildValidationSection(cables, trays, conduits),
   };
 }
@@ -317,6 +361,7 @@ export function renderReportHTML(report) {
       warning: 'badge-warn',
       fail: 'badge-error',
       info: 'badge-info',
+      incomplete: 'badge-warn',
       withinLimit: 'badge-ok',
       overLimit: 'badge-error',
       invalid: 'badge-error',
@@ -362,26 +407,7 @@ export function renderReportHTML(report) {
 
 <section class="report-section" id="rpt-fill">
   <h2>Raceway Fill Analysis</h2>
-  <p class="report-note">${fmt(fill.summary.overCount)} over limit &nbsp;·&nbsp; ${fmt(fill.summary.nearCount)} near limit</p>
-  <div class="report-scroll">
-  <table class="report-table">
-    <thead><tr><th>Raceway</th><th>Type</th><th>Area (in²)</th><th>Fill (in²)</th><th>Used %</th><th>Limit %</th><th>Status</th></tr></thead>
-    <tbody>
-    ${fill.trays.map(r => `<tr>
-      <td>${esc(r.id)}</td><td>${esc(r.type)}</td>
-      <td>${fmt(r.areaIn2)}</td><td>${fmt(r.fillIn2)}</td>
-      <td>${fmt(r.usedPct)}</td><td>${fmt(r.limitPct)}</td>
-      <td>${statusBadge(r.status)}</td>
-    </tr>`).join('')}
-    ${fill.conduits.map(r => `<tr>
-      <td>${esc(r.id)}</td><td>${esc(r.type)}</td>
-      <td>${fmt(r.areaIn2)}</td><td>${fmt(r.fillIn2)}</td>
-      <td>${fmt(r.usedPct)}</td><td>${fmt(r.limitPct)}</td>
-      <td>${statusBadge(r.status)}</td>
-    </tr>`).join('')}
-    </tbody>
-  </table>
-  </div>
+  ${fillTableHTML(fill, { esc, fmt, statusBadge })}
 </section>
 
 <section class="report-section" id="rpt-clashes">
@@ -492,6 +518,21 @@ export function buildArcFlashSection(studies = {}, approvals = {}, options = {})
         .map(([id, v]) => (typeof v === 'object' && v !== null ? { id, ...v } : { id, value: v }));
 
   const rows = entries.map(e => {
+    // A boundary that contradicts its incident energy (typically inches read as
+    // mm) is withheld as invalid rather than issued in the report.
+    const plausibility = assessArcFlashResultPlausibility(e);
+    if (!plausibility.plausible) {
+      return {
+        id:             e.equipmentTag || e.id || e.busId || '—',
+        incidentEnergy: '—',
+        ppeSelection:   '—',
+        boundary:       '—',
+        clearingTime:   '—',
+        voltage:        e.voltage ?? e.nominalVoltage ?? '—',
+        validity:       'invalid',
+        warnings:       [...(Array.isArray(e.warnings) ? e.warnings : []), plausibility.reason],
+      };
+    }
     const incidentEnergy = e.incidentEnergy ?? e.incident_energy;
     const incidentEnergyNumber = Number(incidentEnergy);
     const rowEvaluated = e.validity === undefined
@@ -499,7 +540,7 @@ export function buildArcFlashSection(studies = {}, approvals = {}, options = {})
       : e.validity === 'evaluated';
     const ppeRating = Number(e.minimumArcRatingCalCm2);
     return {
-      id:             e.id || e.busId || '—',
+      id:             e.equipmentTag || e.id || e.busId || '—',
       incidentEnergy: incidentEnergy ?? '—',
       ppeSelection:   rowEvaluated && Number.isFinite(ppeRating) && ppeRating > 0
         ? `Arc rating ≥ ${ppeRating} cal/cm²`
@@ -679,22 +720,32 @@ export function buildLoadFlowSection(studies = {}, approvals = {}, options = {})
     : Array.isArray(data) ? data
     : [];
 
+  // runLoadFlow() saves Vm/Va/voltageKV/Pd/Qd per bus and `lines` for branch
+  // flows; unbalanced runs repeat each bus/line once per phase. Older
+  // interchange shapes used the descriptive names, so both are accepted.
+  const withPhase = (label, record) => (record?.phase && record.phase !== 'balanced' ? `${label} (${record.phase})` : label);
   const busRows = busResults.map(b => ({
-    id:       b.id || b.busId || '—',
-    voltagePu: b.voltagePu ?? b.voltage_pu ?? '—',
-    voltageKv: b.voltageKv ?? b.voltage_kv ?? '—',
-    angleDeg:  b.angleDeg  ?? b.angle_deg  ?? '—',
-    loadKW:    b.loadKW    ?? b.load_kw    ?? '—',
-    loadKVAR:  b.loadKVAR  ?? b.load_kvar  ?? '—',
+    id:        withPhase(b.displayLabel || b.label || b.name || b.id || b.busId || '—', b),
+    voltagePu: b.voltagePu ?? b.voltage_pu ?? b.Vm ?? '—',
+    voltageKv: b.voltageKv ?? b.voltage_kv ?? b.voltageKV ?? '—',
+    angleDeg:  b.angleDeg  ?? b.angle_deg  ?? b.Va ?? '—',
+    loadKW:    b.loadKW    ?? b.load_kw    ?? b.Pd ?? '—',
+    loadKVAR:  b.loadKVAR  ?? b.load_kvar  ?? b.Qd ?? '—',
   }));
 
-  const branchResults = Array.isArray(data.branches) ? data.branches : [];
+  const branchResults = Array.isArray(data.branches) ? data.branches
+    : Array.isArray(data.lines) ? data.lines
+    : [];
+  // Flow records carry the component id; the solver's connection summary has its tag.
+  const branchLabels = new Map((data.summary?.branchConnections || [])
+    .filter(conn => conn?.componentId)
+    .map(conn => [conn.componentId, conn.componentLabel || conn.componentName || conn.componentRef]));
   const branchRows = branchResults.map(br => ({
-    id:          br.id || br.branchId || '—',
-    fromBus:     br.fromBus  ?? '—',
-    toBus:       br.toBus    ?? '—',
-    flowKW:      br.flowKW   ?? br.flow_kw   ?? '—',
-    flowKVAR:    br.flowKVAR ?? br.flow_kvar ?? '—',
+    id:          withPhase(br.componentLabel || br.componentName || branchLabels.get(br.componentId ?? br.id) || br.id || br.branchId || '—', br),
+    fromBus:     br.fromBus  ?? br.fromLabel ?? br.from ?? '—',
+    toBus:       br.toBus    ?? br.toLabel   ?? br.to   ?? '—',
+    flowKW:      br.flowKW   ?? br.flow_kw   ?? br.fromPowerKW   ?? br.P ?? '—',
+    flowKVAR:    br.flowKVAR ?? br.flow_kvar ?? br.fromPowerKvar ?? br.Q ?? '—',
     loading_pct: br.loading_pct ?? br.loadingPct ?? '—',
   }));
 
@@ -754,18 +805,25 @@ export function buildMotorStartSection(studies = {}, approvals = {}, options = {
   if (!data) return { key: 'motorStart', title: 'Motor Starting Study', empty: true };
   const assessment = assessStudyResult('motorStart', data, options.studyProvenance?.motorStart, options);
 
-  const entries = typeof data === 'object' && !Array.isArray(data)
+  // The Motor Starting page saves { runAt, method, criteria, cases, results: [...] };
+  // the One-Line study button saves a map of motor id -> result.
+  const entries = Array.isArray(data?.results)
+    ? data.results
+    : Array.isArray(data)
+    ? data
+    : typeof data === 'object'
     ? Object.entries(data)
-        .filter(([k]) => !k.startsWith('_'))
-        .map(([id, v]) => (typeof v === 'object' ? { id, ...v } : { id }))
-    : (Array.isArray(data) ? data : []);
+        .filter(([k, v]) => !k.startsWith('_') && v && typeof v === 'object' && !Array.isArray(v))
+        .map(([id, v]) => ({ id, ...v }))
+    : [];
 
   const rows = entries.map(e => ({
-    id:           e.label || e.id || '—',
+    id:           e.label || e.tag || e.name || e.id || '—',
     inrushKA:     e.inrushKA     ?? e.inrush_kA    ?? '—',
     voltageSagPct: e.voltageSagPct ?? e.voltage_sag_pct ?? '—',
     accelTime:    e.accelTime    ?? e.accel_time   ?? '—',
     method:       e.starterType  ?? e.method       ?? e.startMethod  ?? '—',
+    status:       e.status ?? (e.ready === false ? 'inputs required' : '—'),
   }));
 
   return {
@@ -793,9 +851,17 @@ export function buildVoltageDropSection(studies = {}, approvals = {}, options = 
         .map(([id, v]) => (typeof v === 'object' ? { id, ...v } : { id }));
 
   const rows = results.map(r => {
+    // The study stores the combined-path contract in `resultContract`, and the
+    // row's result* metadata describes that path. Only the cable's own drop
+    // columns are gated on its individual contract, so an evaluated branch is
+    // not hidden just because an upstream feeder lacks inputs. Older saves
+    // without `individualResultContract` fall back to the `evaluated` flag.
     const contract = r.resultContract || {};
     const legacyEvaluated = r.evaluated === true || r.validity === 'evaluated';
-    const evaluated = contract.validity === 'evaluated' || (!r.resultContract && legacyEvaluated);
+    const individualContract = r.individualResultContract
+      || (r.pathEvaluated === false ? null : r.resultContract)
+      || null;
+    const evaluated = individualContract ? individualContract.validity === 'evaluated' : legacyEvaluated;
     const historicalValues = {
       dropPct: r.dropPct ?? r.drop_pct ?? null,
       dropV: r.dropV ?? r.drop_v ?? null,
@@ -903,7 +969,8 @@ export function buildReliabilitySection(studies = {}, approvals = {}, options = 
       { key: 'eensKwh', label: 'EENS (kWh/yr)' },
     ],
     rows: decorateStudyRows(rows, assessment, options),
-    cutSets,
+    // Cut sets are results of the same study, so they are withheld with it.
+    cutSets: decorateStudyRows(cutSets, assessment, { ...options, preserve: ['order', 'failed'] }),
     summary: assessment.eligible ? reliabilitySummary : {
       'Result summary': assessment.label,
       'Historical summary (withheld)': JSON.stringify(reliabilitySummary),
@@ -1246,7 +1313,7 @@ export function renderPackageHTML(pkg, baseReport = {}) {
     const map = {
       ok: 'badge-ok', near: 'badge-warn', over: 'badge-error',
       pass: 'badge-ok', warning: 'badge-warn', fail: 'badge-error',
-      info: 'badge-info', error: 'badge-error', 'not evaluated': 'badge-info',
+      info: 'badge-info', error: 'badge-error', 'not evaluated': 'badge-info', incomplete: 'badge-warn',
     };
     return `<span class="badge ${map[String(s).toLowerCase()] || ''}">${esc(s)}</span>`;
   };
@@ -1430,18 +1497,7 @@ export function renderPackageHTML(pkg, baseReport = {}) {
     html += `
 <section class="report-section" id="rpt-fill">
   <h2>Raceway Fill Analysis</h2>
-  <p class="report-note">${fmt(fill.summary.overCount)} over limit &nbsp;·&nbsp; ${fmt(fill.summary.nearCount)} near limit</p>
-  <div class="report-scroll"><table class="report-table">
-    <thead><tr><th>Raceway</th><th>Type</th><th>Area (in²)</th><th>Fill (in²)</th><th>Used %</th><th>Limit %</th><th>Status</th></tr></thead>
-    <tbody>
-    ${[...fill.trays, ...fill.conduits].map(r => `<tr>
-      <td>${esc(r.id)}</td><td>${esc(r.type)}</td>
-      <td>${fmt(r.areaIn2)}</td><td>${fmt(r.fillIn2)}</td>
-      <td>${fmt(r.usedPct)}</td><td>${fmt(r.limitPct)}</td>
-      <td>${statusBadge(r.status)}</td>
-    </tr>`).join('')}
-    </tbody>
-  </table></div>
+  ${fillTableHTML(fill, { esc, fmt, statusBadge })}
 </section>`;
   } else if (sections.fill) {
     html += unavailableSection('fill', sections.fill.title || 'Raceway Fill');
@@ -1617,10 +1673,10 @@ export function renderPackageHTML(pkg, baseReport = {}) {
   ${studyMetadataHTML(s.studyMetadata)}
   ${s.empty ? emptySection('Motor Starting') : `
   <div class="report-scroll"><table class="report-table">
-    <thead><tr><th>Motor</th><th>Inrush (kA)</th><th>Voltage Sag (%)</th><th>Accel Time (s)</th><th>Start Method</th></tr></thead>
+    <thead><tr><th>Motor</th><th>Inrush (kA)</th><th>Voltage Sag (%)</th><th>Accel Time (s)</th><th>Start Method</th><th>Status</th></tr></thead>
     <tbody>${(s.rows || []).map(r => `<tr>
       <td>${esc(r.id)}</td><td>${fmt(r.inrushKA)}</td><td>${fmt(r.voltageSagPct)}</td>
-      <td>${fmt(r.accelTime)}</td><td>${esc(r.method)}</td>
+      <td>${fmt(r.accelTime)}</td><td>${esc(r.method)}</td><td>${esc(r.status ?? '—')}</td>
     </tr>`).join('')}</tbody>
   </table></div>`}
 </section>`;

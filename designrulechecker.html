@@ -161,19 +161,24 @@
 
         <dl class="drc-rule-list">
           <dt>DRC-01 — Tray Fill (NEC 392.22(A))</dt>
-          <dd>Flags any tray whose cable fill exceeds the configured limit
-          (default 40 %). Reports a warning when fill is within 10 % of the
-          limit.</dd>
+          <dd>Evaluates each tray against the NEC 392.22(A) allowance. Trays
+          with barriers (more than one slot) are checked compartment by
+          compartment; a cable is placed by its slot index, a cable group that
+          matches the tray's slot groups, or its zone (compartment number).
+          When cable data is unavailable, a clearly labeled aggregate capacity
+          screen (default 40 %) is used instead.</dd>
 
           <dt>DRC-02 — Voltage Segregation (NEC 392.6(H))</dt>
           <dd>Detects tray segments containing cables from different cable
           groups (e.g., HV and LV cables sharing the same tray without a
           physical barrier).</dd>
 
-          <dt>DRC-03 — Ampacity Derating (NEC 310.15)</dt>
-          <dd>Applies bundling derating factors based on the number of
-          current-carrying conductors in each tray section and flags cables
-          whose design current exceeds the derated ampacity.</dd>
+          <dt>DRC-03 — Ampacity Adjustment (NEC 392.80(A)(1)(a))</dt>
+          <dd>Applies Table 310.15(C)(1) adjustment only to multiconductor
+          cables with more than three current-carrying conductors, using the
+          count in each cable (not the tray total), and flags cables whose
+          design current (design current, load amps, or the schedule's Est
+          Load) exceeds the adjusted ampacity.</dd>
 
           <dt>DRC-04 — Grounding Conductor (NEC 250.122)</dt>
           <dd>Warns when a power cable record does not include a grounding

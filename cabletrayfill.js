@@ -116,7 +116,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       initCompactMode();
       initHelpModal('help-btn','helpOverlay','helpClose');
       initNavToggle();
-      const trayGauge = createFillGauge('fill-gauge-container', { label: 'Current fill', width: 160, strokeWidth: 16 });
+      const trayGauge = createFillGauge('fill-gauge-container', { label: 'Packing density', width: 160, strokeWidth: 16 });
       const dirty = createDirtyTracker();
       const markSaved = () => { dirty.markClean(); };
       const markUnsaved = () => { dirty.markDirty(); };

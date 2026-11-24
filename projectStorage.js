@@ -1,6 +1,7 @@
 import { repairMojibakeDeep } from './src/textEncoding.js';
 import { COMPACT_SYNTHESIS_KEYS, isCompactSynthesisKey, isDeviceEvidenceEnvelope, packProjectDeviceEvidence, unpackDeviceEvidence, unpackProjectDeviceEvidence } from './utils/designSynthesisDeviceEvidenceCodec.mjs';
 import { isProjectSettingKey, isProjectStorageKey, sanitizeProjectSettings } from './src/projectSettingKeys.js';
+import { normalizeStudyResultsArcFlashUnits } from './analysis/arcFlashResultUnits.mjs';
 import {
   PROJECT_SCHEMA_VERSION,
   assertValidStoredProject,
@@ -256,6 +257,12 @@ function migrateSettingsPayload(settings = {}) {
       next.studyResults.frequencyScan = next.studyResults.freqScan;
     }
     delete next.studyResults.freqScan;
+    // Saved arc-flash boundaries are millimetres; convert legacy inch/foot values.
+    next.studyResults = normalizeStudyResultsArcFlashUnits(next.studyResults);
+  }
+  const legacyStudies = next.studies;
+  if (legacyStudies && typeof legacyStudies === 'object' && !Array.isArray(legacyStudies)) {
+    next.studies = normalizeStudyResultsArcFlashUnits(legacyStudies);
   }
   return next;
 }

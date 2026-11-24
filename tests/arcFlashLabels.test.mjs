@@ -153,6 +153,15 @@ describe('buildLabelSheetHtml', () => {
     assert.ok(html.includes('1 incomplete result(s) withheld'));
   });
 
+  it('withholds a label whose boundary is inside the working distance above 1.2 cal/cm²', () => {
+    const inchBoundary = { ...warningInfo, equipmentTag: 'SWBD-101', incidentEnergy: 3.8, boundary: 42 };
+    assert.strictEqual(isArcFlashLabelReady(inchBoundary), false);
+    const html = buildLabelSheetHtml({ complete: warningInfo, invalid: inchBoundary });
+    const cellCount = (html.match(/<div class="label-cell">/g) || []).length;
+    assert.strictEqual(cellCount, 1, `Expected only the plausible label cell, got ${cellCount}`);
+    assert.ok(!html.includes('SWBD-101'), 'An implausible boundary must not be printed on a label');
+  });
+
   it('includes the project name in the heading when provided', () => {
     const html = buildLabelSheetHtml({ bus1: warningInfo }, 'Test Plant');
     assert.ok(html.includes('Test Plant'), 'Expected project name in HTML heading');

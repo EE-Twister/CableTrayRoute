@@ -1,6 +1,6 @@
-import { evaluateTrayFill, cablesAssignedToTray } from '../../analysis/trayFill.mjs';
+import { evaluateTrayFillWithCompartments, cablesAssignedToTray, summarizeTrayFillResult } from '../../analysis/trayFill.mjs';
 import { buildTrayCableMapFromRouteResults } from '../../analysis/routeResults.mjs';
-import { barChartHtml, kpiStripHtml, statusLegendHtml } from './resultViz.mjs';
+import { barChartHtml, escapeText, kpiStripHtml, statusLegendHtml } from './resultViz.mjs';
 
 const toNumber = value => {
   if (value === null || value === undefined || value === '') return null;
@@ -43,6 +43,7 @@ export function cableSummaryHtml(cables) {
 export function trayUtilizationRows(trays = [], cables = [], routeSource = null) {
   const routed = buildTrayCableMapFromRouteResults(routeSource, cables);
   const rows = [];
+  const incomplete = [];
   let unassigned = 0;
   (Array.isArray(trays) ? trays : []).forEach(tray => {
     const id = String(tray?.tray_id ?? tray?.id ?? '').trim();
@@ -56,39 +57,52 @@ export function trayUtilizationRows(trays = [], cables = [], routeSource = null)
       unassigned += 1;
       return;
     }
-    const result = evaluateTrayFill(tray, [...byTag.values()]);
+    // Same compartment-aware evaluation as the project report and submittal:
+    // a barrier-separated tray is governed by its fullest compartment.
+    const result = evaluateTrayFillWithCompartments(tray, [...byTag.values()]);
     const pct = Number(result?.utilizationPercent);
-    if (!Number.isFinite(pct)) {
-      unassigned += 1;
+    if (result?.evaluable !== true || !Number.isFinite(pct)) {
+      incomplete.push({ id, reason: summarizeTrayFillResult(result) });
       return;
     }
+    const governing = result.compartmented && result.governingCompartment ? ` · governed by ${result.governingCompartment}` : '';
     rows.push({
       label: id,
       value: pct,
       limit: 100,
       status: result.status === 'fail' ? 'fail' : pct > 80 ? 'warn' : 'pass',
       valueLabel: `${pct.toFixed(0)}% of allowance`,
-      note: `${byTag.size} cable(s)`,
+      note: `${byTag.size} cable(s)${governing}`,
     });
   });
-  return { rows, unassigned };
+  return { rows, unassigned, incomplete };
 }
 
 export function trayUtilizationHtml(trays, cables, routeSource) {
-  const { rows, unassigned } = trayUtilizationRows(trays, cables, routeSource);
-  if (!rows.length) return '';
+  const { rows, unassigned, incomplete } = trayUtilizationRows(trays, cables, routeSource);
+  if (!rows.length && !incomplete.length) return '';
+  const incompleteNote = incomplete.length
+    ? `<p class="field-hint"><strong>${incomplete.length} tray(s) could not be evaluated:</strong> ${incomplete.map(entry => `${escapeText(entry.id)} — ${escapeText(entry.reason)}`).join('; ')}</p>`
+    : '';
   return `<h3 class="study-chart__title">Tray utilization (NEC 392.22 allowance)</h3>
-    ${barChartHtml(rows, { unit: '%', max: 100, ariaLabel: 'Tray utilization against the NEC 392.22 allowance' })}
-    ${statusLegendHtml()}
-    <p class="field-hint">The tick marks 100% of the allowance. ${unassigned ? `${unassigned} tray(s) have no cables assigned or incomplete tray data and are not shown.` : ''}</p>`;
+    ${rows.length ? barChartHtml(rows, { unit: '%', max: 100, ariaLabel: 'Tray utilization against the NEC 392.22 allowance' }) : ''}
+    ${rows.length ? statusLegendHtml() : ''}
+    ${incompleteNote}
+    <p class="field-hint">The tick marks 100% of the allowance. Compartmented trays show their governing compartment. ${unassigned ? `${unassigned} tray(s) have no cables assigned and are not shown.` : ''}</p>`;
 }
 
 export function racewaySummaryHtml({ trays = [], conduits = [], ductbanks = [], cables = [], routeSource = null } = {}) {
   const total = trays.length + conduits.length + ductbanks.length;
   if (!total) return '';
+  const ductbankConduits = ductbanks.reduce((sum, bank) => sum + (Array.isArray(bank?.conduits) ? bank.conduits.length : 0), 0);
   return kpiStripHtml([
     { label: 'Cable trays', value: String(trays.length), status: 'info' },
-    { label: 'Conduits', value: String(conduits.length), status: 'info' },
+    {
+      label: 'Conduits',
+      value: String(conduits.length + ductbankConduits),
+      status: 'info',
+      hint: ductbankConduits ? `${conduits.length} standalone · ${ductbankConduits} in ductbanks` : '',
+    },
     { label: 'Ductbanks', value: String(ductbanks.length), status: 'info' },
   ]) + trayUtilizationHtml(trays, cables, routeSource);
 }

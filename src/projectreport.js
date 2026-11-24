@@ -16,7 +16,10 @@ import {
   getLifecyclePackages,
   getDeliverableArtifacts, getFieldExecutionRecords, getFieldObservationQueue, getFieldObservations, getProcurementRegister, upsertDeliverableArtifact,
   getDesignBasis, getDesignGateApprovals, getItem, getProjectInputFingerprint, getProjectMeta, setProjectMeta,
+  captureStudyRunContext,
 } from '../dataStore.mjs';
+import { assessHeatTraceCase } from './components/heatTraceLifecycle.mjs';
+import { fingerprintStudyValue } from '../analysis/studyLifecycle.mjs';
 import { getProjectState } from '../projectStorage.js';
 import { normalizeProjectMeta } from '../analysis/projectIntegration.mjs';
 import { buildArtifactRegisterRows, normalizeDeliverableArtifact } from '../analysis/deliverableArtifacts.mjs';
@@ -631,7 +634,32 @@ function buildBaseReport(projectData) {
     projectName,
     studies:     projectData.studies,
     approvals:   projectData.approvals,
+    assessHeatTraceCase: activeLifecyclePkg ? assessSnapshotHeatTraceCase : assessLiveHeatTraceCase,
   });
+}
+
+/**
+ * Live project: the same freshness check the Heat Trace page applies before it
+ * totals branches, so stale branches are not counted in the issued schedule.
+ */
+function assessLiveHeatTraceCase(caseItem) {
+  return assessHeatTraceCase(caseItem, captureStudyRunContext('heatTraceSizing', {
+    inputs: caseItem?.inputs,
+    options: { unitSystem: caseItem?.unitSystem || 'imperial' },
+  }));
+}
+
+/**
+ * Lifecycle package: the snapshot is a frozen issue record, so each branch is
+ * checked against its own provenance (inputs unchanged since its result was
+ * calculated) rather than against the live project.
+ */
+function assessSnapshotHeatTraceCase(caseItem) {
+  const provenance = caseItem?._provenance;
+  const context = provenance
+    ? { ...provenance, inputFingerprint: fingerprintStudyValue(caseItem?.inputs ?? null) }
+    : null;
+  return assessHeatTraceCase(caseItem, context);
 }
 
 // ---------------------------------------------------------------------------
@@ -688,7 +716,7 @@ function exportXLSX(pkg, baseReport) {
   // Raceway fill
   if (sections.fill && baseReport.fill) {
     const { trays, conduits } = baseReport.fill;
-    const headers = ['id', 'type', 'areaIn2', 'fillIn2', 'usedPct', 'limitPct', 'status'];
+    const headers = ['id', 'type', 'areaIn2', 'fillIn2', 'usedPct', 'limitPct', 'status', 'basis', 'note'];
     const aoa = [headers, ...[...trays, ...conduits].map(r => headers.map(h => xlsxCell(r[h])))];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Fill');
   }
@@ -721,7 +749,7 @@ function exportXLSX(pkg, baseReport) {
     { key: 'shortCircuit', headers: ['id', 'method', 'studySource', 'i3ph_kA', 'iSlg_kA', 'iLL_kA', 'iDLG_kA', 'iDLGPhaseB_kA', 'iDLGPhaseC_kA', 'iDLGEarth_kA', 'voltage', 'validity', 'calculationStatus', 'requiredInputs', 'warnings', 'provenance', 'modelLimits', 'studyOptions', 'inputFingerprint', 'currentInputFingerprint', 'freshness', 'calculatedAt'], sheetName: 'ShortCircuit' },
     { key: 'loadFlow',     headers: ['id', 'voltagePu', 'voltageKv', 'angleDeg', 'loadKW', 'loadKVAR'],               sheetName: 'LoadFlow-Buses', rowKey: 'busRows' },
     { key: 'harmonics',    headers: ['id', 'ithd', 'vthd', 'limit', 'warning', 'calculationStatus'],                   sheetName: 'Harmonics' },
-    { key: 'motorStart',   headers: ['id', 'inrushKA', 'voltageSagPct', 'accelTime', 'method'],                        sheetName: 'MotorStart' },
+    { key: 'motorStart',   headers: ['id', 'inrushKA', 'voltageSagPct', 'accelTime', 'method', 'status'],              sheetName: 'MotorStart' },
     { key: 'voltageDrop',  headers: ['id', 'from', 'to', 'inputSource', 'path', 'dropPct', 'limitPct', 'status', 'combinedDropPct', 'combinedLimitPct', 'combinedStatus', 'recommendation', 'resultValidity', 'resultUnits', 'resultInputSources', 'resultAssumptions', 'resultModelLimits', 'resultWarnings', 'inputFingerprint'], sheetName: 'VoltageDrop' },
     { key: 'reliability',  headers: ['id', 'kw', 'critical', 'availabilityPct', 'outageHours', 'interruptionsPerYear', 'eensKwh'], sheetName: 'Reliability' },
     { key: 'quasiDynamic', headers: ['bus', 'minVm', 'maxVm', 'risk'], sheetName: 'QuasiDynamic' },

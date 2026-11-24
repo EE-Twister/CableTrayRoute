@@ -21,6 +21,7 @@ import { applyTapRatioToOneLine, evaluateTransformerTapOptimization } from './an
 import { createTransformerTapReviewStaleNotice, formatTapReviewNumber, formatTapReviewPercent, formatTapReviewPu, isCurrentTransformerTapReview } from './src/one-line/transformerTapReviewGuard.mjs';
 import { runShortCircuit } from './analysis/shortCircuit.mjs';
 import { runArcFlash } from './analysis/arcFlash.mjs';
+import { assessArcFlashResultPlausibility } from './analysis/arcFlashResultUnits.mjs';
 import { runHarmonics } from './analysis/harmonics.js';
 import { runNetworkHarmonics } from './analysis/harmonicNetwork.mjs';
 import { runMotorStart } from './analysis/motorStart.js';
@@ -9815,7 +9816,7 @@ function renderArcFlashLabelOverlays(svg) {
     const boundary = Number(af.boundary);
     const clearingTime = Number(af.clearingTime);
     const workingDistance = Number(af.workingDistance);
-    const boundaryText = Number.isFinite(boundary) && boundary > 0 ? `AFB: ${Math.round(boundary)} mm` : 'AFB: not available';
+    const boundaryText = !assessArcFlashResultPlausibility(af).plausible ? 'AFB: invalid, check units' : Number.isFinite(boundary) && boundary > 0 ? `AFB: ${Math.round(boundary)} mm` : 'AFB: not available';
     const timingText = Number.isFinite(clearingTime) && clearingTime > 0
       ? `Clear: ${clearingTime.toFixed(3)} s${Number.isFinite(workingDistance) ? ` @ ${Math.round(workingDistance)} mm` : ''}`
       : 'Clearing time: not available';

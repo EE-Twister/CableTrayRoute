@@ -3,7 +3,7 @@
  *
  * Covers:
  *   - DRC-03: Aggregate ampacity (per-cable × parallel_count) used in violation check
- *   - DRC-03: Conductor count for bundling derating multiplied by parallel_count
+ *   - DRC-03: parallel_count does not raise the per-cable CCC count (NEC 392.80(A)(1)(a))
  *   - DRC-07: NEC 310.10(H) — minimum 1/0 AWG for parallel sets (ERROR)
  *   - DRC-07: NEC 310.10(H) — missing length warns that equal-length cannot be verified (WARNING)
  *   - Pull cards: totalWeight and totalArea multiplied by parallel_count
@@ -66,8 +66,8 @@ function makeRouteResult(cableName, trayIds, totalLength = 100) {
 describe('DRC-03 — Parallel sets aggregate ampacity', () => {
   it('passes when aggregate ampacity (parallel_count × per-cable ampacity) meets design current', () => {
     // Per-cable ampacity = 85 A (#4 AWG baseline), parallel_count = 3 → aggregate = 255 A
-    // 3 sets × 3 conductors = 9 conductors → bundling factor 0.70 → derated = 178.5 A
-    // Design current = 150 A → should pass (150 < 178.5)
+    // Each 3/C cable has 3 CCCs → no Table 310.15(C)(1) adjustment (NEC 392.80(A)(1)(a))
+    // Design current = 150 A → should pass (150 < 255)
     const cable = makeCable('C1', { conductor_size: '#4 AWG', design_current: 150, parallel_count: 3 });
     const tray = makeTray('T1');
     const trayCableMap = { T1: [{ name: 'C1', cable_type: 'Power', conductors: 3, parallel_count: 3 }] };
@@ -102,9 +102,9 @@ describe('DRC-03 — Parallel sets aggregate ampacity', () => {
     assert.ok(hasParallelContext, `DRC-03 message should mention aggregate/parallel: ${drc03[0].message}`);
   });
 
-  it('multiplies conductor count by parallel_count for bundling derating', () => {
-    // 2 cables, each with 3 conductors and parallel_count=2 → 12 total current-carrying conductors
-    // derateFactor(12) < derateFactor(6) → larger derating, lower derated ampacity
+  it('does not multiply the per-cable CCC count by parallel_count', () => {
+    // 2 circuits of 2 parallel 3/C cables each. Every physical cable still has
+    // only 3 CCCs, so NEC 392.80(A)(1)(a) applies no Table 310.15(C)(1) adjustment.
     const cable1 = makeCable('C1', { conductor_size: '3/0 AWG', design_current: 1, parallel_count: 2 });
     const cable2 = makeCable('C2', { conductor_size: '3/0 AWG', design_current: 1, parallel_count: 2 });
     const tray = makeTray('T1');
@@ -115,11 +115,9 @@ describe('DRC-03 — Parallel sets aggregate ampacity', () => {
       ],
     };
     const { findings } = runDRC({ trays: [tray], cables: [cable1, cable2], trayCableMap }, { skipGrounding: true });
-    // With 12 conductors the derating factor should be 0.50 (NEC 310.15(C)(1) for 9–20 conductors)
-    const infoFindings = findings.filter(f => f.ruleId === 'DRC-03' && f.severity === DRC_SEVERITY.INFO);
-    // Expect the derating factor to be 0.50 (12 conductors falls in the 9–20 range)
-    assert.ok(infoFindings.some(f => f.message.includes('0.5') || f.message.includes('0.50')),
-      `Expected 0.50 derating factor for 12 conductors; findings: ${JSON.stringify(infoFindings.map(f => f.message))}`);
+    const drc03 = findings.filter(f => f.ruleId === 'DRC-03');
+    assert.strictEqual(drc03.length, 0,
+      `Expected no DRC-03 adjustment for parallel 3/C cables; findings: ${JSON.stringify(drc03.map(f => f.message))}`);
   });
 });
 

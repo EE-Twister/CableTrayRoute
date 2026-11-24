@@ -3,6 +3,7 @@ import { getOneLine, getStudies, getStudyAssessments, captureStudyRunContext, as
 import { getProjectState } from '../projectStorage.js';
 import { generateArcFlashReport } from '../reports/arcFlashReport.mjs';
 import { arcFlashBarRows, barChartHtml, kpiStripHtml, ppeCategoryForEnergy, statusLegendHtml } from '../src/components/resultViz.mjs';
+import { assessArcFlashResultPlausibility } from '../analysis/arcFlashResultUnits.mjs';
 import {
   arcFlashReadinessLabel,
   arcFlashResultEntries,
@@ -40,29 +41,62 @@ export async function runArcFlashStudy() {
   }
 }
 
-function renderArcFlashChart(entries) {
+/**
+ * Chart readiness for one location. A bar only carries a PPE pass/review/fail
+ * badge when its result is current and label-ready; otherwise it shows why not.
+ * A boundary that contradicts the incident energy is marked invalid and is
+ * excluded from the headline KPIs.
+ */
+function arcFlashChartReadiness(result, { stale = false } = {}) {
+  const plausibility = assessArcFlashResultPlausibility(result);
+  if (!plausibility.plausible) return { ready: false, badge: 'Invalid', reason: plausibility.reason, invalid: true };
+  if (stale) return { ready: false, badge: 'Stale', reason: 'Saved result is not current; rerun before relying on it' };
+  if (!isArcFlashLabelEligible(result)) return { ready: false, badge: 'Not label-ready', reason: arcFlashReadinessLabel(result) };
+  return { ready: true };
+}
+
+function renderArcFlashChart(entries, { stale = false } = {}) {
   const chart = document.getElementById('arcflash-chart');
   if (!chart) return;
-  const rows = arcFlashBarRows(entries);
+  const states = new Map(entries.map(([id, result]) => [id, arcFlashChartReadiness(result, { stale })]));
+  const rows = arcFlashBarRows(entries, { readiness: id => states.get(id) }).map(row => {
+    const state = states.get(row.id);
+    return state?.invalid
+      ? { ...row, valueLabel: `${row.value.toFixed(2)} cal/cm² · Invalid result`, note: state.reason, invalid: true }
+      : row;
+  });
   if (!rows.length) {
     chart.innerHTML = '';
     return;
   }
-  const worst = rows.reduce((best, row) => (row.value > best.value ? row : best), rows[0]);
-  const worstCategory = ppeCategoryForEnergy(worst.value);
-  const dangerous = rows.filter(row => row.value > 40).length;
-  chart.innerHTML = `${kpiStripHtml([
-    { label: 'Highest incident energy', value: `${worst.value.toFixed(1)} cal/cm²`, hint: worst.label, status: worstCategory.status },
-    { label: 'Worst PPE category', value: worstCategory.label.replace(/ cal\/cm².*/, ''), status: worstCategory.status },
-    { label: 'Over 40 cal/cm²', value: String(dangerous), status: dangerous ? 'fail' : 'pass' }
-  ])}
+  const validRows = rows.filter(row => !row.invalid);
+  const invalidCount = rows.length - validRows.length;
+  const kpis = [];
+  if (validRows.length) {
+    const worst = validRows.reduce((best, row) => (row.value > best.value ? row : best), validRows[0]);
+    const worstCategory = ppeCategoryForEnergy(worst.value);
+    const dangerous = validRows.filter(row => row.value > 40).length;
+    // Headline cards only carry a verdict colour when every location is current
+    // and label-ready; otherwise they are informational, like the bars.
+    const allReady = validRows.every(row => !row.notReady);
+    const verdict = status => (allReady ? status : 'info');
+    kpis.push(
+      { label: 'Highest incident energy', value: `${worst.value.toFixed(1)} cal/cm²`, hint: worst.label, status: verdict(worstCategory.status) },
+      { label: 'Worst PPE category', value: worstCategory.label.replace(/ cal\/cm².*/, ''), status: verdict(worstCategory.status) },
+      { label: 'Over 40 cal/cm²', value: String(dangerous), status: dangerous ? 'fail' : verdict('pass') }
+    );
+  }
+  if (invalidCount) {
+    kpis.push({ label: 'Invalid results', value: String(invalidCount), hint: 'Check boundary units', status: 'fail' });
+  }
+  chart.innerHTML = `${kpiStripHtml(kpis)}
   <h3 class="study-chart__title">Incident energy by equipment</h3>
   ${barChartHtml(rows, { unit: 'cal/cm²', ariaLabel: 'Incident energy by equipment' })}
   ${statusLegendHtml()}
   <p class="field-hint">PPE categories follow NFPA 70E thresholds: 1.2, 4, 8, 25 and 40 cal/cm². The tick marks 40 cal/cm², above which energized work is generally not permitted. Confirm against your site arc-flash program.</p>`;
 }
 
-function renderResults(results, scope = 'project') {
+function renderResults(results, scope = 'project', { stale = false } = {}) {
   const entries = arcFlashResultEntries(results, scope);
   const table = document.getElementById('arcflash-results-table');
   const tbody = table?.querySelector('tbody');
@@ -74,9 +108,12 @@ function renderResults(results, scope = 'project') {
   entries.forEach(([id, result]) => {
     const row = document.createElement('tr');
     const finite = value => typeof value === 'number' && Number.isFinite(value);
+    const plausibility = assessArcFlashResultPlausibility(result);
     const incidentEnergy = finite(result.incidentEnergy) ? `${result.incidentEnergy.toFixed(2)} cal/cm²` : 'Not evaluated';
     const minimumRating = finite(result.minimumArcRatingCalCm2) ? result.minimumArcRatingCalCm2 : null;
-    const boundary = finite(result.boundary) ? `${result.boundary.toFixed(0)} mm` : 'Not evaluated';
+    const boundary = !plausibility.plausible
+      ? 'Invalid - check boundary units'
+      : finite(result.boundary) ? `${result.boundary.toFixed(0)} mm` : 'Not evaluated';
     const clearingTimeText = finite(result.clearingTime) ? `${result.clearingTime.toFixed(3)} s` : 'Not evaluated';
     [
       result.equipmentTag || id,
@@ -102,6 +139,12 @@ function renderResults(results, scope = 'project') {
     readiness.className = `arcflash-readiness-pill${isArcFlashLabelEligible(result) ? ' arcflash-readiness-pill--ready' : ''}`;
     readiness.textContent = arcFlashReadinessLabel(result);
     readinessCell.appendChild(readiness);
+    if (!plausibility.plausible) {
+      const note = document.createElement('div');
+      note.className = 'arcflash-readiness-note';
+      note.textContent = plausibility.reason;
+      readinessCell.appendChild(note);
+    }
     if (Array.isArray(result.requiredInputs) && result.requiredInputs.length) {
       const note = document.createElement('div');
       note.className = 'arcflash-readiness-note';
@@ -114,7 +157,7 @@ function renderResults(results, scope = 'project') {
   const readiness = summarizeArcFlashResults(results, scope);
   summary.textContent = readiness.summary;
   summary.hidden = false;
-  renderArcFlashChart(entries);
+  renderArcFlashChart(entries, { stale });
   table.hidden = entries.length === 0;
   details.hidden = false;
   output.textContent = JSON.stringify(Object.fromEntries(entries), null, 2);
@@ -165,6 +208,7 @@ function initializeArcFlashPage() {
     const projectContext = document.getElementById('study-project-context');
     const runButton = form?.querySelector('button[type="submit"]');
     let latestResults = getStudies()?.arcFlash || null;
+    let latestStale = false;
 
     populateScope();
     const componentCount = projectComponents().length;
@@ -181,7 +225,8 @@ function initializeArcFlashPage() {
     } else if (latestResults && arcFlashResultEntries(latestResults).length) {
       const assessment = getStudyAssessments().arcFlash;
       const stale = assessment?.freshness !== 'current' || assessment?.eligible !== true;
-      renderResults(latestResults, scope?.value || 'project');
+      latestStale = stale;
+      renderResults(latestResults, scope?.value || 'project', { stale });
       renderReadiness(latestResults, { stale });
       if (exportButton) exportButton.disabled = stale;
       if (status) {
@@ -200,6 +245,7 @@ function initializeArcFlashPage() {
       if (status) status.textContent = 'Running IEEE 1584 analysis...';
       try {
         latestResults = await runArcFlashStudy();
+        latestStale = false;
         renderResults(latestResults, scope?.value || 'project');
         const readiness = renderReadiness(latestResults);
         if (exportButton) exportButton.disabled = readiness.total === 0;
@@ -217,7 +263,7 @@ function initializeArcFlashPage() {
       }
     });
     scope?.addEventListener('change', () => {
-      if (latestResults) renderResults(latestResults, scope.value);
+      if (latestResults) renderResults(latestResults, scope.value, { stale: latestStale });
     });
     exportButton?.addEventListener('click', () => {
       if (!latestResults) return;

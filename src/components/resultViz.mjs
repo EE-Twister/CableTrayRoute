@@ -85,7 +85,7 @@ export function barChartHtml(rows, { unit = '', max = null, min = 0, ariaLabel =
     return `<li class="viz-bar viz-bar--${status}">
       <span class="viz-bar__label">${escapeText(row.label)}</span>
       <span class="viz-bar__track"><span class="viz-bar__fill" style="width:${pct.toFixed(2)}%"></span>${marker}</span>
-      <span class="viz-bar__value">${escapeText(valueLabel)}${row.status && !row.noBadge ? ` ${statusBadgeHtml(status)}` : ''}</span>
+      <span class="viz-bar__value">${escapeText(valueLabel)}${row.status && !row.noBadge ? ` ${statusBadgeHtml(status, row.badgeLabel)}` : ''}</span>
       ${note}
     </li>`;
   }).join('');
@@ -139,19 +139,42 @@ export function shortCircuitBarRows(entries, ratings = {}) {
   }).filter(Boolean);
 }
 
-/** Arc-flash rows -> bar chart rows with PPE category badges. */
-export function arcFlashBarRows(entries) {
+/**
+ * Arc-flash rows -> bar chart rows with PPE category badges.
+ *
+ * `readiness(id, result)` may return `{ ready: false, reason }` for a location
+ * whose saved result is stale, incomplete, or otherwise not label-ready. Such
+ * rows keep their bar for context but carry a "Not evaluated" badge and the
+ * reason instead of a pass/review/fail verdict.
+ */
+export function arcFlashBarRows(entries, { readiness = null } = {}) {
   return (entries || []).map(([id, result]) => {
     const energy = finite(result?.incidentEnergy);
     if (energy === null) return null;
     const category = ppeCategoryForEnergy(energy);
+    const boundaryNote = finite(result.boundary) !== null ? `Arc-flash boundary ${Math.round(result.boundary)} mm` : '';
+    const state = typeof readiness === 'function' ? readiness(id, result) : null;
+    if (state && state.ready === false) {
+      return {
+        id,
+        label: result.equipmentTag || id,
+        value: energy,
+        limit: 40,
+        status: 'na',
+        badgeLabel: state.badge || 'Not evaluated',
+        valueLabel: `${energy.toFixed(2)} cal/cm² · ${category.label}`,
+        note: [state.reason || 'Not ready for labels', boundaryNote].filter(Boolean).join(' · '),
+        notReady: true,
+      };
+    }
     return {
+      id,
       label: result.equipmentTag || id,
       value: energy,
       limit: 40,
       status: category.status,
       valueLabel: `${energy.toFixed(2)} cal/cm² · ${category.label}`,
-      note: finite(result.boundary) !== null ? `Arc-flash boundary ${Math.round(result.boundary)} mm` : '',
+      note: boundaryNote,
     };
   }).filter(Boolean);
 }

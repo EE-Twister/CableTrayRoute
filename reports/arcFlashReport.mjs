@@ -1,6 +1,7 @@
 import { downloadCSV, downloadPDF } from './reporting.mjs';
 import { generateArcFlashLabel } from './labels.mjs';
 import { isArcFlashLabelEligible } from '../studies/arcFlashReadiness.mjs';
+import { assessArcFlashResultPlausibility } from '../analysis/arcFlashResultUnits.mjs';
 import { studyExportMetadata } from '../analysis/studyExportMetadata.mjs';
 
 export { isArcFlashLabelEligible as isArcFlashLabelReady } from '../studies/arcFlashReadiness.mjs';
@@ -239,56 +240,62 @@ export function generateArcFlashReport(results = {}, options = {}) {
     'resultValidity', 'freshness', 'eligibility', 'calculationVersion', 'calculatedAt',
     'assumptions', 'warnings', 'provenance'
   ];
-  const rows = entries.map(([id, data]) => ({
-    bus: id,
-    equipmentTag: data.equipmentTag || id,
-    nominalVoltage: data.nominalVoltage ?? '',
-    incidentEnergy: data.incidentEnergy,
-    ppeSelectionMethod: data.ppeSelectionMethod || 'incident-energy',
-    minimumArcRatingCalCm2: data.minimumArcRatingCalCm2 ?? '',
-    boundary: data.boundary,
-    clearingTime: data.clearingTime,
-    workingDistance: data.workingDistance ?? '',
-    limitedApproach: data.limitedApproach ?? '',
-    restrictedApproach: data.restrictedApproach ?? '',
-    upstreamDevice: data.upstreamDevice || '',
-    studyDate: resolveStudyDate(data),
-    calculationStatus: data.calculationStatus || 'not-recorded',
-    labelEligibility: isArcFlashLabelEligible(data) ? 'eligible-draft' : 'withheld',
-    requiredInputs: Array.isArray(data.requiredInputs) ? data.requiredInputs.join(' | ') : '',
-    notes: Array.isArray(data.notes) ? data.notes.join(' | ') : '',
-    calculationModel: data.calculationInputs?.model || '',
-    boltedFaultCurrentKA: data.calculationInputs?.boltedFaultCurrentKA ?? '',
-    arcingCurrentKA: data.calculationInputs?.arcingCurrentKA ?? '',
-    clearingTimeSource: data.calculationInputs?.clearingTimeSource || '',
-    clearingCurveStatus: data.calculationInputs?.clearingCurveStatus || '',
-    clearingCurveDomainA: data.calculationInputs?.clearingCurveDomainA
-      ? JSON.stringify(data.calculationInputs.clearingCurveDomainA)
-      : '',
-    protectiveDeviceId: data.calculationInputs?.protectiveDeviceId || '',
-    protectiveDeviceLibraryStatus: data.calculationInputs?.protectiveDeviceLibraryStatus || '',
-    protectiveDeviceSourceFingerprint: data.calculationInputs?.protectiveDeviceSourceFingerprint || '',
-    governingScenario: data.calculationInputs?.governingScenario || '',
-    electrodeConfiguration: data.calculationInputs?.electrodeConfiguration || '',
-    gapMM: data.calculationInputs?.gapMM ?? '',
-    enclosureDimensionsMM: [
-      data.calculationInputs?.boxHeightMM,
-      data.calculationInputs?.boxWidthMM,
-      data.calculationInputs?.boxDepthMM,
-    ].every(Number.isFinite)
-      ? `${data.calculationInputs.boxHeightMM} x ${data.calculationInputs.boxWidthMM} x ${data.calculationInputs.boxDepthMM}`
-      : '',
-    withinModelRange: data.calculationInputs?.withinModelRange ?? '',
-    faultCurrentSource: data.calculationInputs?.faultCurrentSource || '',
-    resultValidity: lifecycle.resultValidity,
-    freshness: lifecycle.freshness,
-    eligibility: lifecycle.resultEligibility,
-    calculationVersion: lifecycle.calculationVersion,
-    calculatedAt: lifecycle.calculatedAt,
-    assumptions: lifecycle.assumptions,
-    warnings: lifecycle.warnings,
-    provenance: lifecycle.provenance,
-  }));
+  const rows = entries.map(([id, data]) => {
+    const plausibility = assessArcFlashResultPlausibility(data);
+    return {
+      bus: id,
+      equipmentTag: data.equipmentTag || id,
+      nominalVoltage: data.nominalVoltage ?? '',
+      incidentEnergy: data.incidentEnergy,
+      ppeSelectionMethod: data.ppeSelectionMethod || 'incident-energy',
+      minimumArcRatingCalCm2: data.minimumArcRatingCalCm2 ?? '',
+      boundary: data.boundary,
+      clearingTime: data.clearingTime,
+      workingDistance: data.workingDistance ?? '',
+      limitedApproach: data.limitedApproach ?? '',
+      restrictedApproach: data.restrictedApproach ?? '',
+      upstreamDevice: data.upstreamDevice || '',
+      studyDate: resolveStudyDate(data),
+      calculationStatus: data.calculationStatus || 'not-recorded',
+      labelEligibility: isArcFlashLabelEligible(data) ? 'eligible-draft' : 'withheld',
+      requiredInputs: Array.isArray(data.requiredInputs) ? data.requiredInputs.join(' | ') : '',
+      notes: [
+        ...(Array.isArray(data.notes) ? data.notes : []),
+        ...(plausibility.plausible ? [] : [plausibility.reason]),
+      ].join(' | '),
+      calculationModel: data.calculationInputs?.model || '',
+      boltedFaultCurrentKA: data.calculationInputs?.boltedFaultCurrentKA ?? '',
+      arcingCurrentKA: data.calculationInputs?.arcingCurrentKA ?? '',
+      clearingTimeSource: data.calculationInputs?.clearingTimeSource || '',
+      clearingCurveStatus: data.calculationInputs?.clearingCurveStatus || '',
+      clearingCurveDomainA: data.calculationInputs?.clearingCurveDomainA
+        ? JSON.stringify(data.calculationInputs.clearingCurveDomainA)
+        : '',
+      protectiveDeviceId: data.calculationInputs?.protectiveDeviceId || '',
+      protectiveDeviceLibraryStatus: data.calculationInputs?.protectiveDeviceLibraryStatus || '',
+      protectiveDeviceSourceFingerprint: data.calculationInputs?.protectiveDeviceSourceFingerprint || '',
+      governingScenario: data.calculationInputs?.governingScenario || '',
+      electrodeConfiguration: data.calculationInputs?.electrodeConfiguration || '',
+      gapMM: data.calculationInputs?.gapMM ?? '',
+      enclosureDimensionsMM: [
+        data.calculationInputs?.boxHeightMM,
+        data.calculationInputs?.boxWidthMM,
+        data.calculationInputs?.boxDepthMM,
+      ].every(Number.isFinite)
+        ? `${data.calculationInputs.boxHeightMM} x ${data.calculationInputs.boxWidthMM} x ${data.calculationInputs.boxDepthMM}`
+        : '',
+      withinModelRange: data.calculationInputs?.withinModelRange ?? '',
+      faultCurrentSource: data.calculationInputs?.faultCurrentSource || '',
+      resultValidity: lifecycle.resultValidity,
+      freshness: lifecycle.freshness,
+      eligibility: lifecycle.resultEligibility,
+      calculationVersion: lifecycle.calculationVersion,
+      calculatedAt: lifecycle.calculatedAt,
+      assumptions: lifecycle.assumptions,
+      warnings: lifecycle.warnings,
+      provenance: lifecycle.provenance,
+    };
+  });
   if (!rows.length) return { reportCount: 0, labelCount: 0, omittedLabelCount: 0 };
   downloadCSV(headers, rows, 'arcflash.csv');
   downloadPDF('Arc Flash Report', headers, rows, 'arcflash.pdf');
