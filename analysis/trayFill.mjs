@@ -186,6 +186,10 @@ function finishResult(base, {
  * Evaluate one tray cross-section using selected NEC 2023 Article 392 rules.
  * Areas and diameters are in square inches and inches respectively.
  */
+/**
+ * @param {import('../types/project').Tray} [tray]
+ * @param {import('../types/project').Cable[]} [cables]
+ */
 export function evaluateTrayFill(tray = {}, cables = []) {
   const construction = normalizeTrayConstruction(
     tray.tray_type ?? tray.trayType ?? tray.construction ?? tray.type
@@ -471,6 +475,10 @@ export function resolveCableCompartment(cable = {}, numSlots = 1, slotGroups = n
  * compartment. Single-compartment trays return evaluateTrayFill() unchanged.
  * Cables that cannot be placed in a compartment make the result incomplete —
  * a whole-tray average is never substituted.
+ */
+/**
+ * @param {import('../types/project').Tray} [tray]
+ * @param {import('../types/project').Cable[]} [cables]
  */
 export function evaluateTrayFillWithCompartments(tray = {}, cables = []) {
   const numSlots = traySlotCount(tray);

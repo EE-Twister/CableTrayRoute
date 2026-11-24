@@ -147,6 +147,11 @@ export function shortCircuitBarRows(entries, ratings = {}) {
  * rows keep their bar for context but carry a "Not evaluated" badge and the
  * reason instead of a pass/review/fail verdict.
  */
+/**
+ * @param {Array<[string, import('../../types/project').ArcFlashResult]>} entries
+ * @param {{ readiness?: ((id: string, result: import('../../types/project').ArcFlashResult) => import('../../types/project').ChartReadiness) | null }} [options]
+ * @returns {import('../../types/project').BarRow[]}
+ */
 export function arcFlashBarRows(entries, { readiness = null } = {}) {
   return (entries || []).map(([id, result]) => {
     const energy = finite(result?.incidentEnergy);
