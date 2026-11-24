@@ -1464,3 +1464,180 @@ body.dark-mode .row-icon-btn .control-icon {
     to { transform: rotate(360deg); }
 }
 
+/* --- Merged workflow band (application review U3) ---
+   site.js nests an active sample-workflow guide inside .workflow-step-nav
+   (.sample-workflow-guide--integrated). On desktop the step label, project
+   status and guide share one compact row instead of two stacked bands; the
+   guide's Previous / Next / Checklist / Exit replace the generic step links.
+   These rules sit after navigation.css in the components layer so they
+   outrank its short-viewport rules that hid the step label. */
+@media (min-width: 721px) {
+    .workflow-step-nav:has(> .sample-workflow-guide--integrated) {
+        flex-wrap: wrap;
+        gap: var(--space-1) var(--space-3);
+        padding-block: var(--space-1);
+    }
+
+    .workflow-step-nav:has(> .sample-workflow-guide--integrated) > .workflow-step-nav-label {
+        display: block;
+    }
+
+    .workflow-step-nav:has(> .sample-workflow-guide--integrated) > .workflow-step-nav-status {
+        display: inline-flex;
+    }
+
+    .workflow-step-nav:has(> .sample-workflow-guide--integrated) > .workflow-step-nav-links {
+        display: none;
+    }
+
+    .workflow-step-nav:has(> .sample-workflow-guide--integrated) > .sample-workflow-guide--integrated {
+        flex: 1 1 34rem;
+        min-width: 0;
+        grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
+        gap: var(--space-3);
+        margin: 0;
+        padding: 0 0 0 var(--space-3);
+        border: 0;
+        border-left: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
+        border-radius: 0;
+        background: transparent;
+    }
+
+    .sample-workflow-guide--integrated .sample-workflow-guide__identity {
+        flex-direction: row;
+        align-items: baseline;
+        gap: 0.45rem;
+        min-width: 0;
+        max-width: 20rem;
+        white-space: nowrap;
+    }
+
+    .sample-workflow-guide--integrated .sample-workflow-guide__identity > strong {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .sample-workflow-guide--integrated .sample-workflow-guide__link,
+    .sample-workflow-guide--integrated .sample-workflow-guide__close {
+        display: inline-flex;
+        align-items: center;
+        box-sizing: border-box;
+        min-height: 2rem;
+        margin: 0;
+        padding-block: 0.25rem;
+    }
+}
+
+@media (min-width: 721px) and (max-width: 1199px) {
+    /* The dot stays; the status text remains in its title and aria-label. */
+    .workflow-step-nav:has(> .sample-workflow-guide--integrated) .workflow-step-nav-status__text {
+        display: none;
+    }
+}
+
+@media (max-width: 720px) {
+    .workflow-step-nav > .sample-workflow-guide--integrated {
+        grid-column: 1 / -1;
+    }
+}
+
+/* --- Cable Schedule workspace header (application review U3) ---
+   One row on desktop: the heading, a split Add Cable button with Quick Add in
+   its menu, Save, the Import / Export, Templates and View menus, Route All,
+   and a More menu for occasional actions. Scoped to the Cable Schedule page
+   because Raceway Schedule, Ductbank Route and Tray Fill share
+   .schedule-card-header and .cable-toolbar. */
+body[data-report-title="Cable Schedule"] .cable-schedule-header {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+}
+
+body[data-report-title="Cable Schedule"] .cable-schedule-header > h2 {
+    flex: 0 0 auto;
+}
+
+body[data-report-title="Cable Schedule"] .cable-schedule-header > .field-hint {
+    flex: 1 0 100%;
+    margin: 0;
+}
+
+body[data-report-title="Cable Schedule"] .cable-schedule-toolbar {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: var(--space-1);
+    row-gap: var(--space-1);
+}
+
+body[data-report-title="Cable Schedule"] .cable-schedule-toolbar .toolbar-btn,
+body[data-report-title="Cable Schedule"] .cable-schedule-toolbar .toolbar-menu > summary.toolbar-btn {
+    padding-inline: 0.45rem;
+}
+
+/* Not a .toolbar-group: oneline.css restyles that class from the pages layer. */
+body[data-report-title="Cable Schedule"] .cable-add-group {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    align-items: center;
+    padding-right: var(--space-2);
+    border-right: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
+}
+
+body[data-report-title="Cable Schedule"] .cable-add-group .add-row-btn,
+body[data-report-title="Cable Schedule"] .cable-add-menu > summary.btn {
+    min-height: 2.15rem;
+    margin: 0;
+    font-size: var(--font-size-sm);
+}
+
+body[data-report-title="Cable Schedule"] .cable-add-group .add-row-btn {
+    padding-inline: 0.6rem;
+    border-start-end-radius: 0;
+    border-end-end-radius: 0;
+}
+
+body[data-report-title="Cable Schedule"] .cable-add-menu > summary.btn {
+    width: auto;
+    min-width: 0;
+    padding-inline: 0.45rem;
+    border-left-color: color-mix(in srgb, var(--button-text) 45%, var(--primary-color));
+    border-start-start-radius: 0;
+    border-end-start-radius: 0;
+    color: var(--button-text);
+}
+
+body[data-report-title="Cable Schedule"] .cable-add-menu > summary.btn::after {
+    margin-left: 0;
+    opacity: 0.9;
+}
+
+@media (max-width: 560px) {
+    body[data-report-title="Cable Schedule"] .cable-schedule-header {
+        align-items: stretch;
+    }
+
+    body[data-report-title="Cable Schedule"] .cable-add-group {
+        width: 100%;
+        padding-right: 0;
+        border-right: none;
+    }
+
+    body[data-report-title="Cable Schedule"] .cable-add-group .add-row-btn {
+        flex: 1 1 auto;
+        width: auto;
+    }
+
+    body[data-report-title="Cable Schedule"] .cable-add-menu {
+        flex: 0 0 auto;
+        width: auto;
+    }
+
+    body[data-report-title="Cable Schedule"] .cable-add-menu .toolbar-menu-panel {
+        position: absolute;
+        right: 0;
+        left: auto;
+        box-shadow: var(--elevation-md);
+    }
+}

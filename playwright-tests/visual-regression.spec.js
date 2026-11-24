@@ -44,7 +44,9 @@ test.describe('critical desktop visual contracts', () => {
 
   test('cable schedule populated workspace', async ({ page }) => {
     await openStablePage(page, 'cableschedule.html?e2e=1&e2e_reset=1', '#cableScheduleTable');
-    await page.locator('#load-sample-cables-btn').click();
+    // The empty-state button runs the same loader as More > Load Sample Cables
+    // and leaves no toolbar menu open in the screenshot.
+    await page.locator('#empty-load-sample-btn').click();
     await expect(page.locator('#cableScheduleTable tbody tr')).toHaveCount(3);
     await settleVisualState(page);
     await expect(page).toHaveScreenshot('cable-schedule-desktop.png');

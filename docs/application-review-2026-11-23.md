@@ -49,7 +49,15 @@ E1–E8 were then corrected:
 
 Still open from E1–E8: the panel's Phase Load (VA) column still falls back to kW.
 
-U1–U5 remain open.
+U1–U5 were then addressed:
+
+- **U1:** 63 previously undefined colour variables are now defined, so they follow each theme. `npm run lint:css` fails on any undefined `var()`. The report preview always renders as a light page, and the dark-on-dark summary headings and dark primary buttons are fixed. The axe pass now also runs in dark mode and covers the report builder, sample gallery, Arc Flash and Short Circuit. **Partly done:** 10 pages still fail dark-mode contrast because older stylesheets use the teal `--primary-color` as both button fill and text; they are listed as `DARK_KNOWN_FAILURES` in `playwright-tests/a11y.spec.ts`.
+- **U2:** the header chip shrinks with an ellipsis, so no page scrolls sideways at any width from 320 to 1,920 px.
+- **U3:** the step bar and sample-workflow bar merge into one band, the toolbar is one row (Add Cable is primary, Quick Add moved into its menu), and the first cable row is at about y = 453 instead of 562 at 1009 × 596.
+- **U4:** the empty workspace shows one identity block and three actions; a saved project shows one card and one Open Step. A project that is unsaved and has never been saved still shows the Create/Open/Sample prompt beside Open Step and Save.
+- **U5:** Tray Fill opens on a project tray (handed-over tray, then `?tray=`, then the first tray with cables); **New blank tray** and `?blank=1` open manual entry.
+
+Still open: the `DARK_KNOWN_FAILURES` pages, and the home page for an unsaved, never-saved project.
 
 **Scope:** what a user sees, what the issued report says, and what the export files contain.
 

@@ -767,3 +767,13 @@ hr {
     background: color-mix(in srgb, var(--color-primary, #2563eb) 4%, transparent);
 }
 
+/* ---- Disclosure Headings ---- */
+
+/* "About This Tool" / "Method & Assumptions" summaries appear on most pages.
+   routing.css (pages layer) hard-codes #0f172a on them, which is dark-on-dark
+   in dark mode; an !important here, in an earlier layer, outranks that rule. */
+.method-panel > summary,
+.advanced-routing-settings > summary {
+    color: var(--color-text) !important;
+}
+

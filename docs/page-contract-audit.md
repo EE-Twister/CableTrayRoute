@@ -561,7 +561,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Cable
-- Source files: `ampacity.mjs`, `analysis/cableLibrary.mjs`, `analysis/conduitFill.mjs`, `analysis/designSynthesisMotorReadiness.mjs`, `analysis/resultContract.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/studyResultReadiness.mjs`, `analysis/trayFill.mjs`, `cableschedule.js`, `codes/iecTables.js`, `codes/necTables.js`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `sizing.js`, `src/cable-schedule/io.js`, `src/cable-schedule/optionModel.js`, `src/cable-schedule/printReport.js`, `src/cable-schedule/scheduleConfig.js`, `src/cable-schedule/sizingHighlight.js`, `src/cable-schedule/tagModel.js`, `src/cable-schedule/templateModel.js`, `src/cableschedule.js`, `src/components/cableScheduleLinksBoot.js`, `src/components/crossHighlight.mjs`, `src/components/crossHighlightMount.js`, `src/components/importedOption.js`, `src/components/projectDeletionReview.js`, `src/components/resultViz.mjs`, `src/components/scheduleSummary.mjs`, `src/components/scheduleSummaryMount.js`, `src/crossProbe.js`, `src/design-synthesis/preliminaryProjectNotice.mjs`, `src/lifecycle/pageBootstrap.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/projectManagerEntry.js`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/cablePhases.js`
+- Source files: `ampacity.mjs`, `analysis/cableLibrary.mjs`, `analysis/conduitFill.mjs`, `analysis/designSynthesisMotorReadiness.mjs`, `analysis/resultContract.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/studyResultReadiness.mjs`, `analysis/trayFill.mjs`, `cableschedule.js`, `codes/iecTables.js`, `codes/necTables.js`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `sizing.js`, `src/cable-schedule/io.js`, `src/cable-schedule/optionModel.js`, `src/cable-schedule/printReport.js`, `src/cable-schedule/scheduleConfig.js`, `src/cable-schedule/sizingHighlight.js`, `src/cable-schedule/tagModel.js`, `src/cable-schedule/templateModel.js`, `src/cable-schedule/toolbarMenus.js`, `src/cableschedule.js`, `src/components/cableScheduleLinksBoot.js`, `src/components/crossHighlight.mjs`, `src/components/crossHighlightMount.js`, `src/components/importedOption.js`, `src/components/projectDeletionReview.js`, `src/components/resultViz.mjs`, `src/components/scheduleSummary.mjs`, `src/components/scheduleSummaryMount.js`, `src/crossProbe.js`, `src/design-synthesis/preliminaryProjectNotice.mjs`, `src/lifecycle/pageBootstrap.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/projectManagerEntry.js`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/cablePhases.js`
 
 **Undocumented Reads**
 - None
@@ -583,21 +583,21 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - cableschedule.js:1874 getCables()
+  - cableschedule.js:1875 getCables()
   - src/components/scheduleSummaryMount.js:16 getCables()
   - src/components/scheduleSummaryMount.js:21 getCables()
   - src/design-synthesis/preliminaryProjectNotice.mjs:12 getCables()
 - `conduitSchedule`
-  - cableschedule.js:108 getConduits()
+  - cableschedule.js:109 getConduits()
   - src/components/scheduleSummaryMount.js:19 getConduits()
 - `ductbankSchedule`
-  - cableschedule.js:109 getDuctbanks()
+  - cableschedule.js:110 getDuctbanks()
   - src/components/scheduleSummaryMount.js:20 getDuctbanks()
 - `equipment`
-  - cableschedule.js:127 getEquipment()
+  - cableschedule.js:128 getEquipment()
   - src/design-synthesis/preliminaryProjectNotice.mjs:10 getEquipment()
 - `loadList`
-  - cableschedule.js:130 getLoads()
+  - cableschedule.js:131 getLoads()
   - src/design-synthesis/preliminaryProjectNotice.mjs:11 getLoads()
 - `oneLineDiagram`
   - src/crossProbe.js:139 getOneLine()
@@ -605,47 +605,47 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - src/crossProbe.js:201 getOneLine()
   - src/design-synthesis/preliminaryProjectNotice.mjs:13 getOneLine()
 - `panelSchedule`
-  - cableschedule.js:118 getPanels()
-  - cableschedule.js:133 getPanels()
+  - cableschedule.js:119 getPanels()
+  - cableschedule.js:134 getPanels()
 - `settings.cableChangeLog`
-  - cableschedule.js:424 getCableChangeLog()
-  - cableschedule.js:425 getItem(settings.cableChangeLog)
+  - cableschedule.js:425 getCableChangeLog()
+  - cableschedule.js:426 getItem(settings.cableChangeLog)
 - `settings.cableTagSettings`
-  - cableschedule.js:388 getCableTagSettings()
-  - cableschedule.js:389 getItem(settings.cableTagSettings)
+  - cableschedule.js:389 getCableTagSettings()
+  - cableschedule.js:390 getItem(settings.cableTagSettings)
 - `settings.cableTemplates`
-  - cableschedule.js:1169 getCableTemplates()
-  - cableschedule.js:1450 getCableTemplates()
-  - cableschedule.js:381 getCableTemplates()
+  - cableschedule.js:1170 getCableTemplates()
+  - cableschedule.js:1451 getCableTemplates()
+  - cableschedule.js:382 getCableTemplates()
 - `settings.designSynthesisReviewDraft`
   - src/design-synthesis/preliminaryProjectNotice.mjs:8 getItem(designSynthesisReviewDraft)
 - `settings.latestRouteResults`
   - src/components/crossHighlightMount.js:38 getItem(latestRouteResults)
   - src/components/scheduleSummaryMount.js:22 getItem(latestRouteResults)
 - `settings.trayHardwareCatalogCustomProducts`
-  - cableschedule.js:1205 getTrayHardwareCatalogCustomProducts()
+  - cableschedule.js:1206 getTrayHardwareCatalogCustomProducts()
 - `traySchedule`
-  - cableschedule.js:107 getTrays()
+  - cableschedule.js:108 getTrays()
   - src/components/scheduleSummaryMount.js:18 getTrays()
 
 **Detected Writes**
 - `cableSchedule`
-  - cableschedule.js:2212 setCables()
-  - cableschedule.js:2224 setCables()
-  - cableschedule.js:2238 setCables()
-  - cableschedule.js:2261 setCables()
+  - cableschedule.js:2213 setCables()
+  - cableschedule.js:2225 setCables()
+  - cableschedule.js:2239 setCables()
+  - cableschedule.js:2262 setCables()
 - `settings.cableChangeLog`
-  - cableschedule.js:431 setCableChangeLog()
-  - cableschedule.js:433 setItem(settings.cableChangeLog)
+  - cableschedule.js:432 setCableChangeLog()
+  - cableschedule.js:434 setItem(settings.cableChangeLog)
 - `settings.cableTagSettings`
-  - cableschedule.js:395 setCableTagSettings()
-  - cableschedule.js:397 setItem(settings.cableTagSettings)
+  - cableschedule.js:396 setCableTagSettings()
+  - cableschedule.js:398 setItem(settings.cableTagSettings)
 - `settings.cableTemplates`
-  - cableschedule.js:1179 setCableTemplates()
-  - cableschedule.js:1198 setCableTemplates()
-  - cableschedule.js:1232 setCableTemplates()
-  - cableschedule.js:1407 setCableTemplates()
-  - cableschedule.js:1733 setCableTemplates()
+  - cableschedule.js:1180 setCableTemplates()
+  - cableschedule.js:1199 setCableTemplates()
+  - cableschedule.js:1233 setCableTemplates()
+  - cableschedule.js:1408 setCableTemplates()
+  - cableschedule.js:1734 setCableTemplates()
   - ... 5 more
 
 ### Panel Schedule (`panelschedule.html`)
@@ -867,7 +867,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Raceway
-- Source files: `analysis/conduitFill.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/trayFill.mjs`, `cabletrayfill.js`, `src/cabletrayfill.js`, `src/components/fillGauge.js`, `src/projectManagerEntry.js`, `src/tray-fill/fillAnalysisSheet.mjs`, `tableUtils.mjs`, `tour.js`
+- Source files: `analysis/conduitFill.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/trayFill.mjs`, `cabletrayfill.js`, `src/cabletrayfill.js`, `src/components/fillGauge.js`, `src/projectManagerEntry.js`, `src/tray-fill/fillAnalysisSheet.mjs`, `src/tray-fill/initialTraySelection.mjs`, `tableUtils.mjs`, `tour.js`
 
 **Undocumented Reads**
 - None
@@ -890,11 +890,11 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `settings.trayFillData`
-  - cabletrayfill.js:2114 getItem(trayFillData)
+  - cabletrayfill.js:2161 getItem(trayFillData)
 
 **Detected Writes**
 - `settings.trayFillData`
-  - cabletrayfill.js:2122 removeItem(trayFillData)
+  - cabletrayfill.js:2172 removeItem(trayFillData)
 
 ### Conduit Fill (`conduitfill.html`)
 

@@ -54,13 +54,11 @@
 
 .home-command__side {
     display: grid;
-    grid-template-columns: minmax(0, 0.86fr) minmax(0, 1fr);
     gap: var(--space-3);
     align-items: stretch;
 }
 
-.home-command__project,
-.home-command__panel {
+.home-command__project {
     min-height: 8.6rem;
 }
 
@@ -125,13 +123,6 @@
     color: var(--color-text-muted);
     font-size: clamp(0.96rem, 1.5vw, 1.08rem);
     line-height: 1.48;
-}
-
-.hero-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.7rem;
-    align-items: center;
 }
 
 .hero-action-btn {
@@ -224,8 +215,7 @@
     line-height: 1.25;
 }
 
-#home-next-action-detail,
-#home-next-action-metrics {
+#home-next-action-detail {
     color: var(--color-text-muted);
     font-size: 0.78rem;
     line-height: 1.35;
@@ -236,12 +226,20 @@
     text-align: right;
 }
 
+/* The page's one primary action while a project is in progress. */
 .home-next-action a {
-    margin-top: 0.2rem;
-    color: color-mix(in srgb, var(--color-primary) 80%, var(--color-text));
-    font-size: 0.82rem;
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.25rem;
+    padding: 0.4rem 0.85rem;
+    border: 1px solid var(--button-bg);
+    border-radius: 8px;
+    background: var(--button-bg);
+    color: var(--button-text);
+    font-size: 0.86rem;
     font-weight: 800;
     text-decoration: none;
+    white-space: nowrap;
 }
 
 #workflow-progress-text,
@@ -250,52 +248,32 @@
 }
 
 .home-next-action a:hover {
-    text-decoration: underline;
-}
-
-body.dark-mode .home-next-action__label,
-body.dark-mode .home-next-action a {
-    color: #bfdbfe;
-}
-
-.home-command__panel {
-    margin: 0;
-    padding: var(--space-4);
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--color-surface-strong) 94%, var(--color-primary));
-    box-shadow: 0 20px 45px -35px rgba(15, 23, 42, 0.45);
-}
-
-.home-command__panel h2 {
-    margin: 0 0 var(--space-3);
-    color: var(--color-text);
-    font-size: 1rem;
-    font-weight: 750;
-    letter-spacing: 0;
-}
-
-.workflow-summary p {
-    margin: 0.35rem 0;
-    color: var(--color-text-muted);
-    font-size: 0.92rem;
-    line-height: 1.45;
-}
-
-.workflow-summary a {
-    font-weight: 700;
-}
-
-.home-command__dashboard-link {
-    display: inline-flex;
-    margin-top: var(--space-2);
-    color: var(--color-primary);
-    font-size: 0.9rem;
+    background: var(--button-hover-bg, var(--button-bg));
+    color: var(--button-text);
     text-decoration: none;
 }
 
-.home-command__dashboard-link:hover {
-    text-decoration: underline;
+body.dark-mode .home-next-action__label {
+    color: #bfdbfe;
+}
+
+/* An empty workspace (no open project, no records) starts from My Projects:
+   the project card, readiness, and next action describe a project in
+   progress, so they wait until there is one. */
+body[data-home-state="empty"] .home-command__inner {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+body[data-home-state="empty"] .home-command__side,
+body[data-home-state="empty"] .home-next-action {
+    display: none;
+}
+
+/* The workspace panel's empty state repeats the workspace identity and
+   counts that the project card already shows. components.css sits in a later
+   cascade layer, so only an important declaration can hide it here. */
+.home-page .project-workspace-current {
+    display: none !important;
 }
 
 .workflow-progress-track {
@@ -414,6 +392,10 @@ body.dark-mode .home-next-action a {
 
 button.home-section__link {
     color: var(--button-text);
+}
+
+button.home-section__link[hidden] {
+    display: none;
 }
 
 .workflow-grid {
@@ -904,7 +886,6 @@ body.dark-mode .hero {
         var(--color-surface);
 }
 
-body.dark-mode .home-command__panel,
 body.dark-mode .home-command__project,
 body.dark-mode .workflow-card,
 body.dark-mode .preview-panel,
@@ -948,12 +929,15 @@ body.dark-mode .workflow-card .status {
 }
 
 @media (max-width: 960px) {
-    .home-command__inner {
-        grid-template-columns: 1fr;
+    /* .container turns into a flex column on narrow screens (auth.css,
+       messages.css). Auto side margins would then shrink this inline-size
+       container to its padding, so let it stretch instead. */
+    .home-page .main-content {
+        margin-inline: 0;
     }
 
-    .home-command__side {
-        grid-template-columns: 1fr 1fr;
+    .home-command__inner {
+        grid-template-columns: 1fr;
     }
 
     .hero-title {
@@ -997,13 +981,6 @@ body.dark-mode .workflow-card .status {
         line-height: 1.42;
     }
 
-    .hero-actions {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        align-items: stretch;
-        gap: 0.55rem;
-    }
-
     .hero-action-btn {
         width: auto;
         min-height: 2.35rem;
@@ -1022,8 +999,7 @@ body.dark-mode .workflow-card .status {
         text-align: left;
     }
 
-    .home-command__project,
-    .home-command__panel {
+    .home-command__project {
         min-height: 0;
         padding: var(--space-3);
     }
@@ -1034,10 +1010,6 @@ body.dark-mode .workflow-card .status {
 
     .home-command__project dl div {
         padding: 0.45rem;
-    }
-
-    .workflow-summary p {
-        font-size: 0.86rem;
     }
 
     .home-command__side,

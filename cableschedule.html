@@ -92,137 +92,132 @@
       <div id="schedule-summary" class="study-chart" aria-live="polite"></div>
       <p id="cross-link-bar" class="cross-link-bar" role="status" aria-live="polite" hidden></p>
       <section class="card cable-schedule-card">
-        <div class="schedule-card-header">
-          <div>
-            <h2>Cable List</h2>
-            <p class="field-hint">Add the core cable data first, then expand details only when routing, sizing, or review fields are needed.</p>
-          </div>
-          <div class="schedule-primary-actions">
-            <button id="quick-add-cables-btn" class="btn compact-action-btn" title="Add several cables in one form">
-              <img src="icons/toolbar/add-arrangement.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-              Quick Add
-            </button>
-            <button id="add-row-btn" class="btn primary-btn add-row-btn compact-action-btn" title="Add cable">
-              <img src="icons/cable.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-              Add Cable
-            </button>
-          </div>
-        </div>
-        <div class="cable-toolbar mb-1" role="toolbar" aria-label="Cable schedule actions" data-no-print>
-          <div class="toolbar-group">
-            <span class="toolbar-group-label sr-only">Data</span>
-            <button id="save-schedule-btn" class="btn toolbar-btn" title="Save schedule">
+        <div class="schedule-card-header cable-schedule-header">
+          <h2>Cable List</h2>
+          <div class="cable-toolbar cable-schedule-toolbar" role="toolbar" aria-label="Cable schedule actions" data-no-print>
+            <div class="cable-add-group">
+              <button id="add-row-btn" class="btn primary-btn add-row-btn compact-action-btn" title="Add one cable in the full cable form">
+                <img src="icons/cable.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Add Cable
+              </button>
+              <details class="toolbar-menu cable-add-menu">
+                <summary class="btn primary-btn compact-action-btn" title="Other ways to add cables"><span class="sr-only">Add options</span></summary>
+                <div class="toolbar-menu-panel">
+                  <button id="quick-add-cables-btn" class="btn toolbar-btn" type="button" title="Add several cables in one form">
+                    <img src="icons/toolbar/add-arrangement.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                    Quick Add Several
+                  </button>
+                </div>
+              </details>
+            </div>
+            <button id="save-schedule-btn" class="btn toolbar-btn" title="Check required fields and save the schedule">
               <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
               Save
             </button>
-            <button id="load-schedule-btn" class="btn toolbar-btn" title="Load schedule">
-              <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-              Load
-            </button>
-            <button id="load-sample-cables-btn" class="btn toolbar-btn" title="Load sample cables">
-              <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-              Sample
-            </button>
-          </div>
-          <details class="toolbar-menu">
-            <summary class="btn toolbar-btn">
-              <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-              Import / Export
-            </summary>
-            <div class="toolbar-menu-panel">
-              <button id="export-xlsx-btn" class="btn toolbar-btn" title="Export as Excel">
+            <details class="toolbar-menu">
+              <summary class="btn toolbar-btn">
                 <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-                Export XLSX
-              </button>
-              <input type="file" id="import-xlsx-input" accept=".xlsx" class="hidden" title="Import from Excel">
-              <button id="import-xlsx-btn" class="btn toolbar-btn" title="Import from Excel">
-                <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-                Import XLSX
-              </button>
-              <button id="open-report-options-btn" type="button" class="btn toolbar-btn" title="Choose report export and print options">
-                <img src="icons/toolbar/download.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-                Reports
-              </button>
-              <button id="print-schedule-btn" type="button" class="btn toolbar-btn" title="Print schedule">
-                <img src="icons/toolbar/download.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-                Print
-              </button>
-            </div>
-          </details>
-          <div class="toolbar-group">
-            <span class="toolbar-group-label sr-only">Entry</span>
-            <button id="open-tag-settings-btn" class="btn toolbar-btn" type="button" title="Configure automatic cable tag numbering">
-              <img src="icons/toolbar/settings.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-              Tags
-            </button>
-            <button id="open-batch-edit-btn" class="btn toolbar-btn" type="button" title="Apply common values to selected cables">
-              <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-              Batch
-            </button>
-          </div>
-          <details class="toolbar-menu">
-            <summary class="btn toolbar-btn">
-              <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-              Templates
-            </summary>
-            <div class="toolbar-menu-panel">
-              <button id="cable-library-btn" class="btn toolbar-btn" title="Manage cable typicals" aria-haspopup="dialog" aria-expanded="false" aria-controls="cable-library-modal">
-                <img src="icons/cable.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-                Cable Library
-              </button>
-              <button id="open-typical-filter-btn" class="btn toolbar-btn" type="button" title="Filter cables by typical" aria-haspopup="dialog" aria-expanded="false">
-                <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-                Filter
-              </button>
-              <button id="open-apply-typical-btn" class="btn toolbar-btn" type="button" title="Apply a typical to selected rows" aria-haspopup="dialog" aria-expanded="false">
-                <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-                Apply Typical
-              </button>
-            </div>
-          </details>
-          <details class="toolbar-menu">
-            <summary class="btn toolbar-btn">
-              <img src="icons/toolbar/grid-size.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-              View
-            </summary>
-            <div class="toolbar-menu-panel">
-              <button id="open-view-preset-btn" class="btn toolbar-btn" type="button" title="Choose visible column groups" aria-haspopup="dialog" aria-expanded="false">
+                Import / Export
+              </summary>
+              <div class="toolbar-menu-panel">
+                <button id="export-xlsx-btn" class="btn toolbar-btn" title="Export as Excel">
+                  <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                  Export XLSX
+                </button>
+                <input type="file" id="import-xlsx-input" accept=".xlsx" class="hidden" title="Import from Excel">
+                <button id="import-xlsx-btn" class="btn toolbar-btn" title="Import from Excel">
+                  <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                  Import XLSX
+                </button>
+                <button id="open-report-options-btn" type="button" class="btn toolbar-btn" title="Choose report export and print options">
+                  <img src="icons/toolbar/download.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                  Reports
+                </button>
+                <button id="print-schedule-btn" type="button" class="btn toolbar-btn" title="Print schedule">
+                  <img src="icons/toolbar/download.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                  Print
+                </button>
+              </div>
+            </details>
+            <details class="toolbar-menu">
+              <summary class="btn toolbar-btn">
+                <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Templates
+              </summary>
+              <div class="toolbar-menu-panel">
+                <button id="cable-library-btn" class="btn toolbar-btn" title="Manage cable typicals" aria-haspopup="dialog" aria-expanded="false" aria-controls="cable-library-modal">
+                  <img src="icons/cable.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                  Cable Library
+                </button>
+                <button id="open-typical-filter-btn" class="btn toolbar-btn" type="button" title="Filter cables by typical" aria-haspopup="dialog" aria-expanded="false">
+                  <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                  Filter
+                </button>
+                <button id="open-apply-typical-btn" class="btn toolbar-btn" type="button" title="Apply a typical to selected rows" aria-haspopup="dialog" aria-expanded="false">
+                  <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                  Apply Typical
+                </button>
+              </div>
+            </details>
+            <details class="toolbar-menu">
+              <summary class="btn toolbar-btn">
                 <img src="icons/toolbar/grid-size.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-                Preset
-              </button>
-              <button id="clear-filters-btn" class="btn toolbar-btn" title="Clear filters">
-                <img src="icons/toolbar/delete-view.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-                Clear Filters
-              </button>
-              <button id="tour-btn" class="btn toolbar-btn" title="Interactive tour of this page">
-                <img src="icons/toolbar/hand.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-                Tour
-              </button>
-            </div>
-          </details>
-          <div class="toolbar-group">
+                View
+              </summary>
+              <div class="toolbar-menu-panel">
+                <button id="open-view-preset-btn" class="btn toolbar-btn" type="button" title="Choose visible column groups" aria-haspopup="dialog" aria-expanded="false">
+                  <img src="icons/toolbar/grid-size.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                  Preset
+                </button>
+                <button id="clear-filters-btn" class="btn toolbar-btn" title="Clear filters">
+                  <img src="icons/toolbar/delete-view.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                  Clear Filters
+                </button>
+                <button id="tour-btn" class="btn toolbar-btn" title="Interactive tour of this page">
+                  <img src="icons/toolbar/hand.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                  Tour
+                </button>
+              </div>
+            </details>
             <button id="auto-route-all-btn" class="btn btn-accent toolbar-btn" title="Route all cables with coordinates in the Optimal Route tool" aria-describedby="auto-route-hint">
               <img src="icons/route.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
               Route All
             </button>
             <span id="auto-route-hint" class="field-hint sr-only">Routes all cables that have start and end coordinates defined. Navigates to the Optimal Route tool.</span>
+            <details id="cable-more-menu" class="toolbar-menu toolbar-menu-danger">
+              <summary class="btn secondary-btn toolbar-btn">
+                <img src="icons/toolbar/settings.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                More
+              </summary>
+              <div class="toolbar-menu-panel">
+                <button id="load-schedule-btn" class="btn toolbar-btn" title="Reload the last saved schedule">
+                  <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                  Reload Saved
+                </button>
+                <button id="load-sample-cables-btn" class="btn toolbar-btn" title="Replace the schedule with sample cables">
+                  <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                  Load Sample Cables
+                </button>
+                <button id="open-tag-settings-btn" class="btn toolbar-btn" type="button" title="Configure automatic cable tag numbering">
+                  <img src="icons/toolbar/settings.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                  Tag Settings
+                </button>
+                <button id="open-batch-edit-btn" class="btn toolbar-btn" type="button" title="Apply common values to selected cables">
+                  <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                  Batch Edit
+                </button>
+                <button id="open-change-log-btn" class="btn toolbar-btn" type="button" title="Show recent cable schedule changes">
+                  <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                  Change Log
+                </button>
+                <button id="delete-all-btn" class="btn btn-danger toolbar-btn" title="Delete all rows">
+                  <img src="icons/toolbar/trash.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                  Delete All Rows
+                </button>
+              </div>
+            </details>
           </div>
-          <details class="toolbar-menu toolbar-menu-danger">
-            <summary class="btn secondary-btn toolbar-btn">
-              <img src="icons/toolbar/settings.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-              More
-            </summary>
-            <div class="toolbar-menu-panel">
-              <button id="open-change-log-btn" class="btn toolbar-btn" type="button" title="Show recent cable schedule changes">
-                <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-                Change Log
-              </button>
-              <button id="delete-all-btn" class="btn btn-danger toolbar-btn" title="Delete all rows">
-                <img src="icons/toolbar/trash.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
-                Delete All Rows
-              </button>
-            </div>
-          </details>
+          <p class="field-hint">Add the core cable data first, then expand details only when routing, sizing, or review fields are needed.</p>
         </div>
         <div id="cable-toolbar-hidden-controls" class="visually-hidden" aria-hidden="true" inert>
           <div id="cable-preset-controls" class="control-modal-group">

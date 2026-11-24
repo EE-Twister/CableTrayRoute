@@ -14,7 +14,7 @@ body.dark-mode .card {
 body.dark-mode h2,
 body.dark-mode h3,
 body.dark-mode h4 {
-    color: var(--primary-color);
+    color: var(--color-heading-accent, var(--primary-color));
 }
 
 .columns {
@@ -107,6 +107,18 @@ button, .primary-btn {
     cursor: pointer;
     font-size: 0.9rem;
     transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+/* Dark mode: the light teal --primary-color is right for text but gives white
+   button labels only 3:1, so the primary button fill is a darker teal. */
+body.dark-mode .primary-btn {
+    background-color: #0e7490;
+    border-color: #0e7490;
+}
+@media (prefers-color-scheme: dark) {
+    body:not(.theme-light):not(.theme-high-contrast) .primary-btn {
+        background-color: #0e7490;
+        border-color: #0e7490;
+    }
 }
 button:hover, .primary-btn:hover {
     background-color: var(--button-hover-bg);

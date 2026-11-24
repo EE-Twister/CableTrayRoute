@@ -510,21 +510,64 @@ export function renderProjectDisplayName(display, name) {
   refreshProjectActionsLabel();
 }
 
+/**
+ * True when the local save state reports that no project is open. Only
+ * "saved" and "unsaved" name an open project (see describeProjectSaveState).
+ * @param {{state?: string}} [saveState]
+ * @returns {boolean}
+ */
+export function isNoProjectSaveState(saveState) {
+  return Boolean(saveState) && saveState.state !== 'saved' && saveState.state !== 'unsaved';
+}
+
+/**
+ * Whether the cloud chip has anything of its own to say. "local" (synced
+ * nowhere) and "dirty" ("Not saved yet": no local or cloud save recorded)
+ * repeat what the local save badge already shows, and with no project open
+ * there is nothing to sync.
+ * @param {{state?: string, label?: string}} [syncDetail]
+ * @param {{noProject?: boolean}} [options]
+ * @returns {boolean}
+ */
+export function shouldShowCloudStatus(syncDetail, { noProject = false } = {}) {
+  if (!syncDetail || !syncDetail.label || noProject) return false;
+  const state = syncDetail.state || 'local';
+  return state !== 'local' && state !== 'dirty';
+}
+
+let lastLocalSaveState = null;
+let lastCloudSyncDetail = null;
+
 function refreshProjectActionsLabel() {
   if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
   const trigger = document.querySelector('.project-actions-trigger');
   const status = document.getElementById('project-sync-status');
   if (!trigger || !status) return;
+  const noProject = isNoProjectSaveState(lastLocalSaveState);
   const projectName = document.getElementById('project-display')?.textContent?.replace(/^Project:\s*/i, '').trim() || 'Untitled';
   const cloud = document.getElementById('project-cloud-status');
   const cloudShown = Boolean(cloud && !cloud.hidden && cloud.textContent);
   const localText = status.hidden ? '' : `${status.textContent}. ${status.title || ''}`.trim();
   const cloudText = cloudShown ? `Cloud: ${cloud.textContent}. ${cloud.title || ''}`.trim() : '';
   const statusText = [localText, cloudText].filter(Boolean).join(' ');
-  trigger.setAttribute('aria-label', [`Project actions for ${projectName}.`, statusText].filter(Boolean).join(' '));
-  trigger.title = statusText ? `${projectName} — ${statusText}` : projectName;
+  trigger.dataset.projectState = noProject ? 'none' : 'open';
+  if (noProject) {
+    // One state, one label: the badge reads "No project", so the chip does
+    // not also show the placeholder "Untitled" name.
+    trigger.setAttribute('aria-label', ['Project actions.', statusText].filter(Boolean).join(' '));
+    trigger.title = statusText || 'No project';
+  } else {
+    trigger.setAttribute('aria-label', [`Project actions for ${projectName}.`, statusText].filter(Boolean).join(' '));
+    trigger.title = statusText ? `${projectName} — ${statusText}` : projectName;
+  }
   const heading = document.getElementById('project-actions-heading');
-  if (heading) heading.textContent = [projectName, status.hidden ? '' : status.textContent, cloudShown ? cloud.textContent : ''].filter(Boolean).join(' · ');
+  if (heading) {
+    heading.textContent = [
+      noProject ? '' : projectName,
+      status.hidden ? '' : status.textContent,
+      cloudShown ? cloud.textContent : ''
+    ].filter(Boolean).join(' · ');
+  }
 }
 
 function renderStatusChip(element, { label, tone, detail }) {
@@ -533,23 +576,39 @@ function renderStatusChip(element, { label, tone, detail }) {
   if (detail) element.title = detail; else element.removeAttribute('title');
 }
 
+function renderCloudStatus() {
+  const cloud = document.getElementById('project-cloud-status');
+  if (!cloud) return;
+  const noProject = isNoProjectSaveState(lastLocalSaveState);
+  cloud.hidden = !shouldShowCloudStatus(lastCloudSyncDetail, { noProject });
+  if (!cloud.hidden) {
+    renderStatusChip(cloud, {
+      label: lastCloudSyncDetail.label,
+      tone: lastCloudSyncDetail.state || 'local',
+      detail: lastCloudSyncDetail.detail
+    });
+  }
+}
+
 // Local save state from src/projectSaveState.js.
 function updateProjectSaveState(detail = {}) {
   const status = document.getElementById('project-sync-status');
   if (!status) return;
+  lastLocalSaveState = detail;
   renderStatusChip(status, { label: detail.label || 'No project', tone: detail.tone || 'local', detail: detail.detail });
   status.hidden = false;
+  const display = document.getElementById('project-display');
+  if (display) display.hidden = isNoProjectSaveState(detail);
+  renderCloudStatus();
   refreshProjectActionsLabel();
 }
 
-// Server/cloud sync results from the project manager. "local" means the
-// project is not synced anywhere, which the local badge already conveys.
+// Server/cloud sync results from the project manager, shown on their own
+// chip only when they add something the local badge does not already say.
 function updateProjectSyncStatus(detail = {}) {
-  const cloud = document.getElementById('project-cloud-status');
-  if (!cloud) return;
-  const state = detail.state || 'local';
-  cloud.hidden = state === 'local' || !detail.label;
-  if (!cloud.hidden) renderStatusChip(cloud, { label: detail.label, tone: state, detail: detail.detail });
+  if (!document.getElementById('project-cloud-status')) return;
+  lastCloudSyncDetail = detail;
+  renderCloudStatus();
   refreshProjectActionsLabel();
 }
 

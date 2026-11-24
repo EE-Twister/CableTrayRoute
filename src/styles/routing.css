@@ -222,7 +222,7 @@ body.dark-mode .large-facility-sample-btn {
 .method-panel > summary,
 .route-control-panel h3,
 .route-visual-header h3 {
-  color: #0f172a;
+  color: var(--color-text, #0f172a);
 }
 
 .route-context {

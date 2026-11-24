@@ -1,5 +1,32 @@
 # UI Refinement Log
 
+## 2026-11-23
+
+- Fixed dark mode drawing light panels under light text (review finding U1):
+  - Stylesheets used 63 colour and layout names that were never defined, so each fell back to a hard-coded light colour. Each name now points to the matching theme colour. This fixes the study result summary on Short Circuit and Arc Flash, and the export, snapshot and preset buttons and section headers in the Report Package Builder. It also fixes the "Downstream handoff" line and **Run Fill Check** button in the Cable Schedule, and the checklist steps and tag chips in the Sample Gallery.
+  - "About This Tool" and "Method & Assumptions" headings now use the theme text colour.
+  - Muted text in dark mode is slightly lighter, so it reaches 4.5:1 on the page background.
+- The Report Package Builder preview now always renders as white paper with dark text, matching what prints and exports, in every app theme.
+- High contrast now starts from the light palette. A dark OS setting no longer shows navy panels under its black text.
+- `npm run lint:css` now fails on any `var(--name)` that no stylesheet defines. The accessibility suite now checks 14 pages, in both the light and dark colour schemes.
+- Stopped the header from overflowing between 961 and about 1,150 px (review finding U2). The project chip now shrinks to fit: it shortens the project name with an ellipsis instead of keeping a fixed 18rem width. The full name and save state remain in the chip's tooltip, its accessible name and the menu heading. Status badges are capped at 7rem, and from 961 to 1,120 px the brand shows only its logo; the link keeps its "CableTrayRoute home" label. Checked from 320 to 1,920 px: no page scrolls horizontally, and the account, assistant and search buttons stay fully on screen.
+- Gave the header one label per project state (review finding U4). With no project open, the chip reads only "No project"; it no longer adds "Untitled" and "Not saved yet". The cloud chip appears only for real cloud results ("Synced", "Cloud synced", "Save failed"), never to repeat the local badge.
+- Rebuilt Home around one identity block and one primary action per state (review finding U4):
+  - **Empty workspace** (no open project, no records): the hero shows only the title and tagline. My Projects carries the actions: Create New Project, Open Existing Project, and Try a Sample Project.
+  - **Project in progress:** one project card holds the name, workflow progress, and record and raceway counts. The former separate Project Readiness card is merged into it. Next Action is the primary action, and My Projects lists the saved projects. Until something has been saved, My Projects still shows its first-project prompt.
+- Removed duplicate Home actions:
+  - "Open Dashboard" and "View full workflow dashboard" (the dashboard stays in the Workflow menu and the project menu);
+  - "Browse Samples", which went to the same place as "Try a Sample Project";
+  - the second set of counts in the Next Action strip;
+  - the repeated "Current workspace" counts in My Projects.
+- "Save Current Project" now appears only when there is unsaved work.
+- Fixed the Home main column collapsing to a sliver at 768 px and narrower.
+- Brought the Cable Schedule table above the fold (review finding U3). With a guided sample active, the first cable row now starts at about y = 453 instead of 562 in a 1009 × 596 pane, and four rows are fully visible at 1265 × 712 instead of three:
+  - An active sample workflow's guide now shares one band with the workflow step label on every workflow page, instead of adding a second band. The band keeps the step label, the project status, the sample name and progress, and **Previous**, **Next**, **Checklist** and **Exit**. Below 1,200 px wide the status shows as a coloured dot, with the text in its tooltip and accessible name.
+  - The Cable Schedule toolbar is one row beside the **Cable List** heading. **Add Cable** is the one primary add button; **Quick Add Several** moved into its menu. **Reload Saved**, **Load Sample Cables**, **Tag Settings**, **Batch Edit**, **Change Log** and **Delete All Rows** are under **More**. **Save** stays in the row because it checks required fields across the schedule.
+  - One toolbar menu is open at a time; Escape or a click elsewhere closes it.
+- Cable Tray Fill now opens on a project tray instead of a blank 12 in tray (review finding U5). It loads, in order: a tray handed over from the Raceway Schedule or Optimal Route, the tray named in `?tray=`, then the first project tray that has cables (or the first tray if none has). When every cable row is complete it draws the tray at once, so the Article 392 result is shown on arrival. Otherwise the banner asks for the cable data that Draw Tray needs. **New blank tray** in the project-tray list keeps manual entry, and switching trays asks first when there are unsaved manual entries. A `?tray=` id that is not in the project leaves the blank tray and says so.
+
 ## 2026-08-24
 
 - Reworked the TCC study entry state around explicit device-evidence readiness, concise device selection, and a guided plot empty state. The workspace now distinguishes calculation-ready, review-pending, and screening curves before plotting; removes the hidden catalog select from the accessibility tree; and keeps screening curves clearly excluded from issued settings and arc-flash clearing-time use.

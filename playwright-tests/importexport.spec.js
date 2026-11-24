@@ -28,6 +28,7 @@ test.describe('Cable Schedule export', () => {
   });
 
   test('loads sample cables and exports an XLSX workbook', async ({ page }) => {
+    await openToolbarMenu(page, 'More');
     await page.click('#load-sample-cables-btn');
     await page.waitForFunction(() => {
       return document.querySelectorAll('#cableScheduleTable tbody tr').length > 0;

@@ -97,9 +97,9 @@
       scroll-margin-top: 4.25rem;
     }
     .rpt-view-tab[aria-selected="true"] {
-      background: var(--color-primary, #2563eb);
-      border-color: var(--color-primary, #2563eb);
-      color: #fff;
+      background: var(--button-bg);
+      border-color: var(--button-bg);
+      color: var(--button-text);
     }
     .rpt-section-checks label small {
       grid-column: 2;
@@ -164,9 +164,34 @@
     }
     .rpt-snapshot-item button { font-size: .75rem; padding: .1rem .4rem; }
 
-    /* Report preview area */
+    /* Report preview area. The preview is the issued document, so it renders as
+       light "paper" in every app theme (print is already light): pin the palette
+       its content consumes instead of inheriting the app theme's tokens. */
     .rpt-preview-col { min-width: 0; scroll-margin-top: 11rem; }
     .report-preview {
+      --color-primary: #2563eb;
+      --primary-color: #2563eb;
+      --color-text: #0f172a;
+      --text-color: #0f172a;
+      --heading-color: #0f172a;
+      --color-text-muted: #475569;
+      --text-muted: #475569;
+      --color-muted: #475569;
+      --color-surface: #f8fafc;
+      --color-surface-strong: #ffffff;
+      --secondary-color: #f8fafc;
+      --card-bg: #ffffff;
+      --surface-1: #ffffff;
+      --surface-2: #f5f7fa;
+      --color-surface-2: #f5f7fa;
+      --table-header-bg: #f5f7fa;
+      --table-row-alt-bg: #f4f6fb;
+      --color-border: #e2e8f0;
+      --border-color: #d0d0d0;
+      --color-warning: #b45309;
+      --color-info: #2563eb;
+      --color-error: #dc3545;
+      color-scheme: light;
       box-sizing: border-box;
       width: 100%;
       max-width: 8.5in;
@@ -175,10 +200,14 @@
       margin-inline: auto;
       padding: clamp(1rem, 4vw, .5in);
       overflow: hidden;
-      border: 1px solid var(--border-color, #d0d0d0);
-      background: var(--surface-1, #fff);
+      border: 1px solid #d0d0d0;
+      background: #ffffff;
+      color: #0f172a;
       box-shadow: 0 .4rem 1.4rem rgba(15, 23, 42, .12);
     }
+    /* Light-theme headings use --primary-color (pinned above); body.dark-mode
+       also recolours h4, which paper keeps as ink. */
+    .report-preview h4 { color: inherit; }
     .report-preview .report-section { min-width: 0; }
     .report-preview .report-scroll { max-width: 100%; overflow: visible; }
     .report-preview .report-table { width: 100%; max-width: 100%; table-layout: fixed; font-size: clamp(.62rem, 1.1vw, .78rem); }

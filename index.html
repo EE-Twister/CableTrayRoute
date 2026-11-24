@@ -112,10 +112,8 @@
       <div class="home-command__copy">
         <h1 class="hero-title">Project Workflow Command Center</h1>
         <p class="hero-tagline">Build the project from equipment and loads through one-line context, schedule reconciliation, routing, studies, and deliverables.</p>
-        <div class="hero-actions" aria-label="Project resources">
-          <a class="hero-action-btn secondary" href="workflowdashboard.html"><img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">Open Dashboard</a>
-          <a class="hero-action-btn secondary" href="samplegallery.html"><img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">Browse Samples</a>
-        </div>
+        <!-- The project in progress has one primary action; an empty workspace
+             starts from My Projects instead (src/index.js sets data-home-state). -->
         <div class="home-next-action" aria-label="Recommended next action">
           <div>
             <span class="home-next-action__label">Next Action</span>
@@ -123,16 +121,19 @@
             <span id="home-next-action-detail">Create equipment records before downstream schedules.</span>
           </div>
           <div class="home-next-action__meta">
-            <span id="home-next-action-metrics">0 equipment items / 0 loads / 0 cable rows</span>
             <a id="home-next-action-link" href="equipmentlist.html">Open Equipment List</a>
           </div>
         </div>
       </div>
+      <!-- The one identity block: project name, workflow progress, and counts. -->
       <div class="home-command__side">
         <section class="home-command__project" aria-labelledby="home-project-card-title">
           <div>
             <h2 id="home-project-card-title">Untitled Project</h2>
-            <p id="home-project-card-meta">Local workspace</p>
+            <p id="home-project-card-meta" aria-live="polite">Local workspace</p>
+            <div class="workflow-progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="8" aria-label="Workflow steps complete" id="workflow-progress-bar-track">
+              <div class="workflow-progress-fill" id="workflow-progress-fill" style="width:0%"></div>
+            </div>
           </div>
           <dl>
             <div>
@@ -145,14 +146,6 @@
             </div>
           </dl>
         </section>
-        <section class="workflow-summary home-command__panel" aria-live="polite" id="workflow-summary-section" aria-labelledby="workflow-progress-heading">
-          <h2 id="workflow-progress-heading">Project Readiness</h2>
-          <p id="workflow-progress-text">0 of 8 workflow steps complete.</p>
-          <div class="workflow-progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="8" aria-labelledby="workflow-progress-text" id="workflow-progress-bar-track">
-            <div class="workflow-progress-fill" id="workflow-progress-fill" style="width:0%"></div>
-          </div>
-          <a class="home-command__dashboard-link" href="workflowdashboard.html">View full workflow dashboard</a>
-        </section>
       </div>
     </div>
   </header>
@@ -162,9 +155,10 @@
         <div class="home-section__header">
           <div>
             <h2 id="home-projects-title">My Projects</h2>
-            <p>Create your first project, open saved work, or start from a sample project.</p>
+            <p>Projects saved in this browser and your account.</p>
           </div>
-          <button type="button" class="home-section__link btn" data-project-action="save">Save Current Project</button>
+          <!-- Shown only when there is unsaved work (src/index.js). -->
+          <button type="button" id="home-save-project-btn" class="home-section__link btn" data-project-action="save" hidden>Save Current Project</button>
         </div>
         <div id="home-projects-panel" class="project-workspace-panel" data-project-workspace aria-live="polite">
           <p class="text-muted">Loading saved projects...</p>
@@ -564,7 +558,7 @@
     </nav>
   </footer>
   <noscript>
-    <style>.hero-actions, .workflow-grid, #settings-menu { display: none !important; }</style>
+    <style>.workflow-grid, #settings-menu { display: none !important; }</style>
     <div style="text-align:center;padding:2rem 1rem;background:#fff3cd;color:#856404;border-bottom:1px solid #ffc107;">
       <strong>JavaScript is required.</strong> Please enable JavaScript to use CableTrayRoute.
     </div>
