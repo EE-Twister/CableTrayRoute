@@ -111,4 +111,17 @@ const replaced = applyRecordImport(
 );
 assert.deepEqual(replaced, [{ tray_id: 'TR-3' }]);
 
+// The workflow step header (workflowStatus) and the panel must count the same cables.
+const { getCableReadiness } = await import('../src/workflowStatus.js');
+const sharedCables = [
+  { tag: 'C-1', from_tag: 'A', to_tag: 'B', conductor_size: '4/0', length: '120' },
+  { tag: 'C-2', from_tag: 'A', to_tag: 'B', conductor_size: '4/0', length: '0' },
+  { tag: 'C-3', from_tag: 'A', to_tag: 'B', conductor_size: '4/0', length: 'TBD' }
+];
+const statusReadiness = getCableReadiness(sharedCables);
+const panelReadiness = summarizeCableWorkflow(sharedCables);
+assert.equal(statusReadiness.scheduleReady, 1);
+assert.equal(statusReadiness.scheduleReady, panelReadiness.scheduleReady);
+assert.equal(statusReadiness.missingSchedule, panelReadiness.missingSchedule);
+
 console.log('✓ schedule workflow');

@@ -142,6 +142,21 @@ export function evaluateOperatingTime(curve, current, { boundary = 'lower', inst
 }
 
 /**
+ * Current at which scaleCurve() cut a device's instantaneous plateau, or null
+ * when the device has no instantaneous element. Shared by checkCoordination()
+ * and the CTI report so both hold the plateau the same way.
+ *
+ * @param {object} scaled - Return value of scaleCurve()
+ * @returns {number|null}
+ */
+export function instantaneousCeiling(scaled) {
+  const settings = scaled?.settings ?? {};
+  return Number(settings.instantaneous) > 0 && Number(settings.instantaneousMax) > 0
+    ? Number(settings.instantaneousMax)
+    : null;
+}
+
+/**
  * Generate n logarithmically spaced values between start and end (inclusive).
  *
  * @param {number} start - Start value (> 0)
@@ -180,6 +195,8 @@ export function checkCoordination(upstreamScaled, downstreamScaled, testCurrents
   const upMin = upstreamScaled?.minCurve ?? upstreamScaled?.curve ?? [];
   const downMax = downstreamScaled?.maxCurve ?? downstreamScaled?.curve ?? [];
   const safeMargin = Number.isFinite(margin) ? margin : DEFAULT_MARGIN;
+  const upCeiling = instantaneousCeiling(upstreamScaled);
+  const downCeiling = instantaneousCeiling(downstreamScaled);
 
   if (!Array.isArray(testCurrents) || !testCurrents.length) {
     return { coordinated: false, violations: [], unevaluated: [], comparisonCount: 0 };
@@ -190,17 +207,19 @@ export function checkCoordination(upstreamScaled, downstreamScaled, testCurrents
   let comparisonCount = 0;
   for (const I of testCurrents) {
     if (!Number.isFinite(I) || I <= 0) continue;
-    const upstreamEvaluation = evaluateTimeCurrentCurve(upMin, I, {
-      boundary: 'lower',
-      outOfRange: 'reject',
-    });
-    const downstreamEvaluation = evaluateTimeCurrentCurve(downMax, I, {
-      boundary: 'upper',
-      outOfRange: 'reject',
-    });
+    // Same evaluator as the CTI report, so Auto-Coordinate and the report
+    // agree on every test current.
+    const upstreamEvaluation = evaluateOperatingTime(upMin, I, { boundary: 'lower', instantaneousCeilingA: upCeiling });
+    const downstreamEvaluation = evaluateOperatingTime(downMax, I, { boundary: 'upper', instantaneousCeilingA: downCeiling });
     // Below the downstream pickup/curve domain, the downstream device does not
     // operate and there is no selective-coordination comparison to make.
-    if (downstreamEvaluation.status === 'below-domain') continue;
+    if (downstreamEvaluation.status === 'no-trip') continue;
+    // The downstream device operates but the upstream one is below its pickup:
+    // upstream never trips, so the pair is selective at this current.
+    if (downstreamEvaluation.status === 'operates' && upstreamEvaluation.status === 'no-trip') {
+      comparisonCount += 1;
+      continue;
+    }
     const upTime = upstreamEvaluation.time;
     const downTime = downstreamEvaluation.time;
     if (!Number.isFinite(upTime) || !Number.isFinite(downTime)) {

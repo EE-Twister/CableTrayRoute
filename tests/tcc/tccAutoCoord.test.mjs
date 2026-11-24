@@ -325,6 +325,15 @@ describe('checkCoordination', () => {
     assert(Array.isArray(result.violations));
   });
 
+  it('treats an upstream device below its pickup as selective, like the CTI report', () => {
+    const lowUpstream = scaleCurve(abb, { pickup: 400, time: 3.0, instantaneous: 0 });
+    const lowDownstream = scaleCurve(abb, { pickup: 100, time: 0.1, instantaneous: 0 });
+    const result = checkCoordination(lowUpstream, lowDownstream, [200], 0.3);
+    assert.strictEqual(result.unevaluated.length, 0);
+    assert.strictEqual(result.violations.length, 0);
+    assert.strictEqual(result.coordinated, true);
+  });
+
   it('does not claim coordination above either published curve domain', () => {
     const result = checkCoordination(upstreamOk, downstream, [2000], 0.3);
     assert.strictEqual(result.coordinated, false);

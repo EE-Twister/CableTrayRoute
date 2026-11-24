@@ -28,8 +28,8 @@ R8–R11 were then corrected:
 
 Still open from R8–R11:
 
-- A stricter third schedule-ready definition remains in the Cable Schedule readiness panel (`summarizeCableWorkflow`).
-- Auto-Coordinate's `checkCoordination` still treats an upstream device below pickup as unevaluated, while the CTI report passes it.
+- ~~A stricter third schedule-ready definition remains in the Cable Schedule readiness panel.~~ Fixed: `isCableScheduleReady` in `analysis/scheduleWorkflow.mjs` is the one definition (length must be a positive number), and `workflowStatus.js` delegates to it.
+- ~~Auto-Coordinate's `checkCoordination` treats an upstream device below pickup as unevaluated.~~ Fixed: it now uses `evaluateOperatingTime` and the shared `instantaneousCeiling`, like the CTI report.
 - The TCC report section carries pair data only; device settings are not included.
 
 E1–E8 were then corrected:
@@ -47,7 +47,7 @@ E1–E8 were then corrected:
   - The arc-flash CSV/PDF has units in its headers, a UTF-8 BOM, and follows the page scope.
   - Tray Fill's Excel export adds a Fill Analysis sheet.
 
-Still open from E1–E8: the panel's Phase Load (VA) column still falls back to kW.
+The panel's Phase Load (VA) kW fallback was fixed: a kW-only AC load is divided by its power factor (unity when none is given) instead of being read as VA.
 
 U1–U5 were then addressed:
 

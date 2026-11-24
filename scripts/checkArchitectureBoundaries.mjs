@@ -188,7 +188,7 @@ export const EXTRACTED_MODULE_BUDGETS = Object.freeze({
   'src/panel-schedule/panelModel.js': 93,
   'src/panel-schedule/phaseModel.js': 91,
   'src/panel-schedule/breakerLayoutModel.js': 360,
-  'src/panel-schedule/phaseLoadModel.js': 176,
+  'src/panel-schedule/phaseLoadModel.js': 184,
   'src/cable-schedule/optionModel.js': 36,
   'src/cable-schedule/templateModel.js': 155,
   'src/cable-schedule/tagModel.js': 60,

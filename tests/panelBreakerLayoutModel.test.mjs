@@ -122,4 +122,9 @@ test("preserves explicit per-phase values and AC/DC source precedence", () => {
   assert.equal(getPhasePowerValue({ demandKva: 4, demandKw: 3 }, "dc"), 3000);
   assert.equal(getPhasePowerValue({ demandKva: 0, kva: "" }, "ac"), 0);
   assert.equal(getPhasePowerValue({}, "ac"), null);
+  // kW-only AC loads convert to VA with the power factor instead of reading kW as VA.
+  assert.equal(getPhasePowerValue({ kw: 8, powerFactor: 0.8 }, "ac"), 10000);
+  assert.equal(getPhasePowerValue({ demandKw: 5 }, "ac"), 5000);
+  assert.equal(getPhasePowerValue({ kw: 8, powerFactor: 0.8 }, "dc"), 8000);
+  assert.equal(getPhasePowerValue({ kw: 8, powerFactor: 1.4 }, "ac"), 8000);
 });

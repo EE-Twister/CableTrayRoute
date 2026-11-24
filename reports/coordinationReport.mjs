@@ -26,7 +26,7 @@
  * analysis/tccAutoCoord.mjs.
  */
 
-import { evaluateOperatingTime } from '../analysis/tccAutoCoord.mjs';
+import { evaluateOperatingTime, instantaneousCeiling } from '../analysis/tccAutoCoord.mjs';
 
 const TIME_STATUS_TEXT = {
   'no-trip': 'No trip',
@@ -41,17 +41,6 @@ export const CTI_RESULT = Object.freeze({
   NOT_EVALUATED_DOWNSTREAM_NO_TRIP: 'NOT EVALUATED (downstream does not operate)',
   NOT_EVALUATED_OUTSIDE_CURVE: 'NOT EVALUATED (outside curve data)'
 });
-
-/**
- * Current at which scaleCurve() cut a device's instantaneous plateau, or null
- * when the device has no instantaneous element.
- */
-function instantaneousCeiling(scaled) {
-  const settings = scaled?.settings ?? {};
-  return Number(settings.instantaneous) > 0 && Number(settings.instantaneousMax) > 0
-    ? Number(settings.instantaneousMax)
-    : null;
-}
 
 function formatOperatingTime(evaluation) {
   return evaluation.status === 'operates'
