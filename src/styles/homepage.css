@@ -398,6 +398,11 @@ button.home-section__link[hidden] {
     display: none;
 }
 
+/* The unsaved-workspace prompt carries its own Save button. */
+.home-section--projects:has([data-empty-kind="unsaved-workspace"]) #home-save-project-btn {
+    display: none;
+}
+
 .workflow-grid {
     display: grid;
     grid-template-columns: repeat(8, minmax(0, 1fr));

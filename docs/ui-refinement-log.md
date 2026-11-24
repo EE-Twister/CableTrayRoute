@@ -1,6 +1,11 @@
 # UI Refinement Log
 
 
+## 2026-11-24 (home page for a never-saved workspace)
+
+- **Unsaved workspace:** when records exist but no project has been saved, My Projects shows "Save this workspace as a project" with Save Project and Open Existing Project and the record count, instead of Create New / Open / Sample. Creating a project or opening the sample from there would replace the unsaved records. The section-level "Save Current Project" button is hidden while this prompt shows, so Save appears once.
+- An empty workspace keeps the Create / Open / Sample prompt.
+
 ## 2026-11-24 (dark-mode contrast on the remaining pages)
 
 - Teal *text* (`color: var(--primary-color)`, 33 rules) now uses `--color-heading-accent`, which is a lighter teal in dark mode; fills and borders keep `--primary-color`. The report preview overrides the token to a darker teal because it is always a light page.
