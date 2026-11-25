@@ -640,6 +640,8 @@ function assemblePackage(config, projectData) {
     currentStudyContext: projectData.currentStudyContext || null,
     calculationVersion: projectData.calculationVersion || null,
     withholdIneligible: true,
+    tccSettings: projectData.tccSettings || null,
+    oneLine: projectData.oneLine || null,
   };
 
   // Build per-section data for study and DRC sections

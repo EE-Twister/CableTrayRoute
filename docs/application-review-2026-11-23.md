@@ -30,7 +30,7 @@ Still open from R8–R11:
 
 - ~~A stricter third schedule-ready definition remains in the Cable Schedule readiness panel.~~ Fixed: `isCableScheduleReady` in `analysis/scheduleWorkflow.mjs` is the one definition (length must be a positive number), and `workflowStatus.js` delegates to it.
 - ~~Auto-Coordinate's `checkCoordination` treats an upstream device below pickup as unevaluated.~~ Fixed: it now uses `evaluateOperatingTime` and the shared `instantaneousCeiling`, like the CTI report.
-- The TCC report section carries pair data only; device settings are not included.
+- ~~The TCC report section carries pair data only; device settings are not included.~~ Fixed: each pair row also lists the upstream and downstream device with the settings saved for it (library device, then component overrides), and the section warns when a pair's device has no saved TCC device, since the interval then cannot be reproduced from the project.
 
 E1–E8 were then corrected:
 

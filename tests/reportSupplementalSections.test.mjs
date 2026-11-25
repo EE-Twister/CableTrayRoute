@@ -106,6 +106,7 @@ function sustainabilityStored(options = { gridRegion: 'us', projectLifeYears: 25
   assert.strictEqual(sec.approval.status, 'reviewed');
   assert.deepStrictEqual(labels(sec), [
     'Upstream device', 'Downstream device', 'Fault current (kA)', 'Coordination time interval (s)', 'Saved coordination status',
+    'Upstream device and settings', 'Downstream device and settings',
   ]);
   assert.strictEqual(sec.rows.length, stored.pairs.length);
   const first = sec.rows[0];
@@ -124,6 +125,43 @@ function sustainabilityStored(options = { gridRegion: 'us', projectLifeYears: 25
   assert.strictEqual(noPairs.rows.length, 0);
   assert.ok(noPairs.warnings.some(warning => /no coordinated device pairs/.test(warning)));
   console.log('✓ TCC section reads saved coordination pairs');
+})();
+
+(function testTccSectionCarriesSavedDeviceSettings() {
+  const stored = roundTrip({
+    status: 'Coordinated',
+    method: 'Log-log protective-device curve screening',
+    minimumCoordinationIntervalSeconds: 0.3,
+    pairs: [
+      { upstream: 'MAIN', downstream: 'FDR', faultCurrentKA: 16.3, intervalSeconds: 0.36, status: 'Coordinated' },
+      { upstream: 'FDR', downstream: 'LOAD', faultCurrentKA: 7.1, intervalSeconds: 0.32, status: 'Coordinated' },
+    ],
+  });
+  const oneLine = { sheets: [{ components: [
+    { id: 'MAIN', tccId: 'sample_mv_breaker_1200', tccOverrides: { instantaneous: 9600 } },
+    { id: 'FDR', tccId: 'sample_lv_breaker', tccOverrides: { pickup: 400 } },
+    { id: 'LOAD', label: 'Pump' },
+  ] }] };
+  const tccSettings = {
+    devices: ['component:MAIN', 'component:FDR'],
+    settings: { sample_lv_breaker: { time: 0.3 } },
+    componentOverrides: { FDR: { pickup: 450 } },
+  };
+  const sec = buildSupplementalStudySections({ tcc: stored }, {}, {
+    ...lifecycleOptions('tcc', stored), tccSettings, oneLine,
+  }).tccSettings;
+
+  assert.strictEqual(sec.rows[0].fromSettings, 'Device sample_mv_breaker_1200; instantaneous 9600');
+  // Library settings, then component overrides, then inline overrides (inline wins).
+  assert.strictEqual(sec.rows[0].toSettings, 'Device sample_lv_breaker; time 0.3; pickup 400');
+  assert.strictEqual(sec.rows[1].toSettings, null, 'a device with no saved TCC device prints no settings');
+  assert.strictEqual(sec.summary['Pair devices without a saved TCC device'], 1);
+  assert.ok(sec.warnings.some(warning => /1 device\(s\).*LOAD/.test(warning)));
+
+  const withoutSettings = section('tccSettings', 'tcc', stored);
+  assert.strictEqual(withoutSettings.rows[0].fromSettings, null);
+  assert.strictEqual(withoutSettings.summary['Pair devices without a saved TCC device'], 3);
+  console.log('✓ TCC section carries the saved device settings and flags unreproducible pairs');
 })();
 
 (function testHazAreaSectionJoinsAreasAndEquipment() {

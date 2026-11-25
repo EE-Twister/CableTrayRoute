@@ -1751,43 +1751,43 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `ductbankSchedule`
   - src/projectreport.js:315 getDuctbanks()
 - `equipment`
-  - src/projectreport.js:1085 getEquipment()
+  - src/projectreport.js:1087 getEquipment()
   - src/projectreport.js:316 getEquipment()
 - `loadList`
-  - src/projectreport.js:1086 getLoads()
+  - src/projectreport.js:1088 getLoads()
   - src/projectreport.js:317 getLoads()
 - `oneLineDiagram`
-  - src/projectreport.js:1087 getOneLine()
+  - src/projectreport.js:1089 getOneLine()
   - src/projectreport.js:318 getOneLine()
 - `settings.costEstimateArtifact`
   - src/projectreport.js:331 getItem(costEstimateArtifact)
 - `settings.deliverableArtifacts`
   - src/projectreport.js:335 getDeliverableArtifacts()
 - `settings.designBasis`
-  - src/projectreport.js:1092 getDesignBasis()
+  - src/projectreport.js:1094 getDesignBasis()
   - src/projectreport.js:323 getDesignBasis()
 - `settings.designGateApprovals`
-  - src/projectreport.js:1093 getDesignGateApprovals()
+  - src/projectreport.js:1095 getDesignGateApprovals()
   - src/projectreport.js:324 getDesignGateApprovals()
 - `settings.designSynthesisReviewDraft`
-  - src/projectreport.js:1094 getItem(designSynthesisReviewDraft)
+  - src/projectreport.js:1096 getItem(designSynthesisReviewDraft)
   - src/projectreport.js:325 getItem(designSynthesisReviewDraft)
 - `settings.fieldExecutionRecords`
   - src/projectreport.js:332 getFieldExecutionRecords()
 - `settings.latestRouteResults`
-  - src/projectreport.js:1125 getItem(latestRouteResults)
-  - src/projectreport.js:1154 getItem(latestRouteResults)
-  - src/projectreport.js:1168 getItem(latestRouteResults)
+  - src/projectreport.js:1127 getItem(latestRouteResults)
+  - src/projectreport.js:1156 getItem(latestRouteResults)
+  - src/projectreport.js:1170 getItem(latestRouteResults)
   - src/projectreport.js:292 getItem(latestRouteResults)
   - src/projectreport.js:327 getItem(latestRouteResults)
 - `settings.lifecyclePackages`
-  - src/projectreport.js:1049 getLifecyclePackages()
-  - src/projectreport.js:1127 getLifecyclePackages()
-  - src/projectreport.js:1165 getLifecyclePackages()
-  - src/projectreport.js:1325 getLifecyclePackages()
-  - src/projectreport.js:1339 getLifecyclePackages()
+  - src/projectreport.js:1051 getLifecyclePackages()
+  - src/projectreport.js:1129 getLifecyclePackages()
+  - src/projectreport.js:1167 getLifecyclePackages()
+  - src/projectreport.js:1327 getLifecyclePackages()
+  - src/projectreport.js:1341 getLifecyclePackages()
 - `settings.oneLineScheduleReconcilePending`
-  - src/projectreport.js:1171 getItem(oneLineScheduleReconcilePending)
+  - src/projectreport.js:1173 getItem(oneLineScheduleReconcilePending)
 - `settings.procurementRegister`
   - src/projectreport.js:330 getProcurementRegister()
 - `settings.projectMeta`
@@ -1797,10 +1797,10 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.pullPlanArtifact`
   - src/projectreport.js:329 getItem(pullPlanArtifact)
 - `settings.reportSnapshots`
-  - src/projectreport.js:1126 getReportSnapshots()
-  - src/projectreport.js:1164 getReportSnapshots()
-  - src/projectreport.js:957 getReportSnapshots()
-  - src/projectreport.js:992 getReportSnapshots()
+  - src/projectreport.js:1128 getReportSnapshots()
+  - src/projectreport.js:1166 getReportSnapshots()
+  - src/projectreport.js:959 getReportSnapshots()
+  - src/projectreport.js:994 getReportSnapshots()
 - `settings.studyApprovals`
   - src/projectreport.js:322 getStudyApprovals()
 - `settings.studyProvenance`
@@ -1808,9 +1808,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - analysis/studyLifecycle.mjs:379 captureStudyRunContext()
   - src/projectreport.js:320 getStudyProvenance()
   - src/projectreport.js:321 getStudyAssessments()
-  - src/projectreport.js:693 captureStudyRunContext()
+  - src/projectreport.js:695 captureStudyRunContext()
 - `settings.tccSettings`
-  - src/projectreport.js:1095 getItem(tccSettings)
+  - src/projectreport.js:1097 getItem(tccSettings)
   - src/projectreport.js:326 getItem(tccSettings)
 - `studyResults`
   - src/projectreport.js:319 getStudies()
@@ -1832,7 +1832,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `studyResults.harmonics`
   - analysis/projectReport.mjs:838 studies.harmonics
 - `studyResults.hazAreaClassification`
-  - analysis/reportSupplementalSections.mjs:302 studies?.hazAreaClassification
+  - analysis/reportSupplementalSections.mjs:354 studies?.hazAreaClassification
 - `studyResults.heatTraceSizing`
   - analysis/projectReport.mjs:355 studies.heatTraceSizing
 - `studyResults.heatTraceSizingCircuits`
@@ -1840,9 +1840,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `studyResults.iec60909`
   - analysis/projectReport.mjs:675 studies.iec60909
 - `studyResults.insulationCoordination`
-  - analysis/reportSupplementalSections.mjs:418 studies?.insulationCoordination
+  - analysis/reportSupplementalSections.mjs:470 studies?.insulationCoordination
 - `studyResults.lighting`
-  - analysis/reportSupplementalSections.mjs:549 studies?.lighting
+  - analysis/reportSupplementalSections.mjs:601 studies?.lighting
 - `studyResults.loadFlow`
   - analysis/projectReport.mjs:786 studies.loadFlow
 - `studyResults.motorStart`
@@ -1864,7 +1864,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `studyResults.sustainabilityFootprint`
   - analysis/reportSupplementalSections.mjs:144 studies?.sustainabilityFootprint
 - `studyResults.tcc`
-  - analysis/reportSupplementalSections.mjs:240 studies?.tcc
+  - analysis/reportSupplementalSections.mjs:272 studies?.tcc
 - `studyResults.transientStability`
   - analysis/projectReport.mjs:1103 studies.transientStability
 - `studyResults.voltageDropStudy`
@@ -1876,12 +1876,12 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Writes**
 - `settings.deliverableArtifacts`
-  - src/projectreport.js:1426 upsertDeliverableArtifact()
+  - src/projectreport.js:1428 upsertDeliverableArtifact()
 - `settings.projectMeta`
   - src/projectreport.js:213 setProjectMeta()
 - `settings.reportSnapshots`
-  - src/projectreport.js:1425 setReportSnapshot()
-  - src/projectreport.js:985 deleteReportSnapshot()
+  - src/projectreport.js:1427 setReportSnapshot()
+  - src/projectreport.js:987 deleteReportSnapshot()
 - `studyResults.duty`
   - validation/rules.js:703 studies.duty
 
