@@ -13,6 +13,7 @@ Done in the Phase 0 pull request:
 - **F1:** `test.yml` is removed. Its unique coverage now runs in `ci.yml`: the full unit suite as a `Full Unit Tests` job after the build, and the full Firefox and Edge Playwright suite (with one retry) in 4 shards in place of the critical-only lane. `ci.yml` already cancelled superseded runs and ran `push` only on `main`, `master` and `claude/**`. The visual regression job now starts after the build instead of waiting for E2E. `test.yml`'s `prettier --check` step was dropped because `.prettierignore` excludes every `.js` file, so it checked nothing.
 - **F3:** inside a synced folder (OneDrive, Dropbox, iCloud Drive, Google Drive), Playwright writes test output to the OS temp folder; `PLAYWRIGHT_OUTPUT_DIR` overrides it. The specs that failed locally with EPERM on downloads now pass. #1832 fixed the local `modalHelperImports` failure. Firefox still has to be installed locally with `npx playwright install firefox`.
 - **F4:** the One-Line startup check already took the median of 3 cold loads; it now takes 5.
+- **Correction:** the first draft said jsPDF was bundled into 83 pages. It is not: `reports/reporting.mjs` loads it on demand from `dist/vendor/`, and the 83 matches were that loader code. A1 and A2 below are rewritten from measured bundle contents.
 - #1829 and #1831 are merged.
 
 ## 1. Where the application stands
@@ -23,7 +24,7 @@ Done in the Phase 0 pull request:
 | Largest files | `oneline.js` 12,494 lines (after #1831), `ductbankroute.js` 5,169, `app.mjs` 4,378, `analysis/tcc.js` 4,254, `cableschedule.js` 3,268, `equipmentarrangements.js` 2,909, `heattracesizing.js` 2,835, `server.mjs` 2,706, `projectStorage.js` 2,570, `dataStore.mjs` 2,369. |
 | Pages | 99 hand-written HTML pages. 92 of them repeat the header and navigation markup. |
 | Build | 93 separate Rollup builds, one per page, each with `inlineDynamicImports: true`. Nothing is shared between pages. |
-| Bundle output | 53.7 MB of JavaScript across the 93 page bundles; the median bundle is 575 KB. `dataStore` and `projectStorage` are copied into 92 bundles, and jsPDF into 83. |
+| Bundle output | 53.7 MB of JavaScript across the 93 page bundles; the median bundle is 575 KB. `dataStore` and `projectStorage` are copied into 92 bundles. Even the 404 page carries about 1 MB of unminified shell code: `site.js`, `pageContracts`, `projectStorage`, `dataStore`, the design rule checker, pull cards, and validation rules, which the shell's workflow status imports. jsPDF, SheetJS, d3, and pdf.js are already loaded on demand from `dist/vendor/` and are not in the page bundles. |
 | Runtime | Node 20 in every workflow. Node 20 reached end of life in April 2026. Express 4, Rollup 3. |
 | Persistence | Projects live in `localStorage` through `projectStorage.js`. The unit tests already hit `QuotaExceededError` with 2–5 MB projects (span evidence). |
 | Type safety | 19 modules opt in to `// @ts-check` (#1824, #1829). `strict` is off. |
@@ -42,15 +43,24 @@ Done in the Phase 0 pull request:
 
 ### A. Build and delivery (highest payoff)
 
-**A1. One multi-entry build with shared chunks.** M, medium risk.
-- **Problem:** each page bundles its own copy of the storage layer, the navigation, jsPDF and the study code. Moving between pages downloads and parses the same code again, and the service worker caches 93 large, overlapping files.
-- **Change:** build all 93 entries in one Rollup build with code splitting (`output.dir`, `entryFileNames`/`chunkFileNames` with hashes), and drop `inlineDynamicImports`. Rewrite the `<script>` tags through the existing manifest step (`scripts/rewriteHtmlForManifest.cjs`).
-- **Success:** total JavaScript well under half of today's 53.7 MB; a shared core chunk cached once; no page startup budget regresses.
+**A1. Decide the bundling policy, then act on it.** M, medium risk, needs a decision.
+- **Today, on purpose:** each page loads one bundle. `src/performance/routeStartupContracts.js` caps startup script requests at 1–4 per page, and `scripts/checkBundleBudgets.mjs` keeps code inline to preserve that. The cost is that every page carries its own copy of the shell, so the build is 53.7 MB and nothing is cached across pages.
+- **Measured with a throwaway multi-entry build** (all 93 entries, terser, ES chunks):
 
-**A2. Load heavy libraries on demand.** S–M, low risk.
-- **Problem:** jsPDF is in 83 bundles and is loaded at page start, although only the export buttons use it. SheetJS is in 12 bundles. Plotly and three.js are page-specific.
-- **Change:** move them to `import()` at the moment of export or render. `reports/reporting.mjs` already loads jsPDF through a dynamic import, but `inlineDynamicImports: true` folds that import back into every page bundle. So this item needs A1's code splitting, or a per-page `external` plus a separately built vendor file, to take effect.
-- **Success:** jsPDF absent from startup requests on every page, checked by the performance contract.
+  | Option | Total built | First-load size per page | Startup script requests |
+  | --- | --- | --- | --- |
+  | Today (one bundle per page) | 53.7 MB | baseline (for example `shortCircuit` 668 KB) | 1 |
+  | Rollup's default shared chunks | 5.9 MB | about 15–20 % **larger** (for example `shortCircuit` 779 KB) | 10–30 |
+  | Shared chunks plus one forced `core` chunk | 5.9 MB | similar for shell-heavy pages; light pages get much heavier (`library` 121 KB to 685 KB) | 1–18 |
+
+- **What this means:** shared chunks cut the deployed size by about 90 % and make the second and later pages much cheaper, because the shell is cached once. But the first page a user opens gets larger and needs many more requests. Over `file://` (how the Playwright suite serves pages) there is no caching gain at all.
+- **Options:** (a) keep one bundle per page and shrink the shell instead (A2); (b) adopt shared chunks and raise the startup request caps; (c) a middle path: one bundle per page for the shell, plus a single shared chunk for the heaviest study engines only.
+- **Success:** whichever option is chosen, startup budgets hold, and the repeat-navigation cost is measured, not assumed.
+
+**A2. Shrink the shell every page carries.** M, low–medium risk.
+- **Problem:** the shell's workflow status (`site.js` to `analysis/projectWorkflowCore.mjs`, `src/workflowStatus.js` to `analysis/deliverableWorkflow.mjs`) statically imports the design rule checker, tray fill, pull cards, validation rules, and the design basis. So every page, including the 404 page, ships and parses them before the navigation renders.
+- **Change:** compute the detailed workflow status after first paint, from a separately built lazy file. This is the same per-entry `external` pattern the repository already uses for `harmonicNetwork.lazy.js` and `dist/vendor/`. A dynamic `import()` alone is not enough while `inlineDynamicImports` is on. The navigation renders from cached step status first.
+- **Success:** the 404 and index bundles drop by several hundred kilobytes; the startup request count is unchanged; the performance contract checks that the design rule checker is not loaded at startup.
 
 **A3. Upgrade the bundler.** M, medium risk. Do this after A1.
 - **Change:** move to Rollup 4, which is faster and needed for current plugins. Alternatively, evaluate Vite (Rollup 4 underneath) for the dev server and multi-page builds. Pick one and keep the 10-step `build` script as one entry (`scripts/build.mjs`).
@@ -141,7 +151,7 @@ Done in the Phase 0 pull request:
 ### G. Runtime performance
 
 **G1. Measure, then fix the slowest pages.** M.
-- **Change:** after A1 and A2, profile `designsynthesis` (1.8 MB bundle), `tcc` (992 KB) and `oneline`, and record startup and longest-task figures in the performance contracts.
+- **Change:** after A2 (and A1, if adopted), profile `designsynthesis` (1.8 MB bundle), `tcc` (1.0 MB) and `oneline`, and record startup and longest-task figures in the performance contracts.
 - **Success:** every page starts within its budget with headroom, and no task over 200 ms on load.
 
 **G2. Move more work off the main thread.** M.
@@ -160,7 +170,7 @@ Done in the Phase 0 pull request:
 | Phase | Items | Why in this order |
 | --- | --- | --- |
 | 0: quick wins (1–2 weeks) | B1 Node 22, F1 one CI workflow, F3 local reliability, F4 steadier perf checks, merge #1829, #1831 and #1832 | Removes an unsupported runtime, cuts CI time per push by about 40 minutes, and stops false local failures before larger work starts. |
-| 1: delivery (2–4 weeks) | A1 shared chunks, A2 lazy heavy libraries, A4 manifest-driven service worker | The largest user-facing gain: much less JavaScript per page and faster page-to-page navigation. A1 comes first, because the existing dynamic imports only take effect once inlining is off. |
+| 1: delivery (2–4 weeks) | A1 bundling decision, A2 shell trim, A4 manifest-driven service worker | The largest user-facing gain. A2 helps every page under either bundling policy, so it can start while A1 is decided. |
 | 2: structure (ongoing, in slices) | C1 entry-file splits, C3 move logic under `src/`, E1 type checking, E2 status rule | Low-risk slices that can run between other work, each lowering a budget. |
 | 3: platform (3–6 weeks) | A3 bundler upgrade, B2 dependency refresh, C2 page shell, F2 sharding | Easier after A1 has settled the build and C1 has shrunk the entry files. |
 | 4: data (4–6 weeks) | D1 IndexedDB, D2 schema validation | The highest-risk change, saved for a codebase with typed, tested storage boundaries. |
@@ -170,8 +180,8 @@ Done in the Phase 0 pull request:
 
 | Metric | Today | Target |
 | --- | --- | --- |
-| Total JavaScript built | 53.7 MB over 93 bundles | under 20 MB, with a shared core chunk |
-| jsPDF loaded at page start | 83 pages | 0 pages |
+| Total JavaScript built | 53.7 MB over 93 bundles | about 6 MB if shared chunks are adopted (A1); otherwise reduced by the A2 shell trim |
+| Shell code on every page | about 1 MB unminified (404 page) | design rule checker, pull cards, and validation rules not loaded at startup |
 | CI time per pull-request push | about 12 min plus a duplicate 37–57 min run | one run of about 12–15 min |
 | `oneline.js` | 12,494 lines | under 8,000 lines |
 | Type-checked modules | 19 | every study producer and consumer, with `strictNullChecks` |
