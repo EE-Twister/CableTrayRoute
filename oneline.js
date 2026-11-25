@@ -55,6 +55,18 @@ import { calculateTransformerImpedance } from './utils/transformerImpedance.js';
 import { computeImpedanceFromPerKm } from './utils/cableImpedance.js';
 import { normalizeCablePhases, formatCablePhases } from './utils/cablePhases.js';
 import {
+  dataStateOverlayLabels,
+  datablockDensityLabels,
+  datablockFormatLabels,
+  datablockFormatPresets,
+  drawingModeLabels,
+  isKnownOption,
+  operatingStateLabels,
+  paletteCategoryFilters,
+  sanitizeViewAttributeKey,
+  sanitizeViewAttributeList
+} from './src/one-line/viewSettingsModel.mjs';
+import {
   buildCableSpecFromComponent as buildCableSpecFromComponentModel,
   buildScheduleDataFromComponents,
   formatLoadFlowCurrentValue
@@ -456,8 +468,6 @@ const paletteRecentStorageKey = 'oneLinePaletteRecent';
 const paletteFavoritesStorageKey = 'oneLinePaletteFavorites';
 const PALETTE_RECENT_LIMIT = 8;
 const PALETTE_FAVORITES_LIMIT = 12;
-const maxViewAttributeCount = 250;
-const maxViewAttributeLength = 128;
 const defaultPaletteWidth = 250;
 const minPaletteWidth = 100;
 const maxPaletteWidth = 600;
@@ -701,28 +711,6 @@ const studyAttributeResolvers = {
   }
 };
 
-function sanitizeViewAttributeKey(key) {
-  if (typeof key !== 'string') return '';
-  const normalized = key.trim();
-  if (!normalized || normalized.length > maxViewAttributeLength) return '';
-  return normalized;
-}
-
-function sanitizeViewAttributeList(keys) {
-  if (!Array.isArray(keys)) return [];
-  const seen = new Set();
-  const normalized = [];
-  for (const key of keys) {
-    const safeKey = sanitizeViewAttributeKey(key);
-    if (!safeKey || seen.has(safeKey)) continue;
-    seen.add(safeKey);
-    normalized.push(safeKey);
-    if (normalized.length >= maxViewAttributeCount) break;
-  }
-  normalized.sort();
-  return normalized;
-}
-
 const storedViewAttributes = getOneLineViewSetting(viewAttributeStorageKey, []);
 const initialViewAttributes = sanitizeViewAttributeList(storedViewAttributes);
 if (Array.isArray(storedViewAttributes)) {
@@ -743,61 +731,12 @@ let componentAttributeLabelMap = new Map();
 const viewComponentStorageKey = 'diagramViewComponentSelection';
 let selectedViewComponent = getOneLineViewSetting(viewComponentStorageKey, null);
 
-const datablockFormatPresets = Object.freeze({
-  off: [],
-  engineering: [
-    'voltage',
-    'volts',
-    'rated_voltage_kv',
-    'baseKV',
-    'kV',
-    'bus_rating_a',
-    'rating_a',
-    'frame_a',
-    'rated_kva',
-    'kva',
-    'rated_hp',
-    'hp',
-    'kw',
-    'kvar',
-    'load.kw',
-    'load.kvar',
-    'percent_z',
-    'impedance_z_percent',
-    'tap_percent',
-    'shortCircuit.threePhaseKA',
-    'voltage_mag'
-  ],
-  nameplate: ['voltage', 'volts', 'rating_a', 'kva', 'hp', 'percent_z', 'manufacturer', 'model'],
-  study: ['voltage_mag', 'shortCircuit.threePhaseKA', 'shortCircuit.asymKA', 'arcFlash.incidentEnergy', 'arcFlash.ppeCategory', 'reliability.availability'],
-  protection: ['rating_a', 'frame_a', 'interrupt_rating_ka', 'short_circuit_rating_ka', 'clearing_time', 'shortCircuit.threePhaseKA', 'arcFlash.incidentEnergy'],
-  report: ['amp_trip', 'voltage_ratio', 'winding'],
-  cable: ['voltage', 'length', 'cable_type', 'conductor_size', 'conductor_material', 'short_circuit_rating_ka']
-});
-const datablockFormatLabels = Object.freeze({
-  off: 'Off',
-  engineering: 'Engineering Labels',
-  nameplate: 'Nameplate',
-  study: 'Studies',
-  protection: 'Protection',
-  report: 'Report Annotations',
-  cable: 'Cable',
-  custom: 'Custom'
-});
-const datablockDensityLabels = Object.freeze({
-  compact: 'Compact',
-  expanded: 'Expanded'
-});
-const drawingModeLabels = Object.freeze({
-  edit: 'Edit',
-  engineeringPrint: 'Engineering Print'
-});
 let oneLineDrawingMode = getOneLineViewSetting(drawingModeStorageKey, 'edit');
-if (!Object.prototype.hasOwnProperty.call(drawingModeLabels, oneLineDrawingMode)) {
+if (!isKnownOption(drawingModeLabels, oneLineDrawingMode)) {
   oneLineDrawingMode = 'edit';
 }
 let datablockFormatMode = getOneLineViewSetting(datablockFormatStorageKey, viewAttributes.size ? 'custom' : 'off');
-if (!Object.prototype.hasOwnProperty.call(datablockFormatLabels, datablockFormatMode)) {
+if (!isKnownOption(datablockFormatLabels, datablockFormatMode)) {
   datablockFormatMode = viewAttributes.size ? 'custom' : 'off';
 }
 if (getOneLineViewSetting(datablockDefaultVersionStorageKey, '') !== 'clean-canvas-v1' && datablockFormatMode !== 'custom') {
@@ -808,22 +747,13 @@ if (getOneLineViewSetting(datablockDefaultVersionStorageKey, '') !== 'clean-canv
   setOneLineViewSetting(datablockDefaultVersionStorageKey, 'clean-canvas-v1');
 }
 let datablockDensityMode = getOneLineViewSetting(datablockDensityStorageKey, 'compact');
-if (!Object.prototype.hasOwnProperty.call(datablockDensityLabels, datablockDensityMode)) {
+if (!isKnownOption(datablockDensityLabels, datablockDensityMode)) {
   datablockDensityMode = 'compact';
 }
 
-const dataStateOverlayLabels = Object.freeze({
-  none: 'None',
-  review: 'Data Quality',
-  validation: 'Validation',
-  loadFlow: 'Load Flow',
-  faultDuty: 'Fault Duty',
-  arcFlash: 'Arc Flash',
-  operating: 'Operating State'
-});
 let dataStateOverlayMode = getOneLineViewSetting(dataStateOverlayStorageKey, 'none');
 if (dataStateOverlayMode === 'studies') dataStateOverlayMode = 'loadFlow';
-if (!Object.prototype.hasOwnProperty.call(dataStateOverlayLabels, dataStateOverlayMode)) {
+if (!isKnownOption(dataStateOverlayLabels, dataStateOverlayMode)) {
   dataStateOverlayMode = 'none';
 }
 if (getOneLineViewSetting(dataStateOverlayDefaultVersionStorageKey, '') !== 'clean-canvas-v1') {
@@ -832,30 +762,13 @@ if (getOneLineViewSetting(dataStateOverlayDefaultVersionStorageKey, '') !== 'cle
   setOneLineViewSetting(dataStateOverlayDefaultVersionStorageKey, 'clean-canvas-v1');
 }
 
-const operatingStateLabels = Object.freeze({
-  normal: 'Normal',
-  emergency: 'Emergency',
-  maintenance: 'Maintenance',
-  switching: 'Switching',
-  alternate: 'Alternate'
-});
 let activeOperatingState = getOneLineViewSetting(operatingStateStorageKey, 'normal');
-if (!Object.prototype.hasOwnProperty.call(operatingStateLabels, activeOperatingState)) {
+if (!isKnownOption(operatingStateLabels, activeOperatingState)) {
   activeOperatingState = 'normal';
 }
 
-const paletteCategoryFilters = Object.freeze({
-  common: 'Common',
-  all: 'All',
-  sources: 'Sources',
-  equipment: 'Equipment',
-  protection: 'Protection',
-  load: 'Loads',
-  cable: 'Cables',
-  annotations: 'Annotations'
-});
 let activePaletteCategoryFilter = getOneLineViewSetting(paletteFilterStorageKey, 'all');
-if (!Object.prototype.hasOwnProperty.call(paletteCategoryFilters, activePaletteCategoryFilter)) {
+if (!isKnownOption(paletteCategoryFilters, activePaletteCategoryFilter)) {
   activePaletteCategoryFilter = 'all';
 }
 if (getOneLineViewSetting(paletteFilterDefaultVersionStorageKey, '') !== 'favorites-recent-palette-v1') {
@@ -3455,7 +3368,7 @@ function scheduleEngineeringPrintFit() {
 }
 
 function setDrawingMode(mode) {
-  const nextMode = Object.prototype.hasOwnProperty.call(drawingModeLabels, mode) ? mode : 'edit';
+  const nextMode = isKnownOption(drawingModeLabels, mode) ? mode : 'edit';
   oneLineDrawingMode = nextMode;
   setOneLineViewSetting(drawingModeStorageKey, oneLineDrawingMode);
   syncDrawingModeControl();
@@ -3477,7 +3390,7 @@ function setDrawingMode(mode) {
 }
 
 function setDatablockFormatMode(mode) {
-  const nextMode = Object.prototype.hasOwnProperty.call(datablockFormatLabels, mode) ? mode : 'off';
+  const nextMode = isKnownOption(datablockFormatLabels, mode) ? mode : 'off';
   datablockFormatMode = nextMode;
   setOneLineViewSetting(datablockFormatStorageKey, datablockFormatMode);
   if (nextMode !== 'custom') {
@@ -3504,7 +3417,7 @@ function syncDatablockDensityControl() {
 }
 
 function setDatablockDensityMode(mode) {
-  datablockDensityMode = Object.prototype.hasOwnProperty.call(datablockDensityLabels, mode) ? mode : 'compact';
+  datablockDensityMode = isKnownOption(datablockDensityLabels, mode) ? mode : 'compact';
   setOneLineViewSetting(datablockDensityStorageKey, datablockDensityMode);
   syncDatablockDensityControl();
   render();
@@ -3516,7 +3429,7 @@ function syncDataStateOverlayControl() {
 }
 
 function setDataStateOverlayMode(mode) {
-  dataStateOverlayMode = Object.prototype.hasOwnProperty.call(dataStateOverlayLabels, mode) ? mode : 'none';
+  dataStateOverlayMode = isKnownOption(dataStateOverlayLabels, mode) ? mode : 'none';
   setOneLineViewSetting(dataStateOverlayStorageKey, dataStateOverlayMode);
   syncDataStateOverlayControl();
   render();
@@ -3528,7 +3441,7 @@ function syncOperatingStateControl() {
 }
 
 function setActiveOperatingState(state) {
-  activeOperatingState = Object.prototype.hasOwnProperty.call(operatingStateLabels, state) ? state : 'normal';
+  activeOperatingState = isKnownOption(operatingStateLabels, state) ? state : 'normal';
   setOneLineViewSetting(operatingStateStorageKey, activeOperatingState);
   showEnergizedState = true;
   const toggle = document.getElementById('toggle-energized');

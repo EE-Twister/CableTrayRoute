@@ -16,7 +16,7 @@ export const ORIGINAL_ENTRYPOINT_BASELINES = Object.freeze({
 });
 
 export const ENTRYPOINT_BUDGETS = Object.freeze({
-  'oneline.js': 12581,
+  'oneline.js': 12494,
   'analysis/tcc.js': 4306,
   'app.mjs': 4453,
   'ductbankroute.js': 5185,
@@ -43,6 +43,7 @@ export const REQUIRED_BOUNDARIES = Object.freeze({
     './src/one-line/propertyClipboardModel.mjs',
     './src/one-line/voltageModel.mjs',
     './src/one-line/scheduleDataModel.mjs',
+    './src/one-line/viewSettingsModel.mjs',
     './src/protectiveDevices/catalogLoader.mjs'
   ],
   'analysis/tcc.js': [
@@ -113,6 +114,7 @@ export const REQUIRED_BOUNDARIES = Object.freeze({
 });
 
 export const EXTRACTED_MODULE_BUDGETS = Object.freeze({
+  'src/one-line/viewSettingsModel.mjs': 129,
   'src/one-line/scheduleDataModel.mjs': 272,
   'analysis/dissimilarMetalsModel.mjs': 833,
   'src/one-line/protectionZones.mjs': 122,
@@ -202,6 +204,7 @@ export const EXTRACTED_MODULE_BUDGETS = Object.freeze({
 });
 
 export const DOM_FREE_MODULES = Object.freeze([
+  'src/one-line/viewSettingsModel.mjs',
   'src/one-line/scheduleDataModel.mjs',
   'analysis/dissimilarMetalsModel.mjs',
   'analysis/tcc/catalogSelectionModel.mjs',
