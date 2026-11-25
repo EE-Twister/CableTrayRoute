@@ -4,6 +4,7 @@
  * example on invalid input), so it is invisible to page-load checks.
  */
 import assert from 'assert';
+import { spawnSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -25,6 +26,20 @@ function walk(dir, out = []) {
   return out;
 }
 
+// Scan the files git tracks or would track, so gitignored local folders
+// (output/, tmp/, scratch copies of old revisions) cannot fail the check.
+// Fall back to walking the tree when git is unavailable.
+function sourceFiles() {
+  const listed = spawnSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: root, encoding: 'utf8' });
+  if (listed.status !== 0 || !listed.stdout) return walk(root);
+  return listed.stdout
+    .split(/\r?\n/)
+    .filter(rel => /\.(?:js|mjs)$/.test(rel))
+    .filter(rel => !rel.split('/').some(part => SKIP_DIRS.has(part)))
+    .map(rel => path.join(root, rel))
+    .filter(file => fs.existsSync(file));
+}
+
 function isDeclared(source, name) {
   const scrubbed = source.replace(new RegExp(`(?<!function\\s)\\b${name}\\(`, 'g'), 'X(');
   const importRe = new RegExp(`import\\s*(?:[\\w$]+\\s*,\\s*)?\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from`);
@@ -33,7 +48,7 @@ function isDeclared(source, name) {
 }
 
 const missing = [];
-for (const file of walk(root)) {
+for (const file of sourceFiles()) {
   const rel = path.relative(root, file).split(path.sep).join('/');
   if (INJECTED.has(rel)) continue;
   const source = fs.readFileSync(file, 'utf8');
