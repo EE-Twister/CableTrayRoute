@@ -468,6 +468,19 @@ export function decorateStudyRow(row = {}, assessment = {}) {
   };
 }
 
+/**
+ * True only when a saved study result is current against the project inputs and
+ * eligible for use in reports, labels, and chart verdicts. Missing or unknown
+ * freshness is not current. Pages and reports share this one rule so a result
+ * is never "current" on one surface and "stale" on another.
+ *
+ * @param {import('../types/project').StudyAssessment | null | undefined} assessment
+ * @returns {boolean}
+ */
+export function isStudyResultCurrent(assessment) {
+  return assessment?.freshness === 'current' && assessment?.eligible === true;
+}
+
 export function decorateStudyRows(rows = [], assessment = {}, options = {}) {
   const preserve = new Set([
     'id', 'label', 'bus', 'branch', 'targetBus', 'unit', 'studyKey', 'method', 'studySource',

@@ -30,7 +30,7 @@ Still open from R8–R11:
 
 - ~~A stricter third schedule-ready definition remains in the Cable Schedule readiness panel.~~ Fixed: `isCableScheduleReady` in `analysis/scheduleWorkflow.mjs` is the one definition (length must be a positive number), and `workflowStatus.js` delegates to it.
 - ~~Auto-Coordinate's `checkCoordination` treats an upstream device below pickup as unevaluated.~~ Fixed: it now uses `evaluateOperatingTime` and the shared `instantaneousCeiling`, like the CTI report.
-- The TCC report section carries pair data only; device settings are not included.
+- ~~The TCC report section carries pair data only; device settings are not included.~~ Fixed: each pair row also lists the upstream and downstream device with the settings saved for it (library device, then component overrides), and the section warns when a pair's device has no saved TCC device, since the interval then cannot be reproduced from the project.
 
 E1–E8 were then corrected:
 
@@ -57,7 +57,7 @@ U1–U5 were then addressed:
 - **U4:** the empty workspace shows one identity block and three actions; a saved project shows one card and one Open Step. A project that is unsaved and has never been saved still shows the Create/Open/Sample prompt beside Open Step and Save.
 - **U5:** Tray Fill opens on a project tray (handed-over tray, then `?tray=`, then the first tray with cables); **New blank tray** and `?blank=1` open manual entry.
 
-Still open: the home page for an unsaved, never-saved project.
+The home page for an unsaved, never-saved project was then fixed: a workspace with records but no saved project shows "Save this workspace as a project" (Save and Open Existing only, with the record count) instead of the Create/Open/Sample prompt, because Create New and the sample would replace the unsaved records. The duplicate section-level Save button is hidden while that prompt is showing.
 
 **Scope:** what a user sees, what the issued report says, and what the export files contain.
 

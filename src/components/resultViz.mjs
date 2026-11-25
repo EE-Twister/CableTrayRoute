@@ -119,6 +119,12 @@ export function statusLegendHtml(keys = ['pass', 'warn', 'fail']) {
  * Such rows keep their bar for context but carry a "Not evaluated" badge and
  * the reason instead of a pass/review/fail verdict.
  */
+/**
+ * @param {Array<[string, import('../../types/project').ShortCircuitResult]>} entries
+ * @param {Record<string, number>} [ratings]
+ * @param {{ readiness?: ((id: string, result: import('../../types/project').ShortCircuitResult) => import('../../types/project').ChartReadiness) | null }} [options]
+ * @returns {import('../../types/project').BarRow[]}
+ */
 export function shortCircuitBarRows(entries, ratings = {}, { readiness = null } = {}) {
   return (entries || []).map(([id, result]) => {
     const ka = finite(result?.threePhaseKA);

@@ -1,5 +1,6 @@
 import { runArcFlash } from '../analysis/arcFlash.mjs';
 import { getOneLine, getStudies, getStudyAssessments, captureStudyRunContext, assertStudyRunContextCurrent, saveStudyResult } from '../dataStore.mjs';
+import { isStudyResultCurrent } from '../analysis/studyResultContext.mjs';
 import { getProjectState } from '../projectStorage.js';
 import { generateArcFlashReport } from '../reports/arcFlashReport.mjs';
 import { arcFlashBarRows, barChartHtml, kpiStripHtml, ppeCategoryForEnergy, statusLegendHtml } from '../src/components/resultViz.mjs';
@@ -224,7 +225,7 @@ function initializeArcFlashPage() {
       if (status) status.textContent = 'Study blocked: the active project One-Line has no components to analyze.';
     } else if (latestResults && arcFlashResultEntries(latestResults).length) {
       const assessment = getStudyAssessments().arcFlash;
-      const stale = assessment?.freshness !== 'current' || assessment?.eligible !== true;
+      const stale = !isStudyResultCurrent(assessment);
       latestStale = stale;
       renderResults(latestResults, scope?.value || 'project', { stale });
       renderReadiness(latestResults, { stale });

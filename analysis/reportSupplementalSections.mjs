@@ -237,19 +237,65 @@ export function buildSustainabilitySection(studies = {}, approvals = {}, options
 // faultCurrentKA, intervalSeconds, status }] }.
 // ---------------------------------------------------------------------------
 
+function oneLineComponents(oneLine) {
+  return list(oneLine?.sheets).flatMap(sheet => list(sheet?.components)).filter(isRecord);
+}
+
+// Settings the TCC page saved for each device, merged in the order the arc-flash
+// clearing-time lookup uses: per-library-device settings, then per-component
+// overrides, then overrides stored on the component itself.
+function tccDeviceSettingsLookup(tccSettings, oneLine) {
+  const saved = isRecord(tccSettings) ? tccSettings : {};
+  const byKey = new Map();
+  oneLineComponents(oneLine).forEach(component => {
+    const libraryId = text(component.tccId);
+    const overrides = {
+      ...(isRecord(saved.settings?.[libraryId]) ? saved.settings[libraryId] : {}),
+      ...(isRecord(saved.componentOverrides?.[component.id]) ? saved.componentOverrides[component.id] : {}),
+      ...(isRecord(component.tccOverrides) ? component.tccOverrides : {}),
+    };
+    const description = [
+      libraryId ? `Device ${libraryId}` : null,
+      ...Object.entries(overrides)
+        .filter(([, value]) => value != null && value !== '' && typeof value !== 'object')
+        .map(([name, value]) => `${name} ${value}`),
+    ].filter(Boolean).join('; ');
+    const entry = { description: description || null, hasDevice: Boolean(libraryId) };
+    [component.id, component.ref, component.tag, component.label]
+      .map(text)
+      .filter(Boolean)
+      .forEach(key => { if (!byKey.has(key)) byKey.set(key, entry); });
+  });
+  return byKey;
+}
+
 export function buildTccSettingsSection(studies = {}, approvals = {}, options = {}) {
   const key = 'tccSettings';
   const data = studies?.tcc;
   if (!isRecord(data)) return emptySection(key);
   const pairs = list(data.pairs).filter(isRecord);
 
-  const rows = pairs.map(pair => ({
-    from: text(pair.upstream ?? pair.upstreamId ?? pair.from),
-    to: text(pair.downstream ?? pair.downstreamId ?? pair.to),
-    faultCurrentKA: num(pair.faultCurrentKA ?? pair.faultKA),
-    intervalSeconds: num(pair.intervalSeconds ?? pair.ctiSeconds),
-    status: text(pair.status),
-  }));
+  const settingsLookup = tccDeviceSettingsLookup(options.tccSettings, options.oneLine);
+  const missingDevices = new Set();
+  const settingsFor = deviceId => {
+    const entry = deviceId ? settingsLookup.get(deviceId) : null;
+    if (!entry?.hasDevice && deviceId) missingDevices.add(deviceId);
+    return entry?.description ?? null;
+  };
+
+  const rows = pairs.map(pair => {
+    const from = text(pair.upstream ?? pair.upstreamId ?? pair.from);
+    const to = text(pair.downstream ?? pair.downstreamId ?? pair.to);
+    return {
+      from,
+      to,
+      faultCurrentKA: num(pair.faultCurrentKA ?? pair.faultKA),
+      intervalSeconds: num(pair.intervalSeconds ?? pair.ctiSeconds),
+      status: text(pair.status),
+      fromSettings: settingsFor(from),
+      toSettings: settingsFor(to),
+    };
+  });
 
   const intervals = rows.map(row => row.intervalSeconds).filter(value => value != null);
   const summary = {
@@ -257,6 +303,7 @@ export function buildTccSettingsSection(studies = {}, approvals = {}, options = 
     'Saved study status': text(data.status),
     'Minimum coordination interval (s)': num(data.minimumCoordinationIntervalSeconds),
     'Device pairs': rows.length,
+    'Pair devices without a saved TCC device': rows.length ? missingDevices.size : null,
     'Smallest saved interval (s)': intervals.length ? Math.min(...intervals) : null,
     'Saved at': text(data.updatedAt),
   };
@@ -264,6 +311,9 @@ export function buildTccSettingsSection(studies = {}, approvals = {}, options = 
   const warnings = [
     ...list(data.warnings),
     ...(rows.length ? [] : ['The saved TCC result lists no coordinated device pairs.']),
+    ...(missingDevices.size
+      ? [`${missingDevices.size} device(s) in the coordinated pairs have no saved TCC device or settings (${[...missingDevices].join(', ')}); the saved intervals cannot be reproduced from the project.`]
+      : []),
   ];
 
   return studySection({
@@ -277,6 +327,8 @@ export function buildTccSettingsSection(studies = {}, approvals = {}, options = 
       { key: 'faultCurrentKA', label: 'Fault current (kA)' },
       { key: 'intervalSeconds', label: 'Coordination time interval (s)' },
       { key: 'status', label: 'Saved coordination status' },
+      { key: 'fromSettings', label: 'Upstream device and settings' },
+      { key: 'toSettings', label: 'Downstream device and settings' },
     ],
     rows,
     summary,

@@ -48,6 +48,42 @@ export function createImportableProjectSnapshot(snapshot) {
   return importable;
 }
 
+/**
+ * What My Projects offers when no project has been saved yet. A workspace that
+ * already holds records is offered Save first: creating or opening another
+ * project from there would replace the unsaved records, so Create New and the
+ * sample are not offered beside it.
+ * @param {{equipment?: number, loads?: number, cables?: number, raceways?: number, oneLineComponents?: number}} [counts]
+ * @returns {{kind: 'unsaved-workspace'|'first-project', eyebrow: string, title: string, detail: string, actions: Array<{action?: string, href?: string, label: string, primary?: boolean}>}}
+ */
+export function resolveEmptyProjectPrompt(counts = {}) {
+  const records = ['equipment', 'loads', 'cables', 'raceways', 'oneLineComponents']
+    .reduce((total, key) => total + (Number(counts?.[key]) || 0), 0);
+  if (records > 0) {
+    return {
+      kind: 'unsaved-workspace',
+      eyebrow: 'Not saved yet',
+      title: 'Save this workspace as a project',
+      detail: `This workspace holds ${records} unsaved record${records === 1 ? '' : 's'}. Save it to keep your work; creating or opening a project first would replace it.`,
+      actions: [
+        { action: 'save', label: 'Save Project', primary: true },
+        { action: 'load', label: 'Open Existing Project' }
+      ]
+    };
+  }
+  return {
+    kind: 'first-project',
+    eyebrow: 'First project',
+    title: 'Create or open a project',
+    detail: 'Start a named project, open saved work, or use a sample project to explore the workflow.',
+    actions: [
+      { action: 'new', label: 'Create New Project', primary: true },
+      { action: 'load', label: 'Open Existing Project' },
+      { href: 'samplegallery.html', label: 'Try a Sample Project' }
+    ]
+  };
+}
+
 export function summarizeSavedProjectRecord(name, record = {}) {
   const raceways = record.raceways && typeof record.raceways === 'object' ? record.raceways : {};
   const meta = record.__meta && typeof record.__meta === 'object' ? record.__meta : {};

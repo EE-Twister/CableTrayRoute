@@ -4,6 +4,7 @@ import { renderLoadFlowResultsHtml } from '../analysis/loadFlowResultsRenderer.j
 import { getOneLine, getStudies, getStudyAssessments, getStudyProvenance, captureStudyRunContext, saveStudyResult } from '../dataStore.mjs';
 import { downloadPDF } from '../reports/reporting.mjs';
 import { studyLifecycleMetadataRows } from '../analysis/studyExportMetadata.mjs';
+import { isStudyResultCurrent } from '../analysis/studyResultContext.mjs';
 
 export function buildModel() {
   return buildLoadFlowModel(getOneLine());
@@ -210,7 +211,7 @@ if (typeof document !== 'undefined') {
     if (initialReadiness?.ready !== false && isUsableLoadFlowResult(saved)) {
       lastValidResult = saved;
       const assessment = getStudyAssessments().loadFlow;
-      output.innerHTML = renderLoadFlowResultsHtml(saved, { stale: assessment?.freshness !== 'current' || assessment?.eligible !== true });
+      output.innerHTML = renderLoadFlowResultsHtml(saved, { stale: !isStudyResultCurrent(assessment) });
       if (exportBtn) exportBtn.disabled = false;
     }
     form.addEventListener('submit', event => {
