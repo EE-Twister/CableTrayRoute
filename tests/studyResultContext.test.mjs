@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   assessStudyResult,
   buildStudyContextIndex,
+  isStudyResultCurrent,
 } from '../analysis/studyResultContext.mjs';
 import {
   buildStudyProvenance,
@@ -126,5 +127,14 @@ const packageSnapshot = snapshotPackage(buildReportPackage(
 ));
 assert.equal(packageSnapshot.studyContextIndex.unmappedStudy.freshness, 'unknown');
 assert.equal(packageSnapshot.config.currentInputFingerprint, 'current');
+
+// One rule for "current": fresh and eligible, never inferred from missing data.
+assert.equal(isStudyResultCurrent({ freshness: 'current', eligible: true }), true);
+assert.equal(isStudyResultCurrent({ freshness: 'current', eligible: false }), false);
+assert.equal(isStudyResultCurrent({ freshness: 'current' }), false);
+assert.equal(isStudyResultCurrent({ freshness: 'stale', eligible: true }), false);
+assert.equal(isStudyResultCurrent({ freshness: 'unknown', eligible: true }), false);
+assert.equal(isStudyResultCurrent(null), false);
+assert.equal(isStudyResultCurrent(undefined), false);
 
 console.log('✓ study result lifecycle context is preserved and enforced by report consumers');

@@ -89,6 +89,7 @@ function cableRaceway(cable) {
 
 // Single definition of schedule-ready, shared by the Cable Schedule panel, the
 // workflow step header, the KPI strip, and the dashboards (see workflowStatus.js).
+/** @param {import('../types/project').Cable} cable */
 export function isCableScheduleReady(cable) {
   const length = numericValue(cableLength(cable));
   return hasValue(cableTag(cable))
