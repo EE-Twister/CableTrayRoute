@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { buildScheduleDataFromComponents } from '../src/one-line/scheduleDataModel.mjs';
+import {
+  buildCableSpecFromComponent,
+  buildScheduleDataFromComponents,
+  formatLoadFlowCurrentValue
+} from '../src/one-line/scheduleDataModel.mjs';
 
 const helpers = {
   getCategory: comp => comp.category || comp.type,
@@ -65,5 +69,57 @@ describe('One-Line schedule data model', () => {
     assert.equal(c2.from_tag, 'SRC');
     assert.equal(c2.to_tag, 'DST');
     assert.equal(c2.load_flow_current, '7');
+  });
+});
+
+describe('One-Line load-flow current formatting', () => {
+  it('formats a single current to one decimal and skips non-numbers', () => {
+    assert.equal(formatLoadFlowCurrentValue(12.345), '12.3');
+    assert.equal(formatLoadFlowCurrentValue('7'), '7.0');
+    assert.equal(formatLoadFlowCurrentValue('n/a'), '');
+    assert.equal(formatLoadFlowCurrentValue(null), '');
+  });
+
+  it('lists per-phase currents sorted by phase', () => {
+    assert.equal(formatLoadFlowCurrentValue({ C: 9, A: 10.04, B: 'x' }), 'A:10.0, C:9.0');
+  });
+});
+
+describe('One-Line cable spec', () => {
+  const helpers = {
+    findSourceComponent: (id, comps) => comps.find(comp => (comp.connections || []).some(conn => conn.target === id)) || null,
+    hasImpedance: holder => Boolean(holder?.impedance),
+    getComponentTag: comp => (comp ? comp.tag || comp.id : ''),
+    parseCablePhases: source => (typeof source === 'string' ? source.split(',').filter(Boolean) : []),
+  };
+  const diagram = () => [
+    { id: 'swbd', type: 'equipment', tag: 'SWBD-1', voltage: 480, connections: [{ target: 'cbl' }] },
+    { id: 'cbl', type: 'cable', label: 'C-101', cable: { conductors: 3, slack_pct: 10 }, connections: [{ target: 'mtr', length: 100, phases: 'A,B,C', loading_amps: 41.26 }] },
+    { id: 'mtr', type: 'load', tag: 'M-1', current: 40, voltage: 480, connections: [] },
+  ];
+
+  it('returns null for components that are not cables', () => {
+    const comps = diagram();
+    assert.equal(buildCableSpecFromComponent(comps[0], comps, helpers), null);
+  });
+
+  it('derives endpoints, phases, and the scaled length with slack', () => {
+    const comps = diagram();
+    const spec = buildCableSpecFromComponent(comps[1], comps, { ...helpers, unitPerPx: 0.5 });
+    assert.equal(spec.tag, 'C-101');
+    assert.equal(spec.from_tag, 'SWBD-1');
+    assert.equal(spec.to_tag, 'M-1');
+    assert.equal(spec.phases, 'A,B,C');
+    assert.equal(spec.length, '55.00', '100 px x 0.5 ft/px x 1.10 slack');
+    assert.equal(spec.load_flow_current, '41.3');
+    assert.equal(comps[1].cable.length, '55.00', 'sizing results are written back to the component');
+  });
+
+  it('keeps a manual length instead of the drawn length', () => {
+    const comps = diagram();
+    comps[1].cable = { ...comps[1].cable, manual_length: true, length: '250' };
+    const spec = buildCableSpecFromComponent(comps[1], comps, helpers);
+    assert.equal(spec.length, '250.00');
+    assert.equal(spec.manual_length, true);
   });
 });
