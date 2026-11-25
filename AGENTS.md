@@ -38,4 +38,4 @@ This repository uses this file for all developer tasks. The rules below apply to
 - Run `npm test` and `npm run build` before completing any task that changes code.
 - If you modify or add E2E scenarios or touch code covered by Playwright tests, run the Playwright suite specified in `playwright-tests/`.
 - Update the relevant documents under `docs/` whenever user-visible behavior changes. Ensure code and docs stay synchronized.
-- `npm run typecheck` (part of `npm run lint`) checks the modules listed in `tsconfig.json` using JSDoc types and the shared shapes in `types/project.d.ts`. When you touch a listed module, keep it clean; when you add a module that handles cables, trays, or study results, add it to the list. See `docs/type-checking.md`.
+- `npm run typecheck` (part of `npm run lint`) checks the modules whose first line is `// @ts-check`, using JSDoc types and the shared shapes in `types/project.d.ts`. When you touch such a module, keep it clean; when you add a module that handles cables, trays, or study results, opt it in. See `docs/type-checking.md`.

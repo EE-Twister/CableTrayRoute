@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Study result lifecycle metadata.
  *

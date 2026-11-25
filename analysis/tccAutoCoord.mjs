@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * TCC Auto-Coordination Algorithm
  *
@@ -261,7 +262,7 @@ export function checkCoordination(upstreamScaled, downstreamScaled, testCurrents
  * @param {object} downstreamScaled - Already-scaled downstream device
  * @param {number[]} testCurrents - Current levels to test [A]
  * @param {number} [margin=0.3] - Required time margin [s]
- * @returns {{ found: boolean, timeDial: number, scaledResult: object, violations: Array }}
+ * @returns {{ found: boolean, timeDial: number, scaledResult: object, violations: Array, unevaluated?: Array }}
  *   found=false + timeDial=TIME_DIAL_MAX if coordination is not achievable in range
  */
 export function findCoordinatingTimeDial(device, currentOverrides, downstreamScaled, testCurrents, margin = DEFAULT_MARGIN) {
@@ -316,7 +317,7 @@ export function findCoordinatingTimeDial(device, currentOverrides, downstreamSca
  * upstream device, finds the minimum time-dial that achieves coordination
  * with the device immediately downstream of it.
  *
- * @param {Array<{id: string, device: object, overrides: object}>} deviceEntries
+ * @param {Array<{id: string, device: object, overrides?: object}>} deviceEntries
  *   Ordered **load → source** (index 0 = most downstream).
  * @param {number} faultCurrentA - Maximum fault current [A]
  * @param {object} [options={}]

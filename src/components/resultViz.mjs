@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Shared result visualisation helpers for study pages.
  *

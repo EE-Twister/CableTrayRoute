@@ -1,3 +1,4 @@
+// @ts-check
 function hasValue(value) {
   if (Array.isArray(value)) return value.some(hasValue);
   if (value && typeof value === 'object') return Object.values(value).some(hasValue);

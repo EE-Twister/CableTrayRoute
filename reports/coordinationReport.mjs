@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * CTI (Coordination Time Interval) Report Generator
  *
@@ -112,6 +113,14 @@ const TEST_FRACTIONS = [1.0, 0.6, 0.25, 0.1, 0.05];
  * @returns {Array<Object>}
  *   One row object per (device pair × test-current level). Returns [] for
  *   fewer than 2 devices or invalid inputs.
+ */
+/**
+ * @param {Array<{id: string, device: object, overrides?: object}>} deviceEntries
+ * @param {{ results: Array<{id: string, scaledResult: object}>, allCoordinated?: boolean }} coordResult
+ * @param {number} faultCurrentA
+ * @param {number} [margin]
+ * @param {{ studyContext?: { provenance?: { heading?: string, inputFingerprint?: string, intendedUse?: string }, faultCurrentSource?: string } }} [options]
+ * @returns {Array<Object>}
  */
 export function buildCTIRows(deviceEntries, coordResult, faultCurrentA, margin = 0.3, { studyContext = {} } = {}) {
   if (

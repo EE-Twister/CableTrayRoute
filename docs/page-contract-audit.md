@@ -229,8 +229,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - src/scenarioComparison.js:371 listScenarios()
   - src/scenarioComparison.js:77 listScenarios()
 - `settings.studyProvenance`
-  - analysis/studyLifecycle.mjs:182 captureStudyRunContext()
-  - analysis/studyLifecycle.mjs:379 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:183 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:380 captureStudyRunContext()
 - `studyResults.filter`
   - analysis/scenarioComparison.mjs:465 studies.filter
 - `studyResults.forEach`
@@ -549,8 +549,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - demandschedule.js:288 getLoads()
   - demandschedule.js:75 getLoads()
 - `settings.studyProvenance`
-  - analysis/studyLifecycle.mjs:182 captureStudyRunContext()
-  - analysis/studyLifecycle.mjs:379 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:183 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:380 captureStudyRunContext()
   - demandschedule.js:291 captureStudyRunContext()
   - demandschedule.js:83 captureStudyRunContext()
 
@@ -1804,8 +1804,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.studyApprovals`
   - src/projectreport.js:322 getStudyApprovals()
 - `settings.studyProvenance`
-  - analysis/studyLifecycle.mjs:182 captureStudyRunContext()
-  - analysis/studyLifecycle.mjs:379 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:183 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:380 captureStudyRunContext()
   - src/projectreport.js:320 getStudyProvenance()
   - src/projectreport.js:321 getStudyAssessments()
   - src/projectreport.js:695 captureStudyRunContext()
@@ -1816,61 +1816,61 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - src/projectreport.js:319 getStudies()
   - src/projectreport.js:321 getStudyAssessments()
 - `studyResults.arcFlash`
-  - analysis/projectReport.mjs:580 studies.arcFlash
+  - analysis/projectReport.mjs:585 studies.arcFlash
 - `studyResults.bessHazard`
-  - analysis/projectReport.mjs:1331 studies.bessHazard
+  - analysis/projectReport.mjs:1337 studies.bessHazard
 - `studyResults.contingency`
-  - analysis/projectReport.mjs:1100 studies.contingency
+  - analysis/projectReport.mjs:1106 studies.contingency
 - `studyResults.cyberCompliance`
-  - analysis/projectReport.mjs:1105 studies.cyberCompliance
+  - analysis/projectReport.mjs:1111 studies.cyberCompliance
 - `studyResults.duty`
   - validation/rules.js:703 studies.duty
   - validation/rules.js:703 studies?.duty
   - validation/rules.js:707 studies?.duty
 - `studyResults.frequencyScan`
-  - analysis/projectReport.mjs:1102 studies.frequencyScan
+  - analysis/projectReport.mjs:1108 studies.frequencyScan
 - `studyResults.harmonics`
-  - analysis/projectReport.mjs:838 studies.harmonics
+  - analysis/projectReport.mjs:843 studies.harmonics
 - `studyResults.hazAreaClassification`
-  - analysis/reportSupplementalSections.mjs:354 studies?.hazAreaClassification
+  - analysis/reportSupplementalSections.mjs:356 studies?.hazAreaClassification
 - `studyResults.heatTraceSizing`
-  - analysis/projectReport.mjs:355 studies.heatTraceSizing
+  - analysis/projectReport.mjs:356 studies.heatTraceSizing
 - `studyResults.heatTraceSizingCircuits`
-  - analysis/projectReport.mjs:356 studies.heatTraceSizingCircuits
+  - analysis/projectReport.mjs:357 studies.heatTraceSizingCircuits
 - `studyResults.iec60909`
-  - analysis/projectReport.mjs:675 studies.iec60909
+  - analysis/projectReport.mjs:680 studies.iec60909
 - `studyResults.insulationCoordination`
-  - analysis/reportSupplementalSections.mjs:470 studies?.insulationCoordination
+  - analysis/reportSupplementalSections.mjs:472 studies?.insulationCoordination
 - `studyResults.lighting`
-  - analysis/reportSupplementalSections.mjs:601 studies?.lighting
+  - analysis/reportSupplementalSections.mjs:603 studies?.lighting
 - `studyResults.loadFlow`
-  - analysis/projectReport.mjs:786 studies.loadFlow
+  - analysis/projectReport.mjs:791 studies.loadFlow
 - `studyResults.motorStart`
-  - analysis/projectReport.mjs:875 studies.motorStart
+  - analysis/projectReport.mjs:880 studies.motorStart
 - `studyResults.optimalPowerFlow`
-  - analysis/projectReport.mjs:1104 studies.optimalPowerFlow
+  - analysis/projectReport.mjs:1110 studies.optimalPowerFlow
 - `studyResults.probabilisticLoadFlow`
-  - analysis/projectReport.mjs:1099 studies.probabilisticLoadFlow
+  - analysis/projectReport.mjs:1105 studies.probabilisticLoadFlow
 - `studyResults.quasiDynamic`
-  - analysis/projectReport.mjs:1098 studies.quasiDynamic
+  - analysis/projectReport.mjs:1104 studies.quasiDynamic
 - `studyResults.reliability`
-  - analysis/projectReport.mjs:994 studies.reliability
+  - analysis/projectReport.mjs:999 studies.reliability
   - validation/rules.js:712 studies?.reliability
   - validation/rules.js:713 studies.reliability
   - validation/rules.js:715 studies?.reliability
   - validation/rules.js:728 studies?.reliability
 - `studyResults.shortCircuit`
-  - analysis/projectReport.mjs:674 studies.shortCircuit
+  - analysis/projectReport.mjs:679 studies.shortCircuit
 - `studyResults.sustainabilityFootprint`
-  - analysis/reportSupplementalSections.mjs:144 studies?.sustainabilityFootprint
+  - analysis/reportSupplementalSections.mjs:146 studies?.sustainabilityFootprint
 - `studyResults.tcc`
-  - analysis/reportSupplementalSections.mjs:272 studies?.tcc
+  - analysis/reportSupplementalSections.mjs:274 studies?.tcc
 - `studyResults.transientStability`
-  - analysis/projectReport.mjs:1103 studies.transientStability
+  - analysis/projectReport.mjs:1109 studies.transientStability
 - `studyResults.voltageDropStudy`
-  - analysis/projectReport.mjs:914 studies.voltageDropStudy
+  - analysis/projectReport.mjs:919 studies.voltageDropStudy
 - `studyResults.voltageStability`
-  - analysis/projectReport.mjs:1101 studies.voltageStability
+  - analysis/projectReport.mjs:1107 studies.voltageStability
 - `traySchedule`
   - src/projectreport.js:297 getTrays()
 
@@ -2160,8 +2160,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `settings.studyProvenance`
-  - analysis/studyLifecycle.mjs:182 captureStudyRunContext()
-  - analysis/studyLifecycle.mjs:379 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:183 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:380 captureStudyRunContext()
   - frequencyscan.js:113 captureStudyRunContext()
   - frequencyscan.js:33 getStudySourceSnapshot()
   - frequencyscan.js:35 getStudyProvenance()
@@ -2385,8 +2385,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `settings.studyProvenance`
-  - analysis/studyLifecycle.mjs:182 captureStudyRunContext()
-  - analysis/studyLifecycle.mjs:379 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:183 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:380 captureStudyRunContext()
   - ibr.js:149 captureStudyRunContext()
   - ibr.js:187 captureStudyRunContext()
   - ibr.js:278 captureStudyRunContext()
@@ -2565,8 +2565,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `settings.studyProvenance`
-  - analysis/studyLifecycle.mjs:182 captureStudyRunContext()
-  - analysis/studyLifecycle.mjs:379 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:183 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:380 captureStudyRunContext()
   - src/components/studyLifecycle.js:301 getStudyAssessment()
   - src/components/studyLifecycle.js:350 getStudyProvenance()
   - src/components/studyLifecycle.js:406 getStudyProvenance()
@@ -2784,8 +2784,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `settings.studyProvenance`
-  - analysis/studyLifecycle.mjs:182 captureStudyRunContext()
-  - analysis/studyLifecycle.mjs:379 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:183 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:380 captureStudyRunContext()
   - studies/shortCircuit.js:148 captureStudyRunContext()
   - studies/shortCircuit.js:176 getStudyAssessments()
   - studies/shortCircuit.js:358 getStudyAssessments()
@@ -2899,8 +2899,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `settings.studyProvenance`
-  - analysis/studyLifecycle.mjs:182 captureStudyRunContext()
-  - analysis/studyLifecycle.mjs:379 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:183 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:380 captureStudyRunContext()
   - studies/arcFlash.js:227 getStudyAssessments()
   - studies/arcFlash.js:26 captureStudyRunContext()
   - studies/arcFlash.js:271 getStudyAssessments()
@@ -3053,8 +3053,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - src/equipmentEvaluation.js:159 getOneLine()
   - ... 1 more
 - `settings.studyProvenance`
-  - analysis/studyLifecycle.mjs:182 captureStudyRunContext()
-  - analysis/studyLifecycle.mjs:379 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:183 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:380 captureStudyRunContext()
   - src/equipmentEvaluation.js:103 captureStudyRunContext()
   - src/equipmentEvaluation.js:148 captureStudyRunContext()
   - src/equipmentEvaluation.js:164 getStudyAssessments()
@@ -3311,8 +3311,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `settings.designBasis`
   - src/components/studyBasis.js:37 getDesignBasis()
 - `settings.studyProvenance`
-  - analysis/studyLifecycle.mjs:182 captureStudyRunContext()
-  - analysis/studyLifecycle.mjs:379 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:183 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:380 captureStudyRunContext()
   - groundgrid.js:153 captureStudyRunContext()
 
 **Detected Writes**
@@ -3494,8 +3494,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - heattracesizing.js:2218 getStudyApprovals()
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `settings.studyProvenance`
-  - analysis/studyLifecycle.mjs:182 captureStudyRunContext()
-  - analysis/studyLifecycle.mjs:379 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:183 captureStudyRunContext()
+  - analysis/studyLifecycle.mjs:380 captureStudyRunContext()
   - heattracesizing.js:2079 captureStudyRunContext()
   - heattracesizing.js:2086 captureStudyRunContext()
   - heattracesizing.js:2095 captureStudyRunContext()

@@ -1,3 +1,4 @@
+// @ts-check
 import { csvCell } from '../utils/csv.mjs';
 
 let jsPdfPromise = null;
@@ -42,12 +43,6 @@ async function ensureJsPDF() {
   return jsPdfPromise;
 }
 
-/**
- * Convert array of objects to CSV string.
- * @param {string[]} headers - column headers / keys
- * @param {Array<Object>} rows
- * @returns {string}
- */
 function sanitizeCsvCell(value) {
   // Lifecycle metadata cells can hold objects; serialize them before the
   // shared CSV formatting (formula neutralising and quoting) is applied.
@@ -121,6 +116,13 @@ export async function toPDF(title = 'Report', headers = [], rows = []) {
 
 /**
  * Convenience helper to export data as CSV file in browser.
+ */
+/**
+ * Download rows as a CSV file.
+ * @param {string[]} headers - column headers / keys
+ * @param {Array<Object>} rows
+ * @param {string} [filename]
+ * @param {{ bom?: boolean }} [options]
  */
 export function downloadCSV(headers, rows, filename = 'report.csv', { bom = false } = {}) {
   const csv = toCSV(headers, rows);

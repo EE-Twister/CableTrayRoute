@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Report sections for the supplemental studies listed in the Report Package
  * Builder registry (analysis/reportPackage.mjs): Sustainability Footprint,
@@ -79,6 +80,7 @@ function readinessFor(data, assessment) {
  * lifecycle assessment and approval lookup; `key` is the report section key.
  * `identityKeys` stay visible when the row values are withheld.
  */
+/** @param {{ key: string, studyKey: string, data: any, approvals?: object, headers: Array<{key: string, label: string}>, rows?: object[], summary?: object, warnings?: string[], identityKeys?: string[], options?: Record<string, any> }} section */
 function studySection({
   key,
   studyKey,

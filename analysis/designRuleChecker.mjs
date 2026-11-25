@@ -1163,6 +1163,12 @@ function checkDataCableSegregation(trayCableMap) {
  *   detail?:      string,
  *   reference:    string|null,
  *   remediation?: string,
+ *   acceptedKey?:       string,
+ *   acceptedSignature?: string,
+ *   isAccepted?:        boolean,
+ *   acceptedBy?:        string,
+ *   acceptedAt?:        string,
+ *   acceptanceNote?:    string,
  * }} DrcFinding
  *
  * @typedef {{
@@ -1171,6 +1177,7 @@ function checkDataCableSegregation(trayCableMap) {
  *   info:     number,
  *   total:    number,
  *   passed:   boolean,
+ *   accepted?: number,
  * }} DrcSummary
  */
 // ---------------------------------------------------------------------------

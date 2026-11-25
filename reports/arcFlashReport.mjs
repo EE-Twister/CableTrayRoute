@@ -1,3 +1,4 @@
+// @ts-check
 import { downloadCSV, downloadPDF } from './reporting.mjs';
 import { generateArcFlashLabel } from './labels.mjs';
 import { isArcFlashLabelEligible } from '../studies/arcFlashReadiness.mjs';

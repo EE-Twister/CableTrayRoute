@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Normalize saved-study lifecycle metadata for report, scenario, and export
  * consumers.  Study calculators keep their raw result shapes; consumers use

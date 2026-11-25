@@ -1,3 +1,4 @@
+// @ts-check
 function text(value) {
   return String(value ?? '').trim();
 }
