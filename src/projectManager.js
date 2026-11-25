@@ -20,7 +20,7 @@ import {
 } from '../projectStorage.js';
 import { openModal, showAlertModal, ensureFieldAssistiveText } from './components/modal.js';
 import { resolveActiveProjectName } from './projectContext.js';
-import { createImportableProjectSnapshot, isVersionedProjectSnapshot, summarizeSavedProjectRecord } from './projectSnapshot.js';
+import { createImportableProjectSnapshot, isVersionedProjectSnapshot, resolveEmptyProjectPrompt, summarizeSavedProjectRecord } from './projectSnapshot.js';
 import { mountProfileControl, signOutCurrentUser, updateAuthSessionControls } from './authProfileControl.js';
 import {
   createAuthContextFromSupabaseSession,
@@ -821,17 +821,19 @@ function currentProjectSummary() {
 
 function renderProjectEmptyState(container) {
   const current = currentProjectSummary();
+  const prompt = resolveEmptyProjectPrompt(current.counts);
+  container.dataset.emptyKind = prompt.kind;
   container.innerHTML = `
     <div class="project-workspace-empty">
       <div>
-        <span class="project-workspace-eyebrow">First project</span>
-        <h3>Create or open a project</h3>
-        <p>Start a named project, open saved work, or use a sample project to explore the workflow.</p>
+        <span class="project-workspace-eyebrow">${escapeHtml(prompt.eyebrow)}</span>
+        <h3>${escapeHtml(prompt.title)}</h3>
+        <p>${escapeHtml(prompt.detail)}</p>
       </div>
       <div class="project-workspace-actions">
-        <button type="button" class="btn primary-btn" data-project-action="new">Create New Project</button>
-        <button type="button" class="btn" data-project-action="load">Open Existing Project</button>
-        <a class="btn" href="samplegallery.html">Try a Sample Project</a>
+        ${prompt.actions.map(item => item.href
+          ? `<a class="btn" href="${escapeHtml(item.href)}">${escapeHtml(item.label)}</a>`
+          : `<button type="button" class="btn${item.primary ? ' primary-btn' : ''}" data-project-action="${escapeHtml(item.action)}">${escapeHtml(item.label)}</button>`).join('')}
       </div>
       <dl class="project-workspace-current">
         <div><dt>Current workspace</dt><dd>${escapeHtml(current.name)}</dd></div>
@@ -887,6 +889,7 @@ async function refreshProjectWorkspace(container) {
     if (!summaries.length) {
       renderProjectEmptyState(container);
     } else {
+      delete container.dataset.emptyKind;
       renderProjectRows(container, summaries);
     }
   } catch (err) {

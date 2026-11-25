@@ -57,7 +57,7 @@ U1–U5 were then addressed:
 - **U4:** the empty workspace shows one identity block and three actions; a saved project shows one card and one Open Step. A project that is unsaved and has never been saved still shows the Create/Open/Sample prompt beside Open Step and Save.
 - **U5:** Tray Fill opens on a project tray (handed-over tray, then `?tray=`, then the first tray with cables); **New blank tray** and `?blank=1` open manual entry.
 
-Still open: the home page for an unsaved, never-saved project.
+The home page for an unsaved, never-saved project was then fixed: a workspace with records but no saved project shows "Save this workspace as a project" (Save and Open Existing only, with the record count) instead of the Create/Open/Sample prompt, because Create New and the sample would replace the unsaved records. The duplicate section-level Save button is hidden while that prompt is showing.
 
 **Scope:** what a user sees, what the issued report says, and what the export files contain.
 

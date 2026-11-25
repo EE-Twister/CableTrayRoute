@@ -3,6 +3,7 @@ import {
   createImportableProjectSnapshot,
   isVersionedProjectSnapshot,
   prepareProjectSnapshotForSave,
+  resolveEmptyProjectPrompt,
   summarizeSavedProjectRecord
 } from '../src/projectSnapshot.js';
 
@@ -65,5 +66,18 @@ const legacySummary = summarizeSavedProjectRecord('Legacy Project', {
 });
 assert.equal(legacySummary.counts.raceways, 3);
 assert.equal(legacySummary.counts.oneLineComponents, 2);
+
+// A workspace with records but no saved project is offered Save, never Create New.
+const emptyPrompt = resolveEmptyProjectPrompt({ equipment: 0, loads: 0, cables: 0, raceways: 0 });
+assert.equal(emptyPrompt.kind, 'first-project');
+assert.deepEqual(emptyPrompt.actions.map(item => item.label), ['Create New Project', 'Open Existing Project', 'Try a Sample Project']);
+const unsavedPrompt = resolveEmptyProjectPrompt({ equipment: 1, cables: 2, raceways: 1 });
+assert.equal(unsavedPrompt.kind, 'unsaved-workspace');
+assert.match(unsavedPrompt.detail, /4 unsaved records/);
+assert.deepEqual(unsavedPrompt.actions.map(item => item.action), ['save', 'load']);
+assert.equal(unsavedPrompt.actions[0].primary, true);
+assert.match(resolveEmptyProjectPrompt({ cables: 1 }).detail, /1 unsaved record\./);
+assert.equal(resolveEmptyProjectPrompt({ oneLineComponents: 3 }).kind, 'unsaved-workspace');
+assert.equal(resolveEmptyProjectPrompt().kind, 'first-project');
 
 console.log('✓ project snapshot boundaries preserve raw data and produce stable summaries');
