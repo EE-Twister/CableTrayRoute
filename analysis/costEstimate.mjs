@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Project cost estimation module.
  * Calculates material and labor costs from cable schedule, raceway schedule,
@@ -626,26 +627,7 @@ export function summarizeCosts(lineItems = []) {
   return { categories, grandTotal, grandMaterial, grandLabor };
 }
 
-/**
- * Parse a pricing CSV into a prices object compatible with DEFAULT_PRICES.
- *
- * Expected CSV columns: category, key, unit_price, unit, source, date
- * Lines beginning with '#' are treated as comments and ignored.
- *
- * Supported categories:
- *   cable        – key = conductor size string (e.g. "4 AWG", "default")
- *   tray         – key = nominal width in inches (e.g. "12", "default")
- *   conduit      – key = trade size in inches (e.g. "1", "0.5", "default")
- *   fitting      – key is ignored; sets the scalar fitting unit price
- *   tray_support – key = tray width or "default"
- *   construction – key = deterministic ductbank BOM material key
- *   labor_unit_hours – key = matching ductbank BOM key, value = labor-hours/unit
- *   labor        – key ∈ { cableInstall, trayInstall, conduitInstall, civilInstall }
- *   productivity – also supports traySupportInstallEaPerHr and trayFittingInstallEaPerHr
- *
- * @param {string} csvText  Raw CSV text
- * @returns {{ prices: Object, meta: { source: string, date: string, rowCount: number, warnings: string[] } }}
- */
+/** Split one CSV line into trimmed fields, honouring double-quoted fields. @param {string} line @returns {string[]} */
 function parseCSVLine(line) {
   const fields = [];
   let current = '';
@@ -683,6 +665,26 @@ function encodeCSVCell(value) {
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
+/**
+ * Parse a pricing CSV into a prices object compatible with DEFAULT_PRICES.
+ *
+ * Expected CSV columns: category, key, unit_price, unit, source, date
+ * Lines beginning with '#' are treated as comments and ignored.
+ *
+ * Supported categories:
+ *   cable        – key = conductor size string (e.g. "4 AWG", "default")
+ *   tray         – key = nominal width in inches (e.g. "12", "default")
+ *   conduit      – key = trade size in inches (e.g. "1", "0.5", "default")
+ *   fitting      – key is ignored; sets the scalar fitting unit price
+ *   tray_support – key = tray width or "default"
+ *   construction – key = deterministic ductbank BOM material key
+ *   labor_unit_hours – key = matching ductbank BOM key, value = labor-hours/unit
+ *   labor        – key ∈ { cableInstall, trayInstall, conduitInstall, civilInstall }
+ *   productivity – also supports traySupportInstallEaPerHr and trayFittingInstallEaPerHr
+ *
+ * @param {string} csvText  Raw CSV text
+ * @returns {{ prices: Object, meta: { source: string, date: string, rowCount: number, warnings: string[] } }}
+ */
 export function parsePricingCSV(csvText) {
   const prices = {};
   const warnings = [];

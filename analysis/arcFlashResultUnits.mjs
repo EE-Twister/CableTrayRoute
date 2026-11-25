@@ -1,3 +1,4 @@
+// @ts-check
 // Saved arc-flash results use millimetres for `boundary` and `workingDistance`,
 // matching analysis/arcFlash.mjs and every display, label, and report
 // consumer. Legacy or hand-authored results may carry a `boundaryUnit` or a

@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Project-integrated voltage-drop recommendation study.
  *

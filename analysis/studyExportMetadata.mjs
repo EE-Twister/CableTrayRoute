@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Common lifecycle fields for standalone study exports.  Exporters keep the
  * calculator's native result rows, while these fields make validity, source,

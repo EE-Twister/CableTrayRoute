@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Unified Project Report Generator
  *
@@ -384,11 +385,15 @@ function buildHeatTraceSection(studies = {}, projectName = '', approval = null, 
  * Generate a unified project report from project data.
  *
  * @param {object}   data
- * @param {object[]} data.cables
- * @param {object[]} data.trays
- * @param {object[]} data.conduits
- * @param {object[]} data.ductbanks
+ * @param {object[]} [data.cables]
+ * @param {object[]} [data.trays]
+ * @param {object[]} [data.conduits]
+ * @param {object[]} [data.ductbanks]
  * @param {string}   [data.projectName]
+ * @param {Record<string, any>} [data.studies]       saved study results keyed by study key
+ * @param {Record<string, any>} [data.approvals]     study approvals keyed by study key
+ * @param {Function|null} [data.assessHeatTraceCase] heat trace case assessor
+ * @param {any} [data.routeResults]                  saved route results
  * @returns {ProjectReport}
  *
  * @typedef {{
@@ -1072,6 +1077,7 @@ function advancedStudyStatus(data, studyKey = '', options = {}) {
   };
 }
 
+/** @param {{ key: string, title: string, data: any, approvals?: object, headers?: any[], rows?: any[], summary?: object, warnings?: string[], options?: Record<string, any> }} section */
 function advancedSection({ key, title, data, approvals, headers, rows, summary = {}, warnings = [], options = {} }) {
   if (!data) return { key, title, empty: true };
   const assessment = assessStudyResult(key, data, options.studyProvenance?.[key], options);

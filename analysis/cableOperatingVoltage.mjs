@@ -1,3 +1,4 @@
+// @ts-check
 // Cable rows carry two different voltages. `operating_voltage` is the nominal
 // system voltage that the Cable Schedule column, the schedule summary, and the
 // sizing and voltage-drop checks read. `cable_rating` / `voltage_rating` is

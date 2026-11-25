@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Report Package Builder — section registry, preset configs, and package assembly.
  *
@@ -144,7 +145,8 @@ export const PRESET_CONFIGS = {
  * when the corresponding arrays are non-empty.
  * Study sections are available when the study results object is non-null.
  *
- * @param {{ studies: object, cables: any[], trays: any[], drcResults: any[] }} projectData
+ * @param {Record<string, any>} [projectData] studies, cables, trays, conduits, ductbanks, equipment, loads,
+ *   routeResults, pullPlans, procurement, costEstimate, fieldExecution, fieldObservations, deliverables, drcResults
  * @returns {Set<string>}
  */
 export function getAvailableSections({
@@ -252,7 +254,8 @@ export function buildRevisionTable(rows = []) {
  * @typedef {{
  *   id: string,
  *   generatedAt: string,
- *   config: { sections: string[], coverSheet: object, revisions: any[], assumptions: string },
+ *   config: { sections: string[], coverSheet: object, revisions: any[], assumptions: string, currentInputFingerprint: string|null },
+ *   studyContextIndex: Record<string, any>,
  *   sections: { [key: string]: object },
  * }} ReportPackage
  */
@@ -261,7 +264,7 @@ export function buildRevisionTable(rows = []) {
  * Assemble a ReportPackage from a config and pre-built section data.
  *
  * @param {{
- *   sections: string[],
+ *   sections?: string[],
  *   coverSheet?: object,
  *   revisions?: any[],
  *   assumptions?: string,

@@ -1,3 +1,4 @@
+// @ts-check
 // Pure table builder for the Short Circuit PDF export. Each bus keeps its own
 // validity, calculation status, required inputs, and warnings; study-level
 // lifecycle metadata goes in separately named columns so it never overwrites
