@@ -14,6 +14,8 @@ import {
 } from './routeResults.mjs';
 
 export { normalizeRouteResults, routedCableNamesFromResults } from './routeResults.mjs';
+export { filterRouteResultsForProject } from './routeResultFilter.mjs';
+import { filterRouteResultsForProject } from './routeResultFilter.mjs';
 
 function hasValue(value) {
   if (Array.isArray(value)) return value.some(hasValue);
@@ -96,74 +98,7 @@ function routeResultFromCable(cable) {
 }
 
 
-function knownCableTags(cables = []) {
-  return new Set(meaningfulRecords(cables).map(cableTag).map(normalizedKey).filter(Boolean));
-}
 
-function collectRacewayIds(rows = [], fields = []) {
-  const ids = new Set();
-  meaningfulRecords(rows).forEach(row => {
-    for (const field of fields) {
-      const value = row?.[field];
-      const key = normalizedKey(value);
-      if (key) ids.add(key);
-    }
-  });
-  return ids;
-}
-
-function routeResultRacewayIds(result) {
-  const ids = [];
-  const entries = [
-    ...(Array.isArray(result?.breakdown) ? result.breakdown : []),
-    ...(Array.isArray(result?.route_segments) ? result.route_segments : []),
-  ];
-  for (const entry of entries) {
-    if (!entry || typeof entry !== 'object') continue;
-    ids.push(
-      entry.tray_id,
-      entry.trayId,
-      entry.raceway_id,
-      entry.racewayId,
-      entry.conduit_id,
-      entry.conduitId,
-      entry.ductbankTag,
-      entry.ductbank_tag,
-      entry.ductbank_id,
-      entry.ductbankId,
-      entry.id,
-    );
-  }
-  return ids.map(normalizedKey).filter(Boolean).filter(id => id !== 'field route');
-}
-
-export function filterRouteResultsForProject(routeResults = [], {
-  cables = [],
-  trays = [],
-  conduits = [],
-  ductbanks = [],
-  currentInputFingerprint = '',
-} = {}) {
-  const savedFingerprint = routeResults && typeof routeResults === 'object' && !Array.isArray(routeResults)
-    ? String(routeResults.inputFingerprint || '').trim()
-    : '';
-  if (savedFingerprint && currentInputFingerprint && savedFingerprint !== currentInputFingerprint) return [];
-  const cableTags = knownCableTags(cables);
-  const nestedConduits = meaningfulRecords(ductbanks).flatMap(ductbank => meaningfulRecords(ductbank.conduits));
-  const racewayIds = new Set([
-    ...collectRacewayIds(trays, ['tray_id', 'trayId', 'id', 'tag']),
-    ...collectRacewayIds(conduits, ['conduit_id', 'conduitId', 'id', 'tag']),
-    ...collectRacewayIds(nestedConduits, ['conduit_id', 'conduitId', 'id', 'tag']),
-    ...collectRacewayIds(ductbanks, ['tag', 'id', 'ductbankTag', 'ductbank_id']),
-  ]);
-
-  return normalizeRouteResults(routeResults).filter(result => {
-    const tag = normalizedKey(routeResultTag(result));
-    if (!tag || !cableTags.has(tag)) return false;
-    const referencedRaceways = routeResultRacewayIds(result);
-    return referencedRaceways.every(id => racewayIds.has(id));
-  });
-}
 
 export function routeResultsFromCableRows(cables = []) {
   return meaningfulRecords(cables)
