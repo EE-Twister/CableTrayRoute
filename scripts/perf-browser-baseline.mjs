@@ -321,7 +321,7 @@ async function measureRoutingAndImport(browser, project) {
 
 // One cold navigation varies by about 10 % on shared CI runners, so the
 // startup:oneline contract uses the median of several independent cold loads.
-const ONE_LINE_STARTUP_SAMPLES = 3;
+const ONE_LINE_STARTUP_SAMPLES = 5;
 
 function median(values) {
   const sorted = [...values].sort((left, right) => left - right);
