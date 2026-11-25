@@ -75,5 +75,8 @@
     "three": "^0.185.1",
     "ws": "^8.16.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
