@@ -13,7 +13,7 @@ import {
   getProjectInputFingerprint,
   getItem
 } from '../dataStore.mjs';
-import { filterRouteResultsForProject } from '../analysis/deliverableWorkflow.mjs';
+import { filterRouteResultsForProject } from '../analysis/routeResultFilter.mjs';
 import { cableHasRoutingCoordinates, cableHasRaceway, isCableScheduleReady as sharedIsCableScheduleReady } from '../analysis/scheduleWorkflow.mjs';
 import { normalizeDesignBasis } from '../analysis/designBasis.mjs';
 import {

@@ -1,5 +1,6 @@
 import "./workflowStatus.js";
 import "../site.js";
+import "./homeWorkflowDiagnostics.js";
 import {
   getCables,
   getConduits,

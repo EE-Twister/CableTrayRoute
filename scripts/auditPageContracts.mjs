@@ -13,6 +13,8 @@ const routeEntryAliases = new Map([
 ]);
 const ignoredSourceFiles = new Set([
   'site.js',
+  // Shell: registers the home page's workflow diagnostics; only runs on the home page.
+  'src/homeWorkflowDiagnostics.js',
   'dataStore.mjs',
   'projectStorage.js',
   'dirtyTracker.js',

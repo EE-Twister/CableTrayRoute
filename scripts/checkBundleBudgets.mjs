@@ -5,20 +5,20 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 export const BUNDLE_BUDGETS = Object.freeze({
-  'workflowdashboard.js': 1_000_000,
-  'shortCircuit.js': 675_000,
-  'iec60909.js': 670_000,
-  'arcFlash.js': 665_000,
-  'tcc.js': 1_020_000,
-  'library.js': 200_000,
+  'workflowdashboard.js': 715_000,
+  'shortCircuit.js': 545_000,
+  'iec60909.js': 540_000,
+  'arcFlash.js': 540_000,
+  'tcc.js': 895_000,
+  'library.js': 125_000,
   // Lossless storage and its preservation guards add roughly 10 kB to these
   // entries; keeping the codec inline preserves their single startup request.
   'harmonics.js': 215_000,
   'loadFlow.js': 345_000,
   'motorStart.js': 225_000,
   'contingency.js': 340_000,
-  'transientstability.js': 650_000,
-  'equipmentevaluation.js': 1_000_000,
+  'transientstability.js': 470_000,
+  'equipmentevaluation.js': 435_000,
 });
 
 export function evaluateBundleSizes(sizes, budgets = BUNDLE_BUDGETS) {

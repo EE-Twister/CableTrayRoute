@@ -47,7 +47,6 @@ import {
   countOneLineComponents,
   getWorkflowPageModeContext
 } from "./src/workflowStatus.js";
-import { buildWorkflowCoreDiagnostics } from "./analysis/projectWorkflowCore.mjs";
 import { runValidation } from "./validation/rules.js";
 import {
   PROJECT_KEY,
@@ -1038,6 +1037,18 @@ function setHomeLink(id,href,text){
   el.textContent=text;
 }
 
+// The home page's workflow diagnostics run the design rule checker, deliverable
+// readiness, and validation. Only the home page needs them, so
+// src/homeWorkflowDiagnostics.js (bundled with the home page entry)
+// registers the builder instead of every page bundling it through site.js.
+let homepageWorkflowDiagnostics=null;
+let homepageCommandCenterStarted=false;
+
+export function registerHomepageWorkflowDiagnostics(build){
+  homepageWorkflowDiagnostics=typeof build==='function'?build:null;
+  if(typeof document!=='undefined'&&document.readyState!=='loading') initHomepageCommandCenter();
+}
+
 function collectHomepageSummary(){
   return buildHomepageSummary({
     readers:{
@@ -1062,7 +1073,7 @@ function collectHomepageSummary(){
     services:{
       getCableReadiness,
       countOneLineComponents,
-      buildWorkflowCoreDiagnostics,
+      buildWorkflowCoreDiagnostics:homepageWorkflowDiagnostics,
       getStepStatus
     },
     workflowSteps:PROJECT_WORKFLOW_STEPS
@@ -1204,6 +1215,8 @@ function renderHomepageCommandCenter(){
 
 function initHomepageCommandCenter(){
   if(typeof document==='undefined'||!document.body?.classList?.contains('home-page')) return;
+  if(!homepageWorkflowDiagnostics||homepageCommandCenterStarted) return;
+  homepageCommandCenterStarted=true;
   renderHomepageCommandCenter();
   onProjectChange(()=>renderHomepageCommandCenter());
 }
